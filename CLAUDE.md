@@ -5,10 +5,10 @@ Fantasy-Football-Rechenwerk für die BWG Fantasy Liga (ESPN, League-ID 116655585
 ## Ziel und Bausteine
 1. **ESPN-Abruf** – Rohdaten je Woche als JSON ablegen (dieser Baustein zuerst).
 2. **Rechenwerk** – Standings, All-Play, optimale Aufstellung/Coaching, Score mit Profilen, Form, Streak, Restspielplan, Spieler-Kennzahlen; Tests gegen die Referenzwerte in `docs/referenz_w1-w2.md`.
-3. **Automatisierung** – öffentliches GitHub-Repo; Action dienstags (Abruf → Rechnung → Tests → Commit) und alle zwei Tage als Transaktions-Archiv (`mTransactions2`, `kona_league_communication` – ESPN hält Transaktionen nur rund drei Tage).
+3. **Automatisierung** – öffentliches GitHub-Repo `frest2101/bwg-fantasy`. Action `Wochenabruf` dienstags 08:30 UTC mit Nachläufen Di 16:30 und Mi 08:30 UTC (`espn_fetch.py --due` → `compute.py` → `pytest` → Commit). Action `Transaktions-Archiv` täglich 05:17 UTC (`espn_fetch.py --transactions`: `mTransactions2` je Periode, `kona_league_communication`). Beide committen nur bei Änderung.
 4. **App** – statische Web-Seite auf GitHub Pages; ersetzt Saison-Dashboard und Record-Book-Zahlen aus Notion (Tabellen, Regler für Gewichte, Spielplan, H2H, Rekorde, Spieler mit Formkurve und Rest of Season, D/ST-Faktoren, Playoffs).
 
-**Variante C (Entscheidung Stephan 28.09.2026):** Notion ist nur noch Wissensbasis für Regeln, Entscheidungen und Historie (Privat › Fantasy Football). Zahlen und Anzeige kommen aus diesem Repo und der App; das Repo schreibt nicht automatisch nach Notion. Die Cloud-Routinen „BWG Fantasy – Wochenimport (Di)“ und „Transaktions-Sync“ laufen weiter, bis Baustein 3 (Transaktions-Archiv) bzw. Baustein 4 (App v1) sie ablösen. Das Repo ist öffentlich: nur Ligadaten, nie Persönliches (Notizen, Ziele, Keeper-Pläne, Entscheidungslog).
+**Variante C (Entscheidung Stephan 28.09.2026):** Notion ist nur noch Wissensbasis für Regeln, Entscheidungen und Historie (Privat › Fantasy Football). Zahlen und Anzeige kommen aus diesem Repo und der App; das Repo schreibt nicht automatisch nach Notion. Die Cloud-Routinen „BWG Fantasy – Wochenimport (Di)“ und „Transaktions-Sync“ laufen weiter, bis Baustein 3 (Transaktions-Archiv, nach einer Woche Parallelbetrieb und lesendem Abgleich mit Notion) bzw. Baustein 4 (App v1) sie ablösen. Pausieren macht Stephan. Das Repo ist öffentlich: nur Ligadaten, nie Persönliches (Notizen, Ziele, Keeper-Pläne, Entscheidungslog).
 
 ## Arbeitsregeln
 - Sprache Deutsch, NFL-Fachbegriffe Englisch. Kommentare und Doku Deutsch.
@@ -16,24 +16,28 @@ Fantasy-Football-Rechenwerk für die BWG Fantasy Liga (ESPN, League-ID 116655585
 - Nie in ESPN schreiben. Nur lesende Endpoints.
 - Notion: nur lesen. Schreiben ausschließlich in den Ausnahmen unter „Gelernt“ und immer erst nach Stephans Freigabe des Textes.
 - Keine destruktiven Git-Kommandos (kein force-push, kein reset --hard) ohne Rückfrage. Commit-Messages Deutsch, ein Satz.
+- Die Actions committen auf `main`: vor lokaler Arbeit `git pull`. Wochen nicht mehr lokal abrufen und committen, das macht der Wochenabruf; sonst gibt es Konflikte in den binären Rohdaten.
 - Vor dem Installieren von Paketen fragen. Ziel: Python 3.11+, Standardbibliothek plus `requests`; keine Frameworks, solange es ohne geht.
 - Zahlen: ESPN liefert Drittel-Nachkommastellen; auf zwei Stellen runden (round half up), Ausgabe mit Komma nur in der App-Anzeige.
 - Jede Korrektur, die Stephan dir gibt, wird eine Zeile in dieser Datei (Abschnitt „Gelernt“).
 - Tests laufen mit `pytest`; ein Baustein gilt als fertig, wenn seine Tests grün sind und die Referenzwerte stimmen.
 
-## Repo-Struktur (Vorschlag, Baustein 1 legt sie an)
+## Repo-Struktur
 ```
 bwg-fantasy/
   CLAUDE.md
   README.md
-  scripts/espn_fetch.py      # Baustein 1
-  scripts/compute.py         # Baustein 2
-  .github/workflows/         # Baustein 3 (Action)
-  data/raw/2026/w03/*.json   # Rohdaten je Woche
-  data/season_2026.json      # Ergebnis des Rechenwerks
-  docs/referenz_w1-w2.md     # Referenzwerte für Tests
-  tests/
-  app/                       # Baustein 4
+  scripts/espn_fetch.py                  # Baustein 1 (+ --due, --transactions für Baustein 3)
+  scripts/compute.py                     # Baustein 2
+  .github/workflows/wochenabruf.yml      # Baustein 3: dienstags
+  .github/workflows/transaktionen.yml    # Baustein 3: täglich
+  data/raw/2026/w03/*.json               # Rohdaten je Woche
+  data/raw/2026/transactions/            # mTransactions2_pNN.json, kona_league_communication_<UTC>.json
+  data/season_2026.json                  # Ergebnis des Rechenwerks
+  docs/referenz_w1-w2.md                 # Referenzwerte für Tests
+  docs/auftraege/sessionN.md             # Aufträge je Session
+  tests/                                 # test_compute.py, test_fetch.py
+  app/                                   # Baustein 4
 ```
 
 ## ESPN-API (lesend, Liga öffentlich, kein Login)
@@ -43,6 +47,9 @@ Basis: `https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/2026/seg
 - `?view=mMatchupScore&scoringPeriodId=N` – alle Matchups; je Matchup home/away mit teamId und totalPoints; W1–W14 Regular Season, 15–17 Playoffs.
 - `?view=mRoster&scoringPeriodId=N` – Roster je Team mit Slot je Spieler (lineupSlotId) und Stats.
 - `?view=kona_player_info` mit Header `X-Fantasy-Filter` (JSON, z. B. `{"players":{"limit":2000,"filterActive":{"value":true}}}`) – ganzer Spielerpool: id, fullName, defaultPositionId, proTeamId, injuryStatus, ownership (percentOwned, percentStarted, percentChange), stats.
+- `?view=mStatus` – nur der `status`-Block (latestScoringPeriod, transactionScoringPeriod, finalScoringPeriod, waiverProcessStatus); jede andere Antwort enthält ihn auch.
+- `?view=mTransactions2&scoringPeriodId=N` – alle Transaktionen der Periode N (0 = Vorsaison, 1 enthält den Draft); je Eintrag id, type (WAIVER, FREEAGENT, TRADE_ACCEPT, ROSTER, DRAFT …), status, proposedDate, processDate, items (playerId, fromTeamId, toTeamId, Slots). Ohne `scoringPeriodId` kommt nur die laufende Periode – geprüft 28.09.2026: p0–p3 vollständig abrufbar, kein Drei-Tage-Fenster.
+- `?view=kona_league_communication` – höchstens 50 Themen (ACTIVITY_TRANSACTIONS, ACTIVITY_SETTINGS, CHAT_ALL_MEMBERS), nicht streng nach Datum sortiert. Nachrichten tragen Metadaten (Autor, Zeit, messageTypeId, for/from/to), Chat-Nachrichten teils Text in `content`. Das Archiv speichert nur ACTIVITY_*-Themen. `/communication/` verlangt Login (401), der Filter-Header der espn-api-Bibliothek gibt 400.
 - Stat-Einträge: `statSourceId` 0 = Ist, 1 = Projektion; `statSplitTypeId` 0 = Saison, 1 = Woche; `scoringPeriodId` = Woche; Punkte in `appliedTotal`. Feldnamen im JSON verifizieren, nicht raten.
 - Lineup-Slot-IDs: 0 QB · 2 RB · 4 WR · 6 TE · 7 OP · 16 D/ST · 17 K · 20 Bench · 21 IR · 23 FLEX. Positions-IDs: 1 QB · 2 RB · 3 WR · 4 TE · 5 K · 16 D/ST.
 - Team-IDs: 1 Asse's Cowboys · 2 Hugh Jass · 3 4th Down Syndrom · 4 cool runnings · 5 TeamTy · 6 SaschaM · 7 Rotzleffe · 8 gloane saubande · 9 Dynamo · 10 SaureGurken.
@@ -62,9 +69,18 @@ Basis: `https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/2026/seg
 ## Notion (nur lesen)
 Data-Source-IDs zum Nachschlagen: Matchups `25588fd6-104c-4086-8e03-7680c8c19a6d` · Spieler `b3f55f54-5368-45da-a5de-8de0dd7da2ee` · Lineups `b532da39-983e-47cf-b34a-52fa48eb66dc`. Seit 28.09.2026 auf Stand W2 eingefroren (Rückbau folgt): Team-Wochen 2026 `d7a79f06-b021-4068-8e96-96cdb5dfc43a` · Saisontabelle 2026 `c67bb31a-1828-494b-b459-c36b9a2d5367` · Spielwochen 2026 `6077bf0a-00c7-4bf1-aabb-16616f3b989e`. Umbau-Plan: Page `3c60559b2745815b8460cf00220d6189`.
 
+## Saisonwechsel (Checkliste, vor Saisonstart des Folgejahres)
+- In `scripts/espn_fetch.py` `DEFAULT_SEASON` und `WEEK1_START` umstellen (Dienstag der NFL-Woche 1). Ab dem 1. August des Folgejahres schlagen beide Actions sonst mit „Saison … ist vorbei“ fehl.
+- Team-IDs, Divisionen und Referenzen in dieser Datei gegen mTeam prüfen, Tests an die neue Saison anpassen.
+- GitHub schaltet geplante Workflows in öffentlichen Repos nach 60 Tagen ohne Commit ab (Offseason): `gh workflow enable wochenabruf.yml` und `gh workflow enable transaktionen.yml`.
+
 ## Gelernt
 - Notion-Ausnahme (28.09.2026): Am Sessionende darf Claude im Umbau-Plan (Kapitel Session G) Haken, Sessionvermerk und Versionsnummer schreiben – nur nach Stephans Freigabe des Textes; alle übrigen Notion-Regeln bleiben.
 - Variante C vorgezogen (28.09.2026): Baustein 3 ist Automatisierung statt Notion-Sync; das Repo schreibt nicht automatisch nach Notion.
 - Notion-Rückbau (28.09.2026): Claude darf Wissensseiten auf Variante C umstellen, Warnhinweise und 🗑-Markierungen setzen und Entscheidungslog-Einträge anlegen – jeweils nach Stephans Freigabe des Textes; Löschen und Archivieren macht Stephan.
 - GitHub-Repo öffentlich (28.09.2026): nur Ligadaten ins Repo, nichts Persönliches.
 - Testdaten kennzeichnen (28.09.2026): Erfundene Werte in Temp-Kopien (z. B. ein Testname für eine Umbenennung) im Text sofort als erfunden benennen, damit sie nicht wie echte Ligadaten wirken.
+- Klarnamen (28.09.2026): `members` in mTeam (Vor-/Nachname, Anzeigename der Manager) gilt als Ligadaten und wird unverändert veröffentlicht – kein Filter, die Liga ist bei ESPN öffentlich lesbar.
+- GitHub (28.09.2026): Claude Code hat keinen GitHub-Connector; Repo anlegen, Action-Läufe starten und Logs lesen über die `gh`-CLI, die Stephan installiert und anmeldet.
+- Chat (28.09.2026): Chat-Themen aus `kona_league_communication` kommen nicht ins öffentliche Archiv, nur ACTIVITY_*; diese Datei ist deshalb als einzige nicht byte-genau.
+- ESPN-Texte (28.09.2026): Die Redaktionstexte in mRoster (seasonOutlook, outlooks) bleiben in den öffentlichen Rohdaten; das Restrisiko wegen der ESPN-Nutzungsbedingungen trägt Stephan bewusst.

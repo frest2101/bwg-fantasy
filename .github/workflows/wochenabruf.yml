@@ -1,0 +1,56 @@
+# Wochenabruf (Baustein 3): dienstags nach dem MNF die abgeschlossene Woche holen, rechnen, testen, committen.
+# Die Nachläufe arbeiten nur, wenn ESPN die Woche beim ersten Lauf noch nicht abgeschlossen hatte
+# (espn_fetch.py --due holt nur Wochen, die im Repo fehlen oder nicht final sind).
+name: Wochenabruf
+
+on:
+  schedule:
+    - cron: "30 8 * * 2"   # Di 08:30 UTC (10:30 MESZ / 09:30 MEZ)
+    - cron: "30 16 * * 2"  # Nachlauf Di 16:30 UTC
+    - cron: "30 8 * * 3"   # Nachlauf Mi 08:30 UTC
+  workflow_dispatch:       # von Hand: Actions › Wochenabruf › Run workflow
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daten-commit      # gemeinsam mit dem Transaktions-Archiv: nie zwei Commits gleichzeitig
+  cancel-in-progress: false
+
+jobs:
+  abruf:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Pakete installieren
+        run: python -m pip install -r requirements.txt
+
+      - name: Fällige Wochen von ESPN holen
+        run: python scripts/espn_fetch.py --due
+
+      - name: Rechenwerk
+        run: python scripts/compute.py
+
+      - name: Tests
+        run: python -m pytest -q
+
+      - name: Committen und pushen (nur bei Änderung)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data
+          if git diff --cached --quiet; then
+            echo "Keine Änderung – nichts zu committen."
+            exit 0
+          fi
+          week=$(python -c "import json, sys; sys.path.insert(0, 'scripts'); import espn_fetch as ef; print(json.load(open(f'data/season_{ef.DEFAULT_SEASON}.json'))['through_week'])")
+          git commit -m "Wochenabruf (Action): Rohdaten aktualisiert, Rechenwerk bis W${week}."
+          git pull --rebase
+          git push

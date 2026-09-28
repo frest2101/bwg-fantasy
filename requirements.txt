@@ -1,2 +1,13 @@
-requests
-pytest
+# Alle Versionen fest (auch die mitgezogenen Pakete): die Action installiert sie mit Schreibrecht aufs Repo,
+# es soll nie ungeprüft eine neue Version laufen. Aktualisieren bewusst und lokal testen.
+requests==2.34.2
+certifi==2026.7.22
+charset-normalizer==3.5.1
+idna==3.20
+urllib3==2.8.0
+pytest==9.1.1
+colorama==0.4.6; sys_platform == "win32"
+iniconfig==2.3.0
+packaging==26.3
+pluggy==1.6.0
+Pygments==2.21.0
