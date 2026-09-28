@@ -10,6 +10,9 @@ __pycache__/
 # lokale Einstellungen der Claude-App (persönlich)
 .claude/settings.local.json
 
+# lokale Arbeitsnotizen mit persönlichen Notion-Auszügen – nie ins öffentliche Repo
+.lokal/
+
 # abgebrochene Downloads von espn_fetch.py
 *.tmp
 
