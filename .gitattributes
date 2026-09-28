@@ -1,0 +1,7 @@
+# Textdateien im Repo einheitlich mit LF speichern (Windows lokal, später Linux in der GitHub Action)
+* text=auto
+
+# ESPN-Rohdaten: byte-genau wie geliefert, eine Zeile je Datei (bis ~3 MB).
+# "binary" = kein Zeilenende-Umbau, kein Text-Diff, kein Merge – bei Konflikten neu abrufen.
+# Ansehen: python -m json.tool data/raw/2026/w01/mTeam.json
+data/raw/** binary

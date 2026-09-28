@@ -1,0 +1,16 @@
+# Geheimnisse (z. B. NOTION_TOKEN) – nie ins Repo
+.env
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# lokale Einstellungen der Claude-App (persönlich)
+.claude/settings.local.json
+
+# abgebrochene Downloads von espn_fetch.py
+*.tmp
+
+# data/raw wird bewusst versioniert (nicht ignorieren)
