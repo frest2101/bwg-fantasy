@@ -39,3 +39,5 @@ Spieler-Kennzahlen, Rest of Season und Ersatzniveau (brauchen `kona_player_info`
 
 ## Danach
 Session 3 = Notion-Sync (Baustein 3): vor dem ersten Write das DB-Schema per API lesen und die Spaltennamen bestätigen lassen.
+
+**Nachtrag 28.09.2026:** Stephan hat Variante C vorgezogen (CLAUDE.md, „Gelernt“). Der Notion-Sync entfällt; Baustein 3 ist jetzt die Automatisierung (öffentliches GitHub-Repo, Action, Transaktions-Archiv), Baustein 4 die App. Die „(Import)“-Bezüge oben sind damit Geschichte.

@@ -5,16 +5,16 @@ Fantasy-Football-Rechenwerk für die BWG Fantasy Liga (ESPN, League-ID 116655585
 ## Ziel und Bausteine
 1. **ESPN-Abruf** – Rohdaten je Woche als JSON ablegen (dieser Baustein zuerst).
 2. **Rechenwerk** – Standings, All-Play, optimale Aufstellung/Coaching, Score mit Profilen, Form, Streak, Restspielplan, Spieler-Kennzahlen; Tests gegen die Referenzwerte in `docs/referenz_w1-w2.md`.
-3. **Notion-Sync** – die „(Import)“-Spalten der Notion-DBs füllen (nur diese Spalten, nur nach Freigabe).
-4. **App** – statische Web-Seite (Tabellen, Regler für Gewichte, Spieler mit Formkurve und Rest of Season), GitHub Pages plus Action dienstags.
+3. **Automatisierung** – öffentliches GitHub-Repo; Action dienstags (Abruf → Rechnung → Tests → Commit) und alle zwei Tage als Transaktions-Archiv (`mTransactions2`, `kona_league_communication` – ESPN hält Transaktionen nur rund drei Tage).
+4. **App** – statische Web-Seite auf GitHub Pages; ersetzt Saison-Dashboard und Record-Book-Zahlen aus Notion (Tabellen, Regler für Gewichte, Spielplan, H2H, Rekorde, Spieler mit Formkurve und Rest of Season, D/ST-Faktoren, Playoffs).
 
-Wissensbasis und Wahrheit für Regeln, Entscheidungen und Historie ist Notion (Privat › Fantasy Football). Dieses Repo rechnet und zeigt; es schreibt nach Notion nur in Baustein 3.
+**Variante C (Entscheidung Stephan 28.09.2026):** Notion ist nur noch Wissensbasis für Regeln, Entscheidungen und Historie (Privat › Fantasy Football). Zahlen und Anzeige kommen aus diesem Repo und der App; das Repo schreibt nicht automatisch nach Notion. Die Cloud-Routinen „BWG Fantasy – Wochenimport (Di)“ und „Transaktions-Sync“ laufen weiter, bis Baustein 3 (Transaktions-Archiv) bzw. Baustein 4 (App v1) sie ablösen. Das Repo ist öffentlich: nur Ligadaten, nie Persönliches (Notizen, Ziele, Keeper-Pläne, Entscheidungslog).
 
 ## Arbeitsregeln
 - Sprache Deutsch, NFL-Fachbegriffe Englisch. Kommentare und Doku Deutsch.
 - Vor neuen Dateien oder Umbauten: Plan in wenigen Sätzen, dann bauen. Stephan gibt Änderungen im Diff frei.
 - Nie in ESPN schreiben. Nur lesende Endpoints.
-- Notion: kein Schreibzugriff außer Baustein 3, und dort nur die Spalten mit dem Zusatz „(Import)“. Vor dem ersten Write: DB-Schema per API lesen und Spaltennamen bestätigen lassen.
+- Notion: nur lesen. Schreiben ausschließlich in den Ausnahmen unter „Gelernt“ und immer erst nach Stephans Freigabe des Textes.
 - Keine destruktiven Git-Kommandos (kein force-push, kein reset --hard) ohne Rückfrage. Commit-Messages Deutsch, ein Satz.
 - Vor dem Installieren von Paketen fragen. Ziel: Python 3.11+, Standardbibliothek plus `requests`; keine Frameworks, solange es ohne geht.
 - Zahlen: ESPN liefert Drittel-Nachkommastellen; auf zwei Stellen runden (round half up), Ausgabe mit Komma nur in der App-Anzeige.
@@ -28,7 +28,7 @@ bwg-fantasy/
   README.md
   scripts/espn_fetch.py      # Baustein 1
   scripts/compute.py         # Baustein 2
-  scripts/notion_sync.py     # Baustein 3
+  .github/workflows/         # Baustein 3 (Action)
   data/raw/2026/w03/*.json   # Rohdaten je Woche
   data/season_2026.json      # Ergebnis des Rechenwerks
   docs/referenz_w1-w2.md     # Referenzwerte für Tests
@@ -59,8 +59,11 @@ Basis: `https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/2026/seg
 - **Spieler:** Pkt Saison, Spiele (ohne Bye), Ø, Floor/Ceiling, Konstanz (Std-Abw.), Form (Ø letzte 3), Form Δ, Trend ↑/→/↓ bei ±15 % vom Ø (mindestens 1 Punkt), Formkurve als Sparkline ▁▂▃▄▅▆▇█ je Woche (Bye „·“, negative Werte auf 0), Starts, Bank-Punkte, Projektions-Delta. **Rest of Season:** ROS/Spiel = (Projektion Saison − Ist Saison) / verbleibende NFL-Spiele des Teams (bis Woche 17, Bye abziehen, falls noch offen); Restspiele Regular Season = Wochen ab der aktuellen bis 14 minus Bye; ROS gesamt = ROS/Spiel × Restspiele; ROS Playoffs = ROS/Spiel × 3; ROS-Rang je Position über alle Spieler (Roster + Pool); Ersatzniveau = Ø ROS/Spiel der drei besten Free Agents der Position; ROS über Ersatz = ROS/Spiel − Ersatzniveau. Alle Projektionen sind ESPN-Input, keine Wahrheit.
 - **Kader-Projektion ROS (Team):** Optimal-Logik auf ROS/Spiel des aktuellen Kaders. **Playoff-Simulation (später):** 10 000 Läufe, erwartete PF = (n × PF-Schnitt + 4 × Kader-Projektion) / (n + 4), Streuung aus den gespielten Wochen.
 
-## Notion-Ziele (Baustein 3, nur „(Import)“-Spalten)
-Data-Source-IDs: Team-Wochen 2026 `d7a79f06-b021-4068-8e96-96cdb5dfc43a` · Saisontabelle 2026 `c67bb31a-1828-494b-b459-c36b9a2d5367` · Spielwochen 2026 `6077bf0a-00c7-4bf1-aabb-16616f3b989e` · Lineups `b532da39-983e-47cf-b34a-52fa48eb66dc` · Matchups `25588fd6-104c-4086-8e03-7680c8c19a6d` · Spieler `b3f55f54-5368-45da-a5de-8de0dd7da2ee`. Erwartete Import-Spalten: Team-Wochen Optimal, Wochenrang, All-Play W/L, Median-Sieg; Saisontabelle Form, Streak, Rang, Rang Division, Restspielplan, Rang Score, N/R/Z je Kennzahl, Waiver-Prio, Moves; Spielwochen Top-Team – exakte Namen vor dem Write aus dem Schema lesen. Token kommt aus einer Umgebungsvariable (`NOTION_TOKEN`), nie ins Repo.
+## Notion (nur lesen)
+Data-Source-IDs zum Nachschlagen: Matchups `25588fd6-104c-4086-8e03-7680c8c19a6d` · Spieler `b3f55f54-5368-45da-a5de-8de0dd7da2ee` · Lineups `b532da39-983e-47cf-b34a-52fa48eb66dc`. Seit 28.09.2026 auf Stand W2 eingefroren (Rückbau folgt): Team-Wochen 2026 `d7a79f06-b021-4068-8e96-96cdb5dfc43a` · Saisontabelle 2026 `c67bb31a-1828-494b-b459-c36b9a2d5367` · Spielwochen 2026 `6077bf0a-00c7-4bf1-aabb-16616f3b989e`. Umbau-Plan: Page `3c60559b2745815b8460cf00220d6189`.
 
 ## Gelernt
 - Notion-Ausnahme (28.09.2026): Am Sessionende darf Claude im Umbau-Plan (Kapitel Session G) Haken, Sessionvermerk und Versionsnummer schreiben – nur nach Stephans Freigabe des Textes; alle übrigen Notion-Regeln bleiben.
+- Variante C vorgezogen (28.09.2026): Baustein 3 ist Automatisierung statt Notion-Sync; das Repo schreibt nicht automatisch nach Notion.
+- Notion-Rückbau (28.09.2026): Claude darf Wissensseiten auf Variante C umstellen, Warnhinweise und 🗑-Markierungen setzen und Entscheidungslog-Einträge anlegen – jeweils nach Stephans Freigabe des Textes; Löschen und Archivieren macht Stephan.
+- GitHub-Repo öffentlich (28.09.2026): nur Ligadaten ins Repo, nichts Persönliches.

@@ -1,7 +1,7 @@
 """Rechenwerk (Baustein 2): Team-Kennzahlen der BWG Fantasy Liga aus den ESPN-Rohdaten.
 
 Liest data/raw/<saison>/wNN (Baustein 1), rechnet alle abgeschlossenen Wochen und schreibt
-data/season_<saison>.json – zugeschnitten auf die (Import)-Spalten für den Notion-Sync.
+data/season_<saison>.json – die Datenquelle der App (Baustein 4).
 Regeln: CLAUDE.md, Abschnitt „Rechenregeln“; Entscheidungen in docs/auftraege/session2.md.
 
 Aufrufe:
