@@ -64,3 +64,65 @@ Die Quelle nennt nur Reihenfolge und ganzzahlige Scores; der Rang gilt nach unge
 - Die Tabelle oben (aus dem Auftrag) führt bei 6 von 10 Paarungen den Sieger als „Heim“: W1 SaschaM–4th Down, Dynamo–Rotzleffe, cool runnings–SaureGurken, Hugh Jass–gloane; W2 cool runnings–Dynamo, 4th Down–TeamTy (ESPN-Heim jeweils das zweitgenannte Team).
 - Die DB Matchups in Notion ist korrekt: Team A = ESPN-Heimteam in 10/10 Paarungen W1–W2, Punkte identisch (gelesen 28.09.2026). Nur die Auftragstabelle war nach Sieger sortiert; Tests in Baustein 2 vergleichen deshalb Paarungen, nicht Seiten.
 - `mRoster` mit `scoringPeriodId` liefert die historische Aufstellung der Woche: Σ Ist-Punkte der 13 Starter W1 = `totalPoints` W1 für alle 10 Teams.
+
+## Zweitreferenz G1 – Ränge, Form, Streak, Restspielplan
+
+Quelle: Notion › Saisontabelle 2026 (Import-Spalten und N/R/Z), von Session G1 am 28.09.2026 aus denselben ESPN-Daten gerechnet und am 28.09. gelesen – keine Record-Book-Werte, sondern eine Zweitreferenz für die Werte, die Baustein 3 nach Notion schreibt. Bestätigt durch `compute.py` und zwei unabhängige Nachrechnungen (je 270/270 in Rundungstoleranz). Rundung in Notion: Form 2 Stellen (Asse's 278,9 = 278,905 mit Float-Rundung; round half up ergibt 278,91), Restspielplan in % und N mit 1 Stelle, Z mit 2 Stellen. Spaltenreihenfolge der Kennzahlen: PF · All-Play · Win · Coaching · Kader · Floor · Form.
+
+| Team | Rang | Rang Division | Rang Score | Form | Streak | Restspielplan |
+|---|---|---|---|---|---|---|
+| Asse's Cowboys | 1 | 1 | 1 | 278,9 | W2 | 44,0 |
+| Hugh Jass | 2 | 1 | 2 | 233,18 | W2 | 43,5 |
+| cool runnings | 3 | 2 | 6 | 198,31 | W2 | 54,2 |
+| SaschaM | 4 | 3 | 3 | 239,79 | L1 | 49,1 |
+| Dynamo | 5 | 2 | 5 | 214,66 | L1 | 47,7 |
+| gloane saubande | 6 | 4 | 4 | 210,98 | W1 | 53,2 |
+| 4th Down Syndrom | 7 | 3 | 10 | 143,6 | W1 | 57,4 |
+| Rotzleffe | 8 | 4 | 7 | 194,12 | L2 | 43,1 |
+| SaureGurken | 9 | 5 | 8 | 167,99 | L2 | 53,7 |
+| TeamTy | 10 | 5 | 9 | 160,56 | L2 | 54,2 |
+
+## Zweitreferenz G1 – Min–Max (N)
+
+| Team | PF | All-Play | Win | Coaching | Kader | Floor | Form |
+|---|---|---|---|---|---|---|---|
+| Asse's Cowboys | 100 | 100 | 100 | 79,7 | 100 | 100 | 100 |
+| Hugh Jass | 66,2 | 76,5 | 100 | 100 | 55,6 | 74,4 | 66,2 |
+| cool runnings | 40,4 | 47,1 | 100 | 11,8 | 66,1 | 45,9 | 40,4 |
+| SaschaM | 71,1 | 52,9 | 50 | 74,7 | 71,4 | 55,3 | 71,1 |
+| Dynamo | 52,5 | 52,9 | 50 | 6,3 | 84,5 | 57,8 | 52,5 |
+| gloane saubande | 49,8 | 64,7 | 50 | 84,4 | 44,6 | 64,7 | 49,8 |
+| 4th Down Syndrom | 0 | 0 | 50 | 56 | 0 | 0 | 0 |
+| Rotzleffe | 37,3 | 35,3 | 0 | 84,3 | 31,5 | 45,9 | 37,3 |
+| SaureGurken | 18 | 23,5 | 0 | 0 | 43 | 12,6 | 18 |
+| TeamTy | 12,5 | 17,6 | 0 | 48,9 | 16,5 | 13,8 | 12,5 |
+
+## Zweitreferenz G1 – Rangpunkte (R)
+
+| Team | PF | All-Play | Win | Coaching | Kader | Floor | Form |
+|---|---|---|---|---|---|---|---|
+| Asse's Cowboys | 10 | 10 | 10 | 7 | 10 | 10 | 10 |
+| Hugh Jass | 8 | 9 | 10 | 10 | 6 | 9 | 8 |
+| cool runnings | 5 | 5 | 10 | 3 | 7 | 5 | 5 |
+| SaschaM | 9 | 7 | 7 | 6 | 8 | 6 | 9 |
+| Dynamo | 7 | 7 | 7 | 2 | 9 | 7 | 7 |
+| gloane saubande | 6 | 8 | 7 | 9 | 5 | 8 | 6 |
+| 4th Down Syndrom | 1 | 1 | 7 | 5 | 1 | 1 | 1 |
+| Rotzleffe | 4 | 4 | 3 | 8 | 3 | 4 | 4 |
+| SaureGurken | 3 | 3 | 3 | 1 | 4 | 2 | 3 |
+| TeamTy | 2 | 2 | 3 | 4 | 2 | 3 | 2 |
+
+## Zweitreferenz G1 – z-Score (Z)
+
+| Team | PF | All-Play | Win | Coaching | Kader | Floor | Form |
+|---|---|---|---|---|---|---|---|
+| Asse's Cowboys | 1,94 | 1,89 | 1,29 | 0,72 | 1,67 | 1,81 | 1,94 |
+| Hugh Jass | 0,75 | 1,05 | 1,29 | 1,31 | 0,15 | 0,93 | 0,75 |
+| cool runnings | -0,15 | 0 | 1,29 | -1,23 | 0,51 | -0,04 | -0,15 |
+| SaschaM | 0,92 | 0,21 | 0 | 0,58 | 0,69 | 0,28 | 0,92 |
+| Dynamo | 0,27 | 0,21 | 0 | -1,39 | 1,14 | 0,37 | 0,27 |
+| gloane saubande | 0,18 | 0,63 | 0 | 0,86 | -0,23 | 0,6 | 0,18 |
+| 4th Down Syndrom | -1,57 | -1,68 | 0 | 0,04 | -1,76 | -1,61 | -1,57 |
+| Rotzleffe | -0,26 | -0,42 | -1,29 | 0,86 | -0,68 | -0,04 | -0,26 |
+| SaureGurken | -0,94 | -0,84 | -1,29 | -1,57 | -0,29 | -1,18 | -0,94 |
+| TeamTy | -1,13 | -1,05 | -1,29 | -0,16 | -1,2 | -1,14 | -1,13 |

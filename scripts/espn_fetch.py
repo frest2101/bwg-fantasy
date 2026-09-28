@@ -138,8 +138,8 @@ def load_json(path: Path):
 def load_week_matchups(season: int, week: int) -> list[dict]:
     """Liest die Matchups einer Woche aus den lokalen Rohdaten.
 
-    Je Matchup: id, home, away (Teamname, away None bei Bye), home_points,
-    away_points (Decimal, zwei Stellen) und final (False, solange ESPN kein Ergebnis führt).
+    Je Matchup: id, home, away (Teamname, away None bei Bye), home_id, away_id,
+    home_points, away_points (Decimal, zwei Stellen) und final (False, solange ESPN kein Ergebnis führt).
     """
     folder = week_dir(season, week)
     settings = load_json(folder / "mSettings.json")["settings"]
@@ -161,8 +161,9 @@ def load_week_matchups(season: int, week: int) -> list[dict]:
         for side in ("home", "away"):
             team = m.get(side)
             if team is None:
-                row[side], row[f"{side}_points"] = None, None
+                row[side], row[f"{side}_id"], row[f"{side}_points"] = None, None, None
                 continue
+            row[f"{side}_id"] = team["teamId"]
             row[side] = names.get(team["teamId"], f"Team {team['teamId']}")
             # totalPoints ist erst nach Abschluss gefüllt; bis dahin steht der Zwischenstand in totalPointsLive
             points = team["totalPoints"] if final else team.get("totalPointsLive", 0)

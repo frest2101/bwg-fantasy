@@ -1,4 +1,4 @@
-# Auftrag Session 2 – Rechenwerk (Entwurf Claude 28.09.2026, Freigabe Stephan)
+# Auftrag Session 2 – Rechenwerk (Entwurf Claude, freigegeben Stephan 28.09.2026)
 
 Grundlage: CLAUDE.md (Rechenregeln Baustein 2), Umbau-Plan 2.2 in Notion (Kapitel Session G: Definitionen, Prüfpunkte 1–4), `docs/referenz_w1-w2.md`. Stell mir die Rückfragen unten, bevor du Dateien anlegst. Erkläre jeden Schritt in zwei, drei Sätzen.
 
@@ -28,6 +28,8 @@ Die Ausgabe ist so geschnitten, dass Baustein 3 die „(Import)“-Spalten in Te
 3. **Restspielplan:** Durchschnitt je offenem Spiel (ein Gegner, der zweimal kommt, zählt doppelt) oder je Gegner? (je offenem Spiel)
 4. **Form bei weniger als drei Spielen:** Durchschnitt der vorhandenen Spiele? (ja)
 5. **Rundung:** Spielerpunkte unverändert summieren und erst das Ergebnis round half up auf zwei Stellen runden? (ja – so entstehen die ESPN-Totals)
+
+**Antwort Stephan 28.09.2026:** alles wie vorgeschlagen. Zu 1 bestätigt durch die Z-Werte aus Session G1 in Notion: Z Win = 1,29 bei den drei 2-0-Teams ergibt sich nur mit ÷ n (mit ÷ n − 1 wären es 1,22).
 
 ## Nicht in dieser Session
 Spieler-Kennzahlen, Rest of Season und Ersatzniveau (brauchen `kona_player_info`, das Baustein 1 noch nicht abruft), Kader-Projektion ROS, Playoff-Simulation, Playoff-Seed (Regel offen, Todoist-Aufgabe „Playoff-Format in ESPN prüfen“). Keine ESPN-Abrufe, keine Notion-Writes außer Haken und Sessionvermerk, keine Pakete außer pytest.
