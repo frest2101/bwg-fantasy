@@ -109,7 +109,11 @@ def cmd_fetch(season: int, weeks: list[int], force: bool) -> int:
                     continue
                 print(f"  {view:<14} {len(content):>10,} Bytes -> {rel(path)}")
             try:
-                if not all(m["final"] for m in load_week_matchups(season, week)):
+                matchups = load_week_matchups(season, week)
+                if not matchups:  # z. B. Playoff-Woche, bevor ESPN das Bracket anlegt
+                    print(f"  Hinweis: ESPN führt für Woche {week} noch keine Paarungen – "
+                          f"später mit --weeks {week} --force neu holen.")
+                elif not all(m["final"] for m in matchups):
                     print(f"  Hinweis: Woche {week} ist noch nicht abgeschlossen, Punkte vorläufig – "
                           f"später mit --weeks {week} --force neu holen.")
             except (FetchError, KeyError, ValueError):
@@ -187,7 +191,7 @@ def cmd_summary(season: int, weeks: list[int] | None) -> int:
             print(f"\nWoche {week}: FEHLER – {reason}", file=sys.stderr)
             continue
         if not matchups:
-            print(f"\nWoche {week}: keine Matchups im Spielplan")
+            print(f"\nWoche {week}  (vorläufig – ESPN führt noch keine Paarungen)")
             continue
         status = "" if all(m["final"] for m in matchups) else "  (vorläufig – Woche läuft noch)"
         print(f"\nWoche {week}{status}   Heim : Gast")

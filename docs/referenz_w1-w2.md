@@ -45,11 +45,13 @@ Heim/Gast wie in Notion übernommen (Team A = ESPN-Heimteam). Es zählt die Paar
 | 3 | SaschaM | 62 |
 | 4 | gloane saubande | 58 |
 | 5 | Dynamo | 51 |
-| 5 | cool runnings | 51 |
+| 6 | cool runnings | 51 |
 | 7 | Rotzleffe | 36 |
 | 8 | SaureGurken | 17 |
 | 9 | TeamTy | 16 |
 | 10 | 4th Down Syndrom | 13 |
+
+Die Quelle nennt nur Reihenfolge und ganzzahlige Scores; der Rang gilt nach ungerundetem Score. Aus den Rohdaten nachgerechnet (Review 28.09.2026): Dynamo 51,35 vor cool runnings 51,27 – kein Gleichstand.
 
 ## Plausibilität (beim Anlegen geprüft)
 
