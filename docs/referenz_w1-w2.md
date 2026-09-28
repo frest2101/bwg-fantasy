@@ -61,6 +61,6 @@ Die Quelle nennt nur Reihenfolge und ganzzahlige Scores; der Rang gilt nach unge
 ## Abgleich mit ESPN (28.09.2026, `espn_fetch.py --summary`)
 
 - Alle 10 Paarungen W1–W2 stimmen, Abweichung jeweils 0,00.
-- ESPN führt Heim/Gast bei 6 von 10 Paarungen andersherum als Notion: W1 SaschaM–4th Down, Dynamo–Rotzleffe, cool runnings–SaureGurken, Hugh Jass–gloane; W2 cool runnings–Dynamo, 4th Down–TeamTy (ESPN-Heim jeweils das zweitgenannte Team).
-- Muster: In Notion steht als Team A immer der Sieger, nicht das ESPN-Heimteam. Die Spaltenbezeichnung „Team A = ESPN-Heimteam“ trifft also nicht zu – relevant für den Notion-Sync (Baustein 3).
+- Die Tabelle oben (aus dem Auftrag) führt bei 6 von 10 Paarungen den Sieger als „Heim“: W1 SaschaM–4th Down, Dynamo–Rotzleffe, cool runnings–SaureGurken, Hugh Jass–gloane; W2 cool runnings–Dynamo, 4th Down–TeamTy (ESPN-Heim jeweils das zweitgenannte Team).
+- Die DB Matchups in Notion ist korrekt: Team A = ESPN-Heimteam in 10/10 Paarungen W1–W2, Punkte identisch (gelesen 28.09.2026). Nur die Auftragstabelle war nach Sieger sortiert; Tests in Baustein 2 vergleichen deshalb Paarungen, nicht Seiten.
 - `mRoster` mit `scoringPeriodId` liefert die historische Aufstellung der Woche: Σ Ist-Punkte der 13 Starter W1 = `totalPoints` W1 für alle 10 Teams.
