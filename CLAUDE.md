@@ -67,3 +67,4 @@ Data-Source-IDs zum Nachschlagen: Matchups `25588fd6-104c-4086-8e03-7680c8c19a6d
 - Variante C vorgezogen (28.09.2026): Baustein 3 ist Automatisierung statt Notion-Sync; das Repo schreibt nicht automatisch nach Notion.
 - Notion-Rückbau (28.09.2026): Claude darf Wissensseiten auf Variante C umstellen, Warnhinweise und 🗑-Markierungen setzen und Entscheidungslog-Einträge anlegen – jeweils nach Stephans Freigabe des Textes; Löschen und Archivieren macht Stephan.
 - GitHub-Repo öffentlich (28.09.2026): nur Ligadaten ins Repo, nichts Persönliches.
+- Testdaten kennzeichnen (28.09.2026): Erfundene Werte in Temp-Kopien (z. B. ein Testname für eine Umbenennung) im Text sofort als erfunden benennen, damit sie nicht wie echte Ligadaten wirken.
