@@ -63,4 +63,4 @@ Basis: `https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/2026/seg
 Data-Source-IDs: Team-Wochen 2026 `d7a79f06-b021-4068-8e96-96cdb5dfc43a` · Saisontabelle 2026 `c67bb31a-1828-494b-b459-c36b9a2d5367` · Spielwochen 2026 `6077bf0a-00c7-4bf1-aabb-16616f3b989e` · Lineups `b532da39-983e-47cf-b34a-52fa48eb66dc` · Matchups `25588fd6-104c-4086-8e03-7680c8c19a6d` · Spieler `b3f55f54-5368-45da-a5de-8de0dd7da2ee`. Erwartete Import-Spalten: Team-Wochen Optimal, Wochenrang, All-Play W/L, Median-Sieg; Saisontabelle Form, Streak, Rang, Rang Division, Restspielplan, Rang Score, N/R/Z je Kennzahl, Waiver-Prio, Moves; Spielwochen Top-Team – exakte Namen vor dem Write aus dem Schema lesen. Token kommt aus einer Umgebungsvariable (`NOTION_TOKEN`), nie ins Repo.
 
 ## Gelernt
-- (leer – hier landen Stephans Korrekturen, eine Zeile je Punkt)
+- Notion-Ausnahme (28.09.2026): Am Sessionende darf Claude im Umbau-Plan (Kapitel Session G) Haken, Sessionvermerk und Versionsnummer schreiben – nur nach Stephans Freigabe des Textes; alle übrigen Notion-Regeln bleiben.
