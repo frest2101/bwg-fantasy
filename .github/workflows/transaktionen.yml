@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   archiv:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04     # fest statt ubuntu-latest (wechselt ab 19.10.2026 auf Ubuntu 26)
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
