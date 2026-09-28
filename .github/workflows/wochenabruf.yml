@@ -1,6 +1,6 @@
 # Wochenabruf (Baustein 3): dienstags nach dem MNF die abgeschlossene Woche holen, rechnen, testen, committen.
-# Die Nachläufe arbeiten nur, wenn ESPN die Woche beim ersten Lauf noch nicht abgeschlossen hatte
-# (espn_fetch.py --due holt nur Wochen, die im Repo fehlen oder nicht final sind).
+# Die Nachläufe holen eine Woche nur, wenn ESPN sie beim ersten Lauf noch nicht abgeschlossen hatte
+# (espn_fetch.py --due holt nur Wochen, die im Repo fehlen oder nicht final sind); den NFL-Spielplan gleicht jeder Lauf ab.
 name: Wochenabruf
 
 on:

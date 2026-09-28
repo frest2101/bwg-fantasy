@@ -31,12 +31,15 @@ bwg-fantasy/
   scripts/compute.py                     # Baustein 2
   .github/workflows/wochenabruf.yml      # Baustein 3: dienstags
   .github/workflows/transaktionen.yml    # Baustein 3: täglich
-  data/raw/2026/w03/*.json               # Rohdaten je Woche
+  data/raw/2026/w03/*.json               # je Woche: Kern (mSettings, mTeam, mMatchupScore, mRoster) +
+                                         #   kona_player_info, ros.json (Auszug), mStandings
+  data/raw/2026/nfl/, draft/, basis/     # NFL-Spielplan, Draft/Keeper, D/ST-Grundlage Vorjahr
   data/raw/2026/transactions/            # mTransactions2_pNN.json, kona_league_communication_<UTC>.json
+  data/history/                          # Liga-Historie 2015–2025 aus Notion (CSV, ohne Manager)
   data/season_2026.json                  # Ergebnis des Rechenwerks
-  docs/referenz_w1-w2.md                 # Referenzwerte für Tests
+  docs/referenz_*.md                     # Referenzwerte für Tests (W1–W2, D/ST, Historie)
   docs/auftraege/sessionN.md             # Aufträge je Session
-  tests/                                 # test_compute.py, test_fetch.py
+  tests/                                 # test_compute, test_fetch, test_daten, test_history
   app/                                   # Baustein 4
 ```
 
@@ -46,17 +49,26 @@ Basis: `https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/2026/seg
 - `?view=mTeam` – Teams: id (= Franchise-Slot 1–10), Name, Division, record, waiverRank, transactionCounter.
 - `?view=mMatchupScore&scoringPeriodId=N` – alle Matchups; je Matchup home/away mit teamId und totalPoints; W1–W14 Regular Season, 15–17 Playoffs.
 - `?view=mRoster&scoringPeriodId=N` – Roster je Team mit Slot je Spieler (lineupSlotId) und Stats.
-- `?view=kona_player_info` mit Header `X-Fantasy-Filter` (JSON, z. B. `{"players":{"limit":2000,"filterActive":{"value":true}}}`) – ganzer Spielerpool: id, fullName, defaultPositionId, proTeamId, injuryStatus, ownership (percentOwned, percentStarted, percentChange), stats.
+- `?view=kona_player_info` mit Header `X-Fantasy-Filter`, z. B. `{"players":{"limit":2000,"filterActive":{"value":true},"sortPercOwned":{"sortPriority":1,"sortAsc":false},"filterStatsForCurrentSeasonScoringPeriodId":{"value":[3]}}}`. Ohne `sortPercOwned` antwortet ESPN mit HTTP 400.
+  - Liefert den ganzen Spielerpool (~1050): onTeamId, status, keeperValueFuture, player (id, fullName, defaultPositionId, proTeamId, injuryStatus, ownership, draftRanksByRankType inkl. SUPERFLEX, rankings, stats).
+  - `filterStatsForCurrentSeasonScoringPeriodId` = Wochen-Ist und Wochenprojektion der genannten Wochen, auch vergangene. `filterRanksFor…` kürzt die Ränge; Wochen-Ränge gibt es nur als PPR.
+  - `filterStatsForTopScoringPeriodIds` = die letzten N Spiele je Spieler über die Saisongrenze hinweg (Vorjahr).
+  - Mehrere Filter werden UND-verknüpft. Besitz und Verletzung gibt es nur als aktuellen Stand.
+  - Der Saison-Eintrag der Projektion (`102026`) ist schon der Rest der Saison inklusive NFL-W18, nicht die ganze Saison.
+- `?view=mStandings&scoringPeriodId=N` – ESPN-Playoff-Simulation (`currentSimulationResults`), nur aktueller Stand. `?view=mDraftDetail` – Picks inklusive Keeper. `?view=mPositionalRatings` – Punkte, die jedes NFL-Team je Position zulässt; aus den eigenen Daten ableitbar, nur als Test.
+- NFL-Spielplan ohne Liga-Pfad: `…/seasons/2026?view=proTeamSchedules_wl` – je Team byeWeek und proGamesByScoringPeriod (Gegner, Anstoß). Vorjahre gehen genauso, geprüft bis 2015. Liga-Vorjahre (leagueHistory) liefern ohne Login 404.
+- Ältere Spielerdaten: Über die Liga reichen die Stats nur bis zum Vorjahr zurück. Ligaunabhängig liefert `…/seasons/{Jahr}/segments/0/leaguedefaults/3?view=kona_player_info` ältere Saisons mit Rohstats je Woche (geprüft 2024 und 2018, alle 32 D/ST). `appliedTotal` ist dort ESPN-Standard-Scoring, deshalb die Punkte aus den Rohstats mit dem Liga-Scoring aus mSettings neu rechnen (für D/ST 94/94 exakt geprüft).
 - `?view=mStatus` – nur der `status`-Block (latestScoringPeriod, transactionScoringPeriod, finalScoringPeriod, waiverProcessStatus); jede andere Antwort enthält ihn auch.
 - `?view=mTransactions2&scoringPeriodId=N` – alle Transaktionen der Periode N (0 = Vorsaison, 1 enthält den Draft); je Eintrag id, type (WAIVER, FREEAGENT, TRADE_ACCEPT, ROSTER, DRAFT …), status, proposedDate, processDate, items (playerId, fromTeamId, toTeamId, Slots). Ohne `scoringPeriodId` kommt nur die laufende Periode – geprüft 28.09.2026: p0–p3 vollständig abrufbar, kein Drei-Tage-Fenster.
 - `?view=kona_league_communication` – höchstens 50 Themen (ACTIVITY_TRANSACTIONS, ACTIVITY_SETTINGS, CHAT_ALL_MEMBERS), nicht streng nach Datum sortiert. Nachrichten tragen Metadaten (Autor, Zeit, messageTypeId, for/from/to), Chat-Nachrichten teils Text in `content`. Das Archiv speichert nur ACTIVITY_*-Themen. `/communication/` verlangt Login (401), der Filter-Header der espn-api-Bibliothek gibt 400.
-- Stat-Einträge: `statSourceId` 0 = Ist, 1 = Projektion; `statSplitTypeId` 0 = Saison, 1 = Woche; `scoringPeriodId` = Woche; Punkte in `appliedTotal`. Feldnamen im JSON verifizieren, nicht raten.
+- Stat-Einträge: `statSourceId` 0 = Ist, 1 = Projektion; `statSplitTypeId` 0 = Saison, 1 = Woche; `scoringPeriodId` = Woche; Punkte in `appliedTotal`. „Hat gespielt“ = `stats["210"] == 1`; ESPN legt Ist-Einträge auch für Inaktive an. Feldnamen im JSON verifizieren, nicht raten.
 - Lineup-Slot-IDs: 0 QB · 2 RB · 4 WR · 6 TE · 7 OP · 16 D/ST · 17 K · 20 Bench · 21 IR · 23 FLEX. Positions-IDs: 1 QB · 2 RB · 3 WR · 4 TE · 5 K · 16 D/ST.
 - Team-IDs: 1 Asse's Cowboys · 2 Hugh Jass · 3 4th Down Syndrom · 4 cool runnings · 5 TeamTy · 6 SaschaM · 7 Rotzleffe · 8 gloane saubande · 9 Dynamo · 10 SaureGurken.
 - Divisionen 2026: Division 1 = Asse's, Dynamo, 4th Down, Rotzleffe, TeamTy · Division 2 = Hugh Jass, cool runnings, SaschaM, gloane, SaureGurken (gegen mTeam prüfen).
 - NFL-Wochen: Woche n läuft Dienstag bis Montag, Woche 1 begann Di 08.09.2026. Regular Season W1–14, Playoffs W15–17 (6 Teams, Tiebreak Total Points Scored; Divisionssieger-Bye ungeklärt).
 
 ## Rechenregeln (Baustein 2)
+**Für Baustein 4 beschlossene Änderungen (Stephan 28.09.2026):** Unentschieden = 0,5; z-Score als Standard; Stärke-Profil ohne Win, **Floor bleibt**; Power Ranking über die Stärke μ; ROS aus Wochenprojektionen; neue D/ST-Formel und weitere Punkte. Sie stehen in `docs/auftraege/session4_vorbereitung.md` und werden in Session 4 zusammen mit dem Code hier eingetragen. Bis dahin gilt der Stand unten.
 - **Starter-Slots:** QB, 2 RB, 3 WR, TE, 2 FLEX (RB/WR/TE), OP (QB/RB/WR/TE), 2 D/ST, K = 13 Starter. IR nicht startfähig.
 - **Standings:** W/L aus Matchups; Rang = Siege, dann PF. Rang Division innerhalb der Division.
 - **All-Play:** je Woche Vergleich der PF gegen alle neun anderen Teams; All-Play % = Siege / (9 × Spiele). Median-Sieg = PF über dem Wochenmedian. Wochenrang = Platz der PF in der Woche.
@@ -82,5 +94,9 @@ Data-Source-IDs zum Nachschlagen: Matchups `25588fd6-104c-4086-8e03-7680c8c19a6d
 - Testdaten kennzeichnen (28.09.2026): Erfundene Werte in Temp-Kopien (z. B. ein Testname für eine Umbenennung) im Text sofort als erfunden benennen, damit sie nicht wie echte Ligadaten wirken.
 - Klarnamen (28.09.2026): `members` in mTeam (Vor-/Nachname, Anzeigename der Manager) gilt als Ligadaten und wird unverändert veröffentlicht – kein Filter, die Liga ist bei ESPN öffentlich lesbar.
 - GitHub (28.09.2026): Claude Code hat keinen GitHub-Connector; Repo anlegen, Action-Läufe starten und Logs lesen über die `gh`-CLI, die Stephan installiert und anmeldet.
-- Chat (28.09.2026): Chat-Themen aus `kona_league_communication` kommen nicht ins öffentliche Archiv, nur ACTIVITY_*; diese Datei ist deshalb als einzige nicht byte-genau.
+- Chat (28.09.2026): Chat-Themen aus `kona_league_communication` kommen nicht ins öffentliche Archiv, nur ACTIVITY_*; diese Datei ist deshalb – wie der ROS-Auszug `wNN/ros.json` – nicht byte-genau.
 - ESPN-Texte (28.09.2026): Die Redaktionstexte in mRoster (seasonOutlook, outlooks) bleiben in den öffentlichen Rohdaten; das Restrisiko wegen der ESPN-Nutzungsbedingungen trägt Stephan bewusst.
+- ROS-Auszug (28.09.2026): `wNN/ros.json` ist ein Auszug (Projektion je Restwoche und Spieler) statt der 6-MB-Rohantwort.
+- Historie (28.09.2026): Liga-Historie ohne Manager ins Repo (`data/history`); Manager-Namen, Kontext, Autopick-Neigung und Rohtext der Regeländerungen bleiben draußen.
+- Power Ranking (28.09.2026): Rang, Trend und freigegebene Kernsätze sind öffentlich (App).
+- Stärke-Profil (28.09.2026): Floor bleibt gewichtet – Korrektur zum Vorschlag „Win und Floor auf 0“; nur Win geht auf 0.

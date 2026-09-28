@@ -2,12 +2,20 @@
 
 Nutzt nur die öffentlichen Lese-Endpoints von ESPN und speichert jede Antwort
 byte-genau unter data/raw/<saison>/wNN/<view>.json, das Transaktions-Archiv
-unter data/raw/<saison>/transactions/ (Ausnahme: kona_league_communication ohne Chat-Themen).
+unter data/raw/<saison>/transactions/. Ausnahmen (Auszüge statt Rohantwort):
+kona_league_communication ohne Chat-Themen, wNN/ros.json (Projektionen der Restwochen).
+
+Ablage je Saison (--due):
+    wNN/  mSettings, mTeam, mMatchupScore, mRoster        Kern: bestimmen, ob die Woche final ist
+    wNN/  kona_player_info, ros.json, mStandings           Stand beim Abschluss der Woche (Spielerpool, ROS, ESPN-Simulation)
+    nfl/proTeamSchedules_wl.json                           NFL-Spielplan mit Byes, wird aktualisiert
+    draft/mDraftDetail.json                                Draft und Keeper, einmalig
+    basis/kona_dst_<vorjahr>.json, proTeamSchedules_wl_<vorjahr>.json   D/ST-Grundlage des Vorjahrs, einmalig
 
 Aufrufe:
-    python scripts/espn_fetch.py --weeks 1 2 3            # abrufen, Vorhandenes bleibt stehen
+    python scripts/espn_fetch.py --weeks 1 2 3            # Kern-Views abrufen, Vorhandenes bleibt stehen
     python scripts/espn_fetch.py --weeks 3 --force        # vorhandene Dateien überschreiben
-    python scripts/espn_fetch.py --due                    # vergangene Wochen, die lokal fehlen oder nicht final sind
+    python scripts/espn_fetch.py --due                    # alles Fällige (Action dienstags), siehe cmd_due
     python scripts/espn_fetch.py --transactions           # Transaktions-Archiv fortschreiben
     python scripts/espn_fetch.py --summary                # Matchups aller lokalen Wochen ausgeben
     python scripts/espn_fetch.py --summary --weeks 1 2    # nur bestimmte Wochen
@@ -25,15 +33,23 @@ import requests
 
 LEAGUE_ID = 1166555857
 DEFAULT_SEASON = 2026
-BASE_URL = "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/{season}/segments/0/leagues/{league}"
-# View → Schlüssel, der in einer brauchbaren Antwort vorhanden und nicht leer sein muss
+SEASON_URL = "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/{season}"
+BASE_URL = SEASON_URL + "/segments/0/leagues/{league}"
+# Kern-Views je Woche → Schlüssel, der in einer brauchbaren Antwort vorhanden und nicht leer sein muss.
+# Nur sie entscheiden, ob eine Woche final ist; weitere Dateien je Woche kommen dazu, ohne das zu ändern.
 VIEWS = {
     "mSettings": "settings",
     "mTeam": "teams",
     "mMatchupScore": "schedule",
     "mRoster": "teams",
 }
+KEYS = dict(VIEWS, mStandings="teams")
 TX_VIEW, COMM_VIEW = "mTransactions2", "kona_league_communication"
+KONA_VIEW = "kona_player_info"
+KONA_FILE, ROS_FILE, STANDINGS_FILE = f"{KONA_VIEW}.json", "ros.json", "mStandings.json"
+MIN_POOL = 300              # ein vollständiger Spielerpool hat rund 1050 aktive Spieler
+DST_POSITION, NFL_TEAMS, NFL_GAMES = 16, 32, 17
+STAT_ACTUAL, STAT_PROJECTION, SPLIT_WEEK, STAT_PLAYED = 0, 1, 1, "210"  # statSourceId, statSplitTypeId, „hat gespielt“
 MAX_WEEK = 17  # W1–14 Regular Season, W15–17 Playoffs
 WEEK1_START = {2026: date(2026, 9, 8)}  # Dienstag, an dem NFL-Woche 1 beginnt; jede Woche läuft Di–Mo
 TIMEOUT = 30  # Sekunden je Anfrage
@@ -54,6 +70,19 @@ def tx_dir(season: int) -> Path:
     return RAW_DIR / str(season) / "transactions"
 
 
+def season_files(season: int) -> dict[str, Path]:
+    """Dateien je Saison, die nicht an einer Woche hängen."""
+    base = RAW_DIR / str(season)
+    return {"schedule": base / "nfl" / "proTeamSchedules_wl.json",
+            "draft": base / "draft" / "mDraftDetail.json",
+            "prior_schedule": base / "basis" / f"proTeamSchedules_wl_{season - 1}.json",
+            "prior_dst": base / "basis" / f"kona_dst_{season - 1}.json"}
+
+
+def league_url(season: int) -> str:
+    return BASE_URL.format(season=season, league=LEAGUE_ID)
+
+
 def rel(path: Path) -> str:
     """Pfad relativ zum Repo, für lesbare Meldungen."""
     return path.relative_to(REPO_DIR).as_posix()
@@ -69,11 +98,10 @@ def to_points(value) -> Decimal:
 
 # ---------------------------------------------------------------- Abruf
 
-def get_json(session: requests.Session, season: int, params: dict) -> tuple[bytes, dict]:
-    """Eine Liga-Anfrage mit Prüfung auf HTTP-Status, leere Antwort und JSON-Objekt; gibt Rohbytes und Daten zurück."""
-    url = BASE_URL.format(season=season, league=LEAGUE_ID)
+def get_json(session: requests.Session, url: str, params: dict, headers: dict | None = None) -> tuple[bytes, dict]:
+    """Eine GET-Anfrage mit Prüfung auf HTTP-Status, leere Antwort und JSON-Objekt; gibt Rohbytes und Daten zurück."""
     try:
-        resp = session.get(url, params=params, timeout=TIMEOUT)
+        resp = session.get(url, params=params, headers=headers, timeout=TIMEOUT)
     except requests.RequestException as exc:
         raise FetchError(f"Netzwerkfehler: {exc}") from exc
     if resp.status_code != 200:
@@ -97,12 +125,128 @@ def check_echo(data: dict, season: int, period: int) -> None:
 
 
 def fetch_view(session: requests.Session, season: int, week: int, view: str) -> bytes:
-    """Holt einen View für eine Woche, prüft die Antwort und gibt die Rohbytes zurück."""
-    content, data = get_json(session, season, {"view": view, "scoringPeriodId": week})
-    key = VIEWS[view]
+    """Holt einen Liga-View für eine Woche, prüft die Antwort und gibt die Rohbytes zurück."""
+    content, data = get_json(session, league_url(season), {"view": view, "scoringPeriodId": week})
+    key = KEYS[view]
     if not data.get(key):
         raise FetchError(f"Antwort ohne Inhalt in '{key}'")
     check_echo(data, season, week)
+    return content
+
+
+def kona_filter(stat_weeks: list[int], rank_week: int | None = None) -> dict:
+    """X-Fantasy-Filter für den ganzen Spielerpool mit Wochenwerten (Ist und Projektion) der genannten Wochen.
+
+    Ohne sortPercOwned antwortet ESPN auf limit mit HTTP 400 (FILTER_LIMIT_MISSING_SORT). Wochen-Ränge gibt es nur als PPR.
+    """
+    players = {"limit": 2000, "filterActive": {"value": True},
+               "sortPercOwned": {"sortPriority": 1, "sortAsc": False},
+               "filterStatsForCurrentSeasonScoringPeriodId": {"value": stat_weeks}}
+    if rank_week is not None:
+        players["filterRanksForScoringPeriodIds"] = {"value": [rank_week]}
+        players["filterRanksForRankTypes"] = {"value": ["PPR"]}
+    return {"X-Fantasy-Filter": json.dumps({"players": players})}
+
+
+def check_pool(data: dict) -> list[dict]:
+    """Ein brauchbarer Spielerpool: genug Spieler und alle 32 D/ST."""
+    players = data.get("players")
+    if not isinstance(players, list) or len(players) < MIN_POOL:
+        raise FetchError(f"Spielerpool unvollständig ({len(players) if isinstance(players, list) else 0} Spieler)")
+    dst = sum(1 for p in players if p.get("player", {}).get("defaultPositionId") == DST_POSITION)
+    if dst != NFL_TEAMS:
+        raise FetchError(f"Spielerpool mit {dst} statt {NFL_TEAMS} D/ST")
+    return players
+
+
+def fetch_kona_week(session: requests.Session, season: int, week: int) -> bytes:
+    """Spielerpool mit Ist und Projektion der Woche und den Experten-Rängen dieser Woche (byte-genau).
+
+    Besitz, Verletzung und Pool-Status sind der Stand beim Abruf – ESPN führt davon keine Historie.
+    """
+    content, data = get_json(session, league_url(season), {"view": KONA_VIEW}, kona_filter([week], rank_week=week))
+    players = check_pool(data)
+    if not any(s.get("seasonId") == season and s.get("scoringPeriodId") == week
+               for p in players for s in p["player"].get("stats", [])):
+        raise FetchError(f"Spielerpool ohne Werte für Woche {week}")
+    return content
+
+
+def ros_extract(data: dict, season: int, after_week: int) -> bytes:
+    """Auszug der Projektionen je Restwoche (after_week+1 … 17) aus einer kona-Antwort, sortiert nach Spieler-ID.
+
+    Ausnahme vom Byte-Prinzip (Entscheidung Stephan 28.09.2026): die Rohantwort ist 6,2 MB groß, zu 97 % Roh-Statistik;
+    gebraucht wird nur appliedTotal je Woche. ESPNs Saisonwert (statSplitTypeId 0) ist schon ROS inklusive NFL-W18
+    und wird deshalb nicht verwendet.
+    """
+    weeks = range(after_week + 1, MAX_WEEK + 1)
+    players = {}
+    for entry in check_pool(data):
+        proj = {s["scoringPeriodId"]: s.get("appliedTotal", 0) for s in entry["player"].get("stats", [])
+                if (s.get("seasonId"), s.get("statSourceId"), s.get("statSplitTypeId")) == (season, STAT_PROJECTION, SPLIT_WEEK)
+                and s.get("scoringPeriodId") in weeks}
+        if proj:
+            players[entry["id"]] = {str(w): proj[w] for w in sorted(proj)}
+    if len(players) < MIN_POOL:
+        raise FetchError(f"ROS-Auszug mit nur {len(players)} Spielern")
+    out = {"season": season, "after_week": after_week, "weeks": list(weeks),
+           "quelle": "kona_player_info, statSourceId 1, statSplitTypeId 1: appliedTotal je Woche",
+           "players": {str(pid): players[pid] for pid in sorted(players)}}
+    return (json.dumps(out, ensure_ascii=False, separators=(",", ":")) + "\n").encode("utf-8")
+
+
+def fetch_ros(session: requests.Session, season: int, week: int) -> bytes | None:
+    """ROS-Stand nach Woche week; nach der letzten Woche gibt es keinen."""
+    if week >= MAX_WEEK:
+        return None
+    rest = list(range(week + 1, MAX_WEEK + 1))
+    _, data = get_json(session, league_url(season), {"view": KONA_VIEW}, kona_filter(rest))
+    return ros_extract(data, season, week)
+
+
+def fetch_schedule(session: requests.Session, season: int) -> bytes:
+    """NFL-Spielplan einer Saison: je Team Bye-Woche und Spiele je Woche (Gegner, Anstoß)."""
+    content, data = get_json(session, SEASON_URL.format(season=season), {"view": "proTeamSchedules_wl"})
+    teams = (data.get("settings") or {}).get("proTeams")
+    if not isinstance(teams, list) or sum(1 for t in teams if t.get("id")) != NFL_TEAMS:
+        raise FetchError(f"NFL-Spielplan {season} ohne {NFL_TEAMS} Teams")
+    return content
+
+
+def fetch_draft(session: requests.Session, season: int) -> bytes | None:
+    """Draft und Keeper der Saison; vor dem Draft gibt es nichts zu holen."""
+    content, data = get_json(session, league_url(season), {"view": "mDraftDetail"})
+    if (data.get("id"), data.get("seasonId")) != (LEAGUE_ID, season):
+        raise FetchError("mDraftDetail passt nicht zu Liga und Saison")
+    draft = data.get("draftDetail") or {}
+    if not draft.get("drafted"):
+        return None
+    if not draft.get("picks"):
+        raise FetchError("Draft ohne Picks")
+    return content
+
+
+def fetch_prior_dst(session: requests.Session, season: int, today: date) -> bytes:
+    """Alle 32 D/ST mit ihren Wochenwerten des Vorjahrs (Liga-Scoring) – Grundlage „Off. zugelassen Vorjahr“.
+
+    filterStatsForTopScoringPeriodIds liefert die letzten N Spiele je Spieler über die Saisongrenze hinweg;
+    N deckt alle 17 Vorjahresspiele plus die bisherigen Spiele dieser Saison ab.
+    """
+    games = NFL_GAMES + max(calendar_week(season, today), 0) + 2
+    players = {"limit": 50, "filterSlotIds": {"value": [DST_POSITION]},
+               "sortPercOwned": {"sortPriority": 1, "sortAsc": False},
+               "filterStatsForTopScoringPeriodIds": {"value": games, "additionalValue": [f"00{season - 1}"]}}
+    content, data = get_json(session, league_url(season), {"view": KONA_VIEW},
+                             {"X-Fantasy-Filter": json.dumps({"players": players})})
+    entries = data.get("players")
+    if not isinstance(entries, list) or len(entries) != NFL_TEAMS:
+        raise FetchError(f"D/ST-Vorjahr: {len(entries) if isinstance(entries, list) else 0} statt {NFL_TEAMS} D/ST")
+    for entry in entries:
+        played = sum(1 for s in entry["player"].get("stats", [])
+                     if (s.get("seasonId"), s.get("statSourceId"), s.get("statSplitTypeId")) == (season - 1, STAT_ACTUAL, SPLIT_WEEK)
+                     and (s.get("stats") or {}).get(STAT_PLAYED) == 1)
+        if played != NFL_GAMES:
+            raise FetchError(f"D/ST-Vorjahr: {entry['player'].get('fullName')} mit {played} statt {NFL_GAMES} Spielen")
     return content
 
 
@@ -114,50 +258,65 @@ def save_atomic(path: Path, content: bytes) -> None:
     tmp.replace(path)
 
 
-def cmd_fetch(season: int, weeks: list[int], force: bool) -> int:
-    """Holt je Woche erst alle Views und schreibt nur, wenn alle geklappt haben (alles oder nichts je Woche).
+def fetch_week(session: requests.Session, season: int, week: int, force: bool, snapshot: bool = False) -> int:
+    """Holt eine Woche und gibt die Zahl der Fehler zurück – alles oder nichts je Woche.
 
-    Sonst könnte ein final geschriebenes mMatchupScore neben einem veralteten mRoster liegen, und --due
-    hielte die Woche für erledigt. mMatchupScore (trägt die Final-Markierung) wird als Letztes geschrieben.
+    Erst werden alle Dateien geholt, geschrieben wird nur, wenn alle geklappt haben. Sonst könnte ein final
+    geschriebenes mMatchupScore neben einem veralteten mRoster liegen, und --due hielte die Woche für erledigt.
+    mMatchupScore (trägt die Final-Markierung) wird als Letztes geschrieben. snapshot: dazu Spielerpool,
+    ROS-Auszug und ESPN-Standings der Woche – das, was nur „jetzt“ zu haben ist.
     """
-    errors = 0
+    print(f"Woche {week}")
+    jobs = {f"{view}.json": (lambda v=view: fetch_view(session, season, week, v)) for view in VIEWS}
+    if snapshot:
+        jobs[STANDINGS_FILE] = lambda: fetch_view(session, season, week, "mStandings")
+        jobs[KONA_FILE] = lambda: fetch_kona_week(session, season, week)
+        jobs[ROS_FILE] = lambda: fetch_ros(session, season, week)
+    fetched, errors = {}, 0
+    for name, job in jobs.items():
+        path = week_dir(season, week) / name
+        if path.exists() and not force:
+            print(f"  {name:<22} übersprungen – {rel(path)} existiert (--force zum Überschreiben)")
+            continue
+        try:
+            content = job()
+        except FetchError as exc:
+            errors += 1
+            print(f"  {name:<22} FEHLER – {exc}", file=sys.stderr)
+            continue
+        if content is not None:
+            fetched[name] = content
+    if errors:
+        print(f"  Woche {week} nicht geschrieben – vorhandene Dateien bleiben unverändert.", file=sys.stderr)
+        return errors
+    for name in sorted(fetched, key=lambda n: n == "mMatchupScore.json"):
+        path = week_dir(season, week) / name
+        try:
+            save_atomic(path, fetched[name])
+        except OSError as exc:
+            print(f"  {name:<22} FEHLER beim Schreiben – {exc}", file=sys.stderr)
+            return errors + 1
+        print(f"  {name:<22} {len(fetched[name]):>10,} Bytes -> {rel(path)}")
+    try:
+        matchups = load_week_matchups(season, week)
+        if not matchups:  # z. B. Playoff-Woche, bevor ESPN das Bracket anlegt
+            print(f"  Hinweis: ESPN führt für Woche {week} noch keine Paarungen – der Wochenabruf (--due) holt sie nach.")
+        elif not all(m["final"] for m in matchups):
+            print(f"  Hinweis: Woche {week} ist noch nicht abgeschlossen, Punkte vorläufig – "
+                  f"der Wochenabruf (--due) holt sie nach.")
+    except (FetchError, KeyError, ValueError):
+        pass  # Fehler wurden oben schon gemeldet
+    return errors
+
+
+def cmd_fetch(season: int, weeks: list[int], force: bool) -> int:
+    """Kern-Views der genannten Wochen (Handabruf für Test oder Notfall – Wochen holt der Wochenabruf).
+
+    --due ergänzt für finale Wochen nur den Spielerpool; ROS-Auszug und mStandings entstehen nur, wenn --due die
+    jüngste Woche selbst holt.
+    """
     with requests.Session() as session:
-        for week in weeks:
-            print(f"Woche {week}")
-            fetched, week_errors = {}, 0
-            for view in VIEWS:
-                path = week_dir(season, week) / f"{view}.json"
-                if path.exists() and not force:
-                    print(f"  {view:<14} übersprungen – {rel(path)} existiert (--force zum Überschreiben)")
-                    continue
-                try:
-                    fetched[view] = fetch_view(session, season, week, view)
-                except FetchError as exc:
-                    week_errors += 1
-                    print(f"  {view:<14} FEHLER – {exc}", file=sys.stderr)
-            if week_errors:
-                errors += week_errors
-                print(f"  Woche {week} nicht geschrieben – vorhandene Dateien bleiben unverändert.", file=sys.stderr)
-                continue
-            for view in sorted(fetched, key=lambda v: v == "mMatchupScore"):
-                path = week_dir(season, week) / f"{view}.json"
-                try:
-                    save_atomic(path, fetched[view])
-                except OSError as exc:
-                    errors += 1
-                    print(f"  {view:<14} FEHLER beim Schreiben – {exc}", file=sys.stderr)
-                    break
-                print(f"  {view:<14} {len(fetched[view]):>10,} Bytes -> {rel(path)}")
-            try:
-                matchups = load_week_matchups(season, week)
-                if not matchups:  # z. B. Playoff-Woche, bevor ESPN das Bracket anlegt
-                    print(f"  Hinweis: ESPN führt für Woche {week} noch keine Paarungen – "
-                          f"der Wochenabruf (--due) holt sie nach.")
-                elif not all(m["final"] for m in matchups):
-                    print(f"  Hinweis: Woche {week} ist noch nicht abgeschlossen, Punkte vorläufig – "
-                          f"der Wochenabruf (--due) holt sie nach.")
-            except (FetchError, KeyError, ValueError):
-                pass  # Fehler wurden oben schon gemeldet
+        errors = sum(fetch_week(session, season, week, force) for week in weeks)
     if errors:
         print(f"\n{errors} Fehler – betroffene Dateien wurden nicht geschrieben.", file=sys.stderr)
         return 1
@@ -284,22 +443,107 @@ def due_weeks(season: int, today: date) -> list[int]:
     Finale Wochen werden nie neu geholt: ESPN liefert bei jedem Abruf andere Bytes (Ownership, Status),
     das gäbe Commits ohne Inhalt.
     """
-    last_past = min(calendar_week(season, today) - 1, MAX_WEEK)
-    return [week for week in range(1, last_past + 1) if not is_final(season, week)]
+    return [week for week in range(1, last_past_week(season, today) + 1) if not is_final(season, week)]
+
+
+def last_past_week(season: int, today: date) -> int:
+    return min(calendar_week(season, today) - 1, MAX_WEEK)
+
+
+def refresh_season_files(session: requests.Session, season: int, today: date) -> int:
+    """Saisondateien: NFL-Spielplan bei jedem Lauf (Verlegungen), Draft und D/ST-Vorjahr einmalig. Gibt Fehler zurück."""
+    files = season_files(season)
+    jobs = [(files["schedule"], True, lambda: fetch_schedule(session, season)),
+            (files["draft"], False, lambda: fetch_draft(session, season)),
+            (files["prior_schedule"], False, lambda: fetch_schedule(session, season - 1)),
+            (files["prior_dst"], False, lambda: fetch_prior_dst(session, season, today))]
+    errors = 0
+    for path, refresh, job in jobs:
+        if path.exists() and not refresh:
+            continue
+        try:
+            content = job()
+        except FetchError as exc:
+            errors += 1
+            print(f"  {path.name:<34} FEHLER – {exc}", file=sys.stderr)
+            continue
+        if content is None:
+            print(f"  {path.name:<34} noch nicht verfügbar")
+        elif path.exists() and path.read_bytes() == content:
+            print(f"  {path.name:<34} unverändert")
+        else:
+            save_atomic(path, content)
+            print(f"  {path.name:<34} {len(content):>10,} Bytes -> {rel(path)}")
+    return errors
+
+
+def backfill_kona(session: requests.Session, season: int, week: int) -> int:
+    """Spielerpool einer finalen Woche nachholen, ohne die übrigen Dateien der Woche anzufassen.
+
+    Punkte und Projektionen der Woche liefert ESPN rückwirkend; Besitz, Verletzung und Pool-Status sind der Stand
+    beim Nachholen, nicht der von damals.
+    """
+    path = week_dir(season, week) / KONA_FILE
+    try:
+        content = fetch_kona_week(session, season, week)
+    except FetchError as exc:
+        print(f"  W{week:02d} {KONA_FILE:<22} FEHLER – {exc}", file=sys.stderr)
+        return 1
+    save_atomic(path, content)
+    print(f"  W{week:02d} {KONA_FILE:<22} {len(content):>10,} Bytes -> {rel(path)} (nachgeholt)")
+    return 0
+
+
+def warn(message: str) -> None:
+    """Warnung, die den Lauf nicht rot macht; in der GitHub Action erscheint sie als Hinweis am Lauf."""
+    prefix = "::warning::" if os.environ.get("GITHUB_ACTIONS") == "true" else "Warnung: "
+    print(prefix + message)
 
 
 def cmd_due(season: int, today: date) -> int:
+    """Alles Fällige: Saisondateien, nicht finale Wochen, fehlende Spielerpools finaler Wochen.
+
+    Finale Wochen werden nie überschrieben – auch nicht, wenn später eine Datei je Woche dazukommt.
+    Stand-Dateien (ROS-Auszug, mStandings) gibt es nur für die jüngste vergangene Woche: ESPN liefert sie nur
+    „jetzt“, bei nachgeholten älteren Wochen stünde sonst ein späterer Stand unter der alten Woche.
+    Nur Fehler bei fälligen Wochen machen den Lauf rot; Saisondateien und Nachholen erzeugen Warnungen,
+    damit ein kurzer ESPN-Fehler dort nicht den Commit einer korrekt geholten Woche verhindert.
+    """
     try:
         check_season_open(season, today)
         weeks = due_weeks(season, today)
+        last_past = last_past_week(season, today)
+        backfill = [w for w in range(1, last_past + 1)
+                    if w not in weeks and not (week_dir(season, w) / KONA_FILE).exists()]
     except FetchError as exc:
         print(f"FEHLER – {exc}", file=sys.stderr)
         return 1
-    if not weeks:
-        print(f"Nichts fällig: alle Wochen vor dem {today:%d.%m.%Y} liegen final vor.")
-        return 0
-    print(f"Fällig: Woche {', '.join(map(str, weeks))}")
-    return cmd_fetch(season, weeks, force=True)
+    errors = side_errors = 0
+    with requests.Session() as session:
+        print("Saisondateien")
+        side_errors += refresh_season_files(session, season, today)
+        if weeks:
+            print(f"Fällig: Woche {', '.join(map(str, weeks))}")
+        for week in weeks:
+            if week == last_past:
+                errors += fetch_week(session, season, week, force=True, snapshot=True)
+            else:  # nachgeholte ältere Woche: Kern plus Spielerpool, aber keine Stand-Dateien von heute
+                week_errors = fetch_week(session, season, week, force=True)
+                errors += week_errors
+                if not week_errors:
+                    side_errors += backfill_kona(session, season, week)
+        if backfill:
+            print(f"Spielerpool nachholen: Woche {', '.join(map(str, backfill))}")
+        for week in backfill:
+            side_errors += backfill_kona(session, season, week)
+    if not weeks and not backfill:
+        print(f"Keine Woche fällig: alle Wochen vor dem {today:%d.%m.%Y} liegen final und vollständig vor.")
+    if side_errors:
+        warn(f"{side_errors} Fehler bei Saisondateien oder beim Nachholen – der nächste Lauf versucht es erneut")
+    if errors:
+        print(f"\n{errors} Fehler – betroffene Wochen wurden nicht geschrieben.", file=sys.stderr)
+        return 1
+    return 0
 
 
 # ---------------------------------------------------------------- Transaktions-Archiv (Action täglich)
@@ -324,7 +568,7 @@ def activity_only(data: dict) -> tuple[bytes, dict]:
     """kona_league_communication ohne Chat: nur Themen vom Typ ACTIVITY_* (Transaktionen, Einstellungen).
 
     Entscheidung Stephan 28.09.2026: Chat-Texte der Manager gehören nicht ins öffentliche Archiv.
-    Diese Datei ist deshalb als einzige nicht byte-genau, sondern kompakt neu geschrieben.
+    Diese Datei ist deshalb – wie wNN/ros.json – nicht byte-genau, sondern kompakt neu geschrieben.
     """
     topics = (data.get("communication") or {}).get("topics")
     if not isinstance(topics, list):
@@ -417,7 +661,8 @@ def cmd_transactions(season: int, now: datetime) -> int:
     with requests.Session() as session:
         try:
             check_season_open(season, now.date())
-            errors, warnings = archive_transactions(season, lambda params: get_json(session, season, params), stamp)
+            errors, warnings = archive_transactions(season, lambda params: get_json(session, league_url(season), params),
+                                                    stamp)
         except FetchError as exc:
             print(f"FEHLER – {exc}", file=sys.stderr)
             return 1
@@ -441,7 +686,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--summary", action="store_true",
                         help="nicht abrufen, sondern Matchups aus den lokalen Dateien ausgeben")
     parser.add_argument("--due", action="store_true",
-                        help="alle vergangenen Wochen abrufen, die lokal fehlen oder nicht final sind (überschreibt)")
+                        help="alles Fällige: Saisondateien, nicht finale Wochen samt Stand-Dateien, fehlende Spielerpools")
     parser.add_argument("--transactions", action="store_true",
                         help="Transaktions-Archiv fortschreiben (mTransactions2 je Periode, kona_league_communication)")
     args = parser.parse_args(argv)

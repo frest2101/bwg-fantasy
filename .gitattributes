@@ -2,6 +2,7 @@
 * text=auto
 
 # ESPN-Rohdaten: byte-genau wie geliefert, eine Zeile je Datei (bis ~3 MB).
+# Ausnahmen (Auszüge): transactions/kona_league_communication_* (ohne Chat) und wNN/ros.json.
 # "binary" = kein Zeilenende-Umbau, kein Text-Diff, kein Merge – bei Konflikten neu abrufen.
 # Ansehen: python -m json.tool data/raw/2026/w01/mTeam.json
 data/raw/** binary

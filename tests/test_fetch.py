@@ -127,7 +127,7 @@ def test_saison_vorbei(raw):
     assert ef.cmd_due(2026, date(2027, 8, 4)) == 1
 
 
-# ---------------------------------------------------------------- Abruf einer fälligen Woche (Fake-Session statt ESPN)
+# ---------------------------------------------------------------- Abruf (Fake-ESPN statt Netz, erfundene Spieler)
 
 class FakeResponse:
     def __init__(self, status_code: int, content: bytes):
@@ -135,11 +135,50 @@ class FakeResponse:
         self.text = content.decode("utf-8", errors="replace")
 
 
-class FakeSession:
-    """Ersetzt requests.Session: liefert je (View, Woche) vorbereitete Antworten und merkt sich die Anfragen."""
+def ok(data) -> FakeResponse:
+    return FakeResponse(200, json.dumps(data).encode())
 
-    def __init__(self, answers: dict[tuple[str, int], FakeResponse]):
-        self.answers, self.requests = answers, []
+
+def fake_pool(weeks, with_actual=False, dst_games=None) -> dict:
+    """Erfundener Spielerpool: „Testspieler 1…300“, die ersten 32 sind D/ST, der Rest RB.
+
+    weeks: Wochen mit Projektion (und bei with_actual auch Ist). dst_games: Vorjahresspiele je D/ST.
+    """
+    players = []
+    for pid in range(1, 301):
+        stats = [{"seasonId": 2026, "statSourceId": 1, "statSplitTypeId": 1, "scoringPeriodId": w,
+                  "appliedTotal": round(pid / 10 + w, 2)} for w in weeks]
+        stats.append({"seasonId": 2026, "statSourceId": 1, "statSplitTypeId": 1, "scoringPeriodId": 18,
+                      "appliedTotal": 99.0})  # NFL-W18 gibt es in Fantasy nicht
+        stats.append({"seasonId": 2026, "statSourceId": 1, "statSplitTypeId": 0, "scoringPeriodId": 0,
+                      "appliedTotal": 500.0})  # Saisonwert: soll nicht in den ROS-Auszug
+        if with_actual:
+            stats += [{"seasonId": 2026, "statSourceId": 0, "statSplitTypeId": 1, "scoringPeriodId": w,
+                       "appliedTotal": 10.0, "stats": {"210": 1}} for w in weeks]
+        if dst_games is not None and pid <= 32:
+            stats += [{"seasonId": 2025, "statSourceId": 0, "statSplitTypeId": 1, "scoringPeriodId": w,
+                       "appliedTotal": 8.0, "stats": {"210": 1}} for w in range(1, dst_games(pid) + 1)]
+        players.append({"id": pid, "onTeamId": 0, "player": {
+            "id": pid, "fullName": f"Testspieler {pid}", "defaultPositionId": 16 if pid <= 32 else 2, "stats": stats}})
+    if dst_games is not None:
+        players = players[:32]
+    return {"players": players, "positionAgainstOpponent": {}}
+
+
+class FakeLeague:
+    """Ersetzt requests.Session: beantwortet Liga-Views, Spielerpool, Spielplan und Draft mit erfundenen Daten.
+
+    week_answers[(view, woche)] überschreibt einzelne Antworten; requests merkt sich jede Anfrage als Schlüssel.
+    """
+
+    def __init__(self, final_week: int):
+        self.week_answers = {(view, final_week): ok(data) for view, data in week_views(final_week, final=True).items()}
+        self.requests: list[tuple] = []
+        self.drafted = True
+        self.dst_games = lambda pid: 17
+        self.schedule_teams = 33          # inkl. Team 0 (Free Agent)
+        self.standings_echo = None        # abweichende Woche im mStandings-Echo
+        self.pool_without_week: set[int] = set()  # Wochen, für die der Spielerpool keine Werte liefert
 
     def __enter__(self):
         return self
@@ -147,52 +186,206 @@ class FakeSession:
     def __exit__(self, *exc):
         return False
 
-    def get(self, url, params=None, timeout=None):
-        key = (params["view"], params.get("scoringPeriodId"))
-        self.requests.append(key)
-        return self.answers[key]
+    def get(self, url, params=None, headers=None, timeout=None):
+        view, week = params["view"], params.get("scoringPeriodId")
+        if view == ef.KONA_VIEW:
+            flt = json.loads(headers["X-Fantasy-Filter"])["players"]
+            if "filterStatsForTopScoringPeriodIds" in flt:
+                self.requests.append(("dst_vorjahr",))
+                return ok(fake_pool([], dst_games=self.dst_games))
+            stat_weeks = flt["filterStatsForCurrentSeasonScoringPeriodId"]["value"]
+            if "filterRanksForScoringPeriodIds" in flt:
+                self.requests.append(("kona", stat_weeks[0]))
+                return ok(fake_pool([] if stat_weeks[0] in self.pool_without_week else stat_weeks, with_actual=True))
+            self.requests.append(("ros", stat_weeks[0], stat_weeks[-1]))
+            return ok(fake_pool(stat_weeks))
+        if view == "proTeamSchedules_wl":
+            season = int(url.rstrip("/").rsplit("/", 1)[-1])
+            self.requests.append(("spielplan", season))
+            return ok({"settings": {"proTeams": [{"id": i, "byeWeek": 5 + i % 9} for i in range(self.schedule_teams)]}})
+        if view == "mDraftDetail":
+            self.requests.append(("draft",))
+            return ok({"id": ef.LEAGUE_ID, "seasonId": 2026,
+                       "draftDetail": {"drafted": self.drafted, "picks": [{"overallPickNumber": 1}] if self.drafted else []}})
+        self.requests.append((view, week))
+        if view == "mStandings":
+            return ok({"id": ef.LEAGUE_ID, "seasonId": 2026, "scoringPeriodId": self.standings_echo or week,
+                       "teams": [{"id": 1}]})
+        return self.week_answers[(view, week)]
 
 
 @pytest.fixture
 def espn_week3(raw, monkeypatch):
-    """W1–2 final, W3 lokal noch laufend; ESPN meldet W3 inzwischen abgeschlossen."""
+    """W1–2 final (nur Kern-Views), W3 lokal noch laufend; ESPN meldet W3 inzwischen abgeschlossen."""
     make_week(1, final=True)
     make_week(2, final=True)
     make_week(3, final=False)
-    answers = {(view, 3): FakeResponse(200, json.dumps(data).encode())
-               for view, data in week_views(3, final=True).items()}
-    session = FakeSession(answers)
+    session = FakeLeague(final_week=3)
     monkeypatch.setattr(ef.requests, "Session", lambda: session)
     return session
 
 
-def snapshot(week: int) -> dict[str, bytes]:
-    return {p.name: p.read_bytes() for p in sorted(ef.week_dir(2026, week).iterdir())}
+def snapshot(week: int, names=tuple(f"{view}.json" for view in ef.VIEWS)) -> dict[str, bytes]:
+    folder = ef.week_dir(2026, week)
+    return {name: (folder / name).read_bytes() for name in names if (folder / name).exists()}
 
 
-def test_cmd_due_holt_nur_die_faellige_woche(espn_week3):
+def test_cmd_due_faellige_woche_mit_stand_dateien(espn_week3):
     before = {week: snapshot(week) for week in (1, 2)}
     assert ef.cmd_due(2026, date(2026, 9, 29)) == 0
     assert ef.is_final(2026, 3)
-    assert {week for _, week in espn_week3.requests} == {3}
-    assert {week: snapshot(week) for week in (1, 2)} == before   # finale Wochen byte-gleich
+    core = {week for key in espn_week3.requests if key[0] in ef.VIEWS for week in [key[1]]}
+    assert core == {3}                                              # Kern-Views nur für die fällige Woche
+    assert {week: snapshot(week) for week in (1, 2)} == before      # finale Wochen byte-gleich
+    w3 = ef.week_dir(2026, 3)
+    for name in (ef.KONA_FILE, ef.ROS_FILE, ef.STANDINGS_FILE):
+        assert (w3 / name).exists(), name
+    assert ("ros", 4, 17) in espn_week3.requests
+
+
+def test_neue_datei_je_woche_ueberschreibt_finale_wochen_nicht(espn_week3):
+    """Befund Prüfung 28.09.: früher galt eine Woche mit fehlender neuer Datei als nicht final und wurde neu geholt."""
+    ef.cmd_due(2026, date(2026, 9, 29))
+    for week in (1, 2):
+        assert ef.is_final(2026, week)
+        assert (ef.week_dir(2026, week) / ef.KONA_FILE).exists()     # Spielerpool nachgeholt …
+        assert not (ef.week_dir(2026, week) / ef.ROS_FILE).exists()  # … ROS/Standings nicht (nur „jetzt“ zu haben)
+    assert ("kona", 1) in espn_week3.requests and ("kona", 2) in espn_week3.requests
+    espn_week3.requests.clear()
+    assert ef.cmd_due(2026, date(2026, 9, 30)) == 0                 # Nachlauf: nur der Spielplan wird geprüft
+    assert espn_week3.requests == [("spielplan", 2026)]
 
 
 def test_cmd_fetch_teilfehler_schreibt_nichts(espn_week3):
-    espn_week3.answers[("mRoster", 3)] = FakeResponse(503, b"Service Unavailable")
+    espn_week3.week_answers[("mRoster", 3)] = FakeResponse(503, b"Service Unavailable")
     before = snapshot(3)
     assert ef.cmd_due(2026, date(2026, 9, 29)) == 1
     assert snapshot(3) == before          # auch das neue, finale mMatchupScore nicht
+    assert not (ef.week_dir(2026, 3) / ef.KONA_FILE).exists()
     assert not ef.is_final(2026, 3)       # der nächste Lauf holt die Woche erneut
 
 
 def test_cmd_fetch_falsche_woche_wird_abgelehnt(espn_week3):
     wrong = week_views(3, final=True)["mTeam"]
     wrong["scoringPeriodId"] = 2
-    espn_week3.answers[("mTeam", 3)] = FakeResponse(200, json.dumps(wrong).encode())
+    espn_week3.week_answers[("mTeam", 3)] = ok(wrong)
     before = snapshot(3)
     assert ef.cmd_due(2026, date(2026, 9, 29)) == 1
     assert snapshot(3) == before
+
+
+def test_saisondateien(espn_week3):
+    files = ef.season_files(2026)
+    espn_week3.drafted = False
+    assert ef.cmd_due(2026, date(2026, 9, 29)) == 0
+    assert files["schedule"].exists() and files["prior_schedule"].exists() and files["prior_dst"].exists()
+    assert not files["draft"].exists()                               # vor dem Draft: nichts, kein Fehler
+    espn_week3.drafted = True
+    espn_week3.requests.clear()
+    before = files["schedule"].stat().st_mtime_ns
+    assert ef.cmd_due(2026, date(2026, 9, 30)) == 0
+    assert files["draft"].exists()
+    assert ("dst_vorjahr",) not in espn_week3.requests               # einmalig
+    assert files["schedule"].stat().st_mtime_ns == before            # unverändert → nicht neu geschrieben
+
+
+def test_dst_vorjahr_braucht_alle_17_spiele(espn_week3, capsys):
+    """Nebenteil: nicht speichern, warnen – aber die fällige Woche wird trotzdem geschrieben (Lauf grün)."""
+    espn_week3.dst_games = lambda pid: 16 if pid == 7 else 17
+    assert ef.cmd_due(2026, date(2026, 9, 29)) == 0
+    assert not ef.season_files(2026)["prior_dst"].exists()
+    assert ef.is_final(2026, 3)
+    assert "Warnung" in capsys.readouterr().out
+
+
+def test_spielplan_fehler_blockiert_die_woche_nicht(espn_week3):
+    espn_week3.schedule_teams = 32   # nur 31 NFL-Teams
+    assert ef.cmd_due(2026, date(2026, 9, 29)) == 0
+    assert not ef.season_files(2026)["schedule"].exists()
+    assert ef.is_final(2026, 3)
+
+
+def test_nachholen_ohne_wochenwerte_wird_nicht_gespeichert(espn_week3):
+    espn_week3.pool_without_week = {1}
+    assert ef.cmd_due(2026, date(2026, 9, 29)) == 0
+    assert not (ef.week_dir(2026, 1) / ef.KONA_FILE).exists()      # der nächste Lauf versucht es erneut
+    assert (ef.week_dir(2026, 2) / ef.KONA_FILE).exists()
+
+
+def test_nachholen_nur_vergangene_wochen(espn_week3):
+    ef.cmd_due(2026, date(2026, 9, 29))
+    assert not ef.week_dir(2026, 4).exists()                        # laufende Woche 4 bleibt unberührt
+
+
+def test_standings_mit_falscher_woche_blockieren_die_woche(espn_week3):
+    espn_week3.standings_echo = 2
+    before = snapshot(3)
+    assert ef.cmd_due(2026, date(2026, 9, 29)) == 1
+    assert snapshot(3) == before
+
+
+def test_catch_up_stand_dateien_nur_fuer_juengste_woche(espn_week3):
+    """Di 06.10. mit offener W3 und fehlender W4: ROS/Standings nur für W4, W3 bekommt Kern und Spielerpool."""
+    espn_week3.week_answers.update({(view, 4): ok(data) for view, data in week_views(4, final=True).items()})
+    assert ef.cmd_due(2026, date(2026, 10, 6)) == 0
+    w3, w4 = ef.week_dir(2026, 3), ef.week_dir(2026, 4)
+    assert ef.is_final(2026, 3) and ef.is_final(2026, 4)
+    assert (w3 / ef.KONA_FILE).exists() and not (w3 / ef.ROS_FILE).exists() and not (w3 / ef.STANDINGS_FILE).exists()
+    assert (w4 / ef.ROS_FILE).exists() and (w4 / ef.STANDINGS_FILE).exists()
+    assert ("ros", 5, 17) in espn_week3.requests and ("ros", 4, 17) not in espn_week3.requests
+
+
+class StubSession:
+    """Antwortet auf jede Anfrage mit denselben erfundenen Daten."""
+
+    def __init__(self, data):
+        self.data = data
+
+    def get(self, url, params=None, headers=None, timeout=None):
+        return ok(self.data)
+
+
+@pytest.mark.parametrize("call, data, match", [
+    (lambda s: ef.fetch_schedule(s, 2026), {"settings": {"proTeams": [{"id": i} for i in range(32)]}}, "Teams"),
+    (lambda s: ef.fetch_draft(s, 2026), {"id": ef.LEAGUE_ID, "seasonId": 2026,
+                                         "draftDetail": {"drafted": True, "picks": []}}, "Picks"),
+    (lambda s: ef.fetch_draft(s, 2026), {"id": ef.LEAGUE_ID, "seasonId": 2025,
+                                         "draftDetail": {"drafted": True, "picks": [1]}}, "Saison"),
+    (lambda s: ef.fetch_prior_dst(s, 2026, date(2026, 9, 29)), fake_pool([], dst_games=lambda pid: 17)
+     | {"players": fake_pool([], dst_games=lambda pid: 17)["players"][:31]}, "31 statt 32"),
+    (lambda s: ef.fetch_ros(s, 2026, 3), {"players": fake_pool(range(4, 18))["players"][:40]}, "unvollständig"),
+])
+def test_pruefungen_der_abrufe(call, data, match):
+    with pytest.raises(ef.FetchError, match=match):
+        call(StubSession(data))
+
+
+def test_ros_auszug():
+    extract = json.loads(ef.ros_extract(fake_pool(range(4, 18)), 2026, after_week=3))
+    assert extract["after_week"] == 3 and extract["weeks"] == list(range(4, 18))
+    first = extract["players"]["1"]
+    assert list(first) == [str(w) for w in range(4, 18)]             # Wochen aufsteigend, W18 und Saisonwert fehlen
+    assert first["4"] == 4.1
+    assert list(extract["players"]) == [str(i) for i in range(1, 301)]
+
+
+def test_ros_nach_letzter_woche():
+    assert ef.fetch_ros(session=None, season=2026, week=17) is None
+
+
+def test_spielerpool_pruefung():
+    pool = fake_pool([3])
+    ef.check_pool(pool)
+    with pytest.raises(ef.FetchError, match="unvollständig"):
+        ef.check_pool({"players": pool["players"][:299]})
+    with pytest.raises(ef.FetchError, match="D/ST"):
+        ef.check_pool({"players": pool["players"][1:] + pool["players"][40:41]})
+
+
+def test_kona_filter_mit_sortierung():
+    """Ohne sortPercOwned antwortet ESPN auf limit mit HTTP 400 – das alte Beispiel in CLAUDE.md hatte den Fehler."""
+    flt = json.loads(ef.kona_filter([3], rank_week=3)["X-Fantasy-Filter"])["players"]
+    assert "sortPercOwned" in flt and flt["filterStatsForCurrentSeasonScoringPeriodId"]["value"] == [3]
 
 
 # ---------------------------------------------------------------- Archiv-Vergleich
