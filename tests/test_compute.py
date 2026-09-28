@@ -4,6 +4,8 @@ Die Sollwerte werden aus der Referenzdatei gelesen, nicht abgeschrieben – jede
 Aufruf: python -m pytest
 """
 
+import json
+import shutil
 from decimal import ROUND_HALF_UP, Decimal
 
 import pytest
@@ -13,6 +15,8 @@ import espn_fetch as ef
 
 REFERENZ = ef.REPO_DIR / "docs" / "referenz_w1-w2.md"
 TOLERANZ = Decimal("0.01")
+# Teamnamen der Referenz → team_id, eingefroren auf den Stand von W2 (übersteht spätere Umbenennungen in ESPN)
+REFERENZ_IDS = {t["name"]: t["id"] for t in ef.load_json(ef.week_dir(2026, 2) / "mTeam.json")["teams"]}
 
 
 def table(heading: str) -> list[list[str]]:
@@ -41,12 +45,13 @@ def season():
 
 @pytest.fixture(scope="module")
 def teams(season):
-    return {t["name"]: t for t in season["teams"]}
+    """Team-Zeilen nach dem Namen aus der Referenz."""
+    by_id = {t["team_id"]: t for t in season["teams"]}
+    return {name: by_id[team_id] for name, team_id in REFERENZ_IDS.items()}
 
 
 def team_week(season, name, week):
-    team_id = next(t["team_id"] for t in season["teams"] if t["name"] == name)
-    return next(r for r in season["team_weeks"] if r["team_id"] == team_id and r["week"] == week)
+    return next(r for r in season["team_weeks"] if r["team_id"] == REFERENZ_IDS[name] and r["week"] == week)
 
 
 # ---------------------------------------------------------------- gegen Referenz
@@ -81,11 +86,10 @@ def test_score_probe(teams, row):
 
 
 def test_top_team_je_woche(season):
-    by_id = {t["team_id"]: t["name"] for t in season["teams"]}
     for w in season["weeks"]:
         rows = [r for r in table("Matchups") if int(r[0]) == w["week"]]
         scores = [(r[1], num(r[2])) for r in rows] + [(r[3], num(r[4])) for r in rows]
-        assert by_id[w["top_team_id"]] == max(scores, key=lambda s: s[1])[0]
+        assert w["top_team_id"] == REFERENZ_IDS[max(scores, key=lambda s: s[1])[0]]
 
 
 # ---------------------------------------------------------------- gegen Zweitreferenz (Notion-Werte Session G1, gerundet)
@@ -130,18 +134,53 @@ def test_normierung(season, metric):
     assert abs(sum(z)) < Decimal("1e-9")
 
 
+def test_normierung_randfaelle():
+    """Alle Teams gleich: Min–Max 50, alle Rangpunkte = n, z = 0 (Std-Abw. 0)."""
+    result = compute.normalize({1: Decimal(5), 2: Decimal(5), 3: Decimal(5)})
+    assert set(result["minmax"].values()) == {50}
+    assert set(result["rank"].values()) == {3}
+    assert set(result["z"].values()) == {0}
+
+
+def test_wochenrang_und_median(season):
+    for week in (1, 2):
+        rows = [r for r in season["team_weeks"] if r["week"] == week]
+        assert sorted(r["wochenrang"] for r in rows) == list(range(1, 11))
+        assert sum(r["median_win"] for r in rows) == 5  # 10 Teams, keine Gleichstände am Median
+        assert all(r["wochenrang"] == 1 + r["allplay_l"] for r in rows)
+
+
 @pytest.mark.parametrize("profile", compute.PROFILES)
 def test_profil_gewichte(profile):
     assert sum(compute.PROFILES[profile].values()) == 100
 
 
-def test_nur_abgeschlossene_wochen_der_regular_season():
+def test_nur_regular_season():
     assert compute.last_regular_week(2026) == 14
     assert compute.completed_weeks(2026, through=2) == [1, 2]
     with pytest.raises(ef.FetchError, match="Regular Season"):
         compute.completed_weeks(2026, through=15)
+
+
+def test_laufende_woche_zaehlt_nicht(tmp_path, monkeypatch):
+    """Konstruierte Datenlage (unabhängig vom wachsenden Repo-Stand): W1 abgeschlossen, W2 läuft noch."""
+    for week in (1, 2):
+        source, target = ef.week_dir(2026, week), tmp_path / "2026" / f"w{week:02d}"
+        target.mkdir(parents=True)
+        for view in ("mSettings", "mTeam", "mMatchupScore"):
+            shutil.copy(source / f"{view}.json", target / f"{view}.json")
+    matchups = target / "mMatchupScore.json"
+    data = json.loads(matchups.read_bytes())
+    for m in data["schedule"]:
+        if m["matchupPeriodId"] == 2:
+            m["winner"] = "UNDECIDED"
+    matchups.write_text(json.dumps(data), encoding="utf-8")
+    monkeypatch.setattr(ef, "RAW_DIR", tmp_path)
+    monkeypatch.setattr(ef, "REPO_DIR", tmp_path.parent)
+
+    assert compute.completed_weeks(2026) == [1]
     with pytest.raises(ef.FetchError, match="nicht abgeschlossen"):
-        compute.completed_weeks(2026, through=14)
+        compute.completed_weeks(2026, through=2)
 
 
 def test_streak():
