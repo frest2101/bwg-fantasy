@@ -295,7 +295,7 @@ def test_dst_vorjahr_braucht_alle_17_spiele(espn_week3, capsys):
     assert ef.cmd_due(2026, date(2026, 9, 29)) == 0
     assert not ef.season_files(2026)["prior_dst"].exists()
     assert ef.is_final(2026, 3)
-    assert "Warnung" in capsys.readouterr().out
+    assert "Fehler bei Saisondateien oder beim Nachholen" in capsys.readouterr().out  # Präfix je nach Umgebung
 
 
 def test_spielplan_fehler_blockiert_die_woche_nicht(espn_week3):
