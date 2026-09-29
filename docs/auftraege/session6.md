@@ -14,6 +14,8 @@ und die Vorbereitungsdatei, dann `git pull`, Branch `claude/session6-tageslauf` 
    die Quellen auch direkt anfragen, aber die Probe stellt sicher, dass sie aus der Action erreichbar sind.
 2. **Tageslauf:** `transaktionen.yml` umbauen (Name „Tageslauf“, cron `45 6-11 * * *` und `40 15-21 * * *`, Aufruf
    `espn_fetch.py --transactions --pool --wetter`); News bleibt für Stufe 2 vorbereitet, aber noch aus.
+   **Achtung:** `pages.yml` hört unter `workflow_run` auf den Workflow-Namen „Transaktions-Archiv“; beim Umbenennen in
+   „Tageslauf“ dort mit umbenennen, sonst baut Pages nach den Tagesläufen nicht mehr.
 3. **Pool-Auszug** `data/raw/2026/pool/latest.json` (Felder laut Vorbereitung, inkl. `lastNewsDate`), Tests.
 4. **Stadion-Tabelle** `data/raw/2026/nfl/stadien.json` von Hand (Koordinaten, Dach, Zeitzone) plus Auslandsspiele 2026.
 5. **Wetter:** Prognosen `wetter/prognose/wNN_<UTC>.json` nur für die laufende Woche, Ist-Wetter dauerhaft in
