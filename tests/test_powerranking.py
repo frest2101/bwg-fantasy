@@ -20,18 +20,19 @@ from zahlen import rounded
 
 TOL = Decimal("0.005")
 EPS = Decimal("1E-6")
-# Sollwerte nach W2 mit Vorjahres-Prior: team_id → (μ, E, Rang, Trend W1 → W2). Asse's und TeamTy aus dem Bauplan
-# Session 4; alle Werte in der Prüfung unabhängig aus den Rohdateien nachgerechnet (Φ über statistics.NormalDist).
-SOLL_W2 = {1: (Decimal("235.825"), Decimal("0.7503"), 1, 0),     # Asse's Cowboys
-           2: (Decimal("218.766"), Decimal("0.6213"), 3, 0),
-           3: (Decimal("189.982"), Decimal("0.3833"), 8, -1),
-           4: (Decimal("199.450"), Decimal("0.4613"), 6, 0),
-           5: (Decimal("178.898"), Decimal("0.2967"), 10, 0),    # TeamTy
-           6: (Decimal("224.164"), Decimal("0.6640"), 2, 0),
-           7: (Decimal("194.664"), Decimal("0.4216"), 7, 1),
-           8: (Decimal("205.154"), Decimal("0.5090"), 5, 0),
-           9: (Decimal("205.232"), Decimal("0.5096"), 4, 0),
-           10: (Decimal("189.930"), Decimal("0.3829"), 9, 0)}
+# Sollwerte nach W2 mit Vorjahres-Prior und k = 6: team_id → (μ, E, Rang, Trend W1 → W2). Unabhängig aus den
+# Rohdateien nachgerechnet (eigenes Skript ohne powerranking/compute, Φ über statistics.NormalDist); dasselbe Skript
+# gibt mit k = 4 die früheren, von der Modulprüfung bestätigten Werte exakt wieder.
+SOLL_W2 = {1: (Decimal("230.440"), Decimal("0.7140"), 1, 0),     # Asse's Cowboys
+           2: (Decimal("216.965"), Decimal("0.6078"), 3, 0),
+           3: (Decimal("195.779"), Decimal("0.4294"), 7, -1),
+           4: (Decimal("199.592"), Decimal("0.4615"), 6, 1),
+           5: (Decimal("181.190"), Decimal("0.3112"), 10, 0),    # TeamTy
+           6: (Decimal("222.211"), Decimal("0.6503"), 2, 0),
+           7: (Decimal("194.733"), Decimal("0.4206"), 8, 0),
+           8: (Decimal("204.427"), Decimal("0.5025"), 4, 1),
+           9: (Decimal("204.054"), Decimal("0.4993"), 5, -1),
+           10: (Decimal("192.673"), Decimal("0.4035"), 9, 0)}
 L_BAR_W2, L_BAR_2025 = Decimal("204.21"), Decimal("201.54")
 OFFENE_SPIELE_W2 = 60                                   # Perioden 3–14 mit je 5 Paarungen
 
@@ -68,6 +69,11 @@ def ids_of(season) -> list[int]:
 
 # ---------------------------------------------------------------- Stärke μ, Prior, E
 
+def test_k_fest_fuer_die_saison():
+    """k = 6 (Kalibrierung 29.09.2026), fest für die ganze Saison; nur zwischen zwei Saisons prüfen."""
+    assert pr.K == 6
+
+
 def test_ligaschnitte(result):
     assert abs(result["l_bar"] - L_BAR_W2) <= TOL
     assert abs(result["l_bar_2025"] - L_BAR_2025) <= TOL
@@ -91,7 +97,7 @@ def test_strength_week_ohne_spiel():
     assert res["l_bar"] == 200 and res["p_quelle"] == pr.QUELLE_VORJAHR
     t1, t2, t3, t4 = (res["teams"][t] for t in (1, 2, 3, 4))
     assert (t3["n"], t3["pf_mean"], t3["p"], t3["mu"]) == (0, None, 200, 200)   # ohne Vorjahr: P = L̄
-    assert (t1["mu"], t2["mu"], t4["mu"]) == (202, 198, 200)                   # (1·PF + 4·200)/5
+    assert (t1["mu"], t2["mu"], t4["mu"]) == tuple((Decimal(v) + pr.K * 200) / (1 + pr.K) for v in (210, 190, 200))
     assert [t1["rang"], t4["rang"], t3["rang"], t2["rang"]] == [1, 2, 3, 4]    # 4 vor 3: PF/Spiel 200 > 0
     assert pr.strength(0, None, Decimal(180)) == 180
 
@@ -110,12 +116,12 @@ def test_mu_zwischen_pf_und_p(result, season):
         team = result["teams"][t["team_id"]]
         low, high = sorted((t["pf_per_game"], team["p"]))
         assert low <= team["mu"] <= high
-        assert team["mu"] == (t["games"] * t["pf_per_game"] + 4 * team["p"]) / (t["games"] + 4)
+        assert team["mu"] == (t["games"] * t["pf_per_game"] + pr.K * team["p"]) / (t["games"] + pr.K)
 
 
 def test_unsicherheit(result, season):
     for t in season["teams"]:
-        assert result["teams"][t["team_id"]]["se"] == season["sigma"] / Decimal(t["games"] + 4).sqrt()
+        assert result["teams"][t["team_id"]]["se"] == season["sigma"] / Decimal(t["games"] + pr.K).sqrt()
 
 
 def test_summe_e_und_monotonie(result):
@@ -175,7 +181,7 @@ def test_trend_none_bei_quellwechsel(season, ssn, weeks):
         team = res["teams"][t["team_id"]]
         assert [v["p_quelle"] for v in team["verlauf"]] == [pr.QUELLE_VORJAHR, pr.QUELLE_PROJEKTION]
         assert team["p_quelle"] == pr.QUELLE_PROJEKTION and team["p"] == 200
-        assert team["mu"] == (2 * t["pf_per_game"] + 4 * 200) / 6
+        assert team["mu"] == (2 * t["pf_per_game"] + pr.K * 200) / (2 + pr.K)
         assert team["rang_vorwoche"] is not None and team["trend"] is None
 
 
@@ -280,12 +286,13 @@ def test_simulation_staerke_zaehlt(result):
     assert espn[by_rang[1]]["restsiege"] > espn[by_rang[10]]["restsiege"]
 
 
-# Unabhängige Prüfer-Simulation nach W2 (eigener Code, 20 000 Läufe, anderer Zufallsweg): team_id → (Playoff,
-# Division, Bye ESPN). simulate() mit 2 000 Läufen muss innerhalb von 0,04 liegen (≈ 3,5 Standardfehler).
-REFERENZ_SIM_W2 = {1: (0.9901, 0.8740, 0.7823), 2: (0.9502, 0.4577, 0.4788), 3: (0.3500, 0.0199, 0.0204),
-                   4: (0.6891, 0.1003, 0.1104), 5: (0.1096, 0.0027, 0.0026), 6: (0.9256, 0.3597, 0.3886),
-                   7: (0.3981, 0.0160, 0.0226), 8: (0.6526, 0.0727, 0.0823), 9: (0.7164, 0.0873, 0.1031),
-                   10: (0.2182, 0.0096, 0.0088)}
+# Unabhängige Referenz-Simulation nach W2 mit k = 6 (eigener Code ohne powerranking, 20 000 Läufe, anderer
+# Zufallsweg): team_id → (Playoff, Division, Bye) im Seeding „espn“. simulate() mit 2 000 Läufen muss innerhalb von
+# 0,04 liegen (≈ 3,5 Standardfehler).
+REFERENZ_SIM_W2 = {1: (0.9853, 0.8499, 0.7484), 2: (0.9456, 0.4537, 0.4870), 3: (0.4374, 0.0393, 0.0369),
+                   4: (0.6869, 0.1035, 0.1175), 5: (0.1138, 0.0028, 0.0027), 6: (0.9235, 0.3573, 0.3898),
+                   7: (0.3701, 0.0192, 0.0206), 8: (0.6208, 0.0745, 0.0887), 9: (0.6794, 0.0887, 0.0968),
+                   10: (0.2371, 0.0112, 0.0115)}
 
 
 def test_simulation_gegen_referenz(result):

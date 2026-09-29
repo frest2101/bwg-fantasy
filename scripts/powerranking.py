@@ -1,7 +1,7 @@
 """Power Ranking (Stärke μ) und Playoff-Simulation (Baustein 4).
 
 Beschluss Stephan 28.09.2026 (docs/auftraege/session4_vorbereitung.md §2) mit den Antworten zu Session 4 (Frage 3, 8):
-- Stärke μᵢ = (n·PF̄ᵢ + k·Pᵢ)/(n + k), k = 4 Wochen. Pᵢ kommt aus der Kader-Projektion (compute/players, je Woche
+- Stärke μᵢ = (n·PF̄ᵢ + k·Pᵢ)/(n + k), k = 6 (K). Pᵢ kommt aus der Kader-Projektion (compute/players, je Woche
   übergeben); fehlt sie, gilt der Vorjahres-Prior Pᵢ = L̄ + 0,6·(PF/Spiel Vorjahr − L̄ Vorjahr).
 - Erwartete All-Play-Quote Eᵢ = 1/(T − 1)·Σⱼ Φ((μᵢ − μⱼ)/(σ√2)) mit dem gepoolten σ (compute.pooled_sigma).
 - Rang nach μ; Trend nur zwischen zwei Wochen mit derselben P-Quelle, sonst „neu“ (None).
@@ -22,7 +22,8 @@ import espn_fetch as ef
 import rawdata
 from zahlen import ZERO, dec
 
-K = 4                                    # Stabilisierungskonstante k = σ²/τ² in Wochen (Beschluss: k = 4 behalten)
+K = 6                                    # k = σ²/E[(P − μ)²] mit der Projektion P als Ausgangswert (Kalibrierung
+                                         # 29.09.2026: fest für die ganze Saison, Prüfung nur zwischen zwei Saisons)
 PRIOR_SHARE = Decimal("0.6")             # Anteil der Vorjahresabweichung vom Ligaschnitt, der im Prior bleibt
 RUNS = 10_000                            # Läufe der Playoff-Simulation
 SEEDINGS = ("liga", "espn")              # Standard „liga“: Top 3 je Division, Divisionssieger auf 1–2 (Regel 2026);

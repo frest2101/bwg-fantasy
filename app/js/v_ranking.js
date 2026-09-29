@@ -40,7 +40,7 @@ function power(box, r, svg) {
     ? h('ol', {class: 'ksl'}, sorted.map(t => h('li', null, h('strong', null, U.tl(t.team_id)), ' ',
       t.pr.kernsatz ? h('p', {class: 'ks'}, t.pr.kernsatz) : h('span', {class: 'na'}, 'folgt'))))
     : h('p', {class: 'note'}, 'Die Kernsätze folgen nach Freigabe.')));
-  U.ap(box, svg.fig('Stärke μ mit Unsicherheit', svg.dots({title: 'Stärke μ je Team mit ± σ/√(n+4)', fmt: v => U.num(v, 1),
+  U.ap(box, svg.fig('Stärke μ mit Unsicherheit', svg.dots({title: 'Stärke μ je Team mit ± σ/√(n+6)', fmt: v => U.num(v, 1),
     desc: `${sorted[0].name} vorn mit μ ${U.num(sorted[0].pr.mu, 1)}, ${sorted.at(-1).name} hinten mit ${U.num(sorted.at(-1).pr.mu, 1)}; die Striche zeigen die Unsicherheit.`,
     rows: sorted.map(t => ({label: t.kuerzel, v: t.pr.mu, lo: t.pr.mu - t.pr.se, hi: t.pr.mu + t.pr.se}))}),
   {heads: ['Team', 'μ', '±', 'E %', 'Rang'], rows: sorted.map(t => [t.name, U.num(t.pr.mu, 1), U.num(t.pr.se, 1), U.pct(U.ok(t.pr.e) ? t.pr.e * 100 : null), t.pr.rang])}));

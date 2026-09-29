@@ -70,7 +70,7 @@
 <div><dt id="g-rangpunkte">Rangpunkte</dt><dd>10 für den besten bis 1 für den schwächsten Wert; die Abstände gehen verloren.</dd></div>
 <div><dt id="g-profile">Profile</dt><dd>Stärke, Verdienst und Form sind Voreinstellungen der Gewichte; „Eigene“ entsteht, sobald ein Regler bewegt wird. Der Anteil zeigt Gewicht / Σ Gewichte.</dd></div>
 <div><dt id="g-redundanz">Redundanz</dt><dd>PF, All-Play, Floor, Form und Kader messen weitgehend dasselbe (früh in der Saison hoch korreliert); wer sie gemeinsam hochzieht, zählt die erzielten Punkte mehrfach.</dd></div>
-<div data-b="Power Ranking"><dt id="g-mu">Stärke μ</dt><dd>Geschätzte Punkte je Woche, μ = (n · PF/Spiel + 4 · P) / (n + 4); mit jeder Woche zählen die Ergebnisse mehr und die Kader-Projektion P weniger. ± zeigt σ/√(n + 4).</dd></div>
+<div data-b="Power Ranking"><dt id="g-mu">Stärke μ</dt><dd>Geschätzte Punkte je Woche, μ = (n · PF/Spiel + 6 · P) / (n + 6); mit jeder Woche zählen die Ergebnisse mehr und die Kader-Projektion P weniger (nach 3 Wochen 33 % Ergebnis, nach 14 Wochen 70 %). ± zeigt σ/√(n + 6).</dd></div>
 <div><dt id="g-p">P aus Vorjahr</dt><dd>Solange keine Kader-Projektion vorliegt: P = L̄ + 0,6 · (PF/Spiel Vorjahr − L̄ Vorjahr), L̄ = Ligaschnitt. Danach P = Kader-Projektion ROS.</dd></div>
 <div><dt id="g-e">Erwartete All-Play-Quote E</dt><dd>Anteil der Wochenduelle gegen alle neun, die das Team bei seiner Stärke im Schnitt gewinnt: E = 1/9 · Σ Φ((μᵢ − μⱼ)/(σ√2)).</dd></div>
 <div><dt id="g-pr-rang">Rang Power Ranking</dt><dd>Platz nach μ.</dd></div>
@@ -81,7 +81,7 @@
 <div><dt id="g-bye">Bye-%</dt><dd>Anteil der Läufe mit Seed 1 oder 2 – nach der Liga-Regel die beiden Divisionssieger –, also Freilos in W15.</dd></div>
 <div><dt id="g-restsiege">Erwartete Restsiege</dt><dd>Ø Siege in den offenen Wochen der Regular Season (Unentschieden halb).</dd></div>
 <div><dt id="g-seeding">Seeding</dt><dd>„Liga“ (Standard, Regel 2026): je Division die besten drei nach Siegen, dann PF; die Divisionssieger auf Seed 1–2 mit Freilos, die übrigen vier nach Siegen, dann PF. Setzt ESPN anders, korrigiert der Commissioner nach W14. „ESPN“: die besten sechs der Gesamttabelle, so wie ESPN ohne Korrektur setzt.</dd></div>
-<div><dt id="g-simulation">Simulation</dt><dd>Je Lauf wird zuerst die Stärke um μ gestreut (Varianz σ²/(n + 4)), dann jede Woche PF ~ N(μ̃ + Wochenabweichung der Kader-Projektion, σ²).</dd></div>
+<div><dt id="g-simulation">Simulation</dt><dd>Je Lauf wird zuerst die Stärke um μ gestreut (Varianz σ²/(n + 6)), dann jede Woche PF ~ N(μ̃ + Wochenabweichung der Kader-Projektion, σ²).</dd></div>
 <div><dt id="g-siegchance">Siegchance</dt><dd>Für offene Paarungen: Φ((μ Heim + ΔP Heim − μ Gast − ΔP Gast)/(σ√2)); ΔP = Abweichung der Kader-Projektion dieser Woche vom eigenen Ø (z. B. Bye), 0, solange P aus dem Vorjahr kommt.</dd></div>
 <div data-b="Spieler"><dt id="g-spiele">Spiele</dt><dd>Wochen, in denen der Spieler laut ESPN gespielt hat (Stat 210 = 1); Byes und Inaktive zählen nicht.</dd></div>
 <div><dt id="g-avg">Ø</dt><dd>Punkte je Spiel.</dd></div>
