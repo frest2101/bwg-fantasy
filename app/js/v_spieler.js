@@ -40,7 +40,7 @@ function list(box, P, r, rosWhy) {
     && (!st.text || p.name.toLowerCase().includes(st.text)));
   const num = (k, l, f = U.num, why) => ({k, l, num: 1, v: p => p[k], f: p => U.val(p[k], f, why)});
   const base = [
-    {k: 'name', l: 'Spieler', v: p => p.name.toLowerCase(), d: 1, f: p => h('a', {href: '#spieler/' + p.id, class: 'pl'},
+    {k: 'name', l: 'Spieler', v: p => p.name.toLowerCase(), d: 1, flt: false, f: p => h('a', {href: '#spieler/' + p.id, class: 'pl'},
       h('span', null, p.name, inj(p.inj)), h('span', {class: 'sub'}, `${p.pos} · ${p.nfl}` + (p.team > 0 ? ' · ' + U.kz(p.team) : '')))},
     num('avg', 'Ø', U.num, 'ohne Spiel'),
     {k: 'form', l: 'Form', num: 1, v: p => p.form, f: p => [U.val(p.form, U.num, 'ohne Spiel'), ' ', trendTxt(p.trend)]},
@@ -50,14 +50,15 @@ function list(box, P, r, rosWhy) {
       num('sd', 'Konstanz', U.num, 'unter 2 Spielen'), num('starts', 'Starts', v => v), num('bench_pts', 'Bank-Pkt'),
       num('proj_d', 'Proj.-Δ', U.sgn, 'ohne Spiel'), {k: 'spark', l: 'Formkurve', f: p => h('span', {class: 'sp', 'aria-hidden': 'true'}, p.spark || '')}],
     ros: [num('ros', 'ROS', U.num, rosWhy), num('rest_g', 'Restspiele', v => v, rosWhy), num('ros_po', 'ROS PO', U.num, rosWhy),
-      num('ros_rang', 'ROS-Rang', v => v + '.', rosWhy), num('ros_ue', 'ROS ü. Ersatz', U.sgn, rosWhy)],
+      {...num('ros_rang', 'ROS-Rang', v => v + '.', rosWhy), d: 1}, num('ros_ue', 'ROS ü. Ersatz', U.sgn, rosWhy)],
     besitz: [num('own', 'Besitz %', v => U.pct(v)), {k: 'status', l: 'Status', v: p => p.status, d: 1, f: p => STAT[p.status] || p.status || '–'},
       {k: 'inj', l: 'Verletzung', v: p => INJ[p.inj] ? p.inj : null, d: 1, f: p => INJ[p.inj]?.[1] || (p.inj === 'ACTIVE' ? 'aktiv' : '–')},
       {k: 'team', l: 'Team', v: p => U.kz(p.team), d: 1, f: p => p.team > 0 ? U.tl(p.team) : (STAT[p.status] || 'frei')}]};
   const sortKey = {saison: 'pts', ros: 'ros_g', besitz: 'own'};
+  const fst = {}, filters = [{k: 'nfl', l: 'NFL-Team', v: p => p.nfl, d: 1, cat: 1, f: p => p.nfl}];
   let tbl;
   const build = () => {
-    tbl = U.table({cap: 'Spielerliste', cls: 'nr', rh: 0, rows: rows(), sort: [sortKey[st.sicht], -1], limit: 50, filter: true, cols: [...base, ...extra[st.sicht]]});
+    tbl = U.table({cap: 'Spielerliste', cls: 'nr', rh: 0, rows: rows(), sort: [sortKey[st.sicht], -1], limit: 50, filter: true, filters, fstate: fst, cols: [...base, ...extra[st.sicht]]});
     slotBox.replaceChildren(tbl);
   };
   const refresh = (rebuild) => {
@@ -78,7 +79,7 @@ function list(box, P, r, rosWhy) {
       }})),
     U.seg('Spalten', [['saison', 'Saison'], ['ros', 'ROS'], ['besitz', 'Besitz']], st.sicht, v => { st.sicht = v; refresh(true); })),
     count, slotBox,
-    U.legend(['spaltenfilter', 'avg', 'form-sp', 'trendpfeil', 'ros-spiel', 'spiele', 'floor-ceil', 'konstanz', 'starts', 'proj-delta-sp', 'ros', 'restspiele', 'ros-po', 'ros-rang', 'ros-ue', 'projektionen']));
+    U.legend(['filter', 'avg', 'form-sp', 'trendpfeil', 'ros-spiel', 'spiele', 'floor-ceil', 'konstanz', 'starts', 'proj-delta-sp', 'ros', 'restspiele', 'ros-po', 'ros-rang', 'ros-ue', 'projektionen']));
   refresh(true);
 }
 
