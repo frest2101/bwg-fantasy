@@ -619,12 +619,20 @@ def archive_transactions(season: int, fetch, stamp: str) -> tuple[int, list[str]
         try:
             content, data = fetch({"view": TX_VIEW, "scoringPeriodId": period})
             check_echo(data, season, period)
-            if not isinstance(data.get("transactions"), list):
-                raise FetchError("Antwort ohne Liste 'transactions'")
             answer_latest = (data.get("status") or {}).get("latestScoringPeriod")
             if isinstance(answer_latest, int) and period > answer_latest:
                 print(f"  p{period:02d}  übersprungen – liegt nach der laufenden Periode {answer_latest} der Antwort")
                 continue
+            if "transactions" not in data:
+                # Periode ohne Einträge (z. B. direkt nach dem Periodenwechsel): ESPN lässt die Liste ganz weg.
+                # Keine Datei anlegen; eine schon archivierte Periode mit Einträgen bleibt stehen (wie beim Schrumpfen).
+                if path.exists() and load_json(path)["transactions"]:
+                    warnings.append(f"{TX_VIEW} p{period}: ESPN liefert für die archivierte Periode keine Liste – "
+                                    f"{rel(path)} bleibt stehen")
+                print(f"  p{period:02d}     0 Einträge  keine Liste (noch keine Transaktionen)")
+                continue
+            if not isinstance(data["transactions"], list):
+                raise FetchError("Antwort mit 'transactions', aber ohne Liste")
             new = data["transactions"]
             state = archive_state(load_json(path)["transactions"] if path.exists() else None, new)
             if state in ("neu", "geändert"):

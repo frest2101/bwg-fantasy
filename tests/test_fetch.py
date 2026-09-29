@@ -422,6 +422,7 @@ class FakeEspn:
         self.periods, self.topics, self.current = periods, topics, current
         self.answer_latest = None  # abweichende laufende Periode in den mTransactions2-Antworten
         self.broken: set[int] = set()
+        self.without_list: set[int] = set()  # Perioden, für die ESPN die Liste „transactions“ weglässt
         self.calls = itertools.count()
 
     def fetch(self, params):
@@ -438,6 +439,8 @@ class FakeEspn:
                 status["latestScoringPeriod"] = self.answer_latest
             data = {"id": ef.LEAGUE_ID, "seasonId": 2026, "scoringPeriodId": period, "status": status,
                     "transactions": self.periods.get(period, [])}
+            if period in self.without_list:
+                del data["transactions"]
         else:
             data = {"communication": {"topics": self.topics}}
         return json.dumps(data).encode(), data
@@ -516,6 +519,23 @@ def test_archiv_speichert_keine_zukunftsperiode(raw):
     assert ef.archive_transactions(2026, espn.fetch, "2026-09-29T0517Z") == (0, [])
     assert not (ef.tx_dir(2026) / "mTransactions2_p01.json").exists()
     assert (ef.tx_dir(2026) / "mTransactions2_p00.json").exists()
+
+
+def test_archiv_periode_ohne_liste(raw):
+    """Direkt nach dem Periodenwechsel lässt ESPN die Liste weg (29.09.2026, p4): kein Fehler, keine Datei;
+    eine schon archivierte Periode mit Einträgen bleibt stehen und erzeugt eine Warnung."""
+    espn = FakeEspn({0: tx("t0"), 1: tx("t1")}, topics=[topic("k1")], current=2)
+    espn.without_list = {2}
+    assert ef.archive_transactions(2026, espn.fetch, "2026-09-29T0517Z") == (0, [])
+    folder = ef.tx_dir(2026)
+    assert not (folder / "mTransactions2_p02.json").exists()
+
+    espn.without_list = {1}
+    before = (folder / "mTransactions2_p01.json").read_bytes()
+    errors, warnings = ef.archive_transactions(2026, espn.fetch, "2026-09-30T0517Z")
+    assert errors == 0 and len(warnings) == 1 and "p1" in warnings[0]
+    assert (folder / "mTransactions2_p01.json").read_bytes() == before
+    assert (folder / "mTransactions2_p02.json").exists()  # p2 hat jetzt eine (leere) Liste
 
 
 def test_archiv_fehler_einer_periode_stoppt_die_anderen_nicht(raw):
