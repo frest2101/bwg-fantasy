@@ -20,18 +20,19 @@ from zahlen import rounded
 
 TOL = Decimal("0.005")
 EPS = Decimal("1E-6")
-# Sollwerte nach W2 mit Vorjahres-Prior: team_id → (μ, E, Rang, Trend W1 → W2). Asse's und TeamTy aus dem Bauplan
-# Session 4; alle Werte in der Prüfung unabhängig aus den Rohdateien nachgerechnet (Φ über statistics.NormalDist).
-SOLL_W2 = {1: (Decimal("235.825"), Decimal("0.7503"), 1, 0),     # Asse's Cowboys
-           2: (Decimal("218.766"), Decimal("0.6213"), 3, 0),
-           3: (Decimal("189.982"), Decimal("0.3833"), 8, -1),
-           4: (Decimal("199.450"), Decimal("0.4613"), 6, 0),
-           5: (Decimal("178.898"), Decimal("0.2967"), 10, 0),    # TeamTy
-           6: (Decimal("224.164"), Decimal("0.6640"), 2, 0),
-           7: (Decimal("194.664"), Decimal("0.4216"), 7, 1),
-           8: (Decimal("205.154"), Decimal("0.5090"), 5, 0),
-           9: (Decimal("205.232"), Decimal("0.5096"), 4, 0),
-           10: (Decimal("189.930"), Decimal("0.3829"), 9, 0)}
+# Sollwerte nach W2 mit Vorjahres-Prior und k = 6: team_id → (μ, E, Rang, Trend W1 → W2). Unabhängig aus den
+# Rohdateien nachgerechnet (eigenes Skript ohne powerranking/compute, Φ über statistics.NormalDist); dasselbe Skript
+# gibt mit k = 4 die früheren, von der Modulprüfung bestätigten Werte exakt wieder.
+SOLL_W2 = {1: (Decimal("230.440"), Decimal("0.7140"), 1, 0),     # Asse's Cowboys
+           2: (Decimal("216.965"), Decimal("0.6078"), 3, 0),
+           3: (Decimal("195.779"), Decimal("0.4294"), 7, -1),
+           4: (Decimal("199.592"), Decimal("0.4615"), 6, 1),
+           5: (Decimal("181.190"), Decimal("0.3112"), 10, 0),    # TeamTy
+           6: (Decimal("222.211"), Decimal("0.6503"), 2, 0),
+           7: (Decimal("194.733"), Decimal("0.4206"), 8, 0),
+           8: (Decimal("204.427"), Decimal("0.5025"), 4, 1),
+           9: (Decimal("204.054"), Decimal("0.4993"), 5, -1),
+           10: (Decimal("192.673"), Decimal("0.4035"), 9, 0)}
 L_BAR_W2, L_BAR_2025 = Decimal("204.21"), Decimal("201.54")
 OFFENE_SPIELE_W2 = 60                                   # Perioden 3–14 mit je 5 Paarungen
 
@@ -68,6 +69,11 @@ def ids_of(season) -> list[int]:
 
 # ---------------------------------------------------------------- Stärke μ, Prior, E
 
+def test_k_fest_fuer_die_saison():
+    """k = 6 (Kalibrierung 29.09.2026), fest für die ganze Saison; nur zwischen zwei Saisons prüfen."""
+    assert pr.K == 6
+
+
 def test_ligaschnitte(result):
     assert abs(result["l_bar"] - L_BAR_W2) <= TOL
     assert abs(result["l_bar_2025"] - L_BAR_2025) <= TOL
@@ -91,7 +97,7 @@ def test_strength_week_ohne_spiel():
     assert res["l_bar"] == 200 and res["p_quelle"] == pr.QUELLE_VORJAHR
     t1, t2, t3, t4 = (res["teams"][t] for t in (1, 2, 3, 4))
     assert (t3["n"], t3["pf_mean"], t3["p"], t3["mu"]) == (0, None, 200, 200)   # ohne Vorjahr: P = L̄
-    assert (t1["mu"], t2["mu"], t4["mu"]) == (202, 198, 200)                   # (1·PF + 4·200)/5
+    assert (t1["mu"], t2["mu"], t4["mu"]) == tuple((Decimal(v) + pr.K * 200) / (1 + pr.K) for v in (210, 190, 200))
     assert [t1["rang"], t4["rang"], t3["rang"], t2["rang"]] == [1, 2, 3, 4]    # 4 vor 3: PF/Spiel 200 > 0
     assert pr.strength(0, None, Decimal(180)) == 180
 
@@ -110,12 +116,12 @@ def test_mu_zwischen_pf_und_p(result, season):
         team = result["teams"][t["team_id"]]
         low, high = sorted((t["pf_per_game"], team["p"]))
         assert low <= team["mu"] <= high
-        assert team["mu"] == (t["games"] * t["pf_per_game"] + 4 * team["p"]) / (t["games"] + 4)
+        assert team["mu"] == (t["games"] * t["pf_per_game"] + pr.K * team["p"]) / (t["games"] + pr.K)
 
 
 def test_unsicherheit(result, season):
     for t in season["teams"]:
-        assert result["teams"][t["team_id"]]["se"] == season["sigma"] / Decimal(t["games"] + 4).sqrt()
+        assert result["teams"][t["team_id"]]["se"] == season["sigma"] / Decimal(t["games"] + pr.K).sqrt()
 
 
 def test_summe_e_und_monotonie(result):
@@ -175,7 +181,7 @@ def test_trend_none_bei_quellwechsel(season, ssn, weeks):
         team = res["teams"][t["team_id"]]
         assert [v["p_quelle"] for v in team["verlauf"]] == [pr.QUELLE_VORJAHR, pr.QUELLE_PROJEKTION]
         assert team["p_quelle"] == pr.QUELLE_PROJEKTION and team["p"] == 200
-        assert team["mu"] == (2 * t["pf_per_game"] + 4 * 200) / 6
+        assert team["mu"] == (2 * t["pf_per_game"] + pr.K * 200) / (2 + pr.K)
         assert team["rang_vorwoche"] is not None and team["trend"] is None
 
 
@@ -258,14 +264,14 @@ def test_simulation_summen(result):
 
 
 def test_simulation_stimmig(result):
-    espn, div = result["sim"]["espn"], result["sim"]["div"]
+    espn, div = result["sim"]["espn"], result["sim"]["liga"]
     for team_id in espn:
         for sim in (espn[team_id], div[team_id]):
             assert sim["playoff"] == sum(sim["seeds"])
             assert sim["bye"] == sum(sim["seeds"][:2])
             assert all(0 <= v <= 1 for v in (sim["playoff"], sim["division"], sim["bye"], *sim["seeds"]))
             assert 0 <= sim["restsiege"] <= 12
-        # dieselben Läufe: Division und Restsiege hängen nicht vom Seeding ab; bei „div“ haben genau die
+        # dieselben Läufe: Division und Restsiege hängen nicht vom Seeding ab; bei „liga“ haben genau die
         # Divisionssieger ein Freilos
         assert espn[team_id]["division"] == div[team_id]["division"]
         assert espn[team_id]["restsiege"] == div[team_id]["restsiege"]
@@ -280,12 +286,13 @@ def test_simulation_staerke_zaehlt(result):
     assert espn[by_rang[1]]["restsiege"] > espn[by_rang[10]]["restsiege"]
 
 
-# Unabhängige Prüfer-Simulation nach W2 (eigener Code, 20 000 Läufe, anderer Zufallsweg): team_id → (Playoff,
-# Division, Bye ESPN). simulate() mit 2 000 Läufen muss innerhalb von 0,04 liegen (≈ 3,5 Standardfehler).
-REFERENZ_SIM_W2 = {1: (0.9901, 0.8740, 0.7823), 2: (0.9502, 0.4577, 0.4788), 3: (0.3500, 0.0199, 0.0204),
-                   4: (0.6891, 0.1003, 0.1104), 5: (0.1096, 0.0027, 0.0026), 6: (0.9256, 0.3597, 0.3886),
-                   7: (0.3981, 0.0160, 0.0226), 8: (0.6526, 0.0727, 0.0823), 9: (0.7164, 0.0873, 0.1031),
-                   10: (0.2182, 0.0096, 0.0088)}
+# Unabhängige Referenz-Simulation nach W2 mit k = 6 (eigener Code ohne powerranking, 20 000 Läufe, anderer
+# Zufallsweg): team_id → (Playoff, Division, Bye) im Seeding „espn“. simulate() mit 2 000 Läufen muss innerhalb von
+# 0,04 liegen (≈ 3,5 Standardfehler).
+REFERENZ_SIM_W2 = {1: (0.9853, 0.8499, 0.7484), 2: (0.9456, 0.4537, 0.4870), 3: (0.4374, 0.0393, 0.0369),
+                   4: (0.6869, 0.1035, 0.1175), 5: (0.1138, 0.0028, 0.0027), 6: (0.9235, 0.3573, 0.3898),
+                   7: (0.3701, 0.0192, 0.0206), 8: (0.6208, 0.0745, 0.0887), 9: (0.6794, 0.0887, 0.0968),
+                   10: (0.2371, 0.0112, 0.0115)}
 
 
 def test_simulation_gegen_referenz(result):
@@ -311,20 +318,31 @@ def konstruiert(wins: dict[int, int], division: dict[int, int]) -> list[dict]:
              "pf": Decimal(500 - t)} for t, w in wins.items()]
 
 
-def test_seeding_div_setzt_divisionssieger_auf_1_und_2():
-    """Konstruiert: Division 1 (ungerade IDs) gewinnt alles, der Beste von Division 2 steht nach W erst auf Platz 6."""
+def test_simulation_liga_drei_je_division(result):
+    """Regel 2026: in jedem Lauf genau 3 Teams je Division, also Σ Playoff je Division = 3."""
+    division = {t["id"]: t["divisionId"] for t in ef.load_json(ef.week_dir(2026, 2) / "mTeam.json")["teams"]}
+    liga = result["sim"]["liga"]
+    for d in (1, 2):
+        assert sum(v["playoff"] for t, v in liga.items() if division[t] == d) == 3
+
+
+def test_seeding_liga_top3_je_division():
+    """Konstruiert: Division 1 (ungerade IDs) gewinnt alles, der Beste von Division 2 steht nach W erst auf Platz 6.
+
+    „liga“: Divisionssieger 1 und 10 auf Seed 1–2, dann je Division Platz 2 und 3 nach Stand (3, 5 aus Division 1,
+    2, 4 aus Division 2); 7 und 9 sind trotz 2-0 draußen. „espn“: die besten sechs nach W, dann PF."""
     division = {t: 1 if t % 2 else 2 for t in range(1, 11)}
     wins = {t: 2 if t % 2 else 0 for t in range(1, 11)}
     wins[10] = 1   # Divisionssieger 2 trotz schlechterer PF als Team 2
     teams = konstruiert(wins, division)
     mu = {t: Decimal(200) for t in range(1, 11)}
     res = pr.simulate(teams, [], mu, Decimal(35), runs=5, seed=1)   # keine offenen Spiele: Stand ist endgültig
-    espn, div = res["espn"], res["div"]
-    # ESPN: 1, 3, 5, 7, 9 (2-0, nach PF), dann 10 (1-1); Divisionssieger 1 und 10
+    espn, liga = res["espn"], res["liga"]
     assert [next(t for t in espn if espn[t]["seeds"][pos] == 1) for pos in range(6)] == [1, 3, 5, 7, 9, 10]
-    assert [next(t for t in div if div[t]["seeds"][pos] == 1) for pos in range(6)] == [1, 10, 3, 5, 7, 9]
-    assert espn[10]["bye"] == 0 and div[10]["bye"] == 1 and div[3]["bye"] == 0 and espn[3]["bye"] == 1
-    assert {t for t in div if div[t]["division"] == 1} == {1, 10}
+    assert [next(t for t in liga if liga[t]["seeds"][pos] == 1) for pos in range(6)] == [1, 10, 3, 5, 2, 4]
+    assert espn[10]["bye"] == 0 and liga[10]["bye"] == 1 and liga[3]["bye"] == 0 and espn[3]["bye"] == 1
+    assert liga[7]["playoff"] == 0 and liga[9]["playoff"] == 0 and liga[2]["playoff"] == 1
+    assert {t for t in liga if liga[t]["division"] == 1} == {1, 10}
     assert espn[2]["playoff"] == 0 and all(v["restsiege"] == 0 for v in espn.values())
 
 
@@ -337,7 +355,7 @@ def test_seeding_gleichstand_nach_pf_und_unentschieden():
     mu = {t: Decimal(200) for t in range(1, 5)}
     res = pr.simulate(teams, [], mu, Decimal(35), runs=1, seed=1, playoff_teams=2)
     assert res["espn"][2]["seeds"] == [1, 0] and res["espn"][1]["seeds"] == [0, 1]
-    assert res["div"][2]["seeds"] == [1, 0] and res["div"][3]["seeds"] == [0, 1]
+    assert res["liga"][2]["seeds"] == [1, 0] and res["liga"][3]["seeds"] == [0, 1]
 
 
 def test_seeding_pf_und_unentschieden_halb():
@@ -350,7 +368,7 @@ def test_seeding_pf_und_unentschieden_halb():
     res = pr.simulate(teams, [], mu, Decimal(35), runs=1, seed=1, playoff_teams=4)
     seeds = {name: [next(t for t, v in res[name].items() if v["seeds"][pos] == 1) for pos in range(4)]
              for name in pr.SEEDINGS}
-    assert seeds == {"espn": [4, 3, 2, 1], "div": [4, 2, 3, 1]}   # 2,0 > 1,5 > 1,0 (400 PF) > 1,0 (300 PF)
+    assert seeds == {"espn": [4, 3, 2, 1], "liga": [4, 2, 3, 1]}   # 2,0 > 1,5 > 1,0 (400 PF) > 1,0 (300 PF)
     assert {t for t, v in res["espn"].items() if v["division"] == 1} == {2, 4}
 
 

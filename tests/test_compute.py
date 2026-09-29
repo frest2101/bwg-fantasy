@@ -239,6 +239,13 @@ def test_sigma_gepoolt_mit_startwert(season):
     assert compute.pooled_sigma([]) == 35
 
 
+def test_luck_band(teams):
+    """Hugh Jass nach W2: All-Play 6/9 und 8/9 → Band √(2/9 + 8/81) = √(26/81) ≈ 0,567; Luck +0,44 liegt darin."""
+    t = teams["Hugh Jass"]
+    assert abs(t["luck_band"] - Decimal(26 / 81).sqrt()) < Decimal("1e-9")
+    assert abs(t["luck"]) < t["luck_band"]
+
+
 def test_form_band():
     assert compute.form_band(Decimal(35), 3) is None  # erst ab 4 Spielen
     assert abs(compute.form_band(Decimal(35), 10) - Decimal(35) * Decimal("0.2333333333").sqrt()) < Decimal("1e-6")

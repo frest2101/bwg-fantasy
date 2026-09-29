@@ -4,12 +4,12 @@
 "through_week":3,
 "datenstand":{"woche_final":3,"ros_nach_woche":3,"pool_woche":3,"transaktionen_bis":1790526720083},
 "files":{
-"claude.json":{"v":"b3e9e56624ae","bytes":26255,"lazy":true},
+"claude.json":{"v":"792a9b8a20ca","bytes":26257,"lazy":true},
 "dst.json":{"v":"c33b2db7e87e","bytes":12966,"lazy":true},
 "history.json":{"v":"d7c4d8da8907","bytes":42016,"lazy":true},
 "players.json":{"v":"8c0806e26742","bytes":246166,"lazy":true},
-"schedule.json":{"v":"37d404845812","bytes":17510,"lazy":false},
-"teams.json":{"v":"4dbe44352516","bytes":27794,"lazy":false},
+"schedule.json":{"v":"e965a13185fc","bytes":17514,"lazy":false},
+"teams.json":{"v":"af21397f4889","bytes":27969,"lazy":false},
 "transactions.json":{"v":"194dd3fc41bb","bytes":45124,"lazy":true}
 }
 }

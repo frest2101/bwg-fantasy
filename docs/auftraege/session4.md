@@ -310,6 +310,34 @@ Damit sind zwei der drei Ablösekriterien der Routine „Wochenimport (Di)“ er
 - **Kernsätze W3:** von Stephan freigegeben (`3226396`), live in der App.
 - **Ablösekriterien der Routine „Wochenimport (Di)“:** alle drei erfüllt; das Pausieren macht Stephan.
 
+## Nachtrag 29.09.2026: Rückfragen nach der Veröffentlichung (PR #1)
+**1. Playoff-Regel:**
+- **Befund:** Stephans Frage zu 4th Down (18 %) deckte eine Lücke im Auftrag auf. Die Simulation nahm die Top 6 gesamt; Frage 8 hatte nur nach den Byes gefragt, nicht nach der Qualifikation.
+- **Entscheidung Stephan, abgestimmt mit dem Commissioner:** Top 3 je Division, Divisionssieger auf Seed 1–2 mit Bye. Setzt ESPN anders, korrigiert der Commissioner nach W14 von Hand.
+- **Umsetzung:** Standard „liga“, „espn“ (Top 6 gesamt) bleibt als Vergleich.
+
+**2. k im Power Ranking:**
+- **Neu bestimmt:** k = 6 statt 4 (Theorie, Monte-Carlo, Gegenprüfung; Berichte lokal unter `.lokal/session4/k_kalibrierung/`).
+- **Begründung:** k = σ²/τ² gilt für die Schrumpfung zum Ligaschnitt. Mit der Projektion als Ausgangswert ist k = σ²/E[(P − μ)²] größer.
+- **Gilt für:** Projektion und Vorjahres-Prior, fest für die ganze Saison. Die Projektion wird nicht gestreckt; Rückschau-Test am Saisonende.
+- **Tests:** Die Sollwerte kommen aus einem unabhängigen Skript, das mit k = 4 die bisherigen Werte exakt wiedergibt.
+
+**3. Luck:**
+- **Frage Stephan:** Warum hat Hugh Jass +0,44?
+- **Antwort:** Luck misst Paarungsglück, nicht Kaderstärke. In W1 war Hugh Jass nur 4. der Woche und hat trotzdem gewonnen.
+- **Umsetzung:** Die Formel bleibt. Neu ist das Zufallsband ±√Σ pₜ(1 − pₜ) (Hugh Jass ±0,57); Werte innerhalb des Bands erscheinen grau.
+
+**Wirkung nach W3** (Playoff-Chance, Regel Top 3 je Division, k = 6):
+
+| Team | Playoff-Chance |
+|---|---|
+| Dynamo | 81 % |
+| Rotzleffe | 70 % |
+| cool runnings | 53 % |
+| 4th Down Syndrom | 33 % (vorher 18 %) |
+
+**Tests:** 365 grün.
+
 **Arbeitsweise:** Zwei Prüf-Agenten teilten sich eine Hilfsdatei im Scratchpad. Dadurch wurde `scripts/players.py` kurz überschrieben, vom zuständigen Prüfer aber byte-genau wiederhergestellt; die Tests laufen grün. Seitdem bekommt jeder Agent einen eigenen Scratchpad-Ordner.
 
 ## Nicht in dieser Session

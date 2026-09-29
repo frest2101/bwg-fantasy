@@ -259,6 +259,11 @@ def compute_teams(ssn: rawdata.Season, weeks: list[int], team_weeks: list[dict],
     by_id = {t["team_id"]: t for t in teams}
     for t in teams:
         t["luck"] = wins(t) - t["allplay_pct"] / HUNDRED * t["games"]
+        # Zufallsstreuung von Luck: je Woche gewinnt ein Team mit All-Play-Anteil p gegen einen zufälligen Gegner
+        # mit Wahrscheinlichkeit p, Varianz p·(1 − p); Luck innerhalb ±Band ist nicht vom Zufall zu unterscheiden
+        shares = [(r["allplay_w"] + HALF * r["allplay_t"]) / (len(snapshot) - 1)
+                  for r in team_weeks if r["team_id"] == t["team_id"]]
+        t["luck_band"] = sum((q * (1 - q) for q in shares), ZERO).sqrt()
 
     # Ränge: Siege (Unentschieden halb), dann PF – gesamt und je Division
     for tid, rang in rank_by(teams, lambda t: (wins(t), t["pf"])).items():

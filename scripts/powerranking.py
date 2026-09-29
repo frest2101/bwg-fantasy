@@ -1,7 +1,7 @@
 """Power Ranking (Stärke μ) und Playoff-Simulation (Baustein 4).
 
 Beschluss Stephan 28.09.2026 (docs/auftraege/session4_vorbereitung.md §2) mit den Antworten zu Session 4 (Frage 3, 8):
-- Stärke μᵢ = (n·PF̄ᵢ + k·Pᵢ)/(n + k), k = 4 Wochen. Pᵢ kommt aus der Kader-Projektion (compute/players, je Woche
+- Stärke μᵢ = (n·PF̄ᵢ + k·Pᵢ)/(n + k), k = 6 (K). Pᵢ kommt aus der Kader-Projektion (compute/players, je Woche
   übergeben); fehlt sie, gilt der Vorjahres-Prior Pᵢ = L̄ + 0,6·(PF/Spiel Vorjahr − L̄ Vorjahr).
 - Erwartete All-Play-Quote Eᵢ = 1/(T − 1)·Σⱼ Φ((μᵢ − μⱼ)/(σ√2)) mit dem gepoolten σ (compute.pooled_sigma).
 - Rang nach μ; Trend nur zwischen zwei Wochen mit derselben P-Quelle, sonst „neu“ (None).
@@ -22,10 +22,12 @@ import espn_fetch as ef
 import rawdata
 from zahlen import ZERO, dec
 
-K = 4                                    # Stabilisierungskonstante k = σ²/τ² in Wochen (Beschluss: k = 4 behalten)
+K = 6                                    # k = σ²/E[(P − μ)²] mit der Projektion P als Ausgangswert (Kalibrierung
+                                         # 29.09.2026: fest für die ganze Saison, Prüfung nur zwischen zwei Saisons)
 PRIOR_SHARE = Decimal("0.6")             # Anteil der Vorjahresabweichung vom Ligaschnitt, der im Prior bleibt
 RUNS = 10_000                            # Läufe der Playoff-Simulation
-SEEDINGS = ("espn", "div")               # Seeding-Schalter: ESPN (W, dann PF) oder Divisionssieger auf 1–2
+SEEDINGS = ("liga", "espn")              # Standard „liga“: Top 3 je Division, Divisionssieger auf 1–2 (Regel 2026);
+                                         # „espn“: Top 6 gesamt nach W, dann PF (so setzt ESPN ohne Korrektur)
 QUELLE_VORJAHR, QUELLE_PROJEKTION = "vorjahr", "projektion"
 REDAKTION_DIR = ef.REPO_DIR / "data" / "redaktion"   # freigegebene Kernsätze: power_ranking_<saison>.csv
 KERNSATZ_FIELDS = ("woche", "slot", "kernsatz")
@@ -198,8 +200,9 @@ def simulate(teams: list[dict], games: list[dict], mu: dict[int, Decimal], sigma
 
     teams: Zeilen mit team_id, division, games, w, t, pf (Stand nach Woche N); games: open_games; mu: μ je Team.
     Je Lauf μ̃ᵢ ~ N(μᵢ, σ²/(nᵢ + k)), dann je offene Woche w PFᵢ,w ~ N(μ̃ᵢ + devᵢ,w, σ²), devᵢ,w aus p_dev (sonst 0).
-    Mehr PF gewinnt, gleich = T. Stand = (W + 0,5·T, PF). „espn“: die besten playoff_teams nach Stand; „div“: die
-    Divisionssieger (Bester je Division) vorn, dann die übrigen nach Stand. Byes = Seeds 1…bye_count.
+    Mehr PF gewinnt, gleich = T. Stand = (W + 0,5·T, PF). „liga“ (Regel 2026, der Commissioner setzt nach W14
+    nötigenfalls von Hand): je Division die besten playoff_teams/Divisionen (6/2 = 3), die Divisionssieger auf Seed 1–2,
+    die übrigen nach Stand; „espn“: die besten playoff_teams nach Stand. Byes = Seeds 1…bye_count.
     Ausgabe je Seeding und Team: playoff, division, bye (Anteile 0–1), restsiege (Ø W + 0,5·T in den offenen
     Spielen), seeds (Anteil je Seed 1…playoff_teams) – als Decimal, exakt aus den Zählern.
     """
@@ -215,6 +218,8 @@ def simulate(teams: list[dict], games: list[dict], mu: dict[int, Decimal], sigma
     half_wins0 = [2 * by_id[t]["w"] + by_id[t]["t"] for t in ids]      # halbe Siege: W zählt 2, T zählt 1
     pf0 = [float(by_id[t]["pf"]) for t in ids]
     division = [by_id[t]["division"] for t in ids]
+    divisions = sorted(set(division))
+    per_division = playoff_teams // len(divisions) if divisions else 0
     dev = p_dev or {}
     plan = [(idx[g["home"]], idx[g["away"]],
              [(float(dev.get(g["home"], {}).get(w, 0)), float(dev.get(g["away"], {}).get(w, 0))) for w in g["weeks"]])
@@ -251,8 +256,10 @@ def simulate(teams: list[dict], games: list[dict], mu: dict[int, Decimal], sigma
                 winners.append(i)
         for i in winners:
             division_wins[i] += 1
-        seeded = {"espn": order[:playoff_teams],
-                  "div": (winners + [i for i in order if i not in winners])[:playoff_teams]}
+        qualified = {i for d in divisions for i in [j for j in order if division[j] == d][:per_division]}
+        liga = winners + [i for i in order if i in qualified and i not in winners]
+        liga += [i for i in order if i not in liga][:max(0, playoff_teams - len(liga))]  # falls Divisionen ungleich
+        seeded = {"liga": liga[:playoff_teams], "espn": order[:playoff_teams]}
         for name in SEEDINGS:
             counts = seed_counts[name]
             for pos, i in enumerate(seeded[name]):
