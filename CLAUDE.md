@@ -12,7 +12,7 @@ Fantasy-Football-Rechenwerk für die BWG Fantasy Liga (ESPN, League-ID 116655585
 
 ## Arbeitsregeln
 - Sprache Deutsch, NFL-Fachbegriffe Englisch. Kommentare und Doku Deutsch.
-- Vor neuen Dateien oder Umbauten: Plan in wenigen Sätzen, dann bauen. Stephan gibt Änderungen im Diff frei.
+- Vor neuen Dateien oder Umbauten: Plan in wenigen Sätzen, dann bauen. Claude merged selbst nach `main`, sobald `compute.py`, `pytest`, `check_public.py` und die Gegenprüfung grün sind (Beschluss 29.09.2026); Stephan liest den Diff danach.
 - Nie in ESPN schreiben. Nur lesende Endpoints.
 - Notion: nur lesen. Schreiben ausschließlich in den Ausnahmen unter „Gelernt“ und immer erst nach Stephans Freigabe des Textes.
 - Keine destruktiven Git-Kommandos (kein force-push, kein reset --hard) ohne Rückfrage. Commit-Messages Deutsch, ein Satz.
@@ -127,3 +127,5 @@ Data-Source-IDs zum Nachschlagen: Matchups `25588fd6-104c-4086-8e03-7680c8c19a6d
 - Playoff-Regel 2026 (29.09.2026): Top 3 je Division, Divisionssieger auf Seed 1–2 mit Bye – mit dem Commissioner abgestimmt; setzt ESPN anders, korrigiert er das Seeding nach W14 von Hand. Die Simulation rechnet diese Regel als Standard („liga“), ESPNs Top 6 gesamt nur als Vergleich.
 - k im Power Ranking (29.09.2026): k = 6 statt 4 – k = σ²/τ² gilt für die Schrumpfung zum Ligaschnitt, mit der Projektion als Ausgangswert ist k = σ²/E[(P − μ)²] größer. Fest für die ganze Saison (Stephan: nicht während der Saison nachjustieren); Rückschau-Test am Saisonende (Kalibrierung von P, bestes k, Brier der Playoff-Anteile), ändern nur, wenn das beste k deutlich außerhalb von 4–9 liegt.
 - Luck (29.09.2026): Formel bleibt; Anzeige mit Zufallsband und Hinweis, dass Luck Paarungsglück misst, nicht Kaderstärke (Frage Stephan zu Hugh Jass).
+- Luck, zweite Nachfrage (29.09.2026): Stephan liest Luck über den Median; die App zeigt deshalb die Wochenbeiträge (Ergebnis − pₜ) je Woche. Median-Luck oder Gegner-Punkte als Zusatzspalte sind offen (Werte in `docs/auftraege/session5.md`).
+- Merge (29.09.2026): Claude merged Arbeitsbranches selbst nach `main` (Pull Request anlegen und sofort mergen), sobald Tests, Öffentlichkeits-Check und Gegenprüfung grün sind – keine Freigabe des Diffs vor dem Merge mehr; Pages baut nur aus `main`.
