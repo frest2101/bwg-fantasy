@@ -140,6 +140,7 @@ def compute_team_weeks(ssn: rawdata.Season, weeks: list[int]) -> list[dict]:
             r["wochenrang"] = 1 + r["allplay_l"]  # Gleichstand teilt sich den besseren Rang
             r["median_win"] = r["pf"] > median
             r["median_abstand"] = r["pf"] - median  # Punkte über (+) oder unter (−) dem Wochenmedian
+            r["gegner_abstand"] = r["pa"] - median  # dasselbe für den Gegner
             r["allplay_pct"] = (r["allplay_w"] + HALF * r["allplay_t"]) / len(others) * HUNDRED  # All-Play-Anteil pₜ
             r["gegner_pkt"] = statistics.mean(o["pf"] for o in week_rows) - r["pa"]  # Ligaschnitt − Gegnerpunkte
         rows.extend(sorted(week_rows, key=lambda r: r["team_id"]))
@@ -150,13 +151,14 @@ def add_matchup(team_weeks: list[dict], sigma: Decimal) -> None:
     """Matchup-Glück je Team-Woche (Beschluss 29.09.2026) und laufende Summe, in place.
 
     Zählt nur, wenn das Ergebnis der Punkteseite widerspricht: Sieg unter dem Wochenmedian = Glück (+), Niederlage
-    über dem Median = Pech (−); Gewicht = Abstand zum Median / σ, gekappt bei 1. Sieg über oder Niederlage unter
-    dem Median und Unentschieden = 0 (verdient). Ein Sieg als Wochen-4. ist damit kein Glück; der Wochen-2., der
-    gegen den Wochenbesten verliert, hat fast ein volles Spiel Pech.
+    über dem Median = Pech (−). Gewicht = (eigener Abstand zum Median + Abstand des Gegners zum Median) / (2σ),
+    gekappt bei 1 – der Gegner zählt also genau dort, wo er den Ausschlag gab. Sieg über oder Niederlage unter dem
+    Median und Unentschieden = 0 (verdient). Ein Sieg als Wochen-4. ist damit kein Glück; der Wochen-2., der gegen
+    den Wochenbesten verliert, hat fast ein volles Spiel Pech.
     """
     running: dict[int, Decimal] = {}
     for r in team_weeks:  # nach Woche sortiert
-        weight = min(ONE, abs(r["median_abstand"]) / sigma)
+        weight = min(ONE, (abs(r["median_abstand"]) + abs(r["gegner_abstand"])) / (2 * sigma))
         if r["result"] == "W" and r["median_abstand"] < 0:
             r["matchup_glueck"] = weight
         elif r["result"] == "L" and r["median_abstand"] > 0:

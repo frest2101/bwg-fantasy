@@ -70,7 +70,7 @@ PR_FIELDS = ("mu", "se", "p", "p_quelle", "e", "rang", "rang_vorwoche", "trend",
 SIM_FIELDS = ("playoff", "division", "bye", "restsiege", "seeds")
 # je Woche (Arrays in teams.json › wochen); Matchup-Glück, laufende Summe und Effizienz kommen aus compute.py
 WEEK_FIELDS = ("pf", "pa", "optimal", "verschenkt", "efficiency", "wochenrang", "allplay_w", "allplay_l", "allplay_t",
-               "allplay_pct", "median_win", "median_abstand", "matchup_glueck", "matchup_kum", "gegner_pkt",
+               "allplay_pct", "median_win", "median_abstand", "gegner_abstand", "matchup_glueck", "matchup_kum", "gegner_pkt",
                "projektions_delta")
 
 

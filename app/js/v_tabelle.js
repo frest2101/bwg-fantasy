@@ -83,11 +83,11 @@ function division(box) {
 
 // ---------------------------------------------------------------- All-Play und Matchup-Glück (Saison und Woche)
 // Matchup-Glück je Woche: zählt nur, wenn das Ergebnis der Punkteseite widerspricht (Sieg unter dem Wochenmedian = +,
-// Niederlage über dem Median = −), Gewicht = Abstand zum Median / σ, gekappt bei 1. Ein Sieg als Wochen-4. ist kein Glück.
-const mgCell = (v, abst, erg) => {
+// Niederlage über dem Median = −), Gewicht = (eigener + Gegner-Abstand zum Median) / 2σ, gekappt bei 1. Ein Sieg als Wochen-4. ist kein Glück.
+const mgCell = (v, abst, gabst, erg) => {
   if (!U.ok(v)) return U.na('kein Spiel');
   if (v === 0) return h('span', {class: 'na'}, '0,00', h('span', {class: 'vh'}, ' (verdient)'));
-  const why = erg === 'W' ? `Sieg ${U.num(-abst, 1)} unter dem Median` : `Niederlage ${U.num(abst, 1)} über dem Median`;
+  const why = erg === 'W' ? `Sieg ${U.num(-abst, 1)} unter dem Median, Gegner ${U.num(-gabst, 1)} darunter` : `Niederlage ${U.num(abst, 1)} über dem Median, Gegner ${U.num(gabst, 1)} darüber`;
   return h('span', {class: v > 0 ? 'W' : 'L', title: why}, U.sgn(v), h('span', {class: 'vh'}, ` (${why})`));
 };
 function allplay(box, r, svg, wi, week) {
@@ -101,7 +101,7 @@ function allplay(box, r, svg, wi, week) {
       {k: 'ap', l: anyT ? 'AP W-L-T' : 'AP W-L', num: 1, v: t => W(t).allplay_pct[wi], f: t => U.apwl(W(t).allplay_w[wi], W(t).allplay_l[wi], W(t).allplay_t[wi], anyT)},
       c.wk('allplay_pct', 'AP %', wi, U.pct), c.erg(wi), c.gegner(wi),
       {k: 'md', l: 'zum Median', num: 1, v: t => W(t).median_abstand[wi], f: t => U.val(W(t).median_abstand[wi], v => U.sgn(v, 1), 'kein Spiel')},
-      {k: 'mg', l: 'Matchup-Glück', num: 1, v: mg, f: t => mgCell(mg(t), W(t).median_abstand[wi], W(t).ergebnis[wi])},
+      {k: 'mg', l: 'Matchup-Glück', num: 1, v: mg, f: t => mgCell(mg(t), W(t).median_abstand[wi], W(t).gegner_abstand[wi], W(t).ergebnis[wi])},
       c.wk('gegner_pkt', 'Spielplan Pkt', wi, U.sgn)],
     note: 'Gegner: Kürzel und dessen Wochenrang. Spielplan Pkt = Ligaschnitt − Punkte des Gegners (+ = leichter Gegner).'}),
     U.legend(['wochenrang', 'ap-wl', 'allplay', 'median', 'matchup-woche', 'spielplan-pkt']),
@@ -131,7 +131,7 @@ function allplay(box, r, svg, wi, week) {
     desc: `Laufende Summe je Team; ${most.name} hervorgehoben (zuletzt ${U.sgn(most.matchup_glueck)}). Graue Linien: übrige Teams.`,
     x: xl, series: S.teams.map(t => ({name: t.kuerzel, vals: W(t).matchup_kum, hi: t.team_id === hi}))}),
   () => ({heads: ['Woche', ...S.teams.map(t => t.kuerzel)], rows: weeks.map((w, i) => ['W' + w, ...S.teams.map(t => U.sgn(W(t).matchup_kum[i]))])}),
-  h('p', {class: 'note'}, 'Je Woche: Sieg unter dem Wochenmedian = Glück (+), Niederlage über dem Median = Pech (−), Gewicht = Abstand zum Median in σ, höchstens 1. ', U.ib('matchup-woche', ''))));
+  h('p', {class: 'note'}, 'Je Woche: Sieg unter dem Wochenmedian = Glück (+), Niederlage über dem Median = Pech (−), Gewicht = eigener und Gegner-Abstand zum Median in σ, höchstens 1. ', U.ib('matchup-woche', ''))));
 }
 
 // ---------------------------------------------------------------- Punkte (Saison und Woche)
