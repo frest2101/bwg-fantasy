@@ -43,7 +43,7 @@
 {"id":"1f682a57-f2cc-48c7-a4a0-98ac44b0a627","type":"FREEAGENT","team_id":4,"datum":1790526434267,"periode":3,"items":[{"type":"ADD","player_id":4569603,"name":"Malik Washington","from_team_id":0,"to_team_id":4},{"type":"DROP","player_id":17427,"name":"Cairo Santos","from_team_id":4,"to_team_id":0}]},
 {"id":"07a8d454-3304-43bb-a623-569557fa8e27","type":"FREEAGENT","team_id":8,"datum":1790526720083,"periode":3,"items":[{"type":"ADD","player_id":4686422,"name":"Xavier Hutchinson","from_team_id":0,"to_team_id":8},{"type":"DROP","player_id":4430834,"name":"Jalen McMillan","from_team_id":8,"to_team_id":0}]}
 ],
-"aufstellungswechsel":{"1":10,"2":18,"3":5,"4":18,"5":21,"6":3,"7":8,"8":9,"9":16,"10":15},
+"aufstellungswechsel":{"1":15,"2":18,"3":5,"4":18,"5":21,"6":3,"7":8,"8":9,"9":16,"10":19},
 "draft":[
 {"pick":1,"runde":1,"runden_pick":1,"team_id":5,"player_id":4871023,"name":"Carnell Tate","keeper":false},
 {"pick":2,"runde":1,"runden_pick":2,"team_id":4,"player_id":4870808,"name":"Jeremiyah Love","keeper":false},
