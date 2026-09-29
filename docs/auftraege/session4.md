@@ -302,6 +302,14 @@ Damit sind zwei der drei Ablösekriterien der Routine „Wochenimport (Di)“ er
   - Die eigene Simulation ist entschiedener als die von ESPN (z. B. 4th Down 18 % gegen 46 % Playoff-Chance). Das ist Methodik; ESPN steht als Vergleich daneben.
 - **Tests:** 361 grün, keiner übersprungen.
 
+## Nachtrag 29.09.2026: Veröffentlichung
+- **Freigabe und Veröffentlichung:** Stephan hat den Diff freigegeben (52 Dateien). Danach Pages eingeschaltet (`build_type=workflow`), die Environment `github-pages` auf `main` beschränkt, Commit `b78a38d`, Push. Der erste Deploy war grün. Die Live-Seite liefert HTTP 200, das Manifest nach W3 und den Build-SHA in `app.js`/`style.css`, `noindex` ist gesetzt, `claude.json` ist über raw.githubusercontent.com erreichbar.
+- **Gegenprobe:** Wochenabruf von Hand, grün, 361 Tests auf Ubuntu, kein neuer Commit. Das Rechenwerk rechnet unter Windows und Linux byte-gleich, einschließlich der Simulation.
+- **Fehler aus Baustein 3:** Direkt nach dem Periodenwechsel lässt ESPN die Liste der Transaktionen weg; das Archiv wertete das als Fehler (Lauf rot, Pages übersprungen). Behoben mit Freigabe Stephan (`c4f665d`), danach grün.
+- **Härtung (Frage 5):** nur GitHub-eigene Actions, SHA-Pinning erzwungen; Pages und Wochenabruf laufen danach weiter grün.
+- **Kernsätze W3:** von Stephan freigegeben (`3226396`), live in der App.
+- **Ablösekriterien der Routine „Wochenimport (Di)“:** alle drei erfüllt; das Pausieren macht Stephan.
+
 **Arbeitsweise:** Zwei Prüf-Agenten teilten sich eine Hilfsdatei im Scratchpad. Dadurch wurde `scripts/players.py` kurz überschrieben, vom zuständigen Prüfer aber byte-genau wiederhergestellt; die Tests laufen grün. Seitdem bekommt jeder Agent einen eigenen Scratchpad-Ordner.
 
 ## Nicht in dieser Session
