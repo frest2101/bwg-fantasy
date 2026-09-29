@@ -5,7 +5,7 @@ Fantasy-Football-Rechenwerk für die BWG Fantasy Liga (ESPN, League-ID 116655585
 ## Ziel und Bausteine
 1. **ESPN-Abruf** – Rohdaten je Woche als JSON ablegen (dieser Baustein zuerst).
 2. **Rechenwerk** – Standings, All-Play, optimale Aufstellung/Coaching, Score mit Profilen, Form, Streak, Power Ranking, Playoff-Simulation, Record Book, D/ST-Faktoren, Spieler-Kennzahlen mit ROS, Liga-Historie; Tests gegen die Referenzwerte in `docs/referenz_*.md`.
-3. **Automatisierung** – öffentliches GitHub-Repo `frest2101/bwg-fantasy`. Action `Wochenabruf` dienstags 08:30 UTC mit Nachläufen Di 16:30 und Mi 08:30 UTC (`espn_fetch.py --due` → `compute.py` → `pytest` → Commit). Action `Transaktions-Archiv` täglich 05:17 UTC (`espn_fetch.py --transactions`: `mTransactions2` je Periode, `kona_league_communication` → `compute.py` → `pytest` → Commit). Beide committen nur bei Änderung; Rohdaten immer, die abgeleiteten Dateien (`season_2026.json`, `app/data`) nur bei grünem Rechenwerk und grünen Tests.
+3. **Automatisierung** – öffentliches GitHub-Repo `frest2101/bwg-fantasy`. Action `Wochenabruf` dienstags 08:30 UTC mit Nachläufen Di 16:30 und Mi 08:30 UTC (`espn_fetch.py --due` → `compute.py` → `pytest` → Commit). Action `Tageslauf` stündlich 06:45–11:45 und 15:40–21:40 UTC (`espn_fetch.py --transactions --pool --wetter`: `mTransactions2` je Periode und `kona_league_communication`, Pool-Auszug `pool/latest.json`, Wetter je Spiel aus Open-Meteo → `compute.py` → `pytest` → Commit; `--news` ist vorbereitet, aber aus). Beide committen nur bei Änderung; Rohdaten immer, die abgeleiteten Dateien (`season_2026.json`, `app/data`) nur bei grünem Rechenwerk und grünen Tests. `pages.yml` hört auf die Workflow-Namen `Wochenabruf` und `Tageslauf`. Action `Probe` nur von Hand, ohne Commit (Quellen-Check, `scripts/probe.py`).
 4. **App** – statische Web-Seite auf GitHub Pages (`https://frest2101.github.io/bwg-fantasy/`, Workflow `pages.yml` nach jedem erfolgreichen Datenlauf); ersetzt Saison-Dashboard und Record-Book-Zahlen aus Notion (Tabellen mit Wochensicht `#tabelle/allplay/w3` für All-Play, Punkte und Coaching, Regler für Gewichte, Spielplan, H2H, Rekorde, Spieler mit Formkurve und Rest of Season, D/ST-Faktoren, Playoffs). Datenvertrag: `docs/app_daten.md`.
 
 **Variante C (Entscheidung Stephan 28.09.2026):** Notion ist nur noch Wissensbasis für Regeln, Entscheidungen und Historie (Privat › Fantasy Football). Zahlen und Anzeige kommen aus diesem Repo und der App; das Repo schreibt nicht automatisch nach Notion. Die Cloud-Routinen „BWG Fantasy – Wochenimport (Di)“ und „Transaktions-Sync“ sind seit 29.09.2026 pausiert – abgelöst durch App v1 bzw. das Transaktions-Archiv nach lesendem Abgleich mit Notion. Seitdem schreibt nichts mehr automatisch nach Notion. Das Repo ist öffentlich: nur Ligadaten, nie Persönliches (Notizen, Ziele, Keeper-Pläne, Entscheidungslog).
@@ -28,13 +28,15 @@ Fantasy-Football-Rechenwerk für die BWG Fantasy Liga (ESPN, League-ID 116655585
 bwg-fantasy/
   CLAUDE.md
   README.md
-  scripts/espn_fetch.py                  # Baustein 1 (+ --due, --transactions für Baustein 3)
+  scripts/espn_fetch.py                  # Baustein 1 (+ --due für den Wochenabruf, --transactions --pool --wetter für den Tageslauf)
+  scripts/wetter.py, news.py, probe.py   # Tageslauf: Open-Meteo (Prognose, Ist), News je Spieler (vorbereitet, aus), Quellen-Probe
   scripts/compute.py                     # Baustein 2/4: einziger Einstieg; schreibt season_2026.json und app/data
   scripts/rawdata.py, lineup.py, zahlen.py  # Rohdaten-Zugriff (je Woche verdichtet), Aufstellungsregel, Rundung
   scripts/records.py, dst.py, players.py, powerranking.py, history.py  # Module des Rechenwerks (reine Funktionen)
   scripts/app_export.py, check_public.py # App-Daten nach docs/app_daten.md; Öffentlichkeits-Check
   .github/workflows/wochenabruf.yml      # Baustein 3: dienstags
-  .github/workflows/transaktionen.yml    # Baustein 3: täglich
+  .github/workflows/tageslauf.yml        # Baustein 3: stündlich vormittags und abends (13 Läufe je Tag)
+  .github/workflows/probe.yml            # nur von Hand: Quellen-Check ohne Commit
   .github/workflows/pages.yml            # Baustein 4: Deploy der App (nur app/)
   .github/dependabot.yml                 # Actions per SHA gepinnt, monatlicher Update-PR
   app/index.html, style.css, js/         # Baustein 4: App (ohne Framework, ohne Build)
@@ -42,8 +44,10 @@ bwg-fantasy/
   data/redaktion/power_ranking_2026.csv  # nur freigegebene Power-Ranking-Kernsätze (woche, slot, kernsatz)
   data/raw/2026/w03/*.json               # je Woche: Kern (mSettings, mTeam, mMatchupScore, mRoster) +
                                          #   kona_player_info, ros.json (Auszug), mStandings
-  data/raw/2026/nfl/, draft/, basis/     # NFL-Spielplan, Draft/Keeper, D/ST-Grundlage Vorjahr
+  data/raw/2026/nfl/, draft/, basis/     # NFL-Spielplan, Stadion-Tabelle stadien.json (von Hand), Draft/Keeper, D/ST-Grundlage Vorjahr
   data/raw/2026/transactions/            # mTransactions2_pNN.json, kona_league_communication_<UTC>.json
+  data/raw/2026/pool/latest.json         # Pool-Auszug des Tageslaufs (Status, Besitz, Verletzung, Waiver-Frist, Projektion je Spieler)
+  data/raw/2026/wetter/                  # prognose/wNN_<UTC>.json (nur laufende Woche), ist_2026.json (dauerhaft, W1–17)
   data/history/                          # Liga-Historie 2015–2025 aus Notion (CSV, ohne Manager)
   data/season_2026.json                  # Ergebnis des Rechenwerks
   docs/referenz_*.md                     # Referenzwerte für Tests (W1–W2, D/ST, Historie)
@@ -103,7 +107,8 @@ Data-Source-IDs zum Nachschlagen: Matchups `25588fd6-104c-4086-8e03-7680c8c19a6d
 ## Saisonwechsel (Checkliste, vor Saisonstart des Folgejahres)
 - In `scripts/espn_fetch.py` `DEFAULT_SEASON` und `WEEK1_START` umstellen (Dienstag der NFL-Woche 1). Ab dem 1. August des Folgejahres schlagen beide Actions sonst mit „Saison … ist vorbei“ fehl.
 - Team-IDs, Divisionen und Referenzen in dieser Datei gegen mTeam prüfen, Tests an die neue Saison anpassen.
-- GitHub schaltet geplante Workflows in öffentlichen Repos nach 60 Tagen ohne Commit ab (Offseason): `gh workflow enable wochenabruf.yml` und `gh workflow enable transaktionen.yml`. `pages.yml` hängt an ihnen und braucht nichts.
+- GitHub schaltet geplante Workflows in öffentlichen Repos nach 60 Tagen ohne Commit ab (Offseason): `gh workflow enable wochenabruf.yml` und `gh workflow enable tageslauf.yml`. `pages.yml` hängt an ihnen und braucht nichts.
+- Stadion-Tabelle `data/raw/<Saison>/nfl/stadien.json` neu prüfen (Stadionwechsel, Auslandsspiele der neuen Saison mit ESPN-Spiel-IDs aus dem Spielplan; Spielorte je Spiel liefert die ESPN-Scoreboard-API `site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?seasontype=2&week=N&dates=<Saison>` mit `venue`, `indoor`, `neutralSite`).
 - Bis W1 der neuen Saison final ist, rechnet `compute.py` nichts und endet grün („noch keine abgeschlossene Woche“); die App zeigt so lange den Stand der alten Saison.
 - Saison in `data/history` übernehmen (Grundlage des Vorjahres-Priors im Power Ranking; Spalte T für Unentschieden ergänzen), die D/ST-Grundlage des Vorjahrs holt der erste Wochenabruf neu (`basis/`), neue `data/redaktion/power_ranking_<Saison>.csv` anlegen, Kürzel in `scripts/app_export.py` (KUERZEL) prüfen.
 
@@ -129,4 +134,7 @@ Data-Source-IDs zum Nachschlagen: Matchups `25588fd6-104c-4086-8e03-7680c8c19a6d
 - Luck (29.09.2026): Formel bleibt; Anzeige mit Zufallsband und Hinweis, dass Luck Paarungsglück misst, nicht Kaderstärke (Frage Stephan zu Hugh Jass).
 - Luck → Matchup-Glück (29.09.2026): Stephan will Siege mit Punkten vergleichen, nicht mit der All-Play-Position; ein Sieg als Wochen-4. ist kein Glück, der Wochen-2., der gegen den 1. verliert, hat erhebliches Pech. Daher die gestufte Median-Formel; Spielplan getrennt in Punkten. Nachtrag: Der Gegner soll in der Zahl stecken – aber nur, wo er entschieden hat (Gewicht aus eigenem und Gegner-Abstand zum Median), nicht als Summe über alle Wochen (das würde SaschaM +1 für einen Sieg schenken, den 288 Punkte ohnehin bringen). Name „Matchup-Glück“ (Stephan); Diskussion und verworfene Varianten in `docs/auftraege/session5.md`.
 - Merge (29.09.2026): Claude merged Arbeitsbranches selbst nach `main` (Pull Request anlegen und sofort mergen), sobald Tests, Öffentlichkeits-Check und Gegenprüfung grün sind – keine Freigabe des Diffs vor dem Merge mehr; Pages baut nur aus `main`.
+- Waiver-Sichtbarkeit (29.09.2026): ESPN meldet `waiverProcessDate` 07:00 UTC, in der App sind die Waiver-Ergebnisse erfahrungsgemäß erst 10:30–11:00 Uhr deutscher Zeit sichtbar – deshalb läuft der Tageslauf vormittags stündlich 06:45–11:45 UTC statt einmal früh. Nach dem Wochenwechsel (Dienstag) stehen alle freien Spieler bis zur nächsten Verarbeitung auf `WAIVERS`, danach `FREEAGENT`.
+- Quellen Wetter und News (29.09.2026, Probe-Lauf): Wetter aus Open-Meteo (`start_hour`/`end_hour`, Modellwerte, rund drei Monate zurück und zwei Wochen voraus, frei ohne Schlüssel); die ESPN-Scoreboard-API liefert nur AccuWeather-Stichworte in °F, aber Spielort, `indoor` und `neutralSite` je Spiel (Prüfgrundlage der Stadion-Tabelle). News je Spieler: `site.api.espn.com/apis/fantasy/v2/games/ffl/news/players?playerId=<id>&days=<n>` (Rotowire-Meldungen und ESPN-Stories mit Schlagzeile, Datum, Link; `lastNewsDate` im Pool entspricht der jüngsten Meldung) – als `--news` vorbereitet, Stufe 2 erst nach Stephans Entscheidung. Der News-Teil merkt sich je Spieler in `news/lastNewsDate.json`, bis wohin er geholt hat (nicht Vergleich mit dem vorigen Pool-Auszug: der ist beim News-Teil schon überschrieben, Fehlschläge gingen sonst verloren).
+- `workflow_dispatch` (29.09.2026): `gh workflow run` findet einen Workflow nur, wenn seine Datei auf `main` liegt; ein neuer Workflow kommt deshalb zuerst per eigenem Pull Request nach `main`, dann `gh workflow run <datei> --ref <branch>`.
 - Routinen abgelöst (29.09.2026): Abgleich Transaktions-Archiv ↔ Notion Roster-Ereignisse – alles aus Notion steht im Archiv (Keeper und Draft 240/240, ausgeführte Moves ab 01.09. 61/61); das Archiv hat zwei IR-Daten genauer und zusätzlich die Vorsaison-Moves; einzige Lücke: der Trade ohne Spieler. Die Woche Parallelbetrieb entfällt, weil ESPN jede Periode vollständig nachliefert. Auf Stephans Anweisung pausiert Claude Routinen selbst (RemoteTrigger, `enabled: false`); Löschen macht Stephan.
