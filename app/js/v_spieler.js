@@ -1,9 +1,9 @@
-// Tab Spieler (lädt players.json): Liste mit Filtern in 50er-Blöcken, Detail #spieler/<id> mit Formkurve und ROS
+// Tab Spieler (lädt players.json, dazu waiver.json als Tagesstand): Liste mit Filtern in 50er-Blöcken, Detail #spieler/<id>
+// mit Formkurve, ROS und News-Kasten (nur Datum der letzten ESPN-Meldung und Verweise, nie Text).
 let U, S, h;
 const POS = ['QB', 'RB', 'WR', 'TE', 'K', 'D/ST'];
-const INJ = {QUESTIONABLE: ['Q', 'fraglich'], DOUBTFUL: ['D', 'zweifelhaft'], OUT: ['O', 'fällt aus'], INJURY_RESERVE: ['IR', 'Injured Reserve'],
-  SUSPENSION: ['SSPD', 'gesperrt'], DAY_TO_DAY: ['DTD', 'Day-to-Day']};
-const STAT = {ONTEAM: 'Kader', FREEAGENT: 'Free Agent', WAIVERS: 'Waivers'};
+// Tagesstand je Spieler (waiver.json, stündlich) überlagert diese Wochenwerte: Team, Status, Verletzung, Besitz
+const DAILY = ['team', 'status', 'inj', 'own'];
 
 export async function render(box, ctx, r) {
   U = ctx.ui; S = U.S; h = U.h;
@@ -12,9 +12,25 @@ export async function render(box, ctx, r) {
   U.ap(box, h1, detail ? null : U.spGroup('spieler'));
   const P = await ctx.lazy('players.json', 'Spielerdaten', box);
   if (!r.alive()) return;
+  // Tagesstand ist Zugabe: ohne waiver.json (vor dem ersten Tageslauf, Ladefehler) gilt der Wochenstand
+  const W = S.man.files?.['waiver.json'] ? await ctx.load('waiver.json').catch(() => null) : null;
+  if (!r.alive()) return;
   const svg = await ctx.mod('svg');
   const rosWhy = P.ros_nach_woche == null ? `ab Wochenabruf W${S.tw + 1}` : 'keine Projektion';
-  if (detail) one(box, h1, P, r.sub, svg, rosWhy); else list(box, P, r, rosWhy);
+  const rows = merge(P, W);
+  if (detail) one(box, h1, P, W, rows, r.sub, svg, rosWhy); else list(box, W, rows, r, rosWhy);
+}
+
+// Wochenwerte je Spieler mit dem Tagesstand überlagern (Schlüssel: Spieler-ID); ohne Tagesstand unverändert
+export function merge(P, W) {
+  const daily = new Map((W?.spieler || []).map(x => [x.id, x]));
+  return P.players.map(p => {
+    const d = daily.get(p.id);
+    if (!d) return p;
+    const out = {...p, own_d: d.own_d, started: d.started, waiver_bis: d.waiver_bis, proj_n: d.proj, news: d.news};
+    for (const k of DAILY) if (d[k] !== undefined) out[k] = d[k];
+    return out;
+  });
 }
 
 const trendTxt = t => {
@@ -22,26 +38,26 @@ const trendTxt = t => {
   return v ? h('span', {class: v === '↑' ? 'up' : v === '↓' ? 'dn' : 'eq', title: 'Trend'}, v,
     h('span', {class: 'vh'}, v === '↑' ? ' steigend' : v === '↓' ? ' fallend' : ' stabil')) : null;
 };
-const inj = s => INJ[s] ? [h('span', {class: 'inj', 'aria-hidden': 'true'}, INJ[s][0]), h('span', {class: 'vh'}, ' ' + INJ[s][1])] : null;
-const stand = () => {
+function stand(W) {
+  if (W?.stand) return h('p', {class: 'note'}, `Team, Status, Besitz und Verletzung: Tagesstand ${U.stamp(W.stand)}`, ' ', U.ib('tagesstand', ''));
   const ds = S.man.datenstand || {}, w = S.weeks.find(x => x.week === (ds.pool_woche ?? S.tw) + 1);
-  return h('p', {class: 'note'}, `Besitz und Verletzung: Stand nach W${ds.pool_woche ?? S.tw}` + (w ? ` (${U.datum(w.start)})` : ''), U.ib('besitz', ''));
-};
+  return h('p', {class: 'note'}, `Besitz und Verletzung: Stand nach W${ds.pool_woche ?? S.tw}` + (w ? ` (${U.datum(w.start)})` : ''), ' ', U.ib('besitz', ''));
+}
 
-function list(box, P, r, rosWhy) {
+function list(box, W, all, r, rosWhy) {
   const q = r.q;
   const st = {pos: POS.includes(q.get('pos')) ? q.get('pos') : '', status: ['kader', 'frei'].includes(q.get('status')) ? q.get('status') : 'alle',
     team: +q.get('team') || 0, sicht: ['ros', 'besitz'].includes(q.get('sicht')) ? q.get('sicht') : 'saison', text: ''};
   const count = h('p', {class: 'note', 'aria-live': 'polite'});
   const slotBox = h('div');
-  const rows = () => P.players.filter(p => (!st.pos || p.pos === st.pos)
+  const rows = () => all.filter(p => (!st.pos || p.pos === st.pos)
     && (st.status === 'alle' || (st.status === 'kader' ? p.team > 0 : !(p.team > 0)))
     && (!st.team || p.team === st.team)
     && (!st.text || p.name.toLowerCase().includes(st.text)));
   const num = (k, l, f = U.num, why) => ({k, l, num: 1, v: p => p[k], f: p => U.val(p[k], f, why)});
   const base = [
     {k: 'name', l: 'Spieler', v: p => p.name.toLowerCase(), d: 1, flt: false, f: p => h('a', {href: '#spieler/' + p.id, class: 'pl'},
-      h('span', null, p.name, inj(p.inj)), h('span', {class: 'sub'}, `${p.pos} · ${p.nfl}` + (p.team > 0 ? ' · ' + U.kz(p.team) : '')))},
+      h('span', null, p.name, U.inj(p.inj)), h('span', {class: 'sub'}, `${p.pos} · ${p.nfl}` + (p.team > 0 ? ' · ' + U.kz(p.team) : '')))},
     num('avg', 'Ø', U.num, 'ohne Spiel'),
     {k: 'form', l: 'Form', num: 1, v: p => p.form, f: p => [U.val(p.form, U.num, 'ohne Spiel'), ' ', trendTxt(p.trend)]},
     num('ros_g', 'ROS/Sp.', U.num, rosWhy)];
@@ -50,10 +66,13 @@ function list(box, P, r, rosWhy) {
       num('sd', 'Konstanz', U.num, 'unter 2 Spielen'), num('starts', 'Starts', v => v), num('bench_pts', 'Bank-Pkt'),
       num('proj_d', 'Proj.-Δ', U.sgn, 'ohne Spiel'), {k: 'spark', l: 'Formkurve', f: p => h('span', {class: 'sp', 'aria-hidden': 'true'}, p.spark || '')}],
     ros: [num('ros', 'ROS', U.num, rosWhy), num('rest_g', 'Restspiele', v => v, rosWhy), num('ros_po', 'ROS PO', U.num, rosWhy),
-      {...num('ros_rang', 'ROS-Rang', v => v + '.', rosWhy), d: 1}, num('ros_ue', 'ROS ü. Ersatz', U.sgn, rosWhy)],
-    besitz: [num('own', 'Besitz %', v => U.pct(v)), {k: 'status', l: 'Status', v: p => p.status, d: 1, f: p => STAT[p.status] || p.status || '–'},
-      {k: 'inj', l: 'Verletzung', v: p => INJ[p.inj] ? p.inj : null, d: 1, f: p => INJ[p.inj]?.[1] || (p.inj === 'ACTIVE' ? 'aktiv' : '–')},
-      {k: 'team', l: 'Team', v: p => U.kz(p.team), d: 1, f: p => p.team > 0 ? U.tl(p.team) : (STAT[p.status] || 'frei')}]};
+      {...num('ros_rang', 'ROS-Rang', v => v + '.', rosWhy), d: 1}, num('ros_ue', 'ROS ü. Ersatz', U.sgn, rosWhy),
+      {k: 'bye', l: 'Bye', num: 1, cat: 1, v: p => p.bye, d: 1, f: p => U.val(p.bye, v => 'W' + v, 'kein NFL-Team')}],
+    besitz: [num('own', 'Besitz %', v => U.pct(v)),
+      ...(W ? [num('own_d', 'Δ Tag', v => U.sgn(v, 2), 'keine Tagesdaten'), num('started', 'gestartet %', v => U.pct(v), 'keine Tagesdaten')] : []),
+      {k: 'status', l: 'Status', v: p => p.status, d: 1, f: p => U.STAT[p.status] || p.status || '–'},
+      {k: 'inj', l: 'Verletzung', v: p => U.INJ[p.inj] ? p.inj : null, d: 1, f: p => U.INJ[p.inj]?.[1] || (p.inj === 'ACTIVE' ? 'aktiv' : '–')},
+      {k: 'team', l: 'Team', v: p => U.kz(p.team), d: 1, f: p => p.team > 0 ? U.tl(p.team) : (U.STAT[p.status] || 'frei')}]};
   const sortKey = {saison: 'pts', ros: 'ros_g', besitz: 'own'};
   const fst = {}, filters = [{k: 'nfl', l: 'NFL-Team', v: p => p.nfl, d: 1, cat: 1, f: p => p.nfl}];
   let tbl;
@@ -67,7 +86,7 @@ function list(box, P, r, rosWhy) {
     U.setQ('spieler', {pos: st.pos || null, status: st.status !== 'alle' ? st.status : null, team: st.team || null, sicht: st.sicht !== 'saison' ? st.sicht : null});
   };
   let timer;
-  U.ap(box, stand(),
+  U.ap(box, stand(W),
     h('div', {class: 'row'}, U.seg('Position', [['', 'Alle'], ...POS.map(p => [p, p])], st.pos, v => { st.pos = v; refresh(); })),
     h('div', {class: 'row'}, U.seg('Status', [['alle', 'Alle'], ['kader', 'Kader'], ['frei', 'Frei']], st.status, v => { st.status = v; refresh(); }),
       h('label', null, h('span', {class: 'vh'}, 'Fantasy-Team '), h('select', {onchange: e => { st.team = +e.target.value; refresh(); }},
@@ -79,19 +98,43 @@ function list(box, P, r, rosWhy) {
       }})),
     U.seg('Spalten', [['saison', 'Saison'], ['ros', 'ROS'], ['besitz', 'Besitz']], st.sicht, v => { st.sicht = v; refresh(true); })),
     count, slotBox,
-    U.legend(['filter', 'avg', 'form-sp', 'trendpfeil', 'ros-spiel', 'spiele', 'floor-ceil', 'konstanz', 'starts', 'proj-delta-sp', 'ros', 'restspiele', 'ros-po', 'ros-rang', 'ros-ue', 'projektionen']));
+    U.legend(['filter', 'avg', 'form-sp', 'trendpfeil', 'ros-spiel', 'spiele', 'floor-ceil', 'konstanz', 'starts', 'proj-delta-sp', 'ros', 'restspiele', 'ros-po', 'ros-rang', 'ros-ue', 'besitz-trend', 'projektionen']));
   refresh(true);
 }
 
-function one(box, h1, P, pid, svg, rosWhy) {
-  const p = P.players.find(x => String(x.id) === pid);
+// ---------------------------------------------------------------- Deep-Links (nur Verweise, keine Texte)
+const SUFFIX = /\s+(jr|sr|ii|iii|iv|v)\.?$/i;
+// FantasyPros führt Spieler ohne Namenszusatz (deebo-samuel), Namensvettern aber mit (marvin-harrison-jr):
+// bei Zusatz deshalb die Suche statt eines geratenen Slugs
+export const fpUrl = name => SUFFIX.test(name) ? `https://www.fantasypros.com/search/?q=${encodeURIComponent(name)}`
+  : `https://www.fantasypros.com/nfl/players/${name.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/['’.]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}.php`;
+export function links(p) {
+  const dst = p.pos === 'D/ST' || p.id < 0;
+  const q = encodeURIComponent(dst ? p.name.replace(/\s*D\/ST$/, '') : p.name);
+  const out = dst ? [[`https://www.espn.com/nfl/team/_/name/${String(p.nfl || '').toLowerCase()}`, 'ESPN-Teamseite']]
+    : [[`https://www.espn.com/nfl/player/_/id/${p.id}`, 'ESPN-Spielerseite'],
+      [`https://fantasy.espn.com/football/player?playerId=${p.id}`, 'ESPN-Fantasy-Karte'],
+      [fpUrl(p.name), 'FantasyPros']];
+  out.push([`https://www.nbcsports.com/search?q=${q}`, 'NBC Sports (Rotoworld) – Suche']);
+  return out;
+}
+function newsBox(p, W) {
+  const last = !W ? U.na('keine Tagesdaten') : U.ok(p.news) ? U.stamp(p.news) : U.na('keine Meldung');
+  return U.card('News', h('p', null, 'Letzte ESPN-Meldung: ', h('strong', null, last), ' ', U.ib('news', '')),
+    h('div', {class: 'row'}, links(p).map(([href, text]) => h('a', {href, target: '_blank', rel: 'noopener', class: 'btn'}, text, h('span', {class: 'vh'}, ' (neues Fenster)')))),
+    h('p', {class: 'note'}, 'Nur Verweise: Die App übernimmt keine Texte. ', W?.stand ? `Tagesstand ${U.stamp(W.stand)}.` : ''));
+}
+
+function one(box, h1, P, W, rows, pid, svg, rosWhy) {
+  const p = rows.find(x => String(x.id) === pid);
   U.ap(box, h('p', null, h('a', {href: '#spieler'}, '← Spielerliste')));
   if (!p) { h1.textContent = 'Spieler nicht gefunden'; U.ap(box, h('p', {class: 'note'}, 'Dieser Spieler steht nicht in den App-Daten (nur Kader, Spieler mit Einsatz und die besten Free Agents).')); return; }
   h1.textContent = p.name;
   const ers = P.ersatz?.[p.pos];
-  U.ap(box, h('p', null, `${p.pos} · ${p.nfl} · `, p.team > 0 ? U.tl(p.team) : STAT[p.status] || 'frei',
-    p.inj && INJ[p.inj] ? h('span', {class: 'badge'}, INJ[p.inj][1]) : null,
-    p.pos === 'D/ST' ? [' · ', h('a', {href: '#dst'}, 'D/ST-Faktoren')] : null), stand(),
+  U.ap(box, h('p', null, `${p.pos} · ${p.nfl} · `, p.team > 0 ? U.tl(p.team) : U.STAT[p.status] || 'frei',
+    p.inj && U.INJ[p.inj] ? h('span', {class: 'badge'}, U.INJ[p.inj][1]) : null,
+    U.ok(p.bye) ? ` · Bye W${p.bye}` : null,
+    p.pos === 'D/ST' ? [' · ', h('a', {href: '#dst'}, 'D/ST-Faktoren')] : null), stand(W),
   h('div', {class: 'tiles'},
     U.tile('Pkt Saison', U.num(p.pts), `${p.g ?? 0} Spiele`, 'spiele'),
     U.tile('Ø', U.val(p.avg, U.num, 'ohne Spiel'), null, 'avg'),
@@ -100,14 +143,17 @@ function one(box, h1, P, pid, svg, rosWhy) {
     U.tile('Form', [U.val(p.form, U.num, 'ohne Spiel'), ' ', trendTxt(p.trend)], `Form Δ ${U.sgn(p.form_d)}`, 'form-sp'),
     U.tile('Starts', U.val(p.starts, v => v), `Bank-Punkte ${U.num(p.bench_pts)}`, 'starts'),
     U.tile('Proj.-Δ', U.val(p.proj_d, U.sgn, 'ohne Spiel'), null, 'proj-delta-sp'),
-    U.tile('Besitz', U.val(p.own, v => U.pct(v)), STAT[p.status] || p.status, 'besitz')));
-  const W = P.weeks || [], wk = p.wk || [];
+    U.tile('Besitz', U.val(p.own, v => U.pct(v)), [U.STAT[p.status] || p.status, W && U.ok(p.own_d) ? ` · Δ ${U.sgn(p.own_d, 2)}` : ''], W ? 'besitz-trend' : 'besitz'),
+    W ? U.tile(`Proj. W${W.woche}`, U.val(p.proj_n, U.num, 'noch keine ESPN-Projektion'),
+      p.status === 'WAIVERS' && U.ok(p.waiver_bis) ? `Frist ${U.stamp(p.waiver_bis)}` : null, 'proj-naechste') : null),
+  newsBox(p, W));
+  const Wk = P.weeks || [], wk = p.wk || [];
   const vals = wk.map(x => x[2] ? null : x[0]);
   U.ap(box, svg.fig('Formkurve', svg.bars({title: `Formkurve ${p.name}`,
     desc: `Punkte je Woche; ${p.g ?? 0} Spiele, Ø ${U.num(p.avg)}; „·“ = Bye, „–“ = nicht gespielt, Strich = Projektion.`,
-    x: W.map(w => 'W' + w), vals, miss: i => wk[i]?.[2] ? '·' : '–', tick: wk.map(x => x[1]),
+    x: Wk.map(w => 'W' + w), vals, miss: i => wk[i]?.[2] ? '·' : '–', tick: wk.map(x => x[1]),
     cls: i => wk[i]?.[4] == null || U.bench(wk[i][4]) ? 'bN' : 'bA', label: i => U.ok(wk[i]?.[0]) ? U.num(wk[i][0], 1) : null, yfmt: v => U.num(v, 0)}),
-  {heads: ['Woche', 'Pkt', 'Proj.', 'Team', 'Slot'], rows: W.map((w, i) => ['W' + w, wk[i]?.[2] ? 'Bye' : U.num(wk[i]?.[0]), U.num(wk[i]?.[1]),
+  {heads: ['Woche', 'Pkt', 'Proj.', 'Team', 'Slot'], rows: Wk.map((w, i) => ['W' + w, wk[i]?.[2] ? 'Bye' : U.num(wk[i]?.[0]), U.num(wk[i]?.[1]),
     wk[i]?.[3] ? U.kz(wk[i][3]) : 'frei', U.slot(wk[i]?.[4])])},
   h('p', {class: 'note'}, 'Blau = Starter, grau = Bank oder ohne Team, orange Strich = ESPN-Projektion. ', U.ib('formkurve', ''))));
   U.ap(box, h('h2', null, 'Rest of Season'), P.ros_nach_woche == null ? h('p', {class: 'warn'}, `ROS-Werte ${rosWhy}.`) : null,

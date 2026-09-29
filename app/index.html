@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex">
 <meta name="color-scheme" content="light dark">
-<meta name="description" content="Tabellen, Ranking, Spielplan, Spieler und Rekorde der BWG Fantasy Liga 2026 – inoffizielle Auswertung.">
+<meta name="description" content="Tabellen, Ranking, Spielplan, Spieler, Waiver und Rekorde der BWG Fantasy Liga 2026 – inoffizielle Auswertung.">
 <title>BWG Fantasy 2026</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230b5aa6'/%3E%3Ctext x='16' y='22' font-size='16' font-family='sans-serif' font-weight='700' fill='white' text-anchor='middle'%3EB%3C/text%3E%3C/svg%3E">
 <link rel="stylesheet" href="style.css?v=__BUILD__">
@@ -27,6 +27,7 @@
 <a href="#ranking" data-s="ranking">Ranking</a>
 <a href="#spielplan" data-s="spielplan">Spielplan</a>
 <a href="#spieler" data-s="spieler">Spieler</a>
+<a href="#waiver" data-s="waiver">Waiver</a>
 <a href="#rekorde" data-s="rekorde">Rekorde</a>
 </nav>
 <div id="banner" class="banner" role="status" hidden></div>
@@ -65,7 +66,7 @@
 <div><dt id="g-form">Form</dt><dd>Ø PF der letzten drei gespielten Wochen.</dd></div>
 <div><dt id="g-form-delta">Form Δ</dt><dd>Form − PF/Spiel. Das ±-Band σ · √(1/3 − 1/n) zeigt die rein zufällige Schwankung; Werte innerhalb des Bands sind nicht deutbar. Erst ab 4 Spielen.</dd></div>
 <div><dt id="g-proj-delta">Projektions-Delta</dt><dd>Σ PF − Σ ESPN-Projektion der eingesetzten Starter.</dd></div>
-<div><dt id="g-waiver">Waiver-Prio</dt><dd>Aktueller Platz in der Waiver-Reihenfolge laut ESPN (1 = zuerst).</dd></div>
+<div><dt id="g-waiver">Waiver-Prio</dt><dd>Platz in der Waiver-Reihenfolge laut ESPN zum Wochenabruf (1 = zuerst); den Tagesstand zeigt der Waiver-Tab.</dd></div>
 <div><dt id="g-moves">Moves</dt><dd>Zahl der Spielerzugänge laut ESPN.</dd></div>
 <div data-b="Score"><dt id="g-score">Score („Echter Tabellenführer“)</dt><dd>Σ Gewicht × Normwert / Σ Gewichte über sieben Kennzahlen. Der Browser rechnet nur diese Gewichtung; die Normwerte kommen fertig aus dem Rechenwerk.</dd></div>
 <div><dt id="g-kennzahlen">Kennzahlen</dt><dd>PF/Spiel, All-Play-Quote, Win %, Coaching-Effizienz, Kader (Potenzial bzw. Projektion ROS), Floor, Form.</dd></div>
@@ -103,7 +104,7 @@
 <div><dt id="g-ros-rang">ROS-Rang</dt><dd>Platz innerhalb der Position über alle Spieler, im Kader und im Pool.</dd></div>
 <div><dt id="g-ersatz">Ersatzniveau</dt><dd>Ø ROS/Spiel der drei besten verfügbaren Spieler der Position (Free Agents und Waivers, ohne OUT/IR).</dd></div>
 <div><dt id="g-ros-ue">ROS über Ersatz</dt><dd>(ROS/Spiel − Ersatzniveau) × Restspiele.</dd></div>
-<div><dt id="g-besitz">Besitz und Verletzung</dt><dd>Anteil der ESPN-Ligen, in denen der Spieler im Kader steht, und Verletzungsstatus – jeweils Stand des letzten Abrufs.</dd></div>
+<div><dt id="g-besitz">Besitz und Verletzung</dt><dd>Anteil der ESPN-Ligen, in denen der Spieler im Kader steht, und Verletzungsstatus – jeweils Stand des letzten Abrufs: der Tagesstand des Tageslaufs, davor der Wochenabruf.</dd></div>
 <div><dt id="g-filter">Filter</dt><dd>„Filter“ öffnet ein Blatt mit einem Dropdown je Spalte. Zahlenspalten bieten Stufen aus den aktuellen Werten („≥ 15“; bei Rängen „≤ 5“), Text- und Wertespalten die vorkommenden Werte. Mehrere Filter gelten zusammen, jeder erscheint als Chip über der Tabelle und lässt sich dort antippen und entfernen; „–“ fällt bei aktivem Zahlenfilter heraus.</dd></div>
 <div><dt id="g-projektionen">Projektionen</dt><dd>Alle Projektionen stammen von ESPN und sind Schätzungen, keine Wahrheit.</dd></div>
 <div data-b="D/ST"><dt id="g-z-dst">Off. zugelassen (Z)</dt><dd>D/ST-Punkte im Liga-Scoring, die gegnerische D/ST gegen diese Offense je Spiel erzielt haben (n = Spiele).</dd></div>
@@ -128,9 +129,20 @@
 <div data-b="Moves"><dt id="g-transaktionen">Transaktionen</dt><dd>Nur ausgeführte Moves und angenommene Trades; keine gescheiterten Claims und keine Trade-Vorschläge. Trades in v1 ohne Spieler.</dd></div>
 <div><dt id="g-aufstellungswechsel">Aufstellungswechsel</dt><dd>Zahl der Slot-Wechsel je Team, nur als Summe.</dd></div>
 <div><dt id="g-draft">Draft</dt><dd>Picks des Drafts 2026 inklusive Keeper.</dd></div>
+<div data-b="Waiver"><dt id="g-tagesstand">Tagesstand</dt><dd>Team, Status, Verletzung, Besitz, Frist, Projektion der nächsten Woche und letzte ESPN-Meldung je Spieler kommen aus dem Tageslauf (stündlich vormittags und abends) und gelten zum genannten Abrufzeitpunkt; Namen, Positionen, Byes und ROS stammen aus dem Wochenabruf.</dd></div>
+<div><dt id="g-verfuegbar">Verfügbar</dt><dd>Status Waivers oder Free Agent laut Tagesstand. Nach dem Wochenwechsel (Dienstag) stehen alle freien Spieler bis zur Waiver-Verarbeitung auf Waivers.</dd></div>
+<div><dt id="g-proj-naechste">Proj. Wn</dt><dd>ESPN-Projektion des Spielers für die nächste Woche (Tagesstand); „–“, solange ESPN die neue Woche noch nicht projiziert hat.</dd></div>
+<div><dt id="g-bye-hinweis">Bye</dt><dd>Spielfreie Woche des NFL-Teams; rot, wenn sie die nächste Woche ist (der Spieler bringt dann keine Punkte).</dd></div>
+<div><dt id="g-besitz-trend">Besitz-Trend</dt><dd>Besitz % = Anteil der ESPN-Ligen, in denen der Spieler im Kader steht (ESPN-weit, nicht diese Liga); Δ Tag = Änderung gegenüber dem Vortag in Prozentpunkten; gestartet % = Anteil der Ligen, in denen er aufgestellt ist. Steigender Besitz zeigt, wen viele Manager gerade holen.</dd></div>
+<div><dt id="g-frist">Frist</dt><dd>Ende der Waiver-Frist laut ESPN in deutscher Zeit; ESPN verarbeitet um 07:00 UTC (09:00 MESZ, 08:00 MEZ), sichtbar sind die Ergebnisse in der ESPN-App erfahrungsgemäß erst 10:30–11:00 Uhr. Free Agents haben keine Frist („–“).</dd></div>
+<div><dt id="g-bedarf">Bedarf</dt><dd>Je Team die nach ROS/Spiel beste Aufstellung des aktuellen Kaders (Tagesstand, Aufstellungsregel der Liga). Lücken sind Starter mit ROS/Spiel unter dem Ersatzniveau ihrer Position und unbesetzte Slots; „über Ersatz“ zählt je Position die Kaderspieler über dem Ersatzniveau. Nur Regular-Season-ROS, ohne Ersatzniveau der Position (kein verfügbarer Spieler) zählt nur ein leerer Slot.</dd></div>
+<div><dt id="g-waiver-reihenfolge">Waiver-Reihenfolge</dt><dd>Reihenfolge der Claims laut ESPN (1 = zuerst), Tagesstand aus dem Tageslauf; davor der Stand des Wochenabrufs. ESPN verarbeitet um 07:00 UTC, in der ESPN-App sichtbar erst 10:30–11:00 Uhr.</dd></div>
+<div><dt id="g-claims">Claims der letzten 7 Tage</dt><dd>Ausgeführte Waiver-Claims und Free-Agent-Zugänge der letzten sieben Tage mit Abgängen; alle Moves und der Draft stehen unter Moves.</dd></div>
+<div><dt id="g-positions-matchup">Positions-Matchup</dt><dd>Folgt in Session 8: Faktor je Defense und Position (Vorjahr als Prior) mit Rang für die nächste Woche und den Rest; bis dahin ohne Spalte.</dd></div>
+<div><dt id="g-news">Letzte ESPN-Meldung</dt><dd>Datum der jüngsten ESPN-Meldung zum Spieler laut Tagesstand. Die App zeigt keine Texte, nur Verweise auf ESPN, FantasyPros und NBC Sports (Rotoworld); bei Namen mit Zusatz (Jr., III …) führt der FantasyPros-Link zur Suche.</dd></div>
 <div data-b="Datenstand"><dt id="g-nach-wn">nach Wn</dt><dd>Alle Zahlen rechnen nur mit abgeschlossenen Wochen bis Wn; die laufende Woche erscheint nur als „läuft“.</dd></div>
 <div><dt id="g-wochensicht">Wochensicht</dt><dd>„Saison“ zeigt den Stand nach der letzten finalen Woche, „W3“ nur die Einzelwoche 3: Wochenrang statt Tabellenrang, Werte nicht kumuliert. Die Wochenwahl gibt es für All-Play, Punkte und Coaching; die Wochentabelle im Spielplan zeigt alle Werte einer Woche auf einmal.</dd></div>
-<div><dt id="g-aktualisierung">Aktualisierung</dt><dd>Wochenabruf dienstags 08:30 UTC, Nachläufe Di 16:30 und Mi 08:30 UTC; Transaktionen, Besitz und Wetter stündlich vormittags (06:45–11:45 UTC) und abends (15:40–21:40 UTC).</dd></div>
+<div><dt id="g-aktualisierung">Aktualisierung</dt><dd>Wochenabruf dienstags 08:30 UTC, Nachläufe Di 16:30 und Mi 08:30 UTC (Wertung, Projektionen ROS). Tageslauf stündlich vormittags (06:45–11:45 UTC) und abends (15:40–21:40 UTC): Transaktionen, Besitz, Verletzung, Projektion der nächsten Woche, Waiver-Reihenfolge und Wetter; er schreibt nur, wenn sich etwas geändert hat.</dd></div>
 <div><dt id="g-quelle">Quelle</dt><dd>ESPN-Liga 1166555857, Punkte = ESPN appliedTotal; inoffizielle Auswertung ohne Verbindung zu ESPN.</dd></div>
 </dl>
 </section>

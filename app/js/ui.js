@@ -52,6 +52,10 @@ const toDate = x => typeof x === 'number' ? new Date(x) : x instanceof Date ? x 
 const parts = d => Object.fromEntries(DF.formatToParts(toDate(d)).map(p => [p.type, p.value]));
 export function datum(x) { const p = parts(x); return `${p.weekday.replace('.', '')} ${p.day}.${p.month}.`; }
 export const zeit = x => TF.format(toDate(x));
+// Abrufzeit des Tageslaufs (manifest.datenstand.pool_stand, waiver.stand) „JJJJ-MM-TTThhmmZ“ → Date; stamp: Date, Epoch-ms
+// oder Abrufzeit → „Di 29.09. 23:51 Uhr“ (deutsche Zeit)
+export const utc = s => typeof s === 'string' && /^\d{4}-\d\d-\d\dT\d{4}Z$/.test(s) ? new Date(s.replace(/T(\d\d)(\d\d)Z$/, 'T$1:$2:00Z')) : null;
+export const stamp = x => { const d = x instanceof Date ? x : typeof x === 'number' ? new Date(x) : utc(x); return d && !isNaN(d) ? `${datum(d)} ${zeit(d)} Uhr` : '–'; };
 export function spanne(iso) {       // Woche Di–Mo, z. B. „08.–14.09.“
   const a = parts(iso), b = parts(new Date(toDate(iso).getTime() + 6 * 864e5));
   return a.month === b.month ? `${a.day}.–${b.day}.${b.month}.` : `${a.day}.${a.month}.–${b.day}.${b.month}.`;
@@ -67,6 +71,11 @@ export function tl(tid, cls) {       // Team-Link: Name, auf dem Handy in schmal
     h('span', {class: 'tn'}, t.name), h('span', {class: 'tk', 'aria-hidden': 'true'}, t.kuerzel));
 }
 export const rec = t => `${t.w}-${t.l}` + (S.hasT ? `-${t.t}` : '');
+// Verletzung und Status je Spieler (ESPN-Kennungen → Kürzel und Langtext), gemeinsam für Spieler- und Waiver-Tab
+export const INJ = {QUESTIONABLE: ['Q', 'fraglich'], DOUBTFUL: ['D', 'zweifelhaft'], OUT: ['O', 'fällt aus'], INJURY_RESERVE: ['IR', 'Injured Reserve'],
+  SUSPENSION: ['SSPD', 'gesperrt'], DAY_TO_DAY: ['DTD', 'Day-to-Day']};
+export const STAT = {ONTEAM: 'Kader', FREEAGENT: 'Free Agent', WAIVERS: 'Waivers'};
+export const inj = s => INJ[s] ? [h('span', {class: 'inj', 'aria-hidden': 'true'}, INJ[s][0]), h('span', {class: 'vh'}, ' ' + INJ[s][1])] : null;
 let naSet = null;
 export function na(reason) {         // „–“ mit Grund: in Tabellen als Fußnote unter der Tabelle, sonst im Text (für Screenreader)
   if (naSet) { if (reason) naSet.add(reason); return h('span', {class: 'na'}, '–'); }

@@ -61,7 +61,7 @@ Die App lädt `data/manifest.json?t=<jetzt>` und danach jede Datei mit `?v=<v>`.
 ## `players.json` (lazy, Tab Spieler und Teamseite)
 - **Kopf:** `ersatz` (Position → Ersatzniveau), `ros_nach_woche`, `cv`, `weeks`.
 - **`players`:** Liste. Aufgenommen wird, wer mindestens ein Spiel hat oder im Kader steht, dazu die 20 besten Free Agents je Position nach ROS/Spiel. Felder:
-  - Stammdaten: `id, name, pos` (Kürzel) `, nfl` (Kürzel) `, team` (team_id oder 0) `, status, inj, own`
+  - Stammdaten: `id, name, pos` (Kürzel) `, nfl` (Kürzel) `, bye` (Bye-Woche des NFL-Teams, `null` ohne NFL-Team) `, team` (team_id oder 0) `, status, inj, own`
   - Saison: `g, pts, avg, floor, ceil, sd, form, form_d, trend, spark, starts, bench_pts, proj_d`
   - `wk`: Liste je Woche `[pts|null, proj|null, bye 0/1, team_id|0, slot|null]` in der Reihenfolge von `weeks`
   - ROS: `ros, ros_g, rest_g, ros_po, ros_rang, ros_ue`
@@ -82,14 +82,16 @@ Die App lädt `data/manifest.json?t=<jetzt>` und danach jede Datei mit `?v=<v>`.
 - `items`: `{id, type, team_id, datum (Epoch-ms), periode, items: [{type ADD/DROP, player_id, name, from_team_id, to_team_id}]}`. `type` ist WAIVER, FREEAGENT, ROSTER (reine Drops) oder TRADE_ACCEPT (ohne Spieler).
 - `draft`: `{pick, runde, runden_pick, team_id, player_id, name, keeper}`.
 
-## `waiver.json` (lazy, Tagesstand je Spieler – Grundlage des Waiver-Tabs ab Session 7)
+## `waiver.json` (lazy, Tagesstand je Spieler – Grundlage des Waiver-Tabs)
 - **Kopf:** `stand` (Abrufzeit des Pool-Auszugs, UTC), `woche` (die Woche der Projektion `proj`: die Kalenderwoche, deren Spiele als Nächstes anstehen).
+- **`reihenfolge`:** Waiver-Reihenfolge als Liste der `team_id` (1 = zuerst); `reihenfolge_quelle` `"tageslauf"` (`waiverRank` aus `mTeam` je Tageslauf, Kopf `waiver_reihenfolge` in `pool/latest.json`) oder `"wochenabruf"` (`waiver_prio` aus `teams.json`, solange der Tageslauf noch keine Reihenfolge geliefert hat); beide `null`, wenn nichts vorliegt.
+- **`bedarf`:** je `team_id` (Schlüssel als Text) `{luecken: [{slot, id, pos, ros_g}], ueber_ersatz: {Position: Zahl}}` – Python rechnet (`players.team_needs`): ROS-optimale Aufstellung des Kaders laut Tagesstand nach ROS/Spiel (Regular Season, Wochenstand); `luecken` = Starter mit ROS/Spiel unter dem Ersatzniveau ihrer Position (`slot` als Text, `pos` Kürzel, `ros_g` ROS/Spiel oder `null`) und unbesetzte Slots (`id`, `pos`, `ros_g` `null`), in Slot-Reihenfolge QB · RB · RB · WR · WR · WR · TE · D/ST · D/ST · K · FLEX · FLEX · OP; `ueber_ersatz` = Kaderspieler je Position mit ROS/Spiel über dem Ersatzniveau (`null` ohne Ersatzniveau). `bedarf` ist `null` ohne Regular-Season-ROS (vor dem ersten ROS-Auszug, nach W14).
 - **`spieler`:** Liste der Spieler aus `players.json` plus alle, die laut Tagesstand in einem Kader stehen; Namen, Position und ROS kommen aus `players.json` (Schlüssel `id`). Felder je Spieler:
   - `id, team` (team_id oder 0), `status` (`ONTEAM`, `WAIVERS`, `FREEAGENT`), `inj` (ESPN-Verletzungsstatus, Stand des Abrufs)
   - Besitz ESPN-weit in %: `own` (Anteil der Ligen), `own_d` (Änderung gegenüber dem Vortag), `started` (Anteil gestartet)
   - `waiver_bis` (Epoch-ms, Ende der Waiver-Frist; `null` bei Free Agents und Kaderspielern), `proj` (ESPN-Projektion der Woche `woche`, 2 Stellen), `news` (Epoch-ms der letzten ESPN-Meldung, `null` ohne)
   - Kaderspieler, die `players.json` nicht führt (unter der Woche geholt, ohne Spiel, nicht unter den 20 besten Free Agents), tragen zusätzlich `name, pos, nfl` aus dem Wochenpool (`null`, wenn auch dort unbekannt).
-- Quelle: `data/raw/2026/pool/latest.json` (Tageslauf, stündlich vormittags und abends); Besitz, Verletzung und Status sind der Stand des Abrufs, ESPN führt keine Historie.
+- Quelle: `data/raw/2026/pool/latest.json` (Tageslauf, stündlich vormittags und abends; Kopf `waiver_reihenfolge` = `waiverRank` je Team aus `mTeam`); Besitz, Verletzung und Status sind der Stand des Abrufs, ESPN führt keine Historie.
 
 ## `wetter.json` (lazy, Wetter je Spiel – Anzeige ab Session 8)
 - **Kopf:** `stand` (jüngster Wetterabruf, UTC), `woche` (Woche der Prognose oder `null`), `einheiten` (`temp` °C, `wind` und `boeen` km/h, `regen_wahrsch` %, `niederschlag` mm, `schnee` cm).

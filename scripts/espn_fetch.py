@@ -13,7 +13,8 @@ Ablage je Saison (--due):
     basis/kona_dst_<vorjahr>.json, proTeamSchedules_wl_<vorjahr>.json   D/ST-Grundlage des Vorjahrs, einmalig
 Tageslauf (--transactions --pool --wetter, Action stündlich vormittags und abends):
     transactions/                                          Transaktions-Archiv (mTransactions2 je Periode, Aktivitäten)
-    pool/latest.json                                       Pool-Auszug: Status, Besitz, Verletzung, Waiver-Frist, Projektion
+    pool/latest.json                                       Pool-Auszug: Status, Besitz, Verletzung, Waiver-Frist, Projektion;
+                                                           dazu die Waiver-Reihenfolge der Teams (mTeam.waiverRank)
     wetter/prognose/wNN_<UTC>.json, wetter/ist_<saison>.json   Wetter je Spiel (scripts/wetter.py, Open-Meteo)
     news/<UTC>.json                                        News je Spieler (scripts/news.py, --news, vorbereitet, aus)
 
@@ -52,6 +53,7 @@ VIEWS = {
 KEYS = dict(VIEWS, mStandings="teams")
 TX_VIEW, COMM_VIEW = "mTransactions2", "kona_league_communication"
 KONA_VIEW = "kona_player_info"
+TEAM_VIEW = "mTeam"        # Tageslauf: nur waiverRank je Team (Waiver-Reihenfolge)
 KONA_FILE, ROS_FILE, STANDINGS_FILE = f"{KONA_VIEW}.json", "ros.json", "mStandings.json"
 POOL_FILE = "latest.json"   # Pool-Auszug des Tageslaufs unter pool/ (je Lauf überschrieben, Historie in Git)
 MIN_POOL = 300              # ein vollständiger Spielerpool hat rund 1050 aktive Spieler
@@ -713,6 +715,7 @@ def pool_extract(data: dict, season: int, week: int, stamp: str) -> dict:
     rows.sort(key=lambda r: r["id"])
     return {"season": season, "woche": week, "stand": stamp,
             "quelle": f"{KONA_VIEW} mit filterStatsForCurrentSeasonScoringPeriodId = [{week}], Auszug je Spieler; "
+                      f"waiver_reihenfolge = waiverRank je Team aus {TEAM_VIEW} (1 = zuerst); "
                       f"stand = Abrufzeit (UTC) des letzten Laufs, der etwas geändert hat",
             "players": rows}
 
@@ -735,11 +738,33 @@ def fetch_pool(session: requests.Session, season: int, week: int) -> dict:
     return data
 
 
+def fetch_waiver_order(session: requests.Session, season: int) -> dict[str, int]:
+    """Waiver-Reihenfolge laut mTeam (ein Aufruf): team_id (als Text, wie im JSON) → waiverRank, 1 = zuerst.
+
+    Nur die Ränge – members, owners und Namen bleiben draußen, der Pool-Auszug ist öffentlich. Die Ränge müssen
+    eine Reihenfolge 1 … n bilden, sonst gilt die Antwort als unbrauchbar (FetchError).
+    """
+    _, data = get_json(session, league_url(season), {"view": TEAM_VIEW})
+    teams = data.get("teams")
+    if not isinstance(teams, list) or not teams:
+        raise FetchError(f"{TEAM_VIEW} ohne Teams")
+    order = {}
+    for t in teams:
+        if not isinstance(t.get("id"), int) or not isinstance(t.get("waiverRank"), int):
+            raise FetchError(f"{TEAM_VIEW} ohne waiverRank (Team {t.get('id')})")
+        order[str(t["id"])] = t["waiverRank"]
+    if sorted(order.values()) != list(range(1, len(order) + 1)):
+        raise FetchError(f"waiverRank ist keine Reihenfolge 1 … {len(order)}: {sorted(order.values())}")
+    return dict(sorted(order.items(), key=lambda kv: int(kv[0])))
+
+
 def update_pool(session: requests.Session, season: int, now: datetime, stamp: str) -> tuple[int, dict | None]:
-    """Holt den Pool-Auszug und schreibt pool/latest.json, wenn sich außer dem Stand etwas geändert hat.
+    """Holt den Pool-Auszug samt Waiver-Reihenfolge (mTeam) und schreibt pool/latest.json, wenn sich außer dem
+    Stand etwas geändert hat.
 
     Rückgabe (Fehler, aktueller Auszug oder None bei Fehler); bei unverändertem Inhalt ist es der gespeicherte Auszug
-    mit seinem alten Stand. Den aktuellen Auszug braucht --news.
+    mit seinem alten Stand. Den aktuellen Auszug braucht --news. Scheitert nur der mTeam-Aufruf, bleibt die
+    Reihenfolge des letzten Laufs stehen (Warnung, kein Fehler): der Pool-Auszug ist das Hauptprodukt.
     """
     path = pool_dir(season) / POOL_FILE
     try:
@@ -754,6 +779,11 @@ def update_pool(session: requests.Session, season: int, now: datetime, stamp: st
                 warn(f"{rel(path)} unlesbar ({exc}) – wird neu geschrieben")
                 previous = None
         extract = pool_extract(fetch_pool(session, season, week), season, week, stamp)
+        try:
+            extract["waiver_reihenfolge"] = fetch_waiver_order(session, season)
+        except FetchError as exc:
+            warn(f"Waiver-Reihenfolge ({TEAM_VIEW}) nicht abrufbar, Stand des letzten Laufs bleibt: {exc}")
+            extract["waiver_reihenfolge"] = (previous or {}).get("waiver_reihenfolge")
         if same_pool(previous, extract):
             print(f"  {POOL_FILE:<22} unverändert (W{week}, {len(extract['players'])} Spieler, Stand {previous['stand']})")
             return 0, previous
@@ -829,7 +859,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--transactions", action="store_true",
                         help="Tageslauf: Transaktions-Archiv fortschreiben (mTransactions2 je Periode, kona_league_communication)")
     parser.add_argument("--pool", action="store_true",
-                        help="Tageslauf: Pool-Auszug pool/latest.json (Status, Besitz, Verletzung, Waiver-Frist, Projektion)")
+                        help="Tageslauf: Pool-Auszug pool/latest.json (Status, Besitz, Verletzung, Waiver-Frist, Projektion, Waiver-Reihenfolge)")
     parser.add_argument("--wetter", action="store_true",
                         help="Tageslauf: Wetterprognose der laufenden Woche und Ist-Wetter gespielter Spiele (Open-Meteo)")
     parser.add_argument("--news", action="store_true",

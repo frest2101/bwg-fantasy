@@ -7,11 +7,11 @@
 "claude.json":{"v":"c9a30d7c581e","bytes":26261,"lazy":true},
 "dst.json":{"v":"c33b2db7e87e","bytes":12966,"lazy":true},
 "history.json":{"v":"d7c4d8da8907","bytes":42016,"lazy":true},
-"players.json":{"v":"8c0806e26742","bytes":246166,"lazy":true},
+"players.json":{"v":"4ecbeec5e937","bytes":251066,"lazy":true},
 "schedule.json":{"v":"4a84d3142d78","bytes":17583,"lazy":false},
 "teams.json":{"v":"2885347abb28","bytes":31435,"lazy":false},
 "transactions.json":{"v":"026e5a02f210","bytes":45124,"lazy":true},
-"waiver.json":{"v":"937b51b37b4b","bytes":88697,"lazy":true},
+"waiver.json":{"v":"c36955895167","bytes":89856,"lazy":true},
 "wetter.json":{"v":"21cc6725df8c","bytes":16397,"lazy":true}
 }
 }

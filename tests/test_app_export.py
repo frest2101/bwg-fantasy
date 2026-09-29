@@ -69,6 +69,14 @@ def test_waiver_vertrag(result):
                         dict(row, id=ignored, onTeamId=0)]}
     out = app_export.round_file("waiver.json", app_export.build_waiver(dict(result, pool_latest=pool)))
     assert (out["stand"], out["woche"]) == ("2026-09-29T0645Z", 3)
+    assert set(out) == {"stand", "woche", "reihenfolge", "reihenfolge_quelle", "bedarf", "spieler"}
+    # ohne Reihenfolge im Pool-Auszug: Wochenstand (waiver_prio aus mTeam des Wochenabrufs); ohne ROS kein Bedarf
+    weekly = sorted(result["teams"], key=lambda t: t["waiver_prio"])
+    assert out["reihenfolge"] == [t["team_id"] for t in weekly] and out["reihenfolge_quelle"] == "wochenabruf"
+    assert len(out["reihenfolge"]) == 10 and out["bedarf"] is None
+    daily = dict(pool, waiver_reihenfolge={str(i): r for i, r in zip(range(1, 11), [6, 10, 5, 7, 3, 1, 4, 8, 9, 2])})
+    out_daily = app_export.build_waiver(dict(result, pool_latest=daily))
+    assert out_daily["reihenfolge"] == [6, 10, 5, 7, 3, 1, 4, 8, 9, 2] and out_daily["reihenfolge_quelle"] == "tageslauf"
     assert [p["id"] for p in out["spieler"]] == [inside, outside]
     first = out["spieler"][0]
     assert set(first) == {"id", "team", "status", "inj", "own", "own_d", "started", "waiver_bis", "proj", "news"}
@@ -82,6 +90,30 @@ def test_waiver_vertrag(result):
     out = app_export.build_waiver(dict(result, pool_latest=dict(pool, players=[dict(row, id=known, onTeamId=3)])))
     assert out["spieler"][0]["name"] == result["players"]["players"][known]["name"] and out["spieler"][0]["pos"]
     assert app_export.build_waiver(dict(result, pool_latest=None)) is None
+
+
+def test_bedarf_vertrag():
+    """bedarf aus erfundenen Wochen- und Tagesdaten: Kader laut Tagesstand, ROS/Spiel und Ersatz laut Wochenstand.
+    Team 1 hat nur QB 20, RB 9 (unter Ersatz 10), WR 12 und einen D/ST; Team 2 nur einen QB unter Ersatz."""
+    from lineup import DST, QB, RB, WR
+    weekly = {10: {"pos": QB, "ros_pro_spiel": Decimal(20)}, 15: {"pos": RB, "ros_pro_spiel": Decimal(9)},
+              30: {"pos": WR, "ros_pro_spiel": Decimal(12)}, -1: {"pos": DST, "ros_pro_spiel": Decimal(8)},
+              70: {"pos": QB, "ros_pro_spiel": Decimal("15.5")}, 99: {"pos": RB, "ros_pro_spiel": None}}
+    result = {"players": {"players": weekly, "ros_after_week": 3,
+                          "ersatz": {QB: Decimal(18), RB: Decimal(10), WR: Decimal(7), DST: None}}}
+    pool = {"players": [{"id": 10, "onTeamId": 1}, {"id": 15, "onTeamId": 1}, {"id": 30, "onTeamId": 1},
+                        {"id": -1, "onTeamId": 1}, {"id": 70, "onTeamId": 2}, {"id": 99, "onTeamId": 0},
+                        {"id": 12345, "onTeamId": 2}]}   # 12345 fehlt im Wochenpool: Position unbekannt, entfällt
+    out = app_export.round_file("waiver.json", {"bedarf": app_export.team_needs(pool, result)})["bedarf"]
+    assert list(out) == [1, 2]
+    assert out[1]["ueber_ersatz"] == {"QB": 1, "RB": 0, "WR": 1, "TE": None, "K": None, "D/ST": None}
+    assert [(g["slot"], g["id"], g["pos"], g["ros_g"]) for g in out[1]["luecken"]] == [
+        ("RB", 15, "RB", 9.0), ("RB", None, None, None), ("WR", None, None, None), ("WR", None, None, None),
+        ("TE", None, None, None), ("D/ST", None, None, None), ("K", None, None, None),
+        ("FLEX", None, None, None), ("FLEX", None, None, None), ("OP", None, None, None)]
+    assert [(g["slot"], g["id"], g["ros_g"]) for g in out[2]["luecken"]][:2] == [("QB", 70, 15.5), ("RB", None, None)]
+    assert app_export.team_needs(pool, {"players": dict(result["players"], ros_after_week=None)}) is None
+    assert app_export.team_needs(pool, {"players": dict(result["players"], ros_after_week=14)}) is None
 
 
 def test_wetter_vertrag():
@@ -174,6 +206,9 @@ def test_players_auswahl(result, data):
         must |= {p["player_id"] for p in free[:app_export.FREE_AGENTS_PER_POS]}
     assert set(rows) == must  # genau Kader ∪ mit Spiel ∪ die 20 besten Free Agents je Position
     assert all(len(p["wk"]) == len(data["players.json"]["weeks"]) for p in rows.values())
+    assert rows[3139477]["bye"] == 5 and rows[3139477]["nfl"] == "KC"      # Patrick Mahomes: KC, Bye W5
+    assert all(p["bye"] is None or 1 <= p["bye"] <= 18 for p in rows.values())
+    assert all(p["bye"] is None for p in rows.values() if p["nfl"] is None)  # ohne NFL-Team kein Bye
     assert {p["pos"] for p in rows.values()} <= {"QB", "RB", "WR", "TE", "K", "D/ST"}
 
 
