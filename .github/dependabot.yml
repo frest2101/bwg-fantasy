@@ -1,0 +1,13 @@
+# Dependabot: hält die per Commit-SHA gepinnten GitHub Actions aktuell (Auftrag Session 4, Frage 5).
+# Monatlich ein gemeinsamer PR für alle Actions; Stephan gibt ihn frei, Claude liest vorher die Release Notes.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: "Actions aktualisiert:"

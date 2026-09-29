@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta name="color-scheme" content="light dark">
+<meta name="description" content="Tabellen, Ranking, Spielplan, Spieler und Rekorde der BWG Fantasy Liga 2026 – inoffizielle Auswertung.">
+<title>BWG Fantasy 2026</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230b5aa6'/%3E%3Ctext x='16' y='22' font-size='16' font-family='sans-serif' font-weight='700' fill='white' text-anchor='middle'%3EB%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css?v=__BUILD__">
+<link rel="modulepreload" href="js/ui.js?v=__BUILD__">
+<link rel="modulepreload" href="js/v_tabelle.js?v=__BUILD__">
+<script>document.documentElement.className="js";try{var t=localStorage.getItem("bwg-theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+<script type="module" src="js/app.js?v=__BUILD__"></script>
+</head>
+<body>
+<a class="skip" href="#main">Zum Inhalt</a>
+<header class="top">
+<a class="brand" href="#tabelle">BWG Fantasy <span>2026</span></a>
+<button id="stand" class="stand" type="button" aria-expanded="false" aria-controls="pop" hidden></button>
+<a class="ico" href="#lesart" aria-label="Lesart: Erklärungen aller Begriffe">i</a>
+<button id="theme" class="ico" type="button" aria-pressed="false" aria-label="Dunkles Design">◐</button>
+</header>
+<nav class="tabs" aria-label="Bereiche">
+<a href="#tabelle" data-s="tabelle">Tabelle</a>
+<a href="#ranking" data-s="ranking">Ranking</a>
+<a href="#spielplan" data-s="spielplan">Spielplan</a>
+<a href="#spieler" data-s="spieler">Spieler</a>
+<a href="#rekorde" data-s="rekorde">Rekorde</a>
+</nav>
+<div id="banner" class="banner" role="status" hidden></div>
+<main id="main" tabindex="-1">
+<noscript><p class="note">Die Tabellen dieser Seite brauchen JavaScript. Die Lesart mit allen Begriffen steht unten.</p></noscript>
+<p class="loading">Lade Daten …</p>
+</main>
+<section id="lesart" class="lesart" aria-labelledby="lesart-h">
+<h2 id="lesart-h">Lesart</h2>
+<p>Kurzfassung aller Begriffe der App. Verbindlich stehen die Rechenregeln im Repo (CLAUDE.md, Abschnitt „Rechenregeln“). Fehlende Werte stehen als „–“.</p>
+<dl id="glossar">
+<div data-b="Tabelle"><dt id="g-rang">Rang</dt><dd>Platz nach Siegen (Unentschieden zählt halb), bei Gleichstand nach PF.</dd></div>
+<div><dt id="g-rang-div">Rang Division</dt><dd>Derselbe Platz innerhalb der eigenen Division.</dd></div>
+<div><dt id="g-wlt">W-L-T</dt><dd>Siege, Niederlagen und Unentschieden der Regular Season; T erscheint nur, wenn es ein Unentschieden gab.</dd></div>
+<div><dt id="g-win">Win %</dt><dd>(W + 0,5 · T) / Spiele.</dd></div>
+<div><dt id="g-pf">PF / PA</dt><dd>Summe der Starter-Punkte des Teams bzw. seiner Gegner laut ESPN.</dd></div>
+<div><dt id="g-diff">Diff</dt><dd>PF − PA.</dd></div>
+<div><dt id="g-pfspiel">PF/Spiel</dt><dd>PF je Spiel; nach n Spielen ist der Wert noch um etwa ±35/√n Punkte zufallsbedingt unsicher.</dd></div>
+<div><dt id="g-streak">Streak</dt><dd>Art und Länge der jüngsten Serie gleicher Ergebnisse, z. B. W3.</dd></div>
+<div><dt id="g-ap-wl">All-Play W-L</dt><dd>Bilanz, als hätte das Team jede Woche gegen alle neun anderen gespielt; Punktgleichstand zählt halb, daher sind Werte wie 13,5 möglich.</dd></div>
+<div><dt id="g-allplay">All-Play %</dt><dd>All-Play-Siege / (9 × Spiele).</dd></div>
+<div><dt id="g-median">Median-Sieg</dt><dd>Eine Woche mit PF über dem Wochenmedian der Liga.</dd></div>
+<div><dt id="g-wochenrang">Wochenrang</dt><dd>Platz der PF in der jeweiligen Woche (1 = beste).</dd></div>
+<div><dt id="g-luck">Luck</dt><dd>(W + 0,5 · T) − All-Play-Quote × Spiele; positiv heißt mehr Siege, als die eigenen Punkte gegen das ganze Feld erwarten ließen.</dd></div>
+<div><dt id="g-optimal">Optimal</dt><dd>Die im Rückblick beste mögliche Aufstellung aus allen Kaderspielern außer IR.</dd></div>
+<div><dt id="g-verschenkt">Verschenkt</dt><dd>Optimal − PF; dazu Ø je Woche und die schlechteste Woche.</dd></div>
+<div><dt id="g-effizienz">Coaching-Effizienz</dt><dd>Σ PF / Σ Optimal. Die Linie im Diagramm ist der Ligawert.</dd></div>
+<div><dt id="g-bank">Bank-Punkte</dt><dd>Punkte der Spieler, die auf der Bank saßen.</dd></div>
+<div><dt id="g-kader-pot">Kader-Potenzial</dt><dd>Σ Optimal / Spiele; ein Rückblick, der mit der Kadertiefe wächst.</dd></div>
+<div><dt id="g-kader-proj">Kader-Projektion ROS</dt><dd>Ø der nach ESPN-Projektion besten Aufstellung des aktuellen Kaders je Restwoche (Byes und Verletzte berücksichtigt) × Ligafaktor Σ PF / Σ Starter-Projektion (≈ 0,98).</dd></div>
+<div><dt id="g-floor">Floor</dt><dd>Schwächste Woche.</dd></div>
+<div><dt id="g-form">Form</dt><dd>Ø PF der letzten drei gespielten Wochen.</dd></div>
+<div><dt id="g-form-delta">Form Δ</dt><dd>Form − PF/Spiel. Das ±-Band σ · √(1/3 − 1/n) zeigt die rein zufällige Schwankung; Werte innerhalb des Bands sind nicht deutbar. Erst ab 4 Spielen.</dd></div>
+<div><dt id="g-proj-delta">Projektions-Delta</dt><dd>Σ PF − Σ ESPN-Projektion der eingesetzten Starter.</dd></div>
+<div><dt id="g-waiver">Waiver-Prio</dt><dd>Aktueller Platz in der Waiver-Reihenfolge laut ESPN (1 = zuerst).</dd></div>
+<div><dt id="g-moves">Moves</dt><dd>Zahl der Spielerzugänge laut ESPN.</dd></div>
+<div data-b="Score"><dt id="g-score">Score („Echter Tabellenführer“)</dt><dd>Σ Gewicht × Normwert / Σ Gewichte über sieben Kennzahlen. Der Browser rechnet nur diese Gewichtung; die Normwerte kommen fertig aus dem Rechenwerk.</dd></div>
+<div><dt id="g-kennzahlen">Kennzahlen</dt><dd>PF/Spiel, All-Play-Quote, Win %, Coaching-Effizienz, Kader (Potenzial bzw. Projektion ROS), Floor, Form.</dd></div>
+<div><dt id="g-z">z-Normierung</dt><dd>Standard. Abstand zum Ligaschnitt in Standardabweichungen, angezeigt als 50 + 10 · Score; 50 = Schnitt, 60 ≈ eine Standardabweichung darüber.</dd></div>
+<div><dt id="g-minmax">Min–Max</dt><dd>0 = schwächster, 100 = stärkster Wert der Liga (50, wenn alle gleich).</dd></div>
+<div><dt id="g-rangpunkte">Rangpunkte</dt><dd>10 für den besten bis 1 für den schwächsten Wert; die Abstände gehen verloren.</dd></div>
+<div><dt id="g-profile">Profile</dt><dd>Stärke, Verdienst und Form sind Voreinstellungen der Gewichte; „Eigene“ entsteht, sobald ein Regler bewegt wird. Der Anteil zeigt Gewicht / Σ Gewichte.</dd></div>
+<div><dt id="g-redundanz">Redundanz</dt><dd>PF, All-Play, Floor, Form und Kader messen weitgehend dasselbe (früh in der Saison hoch korreliert); wer sie gemeinsam hochzieht, zählt die erzielten Punkte mehrfach.</dd></div>
+<div data-b="Power Ranking"><dt id="g-mu">Stärke μ</dt><dd>Geschätzte Punkte je Woche, μ = (n · PF/Spiel + 4 · P) / (n + 4); mit jeder Woche zählen die Ergebnisse mehr und die Kader-Projektion P weniger. ± zeigt σ/√(n + 4).</dd></div>
+<div><dt id="g-p">P aus Vorjahr</dt><dd>Solange keine Kader-Projektion vorliegt: P = L̄ + 0,6 · (PF/Spiel Vorjahr − L̄ Vorjahr), L̄ = Ligaschnitt. Danach P = Kader-Projektion ROS.</dd></div>
+<div><dt id="g-e">Erwartete All-Play-Quote E</dt><dd>Anteil der Wochenduelle gegen alle neun, die das Team bei seiner Stärke im Schnitt gewinnt: E = 1/9 · Σ Φ((μᵢ − μⱼ)/(σ√2)).</dd></div>
+<div><dt id="g-pr-rang">Rang Power Ranking</dt><dd>Platz nach μ.</dd></div>
+<div><dt id="g-trend">Trend</dt><dd>Rangänderung gegenüber der Vorwoche (↑ besser, ↓ schlechter). Der erste Vergleich mit Projektion ist W3 → W4.</dd></div>
+<div><dt id="g-kernsatz">Kernsatz</dt><dd>Redaktioneller Kurztext; erscheint erst nach Freigabe, sonst „folgt“.</dd></div>
+<div data-b="Playoffs"><dt id="g-playoff">Playoff-%</dt><dd>Anteil von 10 000 simulierten Restsaisons, in denen das Team unter die besten sechs kommt.</dd></div>
+<div><dt id="g-div-pct">Division-%</dt><dd>Anteil der Läufe mit Divisionssieg.</dd></div>
+<div><dt id="g-bye">Bye-%</dt><dd>Anteil der Läufe mit Seed 1 oder 2, also Freilos in W15.</dd></div>
+<div><dt id="g-restsiege">Erwartete Restsiege</dt><dd>Ø Siege in den offenen Wochen der Regular Season (Unentschieden halb).</dd></div>
+<div><dt id="g-seeding">Seeding</dt><dd>„ESPN“: nach Siegen, dann PF. „Divisionssieger“: die beiden Divisionssieger auf 1–2, der Rest nach Siegen, dann PF (Tradition bis 2025, bei ESPN 2026 unbelegt).</dd></div>
+<div><dt id="g-simulation">Simulation</dt><dd>Je Lauf wird zuerst die Stärke um μ gestreut (Varianz σ²/(n + 4)), dann jede Woche PF ~ N(μ̃ + Wochenabweichung der Kader-Projektion, σ²).</dd></div>
+<div><dt id="g-siegchance">Siegchance</dt><dd>Für offene Paarungen: Φ((μ Heim + ΔP Heim − μ Gast − ΔP Gast)/(σ√2)); ΔP = Abweichung der Kader-Projektion dieser Woche vom eigenen Ø (z. B. Bye), 0, solange P aus dem Vorjahr kommt.</dd></div>
+<div data-b="Spieler"><dt id="g-spiele">Spiele</dt><dd>Wochen, in denen der Spieler laut ESPN gespielt hat (Stat 210 = 1); Byes und Inaktive zählen nicht.</dd></div>
+<div><dt id="g-avg">Ø</dt><dd>Punkte je Spiel.</dd></div>
+<div><dt id="g-floor-ceil">Floor / Ceiling</dt><dd>Schwächstes und bestes Spiel.</dd></div>
+<div><dt id="g-konstanz">Konstanz</dt><dd>Standardabweichung der Punkte je Spiel (kleiner = gleichmäßiger).</dd></div>
+<div><dt id="g-form-sp">Form (Spieler)</dt><dd>Ø der letzten drei Spiele; Form Δ = Form − Ø.</dd></div>
+<div><dt id="g-trendpfeil">Trendpfeil</dt><dd>Erst ab 4 Spielen. ↑/↓, wenn |Form − Ø| größer ist als 1 Punkt, 15 % von |Ø| und s · √(1/3 − 1/n), sonst →; unter 6 Spielen ist s = Positions-CV × |Ø|.</dd></div>
+<div><dt id="g-formkurve">Formkurve</dt><dd>Punkte je Woche; „·“ = Bye, „–“ = nicht gespielt, negative Werte werden als 0 gezeichnet. Der Strich zeigt die ESPN-Projektion.</dd></div>
+<div><dt id="g-starts">Starts / Bank-Punkte</dt><dd>Wochen im Starter-Slot bzw. Punkte auf der Bank.</dd></div>
+<div><dt id="g-proj-delta-sp">Projektions-Delta (Spieler)</dt><dd>Σ Ist − Σ ESPN-Wochenprojektion der gespielten Wochen.</dd></div>
+<div><dt id="g-ros">ROS</dt><dd>Summe der ESPN-Wochenprojektionen der restlichen Wochen bis W14, Bye = 0.</dd></div>
+<div><dt id="g-restspiele">Restspiele</dt><dd>Offene Wochen bis W14 ohne Bye.</dd></div>
+<div><dt id="g-ros-spiel">ROS/Spiel</dt><dd>ROS / Restspiele.</dd></div>
+<div><dt id="g-ros-po">ROS Playoffs</dt><dd>Summe der Projektionen W15–17.</dd></div>
+<div><dt id="g-ros-rang">ROS-Rang</dt><dd>Platz innerhalb der Position über alle Spieler, im Kader und im Pool.</dd></div>
+<div><dt id="g-ersatz">Ersatzniveau</dt><dd>Ø ROS/Spiel der drei besten verfügbaren Spieler der Position (Free Agents und Waivers, ohne OUT/IR).</dd></div>
+<div><dt id="g-ros-ue">ROS über Ersatz</dt><dd>(ROS/Spiel − Ersatzniveau) × Restspiele.</dd></div>
+<div><dt id="g-besitz">Besitz und Verletzung</dt><dd>Anteil der ESPN-Ligen, in denen der Spieler im Kader steht, und Verletzungsstatus – jeweils Stand des letzten Abrufs.</dd></div>
+<div><dt id="g-projektionen">Projektionen</dt><dd>Alle Projektionen stammen von ESPN und sind Schätzungen, keine Wahrheit.</dd></div>
+<div data-b="D/ST"><dt id="g-z-dst">Off. zugelassen (Z)</dt><dd>D/ST-Punkte im Liga-Scoring, die gegnerische D/ST gegen diese Offense je Spiel erzielt haben (n = Spiele).</dd></div>
+<div><dt id="g-r">r</dt><dd>Z / Ligaschnitt der Saison (1,00 = Schnitt).</dd></div>
+<div><dt id="g-f">Faktor F</dt><dd>(n · r₂₆ + 5 · r₂₅ + 5 · 1,00) / (n + 10); über 1,00 heißt, der Gegner ist für D/ST günstiger als der Schnitt. Blau = günstig, orange = ungünstig; die Zahl steht immer dabei. Rang 1 = höchstes F, also der für D/ST günstigste Gegner; „Vorw.“ = Rang der Vorwoche.</dd></div>
+<div><dt id="g-delta-f">ΔF</dt><dd>Änderung von F gegenüber der Vorwoche.</dd></div>
+<div><dt id="g-naechste3">Nächste 3</dt><dd>Ø F der Gegner in den nächsten drei Kalenderwochen; eine Bye-Woche fällt heraus.</dd></div>
+<div><dt id="g-rest">Restspielplan</dt><dd>Ø F der Gegner bis W14 ohne Bye.</dd></div>
+<div><dt id="g-sos">SoS W15–17</dt><dd>Ø F der Gegner in den Playoff-Wochen.</dd></div>
+<div><dt id="g-ausloeser">Auslöser</dt><dd>Markiert Offenses, deren Faktor sich stärker bewegt, als Zufall erklärt: |ΔF| ≥ 0,10, |z| ≥ 2 für die letzten drei Spiele (ab n ≥ 4) oder ein Rangsprung ≥ 5.</dd></div>
+<div><dt id="g-beobachten">Beobachten</dt><dd>Die drei größten |z| der letzten drei Spiele unterhalb der Auslöser-Schwelle.</dd></div>
+<div data-b="Record Book"><dt id="g-rs-po">RS / Playoffs</dt><dd>Rekorde der Regular Season und der Playoffs werden getrennt geführt.</dd></div>
+<div><dt id="g-h2h">H2H</dt><dd>Direkte Duelle 2026, Bilanz W-L und Summe der Punktdifferenz; unter etwa fünf Duellen keine Aussage über Dominanz.</dd></div>
+<div><dt id="g-positionen">Positionen</dt><dd>PF nach Spielerposition (ESPN defaultPositionId) oder nach Slot der Aufstellung, mit Anteil und Ligarang.</dd></div>
+<div><dt id="g-pfplus">PF+</dt><dd>100 × PF / Ligaschnitt der Saison; macht Saisons mit unterschiedlichem Scoring vergleichbar.</dd></div>
+<div><dt id="g-aera">Ära</dt><dd>Alt-Scoring 2015–17, BWG-Scoring ab 2018; nfl.com bis 2025, ESPN ab 2026; 13 RS-Spiele 2016–2020, sonst 14.</dd></div>
+<div><dt id="g-scoring-titel">Scoring-Titel</dt><dd>Meiste PF der Regular Season.</dd></div>
+<div><dt id="g-endplatz">Endplatz</dt><dd>Plätze 1–6 aus dem Bracket, danach aus der Trostrunde.</dd></div>
+<div><dt id="g-wpct-alltime">W % (All-Time)</dt><dd>W / (W + L).</dd></div>
+<div><dt id="g-pfplus-avg">Ø PF+</dt><dd>Mittel von PF+ über die Saisons der Franchise.</dd></div>
+<div><dt id="g-unverifiziert">Verifiziert / unverifiziert</dt><dd>Ein Wert gilt als verifiziert, wenn er belegt ist (z. B. per Screenshot); unverifizierte Werte zählen nicht als Rekord.</dd></div>
+<div data-b="Moves"><dt id="g-transaktionen">Transaktionen</dt><dd>Nur ausgeführte Moves und angenommene Trades; keine gescheiterten Claims und keine Trade-Vorschläge. Trades in v1 ohne Spieler.</dd></div>
+<div><dt id="g-aufstellungswechsel">Aufstellungswechsel</dt><dd>Zahl der Slot-Wechsel je Team, nur als Summe.</dd></div>
+<div><dt id="g-draft">Draft</dt><dd>Picks des Drafts 2026 inklusive Keeper.</dd></div>
+<div data-b="Datenstand"><dt id="g-nach-wn">nach Wn</dt><dd>Alle Zahlen rechnen nur mit abgeschlossenen Wochen bis Wn; die laufende Woche erscheint nur als „läuft“.</dd></div>
+<div><dt id="g-aktualisierung">Aktualisierung</dt><dd>Wochenabruf dienstags 08:30 UTC, Nachläufe Di 16:30 und Mi 08:30 UTC; Transaktionen täglich.</dd></div>
+<div><dt id="g-quelle">Quelle</dt><dd>ESPN-Liga 1166555857, Punkte = ESPN appliedTotal; inoffizielle Auswertung ohne Verbindung zu ESPN.</dd></div>
+</dl>
+</section>
+<footer class="foot"><p>Inoffizielle Auswertung der BWG Fantasy Liga · Daten: ESPN · <a href="#lesart">Lesart</a></p></footer>
+<div id="live" class="vh" aria-live="polite"></div>
+<div id="pop" class="pop" role="dialog" aria-modal="false" aria-labelledby="pop-t" tabindex="-1" hidden></div>
+</body>
+</html>

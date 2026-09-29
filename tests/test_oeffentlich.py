@@ -1,0 +1,90 @@
+"""Tests Öffentlichkeits-Check (scripts/check_public.py): die App enthält nur Ligadaten.
+
+Die Negativtests bauen ihre Testfälle zur Laufzeit aus den Rohdaten – im Test-Code steht kein Manager-Name.
+Aufruf: python -m pytest
+"""
+
+import json
+import shutil
+
+import pytest
+
+import check_public
+import espn_fetch as ef
+
+APP = ef.REPO_DIR / "app"
+MTEAM = ef.week_dir(2026, 1) / "mTeam.json"
+
+
+def test_app_ist_oeffentlich_tauglich():
+    """Der ganze Ordner app/ (Code und app/data) besteht den Check."""
+    if not (APP / "index.html").exists():
+        pytest.skip("App noch nicht angelegt")
+    assert check_public.check(APP, ef.REPO_DIR) == []
+
+
+def test_redaktion_ohne_manager_namen():
+    """Die freigegebenen Kernsätze (data/redaktion/*.csv) sind öffentlich: keine vollen Namen, Nachnamen,
+    Anzeigenamen oder Member-IDs. CSV steht nicht in den App-Dateitypen, deshalb hier direkt mit den Mustern."""
+    patterns = check_public.manager_patterns(ef.REPO_DIR)
+    for path in sorted((ef.REPO_DIR / "data" / "redaktion").glob("*.csv")):
+        text = path.read_text(encoding="utf-8")
+        found = [kind for kind, rx in patterns if rx.search(text)]
+        assert not found, f"{path.name}: enthält Manager-{', '.join(sorted(set(found)))}"
+
+
+def write(folder, name, content):
+    path = folder / name
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content if isinstance(content, str) else json.dumps(content), encoding="utf-8")
+
+
+def members():
+    return json.loads(MTEAM.read_text(encoding="utf-8"))["members"]
+
+
+def test_kopierte_mteam_datei_faellt_auf(tmp_path):
+    shutil.copy(MTEAM, tmp_path / "teams.json")
+    findings = check_public.check(tmp_path, ef.REPO_DIR)
+    assert any("verbotener Schlüssel 'members'" in f for f in findings)
+    assert any("Manager-Nachname" in f for f in findings)
+
+
+def test_voller_name_und_anzeigename_im_text(tmp_path):
+    m = members()[0]
+    write(tmp_path, "a.html", f"<p>{m['firstName']} {m['lastName']}</p>")
+    write(tmp_path, "b.json", {"text": m["displayName"]})
+    findings = check_public.check(tmp_path, ef.REPO_DIR)
+    assert any(f.startswith("a.html") and "voller Name" in f for f in findings)
+    assert any(f.startswith("b.json") and "Anzeigename" in f for f in findings)
+    # Meldungen nennen nie den gefundenen Namen (Action-Logs sind öffentlich)
+    assert all(m["lastName"].lower() not in f.lower() for f in findings)
+
+
+@pytest.mark.parametrize("obj, key", [
+    ({"players": [{"id": 1, "seasonOutlook": "x"}]}, "seasonOutlook"),
+    ({"tx": [{"memberId": "x", "teamId": 2}]}, "memberId"),
+    ({"topics": [{"author": "x"}]}, "author"),
+])
+def test_verbotene_schluessel(tmp_path, obj, key):
+    write(tmp_path, "data/x.json", obj)
+    assert any(f"'{key}'" in f for f in check_public.check(tmp_path, ef.REPO_DIR))
+
+
+def test_langer_text_und_dateitypen(tmp_path):
+    write(tmp_path, "x.json", {"text": "a" * (check_public.MAX_TEXT + 1)})
+    write(tmp_path, ".env", "TOKEN=1")
+    write(tmp_path, "notiz.md", "# privat")
+    findings = check_public.check(tmp_path, ef.REPO_DIR)
+    assert any("Zeichen" in f for f in findings)
+    assert any(f.startswith(".env") for f in findings)
+    assert any(f.startswith("notiz.md") and "nicht erlaubt" in f for f in findings)
+
+
+def test_spielernamen_ohne_fehlalarm(tmp_path):
+    """Alle ~1050 NFL-Spielernamen des Pools lösen keinen Fund aus (Vornamen werden bewusst nicht geprüft)."""
+    pool = ef.load_json(ef.week_dir(2026, 2) / ef.KONA_FILE)["players"]
+    names = sorted(p["player"]["fullName"] for p in pool)
+    assert len(names) > 1000
+    write(tmp_path, "players.json", {"names": names})
+    assert check_public.check(tmp_path, ef.REPO_DIR) == []

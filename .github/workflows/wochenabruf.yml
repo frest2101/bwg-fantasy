@@ -1,6 +1,8 @@
 # Wochenabruf (Baustein 3): dienstags nach dem MNF die abgeschlossene Woche holen, rechnen, testen, committen.
 # Die Nachläufe holen eine Woche nur, wenn ESPN sie beim ersten Lauf noch nicht abgeschlossen hatte
 # (espn_fetch.py --due holt nur Wochen, die im Repo fehlen oder nicht final sind); den NFL-Spielplan gleicht jeder Lauf ab.
+# Rohdaten werden auch committet, wenn Rechenwerk oder Tests scheitern (ROS-Auszug und Dienstags-Stände gibt es nur
+# „jetzt“); die abgeleiteten Dateien (season_2026.json, app/data) nur, wenn beides grün ist. Der Lauf bleibt dann rot.
 name: Wochenabruf
 
 on:
@@ -22,9 +24,9 @@ jobs:
     runs-on: ubuntu-24.04     # fest statt ubuntu-latest (wechselt ab 19.10.2026 auf Ubuntu 26)
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
           python-version: "3.13"
           cache: pip
@@ -35,22 +37,39 @@ jobs:
       - name: Fällige Wochen von ESPN holen
         run: python scripts/espn_fetch.py --due
 
+      # Auch nach einem Teilfehler des Abrufs rechnen und sichern, was schon geholt ist (je Woche alles oder nichts;
+      # die jüngste Woche mit ROS-Auszug gibt es nur „jetzt“). Der Lauf bleibt dann trotzdem rot.
       - name: Rechenwerk
+        id: rechenwerk
+        if: ${{ !cancelled() }}
         run: python scripts/compute.py
 
       - name: Tests
+        id: tests
+        if: ${{ !cancelled() && steps.rechenwerk.outcome == 'success' }}
         run: python -m pytest -q
 
       - name: Committen und pushen (nur bei Änderung)
+        if: ${{ !cancelled() }}
+        env:
+          ABGELEITET: ${{ steps.rechenwerk.outcome == 'success' && steps.tests.outcome == 'success' }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data
+          git add data/raw
+          if [ "$ABGELEITET" = "true" ]; then
+            git add data/season_*.json app/data
+          fi
           if git diff --cached --quiet; then
             echo "Keine Änderung – nichts zu committen."
             exit 0
           fi
-          week=$(python -c "import json, sys; sys.path.insert(0, 'scripts'); import espn_fetch as ef; print(json.load(open(f'data/season_{ef.DEFAULT_SEASON}.json'))['through_week'])")
-          git commit -m "Wochenabruf (Action): Rohdaten aktualisiert, Rechenwerk bis W${week}."
-          git pull --rebase
+          if [ "$ABGELEITET" = "true" ]; then
+            week=$(python -c "import json, sys; sys.path.insert(0, 'scripts'); import espn_fetch as ef; print(json.load(open(f'data/season_{ef.DEFAULT_SEASON}.json'))['through_week'])")
+            git commit -m "Wochenabruf (Action): Rohdaten aktualisiert, Rechenwerk bis W${week}."
+          else
+            git commit -m "Wochenabruf (Action): Rohdaten aktualisiert, Rechenwerk oder Tests fehlgeschlagen."
+          fi
+          # --autostash: nicht committete abgeleitete Dateien (rotes Rechenwerk/Tests) beiseitelegen, sonst verweigert pull
+          git pull --rebase --autostash
           git push

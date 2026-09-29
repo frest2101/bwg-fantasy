@@ -1,0 +1,68 @@
+# Pages (Baustein 4): veröffentlicht die App auf GitHub Pages – nur app/ (Code und app/data), nie Rohdaten.
+# Auslöser: Pushes auf die App, nach jedem erfolgreichen Wochenabruf bzw. Transaktions-Archiv (deren Bot-Commits
+# mit GITHUB_TOKEN lösen selbst keinen push-Lauf aus) und von Hand. Die App-Daten committen die beiden
+# Daten-Actions; dieser Workflow rechnet nichts. Actions per Commit-SHA gepinnt (Dependabot hält sie aktuell).
+name: Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "app/**"
+      - "scripts/check_public.py"
+      - ".github/workflows/pages.yml"
+  workflow_run:
+    workflows: ["Wochenabruf", "Transaktions-Archiv"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:          # von Hand: gh workflow run pages.yml
+
+permissions: {}               # Workflow-Ebene: nichts; jeder Job bekommt nur, was er braucht
+
+concurrency:
+  group: pages
+  cancel-in-progress: false   # ein laufendes Deployment nie abbrechen
+
+jobs:
+  build:
+    # nach den Daten-Actions nur, wenn sie grün waren und aus diesem Repo stammen
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
+    runs-on: ubuntu-24.04     # fest statt ubuntu-latest (wie die anderen Workflows)
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      # ohne ref: bei workflow_run ist github.sha der neueste Commit auf main, also mit dem Bot-Commit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Build-Ordner nur aus app/
+        run: |
+          mkdir _site
+          cp -r app/. _site/
+          sed -i "s/__BUILD__/${GITHUB_SHA::7}/g" _site/index.html
+
+      - name: Öffentlichkeits-Check (keine Manager, keine ESPN-Texte, kein Chat)
+        run: python3 scripts/check_public.py _site .
+
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9  # v5.0.0
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      pages: write            # Deployment anlegen
+      id-token: write         # OIDC-Nachweis gegenüber Pages
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346  # v5.0.1

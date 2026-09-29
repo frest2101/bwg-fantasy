@@ -12,9 +12,14 @@ import pytest
 
 import compute
 import espn_fetch as ef
+import rawdata
+from rawdata import RosterRow
 
 REFERENZ = ef.REPO_DIR / "docs" / "referenz_w1-w2.md"
 TOLERANZ = Decimal("0.01")
+# Profil „Stärke“ im Stand der Referenz (Notion W2, Min–Max). Seit Session 4 gilt ein anderes Profil (Win 0, Kader 25)
+# und z als Standard; die Referenz prüft deshalb mit diesen eingefrorenen Gewichten die Min–Max-Normwerte.
+STAERKE_W2 = {"pf": 30, "allplay": 25, "win": 15, "coaching": 10, "kader": 10, "floor": 10, "form": 0}
 # Teamnamen der Referenz → team_id, eingefroren auf den Stand von W2 (übersteht spätere Umbenennungen in ESPN)
 REFERENZ_IDS = {t["name"]: t["id"] for t in ef.load_json(ef.week_dir(2026, 2) / "mTeam.json")["teams"]}
 
@@ -54,6 +59,14 @@ def team_week(season, name, week):
     return next(r for r in season["team_weeks"] if r["team_id"] == REFERENZ_IDS[name] and r["week"] == week)
 
 
+@pytest.fixture(scope="module")
+def score_w2(season):
+    """Min–Max-Score mit den eingefrorenen W2-Gewichten und der Rang danach, je team_id."""
+    scores = {t["team_id"]: compute.weighted_score(t["norm"]["minmax"], STAERKE_W2) for t in season["teams"]}
+    ranks = {tid: i for i, tid in enumerate(sorted(scores, key=scores.get, reverse=True), start=1)}
+    return {tid: (scores[tid], ranks[tid]) for tid in scores}
+
+
 # ---------------------------------------------------------------- gegen Referenz
 
 @pytest.mark.parametrize("row", table("Matchups"), ids=lambda r: f"W{r[0]} {r[1]}–{r[3]}")
@@ -78,11 +91,11 @@ def test_saisontabelle(season, teams, row):
 
 
 @pytest.mark.parametrize("row", table("Score-Probe"), ids=lambda r: r[1])
-def test_score_probe(teams, row):
+def test_score_probe(score_w2, row):
     rang, name, score = row
-    t = teams[name]
-    assert t["score"]["Stärke"]["minmax"].quantize(Decimal(1), rounding=ROUND_HALF_UP) == Decimal(score)
-    assert t["rang_score"] == int(rang)
+    value, rank = score_w2[REFERENZ_IDS[name]]
+    assert value.quantize(Decimal(1), rounding=ROUND_HALF_UP) == Decimal(score)
+    assert rank == int(rang)
 
 
 def test_top_team_je_woche(season):
@@ -95,13 +108,14 @@ def test_top_team_je_woche(season):
 # ---------------------------------------------------------------- gegen Zweitreferenz (Notion-Werte Session G1, gerundet)
 
 @pytest.mark.parametrize("row", table("Zweitreferenz G1 – Ränge"), ids=lambda r: r[0])
-def test_g1_raenge_form_streak_restspielplan(teams, row):
-    name, rang, rang_division, rang_score, form, streak, restspielplan = row
+def test_g1_raenge_form_streak(teams, score_w2, row):
+    """Rang Score mit den W2-Gewichten; die Spalte Restspielplan entfällt (Beschluss: erwartete Restsiege)."""
+    name, rang, rang_division, rang_score, form, streak, _restspielplan = row
     t = teams[name]
-    assert (t["rang"], t["rang_division"], t["rang_score"]) == (int(rang), int(rang_division), int(rang_score))
+    assert (t["rang"], t["rang_division"]) == (int(rang), int(rang_division))
+    assert score_w2[t["team_id"]][1] == int(rang_score)
     assert t["streak"] == streak
     assert abs(t["form"] - num(form)) <= Decimal("0.011")  # G1 rundete 278,905 per Float auf 278,9
-    assert abs(t["restspielplan"] - num(restspielplan)) <= Decimal("0.051")
 
 
 @pytest.mark.parametrize("kind, heading, toleranz", [
@@ -217,6 +231,90 @@ def entry(slot, pos, points, projection=0, week=1):
     stats = [{"seasonId": 2026, "scoringPeriodId": week, "statSourceId": 0, "statSplitTypeId": 1, "appliedTotal": points},
              {"seasonId": 2026, "scoringPeriodId": week, "statSourceId": 1, "statSplitTypeId": 1, "appliedTotal": projection}]
     return {"lineupSlotId": slot, "playerPoolEntry": {"player": {"defaultPositionId": pos, "stats": stats}}}
+
+
+def test_sigma_gepoolt_mit_startwert(season):
+    """σ² = (Σ Quadratsummen + 20·35²)/(Σ(n−1) + 20); nach W2 ≈ 35,52 (ohne Startwert 36,54)."""
+    assert abs(season["sigma"] - Decimal("35.52")) <= Decimal("0.01")
+    assert compute.pooled_sigma([]) == 35
+
+
+def test_form_band():
+    assert compute.form_band(Decimal(35), 3) is None  # erst ab 4 Spielen
+    assert abs(compute.form_band(Decimal(35), 10) - Decimal(35) * Decimal("0.2333333333").sqrt()) < Decimal("1e-6")
+
+
+def test_profil_staerke_und_z_standard(season):
+    assert compute.PROFILES["Stärke"] == {"pf": 30, "allplay": 25, "win": 0, "coaching": 10, "kader": 25,
+                                          "floor": 10, "form": 0}
+    order = sorted(season["teams"], key=lambda t: t["score"]["Stärke"]["z"], reverse=True)
+    assert [t["rang_score"] for t in order] == list(range(1, 11))
+    assert all(t["kader_quelle"] == "potenzial" for t in season["teams"])  # ros.json gibt es für W2 nicht
+
+
+class FakeSeason:
+    """Konstruierte Rohdaten für Unentschieden: 4 Teams, eine Woche, 1–2 enden 100:100, 3 schlägt 4."""
+
+    def __init__(self, points: dict[int, tuple[int, int]]):
+        self.points = points  # team_id → (pf, gegner)
+
+    def matchups(self, week):
+        done, rows = set(), []
+        for tid, (pf, opp) in self.points.items():
+            if tid in done:
+                continue
+            done |= {tid, opp}
+            rows.append({"home_id": tid, "away_id": opp, "home_points": Decimal(pf),
+                         "away_points": Decimal(self.points[opp][0]), "final": True})
+        return rows
+
+    def roster(self, week):
+        return [RosterRow(tid, 0, tid, 1, "", 0, Decimal(pf), Decimal(0), True, None) for tid, (pf, _) in self.points.items()]
+
+    def teams(self):
+        return [{"id": tid, "name": f"T{tid}", "divisionId": 0, "waiverRank": tid, "transactionCounter": {}}
+                for tid in self.points]
+
+
+def test_unentschieden_zaehlen_halb():
+    fake = FakeSeason({1: (100, 2), 2: (100, 1), 3: (120, 4), 4: (80, 3)})
+    rows = compute.compute_team_weeks(fake, [1])
+    by_id = {r["team_id"]: r for r in rows}
+    assert by_id[1]["result"] == by_id[2]["result"] == "T"
+    assert (by_id[1]["allplay_w"], by_id[1]["allplay_l"], by_id[1]["allplay_t"]) == (1, 1, 1)
+    assert by_id[1]["wochenrang"] == by_id[2]["wochenrang"] == 2
+    teams = {t["team_id"]: t for t in compute.compute_teams(fake, [1], rows, Decimal(35))}
+    # Win % = (W + 0,5·T)/G; All-Play = (1 + 0,5)/3; Luck = 0,5 − 0,5 = 0
+    assert teams[1]["win_pct"] == 50 and teams[1]["t"] == 1
+    assert teams[1]["allplay_pct"] == 50 and teams[1]["luck"] == 0
+    assert teams[1]["streak"] == "T1"
+    assert (teams[3]["rang"], teams[4]["rang"]) == (1, 4)
+    assert {teams[1]["rang"], teams[2]["rang"]} == {2, 3}  # 0,5 Siege und gleiche PF
+
+
+def test_paarungen_gleich_tabelle(season):
+    """Spielplan und Tabelle nutzen dieselbe Quelle (Wochendatei): PF und Sieger stimmen je Team-Woche überein."""
+    games = {(g["week"], g["home"]): g for g in compute.league_games(rawdata.Season(2026, 2), [1, 2])}
+    for r in season["team_weeks"]:
+        g = games.get((r["week"], r["team_id"])) or games[(r["week"], r["opponent_id"])]
+        mine = g["home_pf"] if g["home"] == r["team_id"] else g["away_pf"]
+        assert mine == r["pf"]
+        assert (g["winner"] == r["team_id"]) == (r["result"] == "W")
+
+
+def test_wochenstatus_ohne_byes(monkeypatch):
+    """Eine Playoff-Woche mit Bye ohne Sieger gilt nicht als „läuft“, wenn alle echten Spiele final sind."""
+    monkeypatch.setattr(ef, "local_weeks", lambda s: [14, 15])
+    monkeypatch.setattr(ef, "load_week_matchups",
+                        lambda s, w: [{"away_id": None, "final": False}, {"away_id": 3, "final": w == 15}])
+    assert compute.week_status(2026, 13) == {14: "laeuft"}
+    assert compute.week_status(2026, 14) == {}
+
+
+def test_vorsaison_ohne_fehler():
+    """Nach dem Saisonwechsel bis W1 final: nichts rechnen, Exit 0 (sonst wären die Actions wochenlang rot)."""
+    assert compute.season_started(2026) and not compute.season_started(2099)
+    assert compute.main(["--season", "2099"]) == 0
 
 
 def test_roster_week_ir_bank_und_projektion():

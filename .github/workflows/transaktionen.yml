@@ -1,6 +1,7 @@
 # Transaktions-Archiv (Baustein 3): täglich mTransactions2 je Periode und kona_league_communication sichern.
 # Ohne scoringPeriodId liefert ESPN nur die laufende Periode – deshalb holt espn_fetch.py alle Perioden 0 … laufend
-# und schreibt nur, was sich geändert hat.
+# und schreibt nur, was sich geändert hat. Danach rechnet es das Rechenwerk neu, damit die Transaktionsliste der App
+# (app/data) täglich stimmt; die abgeleiteten Dateien kommen nur bei grünem Rechenwerk und grünen Tests mit.
 name: Transaktions-Archiv
 
 on:
@@ -20,9 +21,9 @@ jobs:
     runs-on: ubuntu-24.04     # fest statt ubuntu-latest (wechselt ab 19.10.2026 auf Ubuntu 26)
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
           python-version: "3.13"
           cache: pip
@@ -33,17 +34,37 @@ jobs:
       - name: Transaktionen von ESPN holen
         run: python scripts/espn_fetch.py --transactions
 
-      # Auch nach einem Teilfehler sichern, was schon geholt ist (der Lauf bleibt trotzdem rot).
+      # Auch nach einem Teilfehler des Abrufs rechnen und sichern, was schon geholt ist (der Lauf bleibt trotzdem rot).
+      - name: Rechenwerk
+        id: rechenwerk
+        if: ${{ !cancelled() }}
+        run: python scripts/compute.py
+
+      - name: Tests
+        id: tests
+        if: ${{ !cancelled() && steps.rechenwerk.outcome == 'success' }}
+        run: python -m pytest -q
+
       - name: Committen und pushen (nur bei Änderung)
         if: ${{ !cancelled() }}
+        env:
+          ABGELEITET: ${{ steps.rechenwerk.outcome == 'success' && steps.tests.outcome == 'success' }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/raw
+          if [ "$ABGELEITET" = "true" ]; then
+            git add data/season_*.json app/data
+          fi
           if git diff --cached --quiet; then
             echo "Keine Änderung – nichts zu committen."
             exit 0
           fi
-          git commit -m "Transaktions-Archiv (Action): Stand $(date -u +%d.%m.%Y)."
-          git pull --rebase
+          if [ "$ABGELEITET" = "true" ]; then
+            git commit -m "Transaktions-Archiv (Action): Stand $(date -u +%d.%m.%Y)."
+          else
+            git commit -m "Transaktions-Archiv (Action): Stand $(date -u +%d.%m.%Y), Rechenwerk oder Tests fehlgeschlagen."
+          fi
+          # --autostash: nicht committete abgeleitete Dateien (rotes Rechenwerk/Tests) beiseitelegen, sonst verweigert pull
+          git pull --rebase --autostash
           git push
