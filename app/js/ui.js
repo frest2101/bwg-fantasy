@@ -190,7 +190,8 @@ export function infoPop(btn) {        // i-Knopf: Begriff und Erklärung aus dem
 
 // ---------------------------------------------------------------- sortierbare Tabelle
 // o = {cap, cols: [{k, l, v: Zeile → Sortierwert, f: Zeile → Inhalt, num, d (1 auf-, −1 absteigend), cls}],
-//      rows, sort: [key, dir], cls (z. B. 'rk': Rang und Team fest, auf dem Handy Kürzel), rh (Index der Zeilenkopf-Spalte), rc (Zeile → Klasse), limit}
+//      rows, sort: [key, dir], cls (z. B. 'rk': Rang und Team fest, auf dem Handy Kürzel), rh (Index der Zeilenkopf-Spalte), rc (Zeile → Klasse), limit,
+//      filter (true: Knopf „Spalten filtern“ blendet eine Filterzeile ein; Zahlenspalten „≥ 15“, „< 5“, „10-20“, Textspalten Teiltext)}
 export function table(o) {
   const capId = id('c');
   const cols = o.cols;
@@ -205,12 +206,49 @@ export function table(o) {
     return th;
   });
   const tb = h('tbody'), fn = h('p', {class: 'fn', id: id('f')}), more = h('div');
-  const tbl = h('table', {class: o.cls}, h('caption', {id: capId}, o.cap), h('thead', null, h('tr', null, heads)), tb);
+  // Spaltenfilter: je Spalte mit Sortierwert ein Eingabefeld; Zahlenspalten als Bedingung, Textspalten als Teiltext des Zellinhalts
+  const flt = {}, ftr = o.filter ? h('tr', {class: 'flt', hidden: true}) : null;
+  let fbtn = null, fclr = null;
+  if (ftr) {
+    cols.forEach((c, i) => {
+      const th = h('th', {scope: 'col', class: c.num ? 'n' : null});
+      if (c.v) {
+        const label = typeof c.l === 'string' ? c.l : `Spalte ${i + 1}`;
+        let timer;
+        th.append(h('input', {type: 'search', inputmode: c.num ? 'decimal' : null, placeholder: c.num ? '≥ …' : '…', 'aria-label': `Filter ${label}`,
+          oninput: e => { clearTimeout(timer); timer = setTimeout(() => { flt[c.k] = e.target.value; draw(); }, 150); }}));
+      }
+      ftr.append(th);
+    });
+    fbtn = h('button', {type: 'button', class: 'btn', 'aria-expanded': 'false', onclick: () => {
+      ftr.hidden = !ftr.hidden;
+      fbtn.setAttribute('aria-expanded', String(!ftr.hidden));
+      if (!ftr.hidden) ftr.querySelector('input')?.focus();
+    }}, 'Spalten filtern');
+    fclr = h('button', {type: 'button', class: 'btn', hidden: true, onclick: () => {
+      for (const k in flt) delete flt[k];
+      ftr.querySelectorAll('input').forEach(i => { i.value = ''; });
+      draw();
+    }}, 'Filter löschen');
+  }
+  const tbl = h('table', {class: o.cls}, h('caption', {id: capId}, o.cap), h('thead', null, h('tr', null, heads), ftr), tb);
   const wrap = scrollHint(h('div', {class: 'tw', role: 'region', tabindex: '0', 'aria-labelledby': capId}, tbl));
-  const box = h('div', {class: 'tbox'}, wrap, fn, more);
+  const box = h('div', {class: 'tbox'}, ftr ? h('div', {class: 'row tt'}, fbtn, fclr) : null, wrap, fn, more);
   const rh = o.rh ?? 1;
   function draw() {
     let rows = o.rows;
+    const active = ftr ? cols.filter(x => x.v && (flt[x.k] || '').trim()) : [];
+    let fdrop = 0;
+    if (active.length) {
+      const tests = active.map(x => [x, x.num ? numTest(flt[x.k]) : textTest(flt[x.k])]).filter(x => x[1]);
+      const all = rows.length;
+      rows = rows.filter(r => tests.every(([x, fn]) => fn(x.num ? x.v(r) : h('td', null, x.f(r, 0)).textContent)));
+      fdrop = all - rows.length;
+    }
+    if (fbtn) {
+      fbtn.textContent = active.length ? `Spalten filtern (${active.length})` : 'Spalten filtern';
+      fclr.hidden = !active.length;
+    }
     const c = cols.find(x => x.k === sk);
     if (c?.v) rows = sortRows(rows, c.v, sd);
     heads.forEach((th, i) => {
@@ -224,7 +262,8 @@ export function table(o) {
     const reasons = [...naSet];
     naSet = null;
     // leere Auswahl (z. B. Filter ohne Treffer) sichtbar machen, statt nur einen leeren Tabellenkörper zu zeigen
-    const txt = [rows.length ? '' : 'Keine Einträge für diese Auswahl.', reasons.length ? '„–“: ' + reasons.join(' · ') : ''].filter(Boolean).join(' ');
+    const txt = [rows.length ? '' : 'Keine Einträge für diese Auswahl.', fdrop ? `Spaltenfilter: ${rows.length} von ${rows.length + fdrop}.` : '',
+      reasons.length ? '„–“: ' + reasons.join(' · ') : ''].filter(Boolean).join(' ');
     fn.replaceChildren(txt);
     fn.hidden = !txt && !o.note;
     if (o.note) fn.append(txt ? ' · ' : '', o.note);
@@ -237,6 +276,29 @@ export function table(o) {
   box.upd = rows => { o.rows = rows; if (o.limit) limit = o.limit; draw(); };
   draw();
   return box;
+}
+// Zahlenfilter: „15“ oder „≥ 15“ = mindestens, „> 15“, „≤ 5“, „< 5“, „= 10“, „10-20“ (Bereich); Komma als Dezimalzeichen erlaubt.
+// Ungültige Eingabe filtert nicht; fehlende Werte fallen bei aktivem Filter immer heraus.
+export function numTest(s) {
+  s = String(s).replace(/\s+/g, '').replace(/,/g, '.').replace('≥', '>=').replace('≤', '<=');
+  let m;
+  if ((m = s.match(/^(-?\d*\.?\d+)(?:-|–|\.\.)(-?\d*\.?\d+)$/))) {
+    const a = Math.min(+m[1], +m[2]), b = Math.max(+m[1], +m[2]);
+    return v => ok(v) && v >= a && v <= b;
+  }
+  if (!(m = s.match(/^(>=|<=|>|<|=)?(-?\d*\.?\d+)$/))) return null;
+  const n = +m[2];
+  switch (m[1]) {
+    case '<': return v => ok(v) && v < n;
+    case '<=': return v => ok(v) && v <= n;
+    case '>': return v => ok(v) && v > n;
+    case '=': return v => ok(v) && Math.abs(v - n) < 1e-9;
+    default: return v => ok(v) && v >= n;
+  }
+}
+export function textTest(s) {
+  const q = String(s).trim().toLowerCase();
+  return q ? v => String(v).toLowerCase().includes(q) : null;
 }
 export function sortRows(rows, fn, dir) {
   const miss = x => x == null || x === '' || Number.isNaN(x);

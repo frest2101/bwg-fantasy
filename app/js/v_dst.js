@@ -51,13 +51,13 @@ function streaming(box, D, r) {
     {k: 'rest', l: `Rest bis W14`, num: 1, v: t => t.rest, cls: t => 'fz ' + fcls(t.rest), f: t => fcell(t.rest)},
     {k: 'sos', l: 'SoS W15–17', num: 1, v: t => t.sos_po, cls: t => 'fz ' + fcls(t.sos_po), f: t => fcell(t.sos_po)}];
   const rows = () => teams.filter(t => !frei || !(t.besitzer > 0));
-  const tbl = U.table({cap: 'D/ST-Streaming: Gegner der nächsten Wochen', cls: 'nr', rh: 0, rows: rows(), sort: ['n3', -1], cols});
+  const tbl = U.table({cap: 'D/ST-Streaming: Gegner der nächsten Wochen', cls: 'nr', rh: 0, rows: rows(), sort: ['n3', -1], filter: true, cols});
   U.ap(box, h('div', {class: 'row'}, h('label', {class: 'chk'}, h('input', {type: 'checkbox', checked: frei, onchange: e => {
     frei = e.target.checked;
     tbl.upd(rows());
     U.setQ('dst', {frei: frei ? 1 : null});
   }}), 'nur freie D/ST (FA und Waivers)')), tbl,
-  U.legend(['f', 'naechste3', 'rest', 'sos', 'ausloeser']));
+  U.legend(['spaltenfilter', 'f', 'naechste3', 'rest', 'sos', 'ausloeser']));
 }
 
 function offense(box, D) {
@@ -76,7 +76,7 @@ function offense(box, D) {
       return a.length ? h('span', {class: 'flag'}, '⚑ ' + a.join(' · ')) : t.beobachten ? h('span', {class: 'note'}, 'beobachten') : '–';
     }}];
   const L = D.ausloeser_legende || {};
-  U.ap(box, U.table({cap: 'Offenses: Off. zugelassen und Faktor F', cls: 'nr', rh: 0, rows: D.teams || [], sort: ['f', -1], cols}),
+  U.ap(box, U.table({cap: 'Offenses: Off. zugelassen und Faktor F', cls: 'nr', rh: 0, rows: D.teams || [], sort: ['f', -1], filter: true, cols}),
     Object.keys(L).length ? h('ul', {class: 'leg', 'aria-label': 'Auslöser'}, Object.entries(L).map(([k, v]) => h('li', null, h('strong', null, '⚑ ' + (AUS[k] || k) + ': '), v))) : null,
-    U.legend(['z-dst', 'r', 'f', 'delta-f', 'ausloeser', 'beobachten']));
+    U.legend(['spaltenfilter', 'z-dst', 'r', 'f', 'delta-f', 'ausloeser', 'beobachten']));
 }
