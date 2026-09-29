@@ -715,7 +715,8 @@ def pool_extract(data: dict, season: int, week: int, stamp: str) -> dict:
     rows.sort(key=lambda r: r["id"])
     return {"season": season, "woche": week, "stand": stamp,
             "quelle": f"{KONA_VIEW} mit filterStatsForCurrentSeasonScoringPeriodId = [{week}], Auszug je Spieler; "
-                      f"waiver_reihenfolge = waiverRank je Team aus {TEAM_VIEW} (1 = zuerst); "
+                      f"waiver_reihenfolge = waiverRank je Team aus {TEAM_VIEW} (1 = zuerst), "
+                      f"waiver_reihenfolge_stand = Abrufzeit ihrer letzten Änderung; "
                       f"stand = Abrufzeit (UTC) des letzten Laufs, der etwas geändert hat",
             "players": rows}
 
@@ -745,6 +746,8 @@ def fetch_waiver_order(session: requests.Session, season: int) -> dict[str, int]
     eine Reihenfolge 1 … n bilden, sonst gilt die Antwort als unbrauchbar (FetchError).
     """
     _, data = get_json(session, league_url(season), {"view": TEAM_VIEW})
+    if (data.get("id"), data.get("seasonId")) != (LEAGUE_ID, season):
+        raise FetchError(f"{TEAM_VIEW} passt nicht zu Liga und Saison: {(data.get('id'), data.get('seasonId'))}")
     teams = data.get("teams")
     if not isinstance(teams, list) or not teams:
         raise FetchError(f"{TEAM_VIEW} ohne Teams")
@@ -765,6 +768,8 @@ def update_pool(session: requests.Session, season: int, now: datetime, stamp: st
     Rückgabe (Fehler, aktueller Auszug oder None bei Fehler); bei unverändertem Inhalt ist es der gespeicherte Auszug
     mit seinem alten Stand. Den aktuellen Auszug braucht --news. Scheitert nur der mTeam-Aufruf, bleibt die
     Reihenfolge des letzten Laufs stehen (Warnung, kein Fehler): der Pool-Auszug ist das Hauptprodukt.
+    waiver_reihenfolge_stand ist die Abrufzeit des Laufs, der die Reihenfolge zuletzt geändert hat – so sieht die App,
+    wie alt sie wirklich ist, auch wenn der Pool selbst in einem Lauf mit mTeam-Ausfall neu geschrieben wurde.
     """
     path = pool_dir(season) / POOL_FILE
     try:
@@ -779,11 +784,14 @@ def update_pool(session: requests.Session, season: int, now: datetime, stamp: st
                 warn(f"{rel(path)} unlesbar ({exc}) – wird neu geschrieben")
                 previous = None
         extract = pool_extract(fetch_pool(session, season, week), season, week, stamp)
+        old_order, old_stand = (previous or {}).get("waiver_reihenfolge"), (previous or {}).get("waiver_reihenfolge_stand")
         try:
-            extract["waiver_reihenfolge"] = fetch_waiver_order(session, season)
+            order = fetch_waiver_order(session, season)
+            extract["waiver_reihenfolge"] = order
+            extract["waiver_reihenfolge_stand"] = old_stand if order == old_order and old_stand else stamp
         except FetchError as exc:
             warn(f"Waiver-Reihenfolge ({TEAM_VIEW}) nicht abrufbar, Stand des letzten Laufs bleibt: {exc}")
-            extract["waiver_reihenfolge"] = (previous or {}).get("waiver_reihenfolge")
+            extract["waiver_reihenfolge"], extract["waiver_reihenfolge_stand"] = old_order, old_stand
         if same_pool(previous, extract):
             print(f"  {POOL_FILE:<22} unverändert (W{week}, {len(extract['players'])} Spieler, Stand {previous['stand']})")
             return 0, previous

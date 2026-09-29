@@ -770,7 +770,9 @@ def test_fetch_waiver_order():
     with pytest.raises(ef.FetchError, match="ohne waiverRank"):
         ef.fetch_waiver_order(session, 2026)
     with pytest.raises(ef.FetchError, match="ohne Teams"):
-        ef.fetch_waiver_order(StubSession({"teams": []}), 2026)
+        ef.fetch_waiver_order(StubSession(dict(fake_mteam(), teams=[])), 2026)
+    with pytest.raises(ef.FetchError, match="Liga und Saison"):
+        ef.fetch_waiver_order(StubSession(dict(fake_mteam(), seasonId=2025)), 2026)
 
 
 def test_update_pool_mit_waiver_reihenfolge(raw, capsys):
@@ -783,23 +785,33 @@ def test_update_pool_mit_waiver_reihenfolge(raw, capsys):
     assert errors == 0 and current["waiver_reihenfolge"] == {str(i): r for i, r in zip(range(1, 11), RANKS)}
     saved, text = json.loads(path.read_bytes()), path.read_text(encoding="utf-8")
     assert saved["waiver_reihenfolge"]["6"] == 1 and "Testteam" not in text and "Testmanager" not in text
-    assert list(saved) == ["season", "woche", "stand", "quelle", "waiver_reihenfolge", "players"]
-    # nur die Reihenfolge ändert sich (Waiver verarbeitet): neue Datei mit neuem Stand
+    assert saved["waiver_reihenfolge_stand"] == "2026-09-29T0645Z"
+    assert list(saved) == ["season", "woche", "stand", "quelle", "waiver_reihenfolge", "waiver_reihenfolge_stand", "players"]
+    # unverändert (auch die Reihenfolge): keine neue Datei, kein neuer Stand der Reihenfolge
+    errors, current = ef.update_pool(session, 2026, now + timedelta(minutes=30), "2026-09-29T0715Z")
+    assert errors == 0 and current["stand"] == "2026-09-29T0645Z" and current["waiver_reihenfolge_stand"] == "2026-09-29T0645Z"
+    # nur die Reihenfolge ändert sich (Waiver verarbeitet): neue Datei mit neuem Stand, auch für die Reihenfolge
     session.ranks = RANKS[1:] + RANKS[:1]
     errors, current = ef.update_pool(session, 2026, now + timedelta(hours=1), "2026-09-29T0745Z")
     assert errors == 0 and json.loads(path.read_bytes())["stand"] == "2026-09-29T0745Z"
-    assert current["waiver_reihenfolge"]["1"] == 10
+    assert current["waiver_reihenfolge"]["1"] == 10 and current["waiver_reihenfolge_stand"] == "2026-09-29T0745Z"
     # mTeam scheitert: Warnung, Reihenfolge des letzten Laufs, Datei unverändert
     session.mteam_broken = True
     errors, current = ef.update_pool(session, 2026, now + timedelta(hours=2), "2026-09-29T0845Z")
     assert errors == 0 and current["waiver_reihenfolge"]["1"] == 10
     assert json.loads(path.read_bytes())["stand"] == "2026-09-29T0745Z"
     assert "Waiver-Reihenfolge (mTeam) nicht abrufbar" in capsys.readouterr().out
-    # erster Lauf ohne mTeam: Reihenfolge None, der Auszug wird trotzdem geschrieben
+    # mTeam scheitert und der Besitz ändert sich: neuer Pool-Stand, die Reihenfolge behält ihren alten Stand
+    session.owned = 50.0
+    errors, current = ef.update_pool(session, 2026, now + timedelta(hours=3), "2026-09-29T0945Z")
+    saved = json.loads(path.read_bytes())
+    assert errors == 0 and saved["stand"] == "2026-09-29T0945Z" and saved["waiver_reihenfolge_stand"] == "2026-09-29T0745Z"
+    assert saved["waiver_reihenfolge"]["1"] == 10
+    # erster Lauf ohne mTeam: Reihenfolge und Stand None, der Auszug wird trotzdem geschrieben
     path.unlink()
-    errors, current = ef.update_pool(session, 2026, now, "2026-09-29T0945Z")
-    assert errors == 0 and current["waiver_reihenfolge"] is None
-    assert json.loads(path.read_bytes())["waiver_reihenfolge"] is None and session.mteam_calls == 4
+    errors, current = ef.update_pool(session, 2026, now, "2026-09-29T1045Z")
+    assert errors == 0 and current["waiver_reihenfolge"] is None and current["waiver_reihenfolge_stand"] is None
+    assert json.loads(path.read_bytes())["waiver_reihenfolge"] is None and session.mteam_calls == 6
 
 
 def test_pool_extract_verlangt_32_dst():

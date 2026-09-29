@@ -3,6 +3,7 @@
 "woche":4,
 "reihenfolge":[6,10,5,7,3,1,4,8,9,2],
 "reihenfolge_quelle":"wochenabruf",
+"reihenfolge_stand":null,
 "bedarf":{
 "1":{"luecken":[{"slot":"K","id":4567104,"pos":"K","ros_g":8.7}],"ueber_ersatz":{"QB":2,"RB":4,"WR":6,"TE":2,"K":0,"D/ST":null}},
 "2":{"luecken":[],"ueber_ersatz":{"QB":3,"RB":4,"WR":5,"TE":2,"K":1,"D/ST":null}},

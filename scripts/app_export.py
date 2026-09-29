@@ -215,14 +215,16 @@ def build_transactions(result: dict) -> dict | None:
     return {k: data[k] for k in ("spieler", "items", "aufstellungswechsel", "draft")} if data else None
 
 
-def waiver_order(pool: dict, result: dict) -> tuple[list[int] | None, str | None]:
-    """Waiver-Reihenfolge als Liste der team_ids (1 = zuerst) und ihre Quelle: "tageslauf" aus dem Pool-Auszug
-    (mTeam.waiverRank je Lauf), sonst "wochenabruf" aus dem Wochenstand (teams.waiver_prio); (None, None) ohne beides."""
+def waiver_order(pool: dict, result: dict) -> tuple[list[int] | None, str | None, str | None]:
+    """Waiver-Reihenfolge als Liste der team_ids (1 = zuerst), ihre Quelle und ihr Stand: "tageslauf" aus dem
+    Pool-Auszug (mTeam.waiverRank; Stand = Abrufzeit der letzten Änderung, auch wenn ein späterer Lauf sie nur
+    nachgezogen hat), sonst "wochenabruf" aus dem Wochenstand (teams.waiver_prio, Stand None); (None, None, None) ohne beides."""
     daily = pool.get("waiver_reihenfolge")
     if daily:
-        return [int(tid) for tid, _ in sorted(daily.items(), key=lambda kv: (kv[1], int(kv[0])))], "tageslauf"
+        order = [int(tid) for tid, _ in sorted(daily.items(), key=lambda kv: (kv[1], int(kv[0])))]
+        return order, "tageslauf", pool.get("waiver_reihenfolge_stand") or pool["stand"]
     weekly = sorted((t["waiver_prio"], t["team_id"]) for t in result["teams"] if t.get("waiver_prio") is not None)
-    return ([tid for _, tid in weekly], "wochenabruf") if weekly else (None, None)
+    return ([tid for _, tid in weekly], "wochenabruf", None) if weekly else (None, None, None)
 
 
 def team_needs(pool: dict, result: dict) -> dict | None:
@@ -275,9 +277,9 @@ def build_waiver(result: dict) -> dict | None:
             row.update(name=w["name"] if w else None, pos=POSITION_NAMES.get(w["pos"], str(w["pos"])) if w else None,
                        nfl=w["nfl"] if w else None)
         rows.append(row)
-    reihenfolge, quelle = waiver_order(pool, result)
+    reihenfolge, quelle, stand = waiver_order(pool, result)
     return {"stand": pool["stand"], "woche": pool["woche"], "reihenfolge": reihenfolge, "reihenfolge_quelle": quelle,
-            "bedarf": team_needs(pool, result), "spieler": rows}
+            "reihenfolge_stand": stand, "bedarf": team_needs(pool, result), "spieler": rows}
 
 
 CLAUDE_PLAYER_COLS = ("name", "pos", "nfl", "inj", "avg", "form", "trend", "ros_g", "ros_rang")

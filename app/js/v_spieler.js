@@ -21,16 +21,24 @@ export async function render(box, ctx, r) {
   if (detail) one(box, h1, P, W, rows, r.sub, svg, rosWhy); else list(box, W, rows, r, rosWhy);
 }
 
-// Wochenwerte je Spieler mit dem Tagesstand überlagern (Schlüssel: Spieler-ID); ohne Tagesstand unverändert
+// Wochenwerte je Spieler mit dem Tagesstand überlagern (Schlüssel: Spieler-ID); ohne Tagesstand unverändert.
+// Kaderspieler, die nur der Tagesstand kennt (unter der Woche geholt, ohne Wochendaten), kommen mit „–“ dazu statt zu fehlen.
 export function merge(P, W) {
   const daily = new Map((W?.spieler || []).map(x => [x.id, x]));
-  return P.players.map(p => {
+  const rows = P.players.map(p => {
     const d = daily.get(p.id);
     if (!d) return p;
     const out = {...p, own_d: d.own_d, started: d.started, waiver_bis: d.waiver_bis, proj_n: d.proj, news: d.news};
     for (const k of DAILY) if (d[k] !== undefined) out[k] = d[k];
     return out;
   });
+  const known = new Set(P.players.map(p => p.id));
+  for (const d of daily.values()) {
+    if (known.has(d.id) || !(d.team > 0)) continue;
+    rows.push({id: d.id, name: d.name ?? `Spieler ${d.id}`, pos: d.pos ?? null, nfl: d.nfl ?? null, team: d.team, status: d.status, inj: d.inj,
+      own: d.own, own_d: d.own_d, started: d.started, waiver_bis: d.waiver_bis, proj_n: d.proj, news: d.news, nur_tag: true});
+  }
+  return rows;
 }
 
 const trendTxt = t => {
@@ -57,7 +65,7 @@ function list(box, W, all, r, rosWhy) {
   const num = (k, l, f = U.num, why) => ({k, l, num: 1, v: p => p[k], f: p => U.val(p[k], f, why)});
   const base = [
     {k: 'name', l: 'Spieler', v: p => p.name.toLowerCase(), d: 1, flt: false, f: p => h('a', {href: '#spieler/' + p.id, class: 'pl'},
-      h('span', null, p.name, U.inj(p.inj)), h('span', {class: 'sub'}, `${p.pos} · ${p.nfl}` + (p.team > 0 ? ' · ' + U.kz(p.team) : '')))},
+      h('span', null, p.name, U.inj(p.inj)), h('span', {class: 'sub'}, `${p.pos ?? '–'} · ${p.nfl ?? '–'}` + (p.team > 0 ? ' · ' + U.kz(p.team) : '')))},
     num('avg', 'Ø', U.num, 'ohne Spiel'),
     {k: 'form', l: 'Form', num: 1, v: p => p.form, f: p => [U.val(p.form, U.num, 'ohne Spiel'), ' ', trendTxt(p.trend)]},
     num('ros_g', 'ROS/Sp.', U.num, rosWhy)];
@@ -104,19 +112,27 @@ function list(box, W, all, r, rosWhy) {
 
 // ---------------------------------------------------------------- Deep-Links (nur Verweise, keine Texte)
 const SUFFIX = /\s+(jr|sr|ii|iii|iv|v)\.?$/i;
-// FantasyPros führt Spieler ohne Namenszusatz (deebo-samuel), Namensvettern aber mit (marvin-harrison-jr):
-// bei Zusatz deshalb die Suche statt eines geratenen Slugs
-export const fpUrl = name => SUFFIX.test(name) ? `https://www.fantasypros.com/search/?q=${encodeURIComponent(name)}`
+// FantasyPros-D/ST-Seiten heißen <stadt>-defense.php (alle 32 geprüft 30.09.2026), Schlüssel = ESPN-Kürzel
+const FP_DST = {ARI: 'arizona', ATL: 'atlanta', BAL: 'baltimore', BUF: 'buffalo', CAR: 'carolina', CHI: 'chicago', CIN: 'cincinnati', CLE: 'cleveland',
+  DAL: 'dallas', DEN: 'denver', DET: 'detroit', GB: 'green-bay', HOU: 'houston', IND: 'indianapolis', JAX: 'jacksonville', KC: 'kansas-city',
+  LAC: 'los-angeles-chargers', LAR: 'los-angeles-rams', LV: 'las-vegas', MIA: 'miami', MIN: 'minnesota', NE: 'new-england', NO: 'new-orleans',
+  NYG: 'new-york-giants', NYJ: 'new-york-jets', PHI: 'philadelphia', PIT: 'pittsburgh', SEA: 'seattle', SF: 'san-francisco', TB: 'tampa-bay',
+  TEN: 'tennessee', WSH: 'washington'};
+// FantasyPros führt Spieler ohne Namenszusatz (deebo-samuel), Namensvettern aber mit (marvin-harrison-jr); die eigene Suche der
+// Seite nimmt keinen Suchbegriff aus der Adresse – bei Zusatz deshalb eine Seitensuche (DuckDuckGo, site:fantasypros.com) statt Slug;
+// sonst der Slug aus dem Namen: Kleinbuchstaben ohne Akzente, Apostrophe und Punkte, Bindestriche zwischen den Teilen
+export const fpUrl = (name, nfl) => FP_DST[nfl] && /D\/ST$/.test(name) ? `https://www.fantasypros.com/nfl/players/${FP_DST[nfl]}-defense.php`
+  : SUFFIX.test(name) ? `https://duckduckgo.com/?q=${encodeURIComponent('site:fantasypros.com ' + name)}`
   : `https://www.fantasypros.com/nfl/players/${name.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/['’.]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}.php`;
 export function links(p) {
   const dst = p.pos === 'D/ST' || p.id < 0;
   const q = encodeURIComponent(dst ? p.name.replace(/\s*D\/ST$/, '') : p.name);
-  const out = dst ? [[`https://www.espn.com/nfl/team/_/name/${String(p.nfl || '').toLowerCase()}`, 'ESPN-Teamseite']]
-    : [[`https://www.espn.com/nfl/player/_/id/${p.id}`, 'ESPN-Spielerseite'],
-      [`https://fantasy.espn.com/football/player?playerId=${p.id}`, 'ESPN-Fantasy-Karte'],
-      [fpUrl(p.name), 'FantasyPros']];
-  out.push([`https://www.nbcsports.com/search?q=${q}`, 'NBC Sports (Rotoworld) – Suche']);
-  return out;
+  return [
+    dst ? [`https://www.espn.com/nfl/team/_/name/${String(p.nfl || '').toLowerCase()}`, 'ESPN-Teamseite']
+      : [`https://www.espn.com/nfl/player/_/id/${p.id}`, 'ESPN-Spielerseite'],
+    [`https://fantasy.espn.com/football/player?playerId=${p.id}`, 'ESPN-Fantasy-Karte'],
+    dst && !FP_DST[p.nfl] ? null : [fpUrl(p.name, p.nfl), SUFFIX.test(p.name) && !dst ? 'FantasyPros – Suche' : 'FantasyPros'],
+    [`https://www.nbcsports.com/search?q=${q}`, 'NBC Sports (Rotoworld) – Suche']].filter(Boolean);
 }
 function newsBox(p, W) {
   const last = !W ? U.na('keine Tagesdaten') : U.ok(p.news) ? U.stamp(p.news) : U.na('keine Meldung');
@@ -131,7 +147,7 @@ function one(box, h1, P, W, rows, pid, svg, rosWhy) {
   if (!p) { h1.textContent = 'Spieler nicht gefunden'; U.ap(box, h('p', {class: 'note'}, 'Dieser Spieler steht nicht in den App-Daten (nur Kader, Spieler mit Einsatz und die besten Free Agents).')); return; }
   h1.textContent = p.name;
   const ers = P.ersatz?.[p.pos];
-  U.ap(box, h('p', null, `${p.pos} · ${p.nfl} · `, p.team > 0 ? U.tl(p.team) : U.STAT[p.status] || 'frei',
+  U.ap(box, h('p', null, `${p.pos ?? '–'} · ${p.nfl ?? '–'} · `, p.team > 0 ? U.tl(p.team) : U.STAT[p.status] || 'frei',
     p.inj && U.INJ[p.inj] ? h('span', {class: 'badge'}, U.INJ[p.inj][1]) : null,
     U.ok(p.bye) ? ` · Bye W${p.bye}` : null,
     p.pos === 'D/ST' ? [' · ', h('a', {href: '#dst'}, 'D/ST-Faktoren')] : null), stand(W),
@@ -147,6 +163,10 @@ function one(box, h1, P, W, rows, pid, svg, rosWhy) {
     W ? U.tile(`Proj. W${W.woche}`, U.val(p.proj_n, U.num, 'noch keine ESPN-Projektion'),
       p.status === 'WAIVERS' && U.ok(p.waiver_bis) ? `Frist ${U.stamp(p.waiver_bis)}` : null, 'proj-naechste') : null),
   newsBox(p, W));
+  if (p.nur_tag) {
+    U.ap(box, h('p', {class: 'warn'}, 'Noch keine Wochendaten: Der Spieler steht laut Tagesstand im Kader, Saison- und ROS-Werte kommen mit dem nächsten Wochenabruf.'));
+    return;
+  }
   const Wk = P.weeks || [], wk = p.wk || [];
   const vals = wk.map(x => x[2] ? null : x[0]);
   U.ap(box, svg.fig('Formkurve', svg.bars({title: `Formkurve ${p.name}`,

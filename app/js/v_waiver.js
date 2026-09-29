@@ -120,7 +120,7 @@ function order(W, mine) {
   const card = U.card('Waiver-Reihenfolge');
   const list = W.reihenfolge || [];
   if (!list.length) { U.ap(card, h('p', {class: 'note'}, 'Noch keine Reihenfolge gemeldet.')); return card; }
-  const src = W.reihenfolge_quelle === 'tageslauf' ? `Tagesstand ${U.stamp(W.stand)}` : `Stand Wochenabruf (nach W${S.tw}); der Tagesstand kommt mit dem nächsten Tageslauf`;
+  const src = W.reihenfolge_quelle === 'tageslauf' ? `Tagesstand ${U.stamp(W.reihenfolge_stand || W.stand)}` : `Stand Wochenabruf (nach W${S.tw}); der Tagesstand kommt mit dem nächsten Tageslauf`;
   U.ap(card, U.table({cap: 'Reihenfolge der Claims', cls: 'nr', rh: 1, rows: list.map((tid, i) => ({i: i + 1, tid})), sortable: false,
     rc: x => x.tid === mine ? 'me' : null, cols: [
       {k: 'p', l: 'Platz', num: 1, f: x => x.i + '.'},
