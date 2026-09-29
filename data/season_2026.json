@@ -23,14 +23,15 @@
    "allplay_t": 0,
    "allplay_pct": 74.07,
    "median_w": 2,
+   "median_l": 1,
+   "matchup_glueck": 0.39,
+   "spielplan_pkt": 40.62,
    "optimal": 855.17,
    "verschenkt": 110.36,
    "efficiency": 87.09,
    "kader_potenzial": 285.06,
    "kader_projektion": 216.18,
    "bench": 308.91,
-   "luck": 0.78,
-   "luck_band": 0.42,
    "floor": 187.0,
    "form": 248.27,
    "form_delta": 0.0,
@@ -108,14 +109,15 @@
    "allplay_t": 0,
    "allplay_pct": 85.19,
    "median_w": 3,
+   "median_l": 0,
+   "matchup_glueck": 0.0,
+   "spielplan_pkt": 17.62,
    "optimal": 781.59,
    "verschenkt": 63.33,
    "efficiency": 91.9,
    "kader_potenzial": 260.53,
    "kader_projektion": 214.21,
    "bench": 243.41,
-   "luck": 0.44,
-   "luck_band": 0.57,
    "floor": 216.62,
    "form": 239.42,
    "form_delta": 0.0,
@@ -193,14 +195,15 @@
    "allplay_t": 0,
    "allplay_pct": 66.67,
    "median_w": 2,
+   "median_l": 1,
+   "matchup_glueck": 0.0,
+   "spielplan_pkt": 68.94,
    "optimal": 807.56,
    "verschenkt": 95.99,
    "efficiency": 88.11,
    "kader_potenzial": 269.19,
    "kader_projektion": 211.53,
    "bench": 236.94,
-   "luck": 0.0,
-   "luck_band": 0.61,
    "floor": 191.54,
    "form": 237.19,
    "form_delta": 0.0,
@@ -278,14 +281,15 @@
    "allplay_t": 0,
    "allplay_pct": 66.67,
    "median_w": 3,
+   "median_l": 0,
+   "matchup_glueck": -0.29,
+   "spielplan_pkt": -5.99,
    "optimal": 698.23,
    "verschenkt": 71.29,
    "efficiency": 89.79,
    "kader_potenzial": 232.74,
    "kader_projektion": 206.27,
    "bench": 218.56,
-   "luck": 0.0,
-   "luck_band": 0.8,
    "floor": 203.9,
    "form": 208.98,
    "form_delta": 0.0,
@@ -363,14 +367,15 @@
    "allplay_t": 0,
    "allplay_pct": 51.85,
    "median_w": 2,
+   "median_l": 1,
+   "matchup_glueck": 0.4,
+   "spielplan_pkt": 77.34,
    "optimal": 763.37,
    "verschenkt": 165.29,
    "efficiency": 78.35,
    "kader_potenzial": 254.46,
    "kader_projektion": 203.57,
    "bench": 429.37,
-   "luck": 0.44,
-   "luck_band": 0.83,
    "floor": 179.24,
    "form": 199.36,
    "form_delta": 0.0,
@@ -448,14 +453,15 @@
    "allplay_t": 0,
    "allplay_pct": 40.74,
    "median_w": 1,
+   "median_l": 2,
+   "matchup_glueck": 0.0,
+   "spielplan_pkt": 29.01,
    "optimal": 830.02,
    "verschenkt": 221.79,
    "efficiency": 73.28,
    "kader_potenzial": 276.67,
    "kader_projektion": 205.9,
    "bench": 401.94,
-   "luck": -0.22,
-   "luck_band": 0.7,
    "floor": 178.92,
    "form": 202.74,
    "form_delta": 0.0,
@@ -533,14 +539,15 @@
    "allplay_t": 0,
    "allplay_pct": 51.85,
    "median_w": 2,
+   "median_l": 1,
+   "matchup_glueck": -0.12,
+   "spielplan_pkt": -63.72,
    "optimal": 683.7,
    "verschenkt": 75.93,
    "efficiency": 88.89,
    "kader_potenzial": 227.9,
    "kader_projektion": 197.16,
    "bench": 211.98,
-   "luck": -0.56,
-   "luck_band": 0.77,
    "floor": 179.23,
    "form": 202.59,
    "form_delta": 0.0,
@@ -618,14 +625,15 @@
    "allplay_t": 0,
    "allplay_pct": 14.81,
    "median_w": 0,
+   "median_l": 3,
+   "matchup_glueck": 1.0,
+   "spielplan_pkt": -31.99,
    "optimal": 585.29,
    "verschenkt": 106.51,
    "efficiency": 81.8,
    "kader_potenzial": 195.1,
    "kader_projektion": 200.93,
    "bench": 210.34,
-   "luck": 0.56,
-   "luck_band": 0.57,
    "floor": 118.83,
    "form": 159.59,
    "form_delta": 0.0,
@@ -703,14 +711,15 @@
    "allplay_t": 0,
    "allplay_pct": 29.63,
    "median_w": 0,
+   "median_l": 3,
+   "matchup_glueck": 0.0,
+   "spielplan_pkt": -115.17,
    "optimal": 610.54,
    "verschenkt": 89.87,
    "efficiency": 85.28,
    "kader_potenzial": 203.51,
    "kader_projektion": 190.68,
    "bench": 224.09,
-   "luck": -0.89,
-   "luck_band": 0.7,
    "floor": 137.03,
    "form": 173.56,
    "form_delta": 0.0,
@@ -788,14 +797,15 @@
    "allplay_t": 0,
    "allplay_pct": 18.52,
    "median_w": 0,
+   "median_l": 3,
+   "matchup_glueck": 0.0,
+   "spielplan_pkt": -16.66,
    "optimal": 676.59,
    "verschenkt": 165.5,
    "efficiency": 75.54,
    "kader_potenzial": 225.53,
    "kader_projektion": 196.75,
    "bench": 390.31,
-   "luck": -0.56,
-   "luck_band": 0.59,
    "floor": 135.44,
    "form": 170.36,
    "form_delta": 0.0,
@@ -879,9 +889,11 @@
    "allplay_t": 0,
    "wochenrang": 1,
    "median_win": true,
+   "median_abstand": 113.52,
    "allplay_pct": 100.0,
-   "luck": 0.0,
-   "luck_kum": 0.0
+   "gegner_pkt": 20.66,
+   "matchup_glueck": 0.0,
+   "matchup_kum": 0.0
   },
   {
    "team_id": 2,
@@ -904,9 +916,11 @@
    "allplay_t": 0,
    "wochenrang": 4,
    "median_win": true,
+   "median_abstand": 22.63,
    "allplay_pct": 66.67,
-   "luck": 0.33,
-   "luck_kum": 0.33
+   "gegner_pkt": 0.84,
+   "matchup_glueck": 0.0,
+   "matchup_kum": 0.0
   },
   {
    "team_id": 3,
@@ -929,9 +943,11 @@
    "allplay_t": 0,
    "wochenrang": 10,
    "median_win": false,
+   "median_abstand": -75.16,
    "allplay_pct": 0.0,
-   "luck": 0.0,
-   "luck_kum": 0.0
+   "gegner_pkt": -83.31,
+   "matchup_glueck": 0.0,
+   "matchup_kum": 0.0
   },
   {
    "team_id": 4,
@@ -954,9 +970,11 @@
    "allplay_t": 0,
    "wochenrang": 7,
    "median_win": false,
+   "median_abstand": -14.75,
    "allplay_pct": 33.33,
-   "luck": 0.67,
-   "luck_kum": 0.67
+   "gegner_pkt": 69.3,
+   "matchup_glueck": 0.43,
+   "matchup_kum": 0.43
   },
   {
    "team_id": 5,
@@ -979,9 +997,11 @@
    "allplay_t": 0,
    "wochenrang": 6,
    "median_win": false,
+   "median_abstand": -9.91,
    "allplay_pct": 44.44,
-   "luck": -0.44,
-   "luck_kum": -0.44
+   "gegner_pkt": -102.78,
+   "matchup_glueck": 0.0,
+   "matchup_kum": 0.0
   },
   {
    "team_id": 6,
@@ -1004,9 +1024,11 @@
    "allplay_t": 0,
    "wochenrang": 2,
    "median_win": true,
+   "median_abstand": 94.05,
    "allplay_pct": 88.89,
-   "luck": 0.11,
-   "luck_kum": 0.11
+   "gegner_pkt": 85.91,
+   "matchup_glueck": 0.0,
+   "matchup_kum": 0.0
   },
   {
    "team_id": 7,
@@ -1029,9 +1051,11 @@
    "allplay_t": 0,
    "wochenrang": 8,
    "median_win": false,
+   "median_abstand": -14.76,
    "allplay_pct": 22.22,
-   "luck": -0.22,
-   "luck_kum": -0.22
+   "gegner_pkt": -29.73,
+   "matchup_glueck": 0.0,
+   "matchup_kum": 0.0
   },
   {
    "team_id": 8,
@@ -1054,9 +1078,11 @@
    "allplay_t": 0,
    "wochenrang": 5,
    "median_win": true,
+   "median_abstand": 9.91,
    "allplay_pct": 55.56,
-   "luck": -0.56,
-   "luck_kum": -0.56
+   "gegner_pkt": -11.89,
+   "matchup_glueck": -0.29,
+   "matchup_kum": -0.29
   },
   {
    "team_id": 9,
@@ -1079,9 +1105,11 @@
    "allplay_t": 0,
    "wochenrang": 3,
    "median_win": true,
+   "median_abstand": 40.47,
    "allplay_pct": 77.78,
-   "luck": 0.22,
-   "luck_kum": 0.22
+   "gegner_pkt": 25.51,
+   "matchup_glueck": 0.0,
+   "matchup_kum": 0.0
   },
   {
    "team_id": 10,
@@ -1104,9 +1132,11 @@
    "allplay_t": 0,
    "wochenrang": 9,
    "median_win": false,
+   "median_abstand": -58.55,
    "allplay_pct": 11.11,
-   "luck": -0.11,
-   "luck_kum": -0.11
+   "gegner_pkt": 25.5,
+   "matchup_glueck": 0.0,
+   "matchup_kum": 0.0
   },
   {
    "team_id": 1,
@@ -1129,9 +1159,11 @@
    "allplay_t": 0,
    "wochenrang": 1,
    "median_win": true,
+   "median_abstand": 45.54,
    "allplay_pct": 100.0,
-   "luck": 0.0,
-   "luck_kum": 0.0
+   "gegner_pkt": -5.32,
+   "matchup_glueck": 0.0,
+   "matchup_kum": 0.0
   },
   {
    "team_id": 2,
@@ -1154,9 +1186,11 @@
    "allplay_t": 0,
    "wochenrang": 2,
    "median_win": true,
+   "median_abstand": 44.97,
    "allplay_pct": 88.89,
-   "luck": 0.11,
-   "luck_kum": 0.44
+   "gegner_pkt": 12.14,
+   "matchup_glueck": 0.0,
+   "matchup_kum": 0.0
   },
   {
    "team_id": 3,
@@ -1179,9 +1213,11 @@
    "allplay_t": 0,
    "wochenrang": 9,
    "median_win": false,
+   "median_abstand": -36.4,
    "allplay_pct": 11.11,
-   "luck": 0.89,
-   "luck_kum": 0.89
+   "gegner_pkt": 66.65,
+   "matchup_glueck": 1.0,
+   "matchup_kum": 1.0
   },
   {
    "team_id": 4,
@@ -1204,9 +1240,11 @@
    "allplay_t": 0,
    "wochenrang": 4,
    "median_win": true,
+   "median_abstand": 12.62,
    "allplay_pct": 66.67,
-   "luck": 0.33,
-   "luck_kum": 1.0
+   "gegner_pkt": 8.83,
+   "matchup_glueck": 0.0,
+   "matchup_kum": 0.43
   },
   {
    "team_id": 5,
@@ -1229,9 +1267,11 @@
    "allplay_t": 0,
    "wochenrang": 10,
    "median_win": false,
+   "median_abstand": -67.74,
    "allplay_pct": 0.0,
-   "luck": 0.0,
-   "luck_kum": -0.44
+   "gegner_pkt": 35.31,
+   "matchup_glueck": 0.0,
+   "matchup_kum": 0.0
   },
   {
    "team_id": 6,
@@ -1254,9 +1294,11 @@
    "allplay_t": 0,
    "wochenrang": 8,
    "median_win": false,
+   "median_abstand": -13.23,
    "allplay_pct": 22.22,
-   "luck": -0.22,
-   "luck_kum": -0.11
+   "gegner_pkt": -46.05,
+   "matchup_glueck": 0.0,
+   "matchup_kum": 0.0
   },
   {
    "team_id": 7,
@@ -1279,9 +1321,11 @@
    "allplay_t": 0,
    "wochenrang": 5,
    "median_win": true,
+   "median_abstand": 4.24,
    "allplay_pct": 55.56,
-   "luck": -0.56,
-   "luck_kum": -0.78
+   "gegner_pkt": -46.62,
+   "matchup_glueck": -0.12,
+   "matchup_kum": -0.12
   },
   {
    "team_id": 8,
@@ -1304,9 +1348,11 @@
    "allplay_t": 0,
    "wochenrang": 3,
    "median_win": true,
+   "median_abstand": 13.29,
    "allplay_pct": 77.78,
-   "luck": 0.22,
-   "luck_kum": -0.33
+   "gegner_pkt": 3.15,
+   "matchup_glueck": 0.0,
+   "matchup_kum": -0.29
   },
   {
    "team_id": 9,
@@ -1329,9 +1375,11 @@
    "allplay_t": 0,
    "wochenrang": 7,
    "median_win": false,
+   "median_abstand": -9.92,
    "allplay_pct": 33.33,
-   "luck": -0.33,
-   "luck_kum": -0.11
+   "gegner_pkt": -13.7,
+   "matchup_glueck": 0.0,
+   "matchup_kum": 0.0
   },
   {
    "team_id": 10,
@@ -1354,9 +1402,11 @@
    "allplay_t": 0,
    "wochenrang": 6,
    "median_win": false,
+   "median_abstand": -4.24,
    "allplay_pct": 44.44,
-   "luck": -0.44,
-   "luck_kum": -0.56
+   "gegner_pkt": -14.37,
+   "matchup_glueck": 0.0,
+   "matchup_kum": 0.0
   },
   {
    "team_id": 1,
@@ -1379,9 +1429,11 @@
    "allplay_t": 0,
    "wochenrang": 8,
    "median_win": false,
+   "median_abstand": -13.51,
    "allplay_pct": 22.22,
-   "luck": 0.78,
-   "luck_kum": 0.78
+   "gegner_pkt": 25.29,
+   "matchup_glueck": 0.39,
+   "matchup_kum": 0.39
   },
   {
    "team_id": 2,
@@ -1404,9 +1456,11 @@
    "allplay_t": 0,
    "wochenrang": 1,
    "median_win": true,
+   "median_abstand": 51.4,
    "allplay_pct": 100.0,
-   "luck": 0.0,
-   "luck_kum": 0.44
+   "gegner_pkt": 4.65,
+   "matchup_glueck": 0.0,
+   "matchup_kum": 0.0
   },
   {
    "team_id": 3,
@@ -1429,9 +1483,11 @@
    "allplay_t": 0,
    "wochenrang": 7,
    "median_win": false,
+   "median_abstand": -8.93,
    "allplay_pct": 33.33,
-   "luck": -0.33,
-   "luck_kum": 0.56
+   "gegner_pkt": -15.33,
+   "matchup_glueck": 0.0,
+   "matchup_kum": 1.0
   },
   {
    "team_id": 4,
@@ -1454,9 +1510,11 @@
    "allplay_t": 0,
    "wochenrang": 5,
    "median_win": true,
+   "median_abstand": 0.95,
    "allplay_pct": 55.56,
-   "luck": -0.56,
-   "luck_kum": 0.44
+   "gegner_pkt": -0.78,
+   "matchup_glueck": -0.03,
+   "matchup_kum": 0.4
   },
   {
    "team_id": 5,
@@ -1479,9 +1537,11 @@
    "allplay_t": 0,
    "wochenrang": 6,
    "median_win": false,
+   "median_abstand": -0.95,
    "allplay_pct": 44.44,
-   "luck": -0.44,
-   "luck_kum": -0.89
+   "gegner_pkt": -47.7,
+   "matchup_glueck": 0.0,
+   "matchup_kum": 0.0
   },
   {
    "team_id": 6,
@@ -1504,9 +1564,11 @@
    "allplay_t": 0,
    "wochenrang": 2,
    "median_win": true,
+   "median_abstand": 31.48,
    "allplay_pct": 88.89,
-   "luck": 0.11,
-   "luck_kum": 0.0
+   "gegner_pkt": 29.09,
+   "matchup_glueck": 0.0,
+   "matchup_kum": 0.0
   },
   {
    "team_id": 7,
@@ -1529,9 +1591,11 @@
    "allplay_t": 0,
    "wochenrang": 3,
    "median_win": true,
+   "median_abstand": 19.03,
    "allplay_pct": 77.78,
-   "luck": 0.22,
-   "luck_kum": -0.56
+   "gegner_pkt": 12.63,
+   "matchup_glueck": 0.0,
+   "matchup_kum": -0.12
   },
   {
    "team_id": 8,
@@ -1554,9 +1618,11 @@
    "allplay_t": 0,
    "wochenrang": 4,
    "median_win": true,
+   "median_abstand": 4.48,
    "allplay_pct": 66.67,
-   "luck": 0.33,
-   "luck_kum": 0.0
+   "gegner_pkt": 2.75,
+   "matchup_glueck": 0.0,
+   "matchup_kum": -0.29
   },
   {
    "team_id": 9,
@@ -1579,9 +1645,11 @@
    "allplay_t": 0,
    "wochenrang": 9,
    "median_win": false,
+   "median_abstand": -21.59,
    "allplay_pct": 11.11,
-   "luck": -0.11,
-   "luck_kum": -0.22
+   "gegner_pkt": 17.21,
+   "matchup_glueck": 0.0,
+   "matchup_kum": 0.0
   },
   {
    "team_id": 10,
@@ -1604,9 +1672,11 @@
    "allplay_t": 0,
    "wochenrang": 10,
    "median_win": false,
+   "median_abstand": -25.39,
    "allplay_pct": 0.0,
-   "luck": 0.0,
-   "luck_kum": -0.56
+   "gegner_pkt": -27.78,
+   "matchup_glueck": 0.0,
+   "matchup_kum": 0.0
   }
  ],
  "weeks": [

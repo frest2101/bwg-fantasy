@@ -61,15 +61,17 @@ def pick(source: dict | None, keys) -> dict | None:
 # ---------------------------------------------------------------- teams.json
 
 TEAM_FIELDS = ("team_id", "name", "division", "games", "w", "l", "t", "pf", "pa", "pf_per_game", "win_pct",
-               "allplay_w", "allplay_l", "allplay_t", "allplay_pct", "median_w", "luck", "luck_band", "optimal", "verschenkt",
+               "allplay_w", "allplay_l", "allplay_t", "allplay_pct", "median_w", "median_l", "matchup_glueck",
+               "spielplan_pkt", "optimal", "verschenkt",
                "efficiency", "kader_potenzial", "kader_projektion", "bench", "floor", "form", "form_delta",
                "form_band", "streak", "projection", "projektions_delta", "waiver_prio", "moves", "rang",
                "rang_division", "rang_score", "norm", "score")
 PR_FIELDS = ("mu", "se", "p", "p_quelle", "e", "rang", "rang_vorwoche", "trend", "kernsatz")
 SIM_FIELDS = ("playoff", "division", "bye", "restsiege", "seeds")
-# je Woche (Arrays in teams.json › wochen); Luck-Beitrag, laufende Summe und Effizienz kommen aus compute_team_weeks
+# je Woche (Arrays in teams.json › wochen); Matchup-Glück, laufende Summe und Effizienz kommen aus compute.py
 WEEK_FIELDS = ("pf", "pa", "optimal", "verschenkt", "efficiency", "wochenrang", "allplay_w", "allplay_l", "allplay_t",
-               "allplay_pct", "luck", "luck_kum", "median_win", "projektions_delta")
+               "allplay_pct", "median_win", "median_abstand", "matchup_glueck", "matchup_kum", "gegner_pkt",
+               "projektions_delta")
 
 
 def build_teams(result: dict) -> dict:
@@ -214,7 +216,7 @@ def build_claude(result: dict, teams: dict, schedule: dict, players: dict | None
     for t in teams["teams"]:
         pr, sim = t.get("pr") or {}, (t.get("sim") or {}).get("liga") or {}
         tabelle.append([t["rang"], k(t["team_id"]), t["name"], f"{t['w']}-{t['l']}-{t['t']}", t["pf"],
-                        t["allplay_pct"], t["luck"], t["efficiency"], t["form"],
+                        t["allplay_pct"], t["matchup_glueck"], t["efficiency"], t["form"],
                         50 + 10 * t["score_ref"]["Stärke"]["z"], t["kader_projektion"] or t["kader_potenzial"],
                         pr.get("rang"), pr.get("mu"), fixed(pr.get("e"), 3), pr.get("trend"),
                         fixed(sim.get("playoff"), 4)])
@@ -224,7 +226,7 @@ def build_claude(result: dict, teams: dict, schedule: dict, players: dict | None
            "stand": {"saison": result["season"], "nach_woche": result["through_week"],
                      "kader_quelle": teams["meta"]["kader_quelle"], "ros_nach_woche": result.get("ros_after_week")},
            "teams": {k(t["team_id"]): t["name"] for t in teams["teams"]},
-           "tabelle_spalten": ["rang", "team", "name", "w_l_t", "pf", "allplay_pct", "luck", "effizienz_pct", "form",
+           "tabelle_spalten": ["rang", "team", "name", "w_l_t", "pf", "allplay_pct", "matchup_glueck", "effizienz_pct", "form",
                                "score_50_10z", "kader", "pr_rang", "mu", "e", "trend", "playoff_anteil"],
            "tabelle": tabelle,
            "spiele_spalten": ["woche", "heim", "gast", "pf_heim", "pf_gast", "p_heim"],
