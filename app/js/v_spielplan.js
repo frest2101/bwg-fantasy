@@ -40,7 +40,7 @@ function tiles(W) {
 function weekTable(i, wk) {
   const w = t => t.wochen, anyT = S.teams.some(t => w(t).allplay_t[i] > 0);
   const val = (k, f) => ({v: t => w(t)[k][i], f: t => U.val(w(t)[k][i], f, 'kein Spiel')});
-  return h('div', null, U.table({cap: h('span', null, `Wochentabelle W${wk}`, h('span', {class: 'sub'}, h('a', {href: '#tabelle/allplay/w' + wk}, 'All-Play und Luck dieser Woche'), ' · ',
+  return h('div', null, U.table({cap: h('span', null, `Wochentabelle W${wk}`, h('span', {class: 'sub'}, h('a', {href: '#tabelle/allplay/w' + wk}, 'All-Play und Matchup-Glück dieser Woche'), ' · ',
     h('a', {href: '#tabelle/coaching/w' + wk}, 'Coaching'))), cls: 'rk', rows: S.teams, sort: ['wr', 1], cols: [
     {k: 'wr', l: '#', v: t => w(t).wochenrang[i], d: 1, f: t => w(t).wochenrang[i]},
     {k: 'team', l: 'Team', v: t => t.name.toLowerCase(), d: 1, f: t => U.tl(t.team_id)},
@@ -51,12 +51,12 @@ function weekTable(i, wk) {
     {k: 'ef', l: 'Eff. %', num: 1, ...val('efficiency', U.pct)},
     {k: 'ap', l: anyT ? 'AP W-L-T' : 'AP W-L', num: 1, v: t => w(t).allplay_pct[i], f: t => U.apwl(w(t).allplay_w[i], w(t).allplay_l[i], w(t).allplay_t[i], anyT)},
     {k: 'md', l: 'Median', v: t => +!!w(t).median_win[i], f: t => w(t).median_win[i] ? h('span', {class: 'W'}, '✓', h('span', {class: 'vh'}, 'ja')) : h('span', {class: 'na'}, '–', h('span', {class: 'vh'}, 'nein'))},
-    {k: 'lk', l: 'Luck', num: 1, ...val('luck', U.sgn)},
+    {k: 'mg', l: 'Matchup-Glück', num: 1, ...val('matchup_glueck', U.sgn)},
     {k: 'vs', l: 'Verschenkt', num: 1, ...val('verschenkt', U.num)},
     {k: 'bk', l: 'Bank', num: 1, ...val('bank', U.num)},
     {k: 'pd', l: 'Proj.-Δ', num: 1, ...val('projektions_delta', U.sgn)}],
-  note: 'Luck = Beitrag der Woche (Ergebnis − All-Play-Anteil).'}),
-  U.legend(['wochenrang', 'eff-woche', 'ap-wl', 'median', 'luck-beitrag', 'verschenkt', 'bank', 'proj-delta']));
+  note: 'Matchup-Glück: Sieg unter dem Wochenmedian +, Niederlage über dem Median −, sonst 0.'}),
+  U.legend(['wochenrang', 'eff-woche', 'ap-wl', 'median', 'matchup-woche', 'verschenkt', 'bank', 'proj-delta']));
 }
 
 function topScorer(W) {

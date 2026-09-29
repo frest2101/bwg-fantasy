@@ -32,7 +32,7 @@ Die App lädt `data/manifest.json?t=<jetzt>` und danach jede Datei mit `?v=<v>`.
   - Tabelle:
     - Stammdaten: `team_id, name, kuerzel, division, games, w, l, t`
     - Punkte: `pf, pa, diff, pf_per_game, pa_per_game`
-    - All-Play: `win_pct, allplay_w, allplay_l, allplay_t, allplay_pct, median_w, luck, luck_band` (Zufallsband von Luck)
+    - All-Play: `win_pct, allplay_w, allplay_l, allplay_t, allplay_pct, median_w, median_l, matchup_glueck` (Σ der Wochenwerte), `spielplan_pkt` (Σ Ligaschnitt − Gegnerpunkte)
     - Coaching: `optimal, verschenkt, verschenkt_avg, verschenkt_max, efficiency, kader_potenzial, kader_projektion, bench`
     - Form und Projektion: `floor, form, form_delta, form_band, streak, projection, projektions_delta`
     - Ränge und Liga: `waiver_prio, moves, rang, rang_division, rang_score`
@@ -40,7 +40,7 @@ Die App lädt `data/manifest.json?t=<jetzt>` und danach jede Datei mit `?v=<v>`.
   - Power Ranking `pr`: `{mu, se, p, p_quelle, e, rang, rang_vorwoche, trend, kernsatz}`
   - Simulation `sim`: `{liga: {playoff, division, bye, restsiege, seeds: [6]}, espn: {…}}` – `liga` = Regel 2026 (Top 3 je Division), `espn` = Top 6 gesamt; dazu `espn_sim` (ESPN-Vergleich oder `null`)
   - `positionen`: `{nach_position: {"QB": {pts, anteil, rang}, …}, nach_slot: {"QB", "RB", "WR", "TE", "FLEX", "OP", "D/ST", "K"}}`
-  - `wochen`: Arrays in der Reihenfolge von `meta.weeks` (Einzelwoche, nicht kumuliert): `gegner, heim, pf, pa, ergebnis, wochenrang, allplay_w, allplay_l, allplay_t, allplay_pct` (All-Play-Anteil pₜ der Woche in %), `luck` (Beitrag der Woche = Ergebnis W 1 · T 0,5 · L 0 − pₜ; ungerundet Σ = `luck` des Teams und je Woche Nullsumme über alle Teams – die einzeln auf 2 Stellen gerundeten Beiträge können in Summe um 0,01 abweichen, verbindlich ist `luck_kum`), `luck_kum` (laufende Summe, letzter Wert = `luck`), `median_win, optimal, verschenkt, efficiency` (PF / Optimal der Woche in %), `bank, projektion, projektions_delta, mu, pr_rang`
+  - `wochen`: Arrays in der Reihenfolge von `meta.weeks` (Einzelwoche, nicht kumuliert): `gegner, heim, pf, pa, ergebnis, wochenrang, allplay_w, allplay_l, allplay_t, allplay_pct` (All-Play-Anteil pₜ der Woche in %), `median_abstand` (PF − Wochenmedian), `matchup_glueck` (Woche: Sieg unter dem Median +|Abstand|/σ, Niederlage über dem Median −|Abstand|/σ, gekappt bei 1, sonst 0), `matchup_kum` (laufende Summe, letzter Wert = `matchup_glueck` des Teams), `gegner_pkt` (Ligaschnitt − PA), `median_win, optimal, verschenkt, efficiency` (PF / Optimal der Woche in %), `bank, projektion, projektions_delta, mu, pr_rang`
 
 ## `schedule.json` (Erstaufruf)
 - **`weeks`:** Liste je Woche 1–17 mit `week`, `start` (Dienstag, ISO-Datum), `status` (`final`, `laeuft`, `offen`) und `playoff` (bool). Für finale Wochen zusätzlich:
@@ -83,7 +83,7 @@ Die App lädt `data/manifest.json?t=<jetzt>` und danach jede Datei mit `?v=<v>`.
 ## `claude.json` (kompakt, < 50 KB, für Claude-Sessions unterwegs)
 - **Stand:** `legende`, `stand`.
 - **Liga:**
-  - `tabelle`: 10 Teams mit Rang, W-L-T, PF, All-Play-Quote, Luck, Effizienz, Form, Score, Power Ranking (μ, E, Rang, Trend) und Playoff-%
+  - `tabelle`: 10 Teams mit Rang, W-L-T, PF, All-Play-Quote, Matchup-Glück, Effizienz, Form, Score, Power Ranking (μ, E, Rang, Trend) und Playoff-%
   - `spiele`: alle Paarungen mit Ergebnis
 - **Spieler:**
   - `kader`: alle Kaderspieler mit Name, Position, NFL-Team, Team, Verletzung, Ø, Form, ROS/Spiel und ROS-Rang

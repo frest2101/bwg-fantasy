@@ -239,37 +239,43 @@ def test_sigma_gepoolt_mit_startwert(season):
     assert compute.pooled_sigma([]) == 35
 
 
-def test_luck_band(teams):
-    """Hugh Jass nach W2: All-Play 6/9 und 8/9 → Band √(2/9 + 8/81) = √(26/81) ≈ 0,567; Luck +0,44 liegt darin."""
-    t = teams["Hugh Jass"]
-    assert abs(t["luck_band"] - Decimal(26 / 81).sqrt()) < Decimal("1e-9")
-    assert abs(t["luck"]) < t["luck_band"]
-
-
-def test_luck_wochenbeitraege(season, teams):
-    """Luck = Σ Wochenbeiträge (Ergebnis − pₜ) und zugleich (W + 0,5·T) − All-Play-Quote × Spiele; Hugh Jass nach W2:
-    W1 Sieg als Wochen-4. → 1 − 6/9, W2 Sieg als Wochen-2. → 1 − 8/9; luck_kum ist die laufende Summe."""
-    eps = Decimal("1e-12")
-    for name, t in teams.items():
+def test_matchup_glueck(season, teams):
+    """Matchup-Glück je Woche: nur, wenn das Ergebnis der Punkteseite widerspricht, Gewicht = |PF − Median| / σ ≤ 1.
+    Nach W2: Hugh Jass 0 (beide Siege über dem Median); gloane W1 Niederlage 9,91 über dem Median → −9,91/σ;
+    4th Down W2 Sieg 36,40 unter dem Median → gekappt +1; cool runnings W1 Sieg 14,75 unter dem Median → +14,75/σ."""
+    sigma, eps = season["sigma"], Decimal("1e-12")
+    medians = {w["week"]: w["median"] for w in season["weeks"]}
+    for t in teams.values():
         rows = [r for r in season["team_weeks"] if r["team_id"] == t["team_id"]]
-        assert abs(sum(r["luck"] for r in rows) - t["luck"]) < eps
-        assert abs(compute.wins(t) - t["allplay_pct"] / 100 * t["games"] - t["luck"]) < eps
         running = Decimal(0)
         for r in rows:
-            running += r["luck"]
-            assert r["luck_kum"] == running
+            assert r["median_abstand"] == r["pf"] - medians[r["week"]]
+            assert (r["median_abstand"] > 0) == r["median_win"]
+            expect = min(Decimal(1), abs(r["median_abstand"]) / sigma)
+            if r["result"] == "W" and r["median_abstand"] < 0:
+                assert r["matchup_glueck"] == expect
+            elif r["result"] == "L" and r["median_abstand"] > 0:
+                assert r["matchup_glueck"] == -expect
+            else:
+                assert r["matchup_glueck"] == 0
+            running += r["matchup_glueck"]
+            assert r["matchup_kum"] == running
             assert abs(r["allplay_pct"] - (r["allplay_w"] + Decimal("0.5") * r["allplay_t"]) / 9 * 100) < eps
-    hj = [team_week(season, "Hugh Jass", w) for w in (1, 2)]
-    assert [r["wochenrang"] for r in hj] == [4, 2]
-    assert abs(hj[0]["luck"] - (1 - Decimal(6) / 9)) < eps and abs(hj[1]["luck"] - (1 - Decimal(8) / 9)) < eps
+        assert t["matchup_glueck"] == running
+        assert t["median_w"] + t["median_l"] == t["games"]
+        assert abs(t["spielplan_pkt"] - sum(r["gegner_pkt"] for r in rows)) < eps
+    assert teams["Hugh Jass"]["matchup_glueck"] == 0 and teams["Hugh Jass"]["median_w"] == 2
+    assert abs(team_week(season, "gloane saubande", 1)["matchup_glueck"] + Decimal("9.91") / sigma) < Decimal("1e-9")
+    assert team_week(season, "4th Down Syndrom", 2)["matchup_glueck"] == 1
+    assert abs(team_week(season, "cool runnings", 1)["matchup_glueck"] - Decimal("14.75") / sigma) < Decimal("1e-9")
 
 
-def test_luck_nullsumme_je_woche(season):
-    """Je Woche werden 5 Siege vergeben und Σ pₜ = 45/9 = 5: die Luck-Beiträge aller Teams heben sich auf."""
-    for week in (1, 2):
-        rows = [r for r in season["team_weeks"] if r["week"] == week]
-        assert abs(sum(r["luck"] for r in rows)) < Decimal("1e-12")
-        assert abs(sum(r["allplay_pct"] for r in rows) - 500) < Decimal("1e-12")
+def test_gegner_punkte(season):
+    """Spielplan: Ligaschnitt der Woche − Gegnerpunkte; über alle Teams einer Woche Σ = 0 (jeder ist Gegner von einem)."""
+    for w in season["weeks"]:
+        rows = [r for r in season["team_weeks"] if r["week"] == w["week"]]
+        assert all(r["gegner_pkt"] == w["ligaschnitt"] - r["pa"] for r in rows)
+        assert abs(sum(r["gegner_pkt"] for r in rows)) < Decimal("1e-9")
 
 
 def test_wochenwerte_effizienz_und_projektion(season):
@@ -328,13 +334,15 @@ def test_unentschieden_zaehlen_halb():
     assert by_id[1]["result"] == by_id[2]["result"] == "T"
     assert (by_id[1]["allplay_w"], by_id[1]["allplay_l"], by_id[1]["allplay_t"]) == (1, 1, 1)
     assert by_id[1]["wochenrang"] == by_id[2]["wochenrang"] == 2
-    # Wochenbeitrag: T = 0,5 − (1 + 0,5)/3 = 0; Sieg als Wochenbester 1 − 1 = 0; Niederlage als Letzter 0 − 0 = 0
-    assert by_id[1]["allplay_pct"] == 50 and by_id[1]["luck"] == by_id[3]["luck"] == by_id[4]["luck"] == 0
+    compute.add_matchup(rows, Decimal(35))
+    # Matchup-Glück: Unentschieden 0; Sieg über dem Median (Median 100) 0; Niederlage unter dem Median 0
+    assert by_id[1]["allplay_pct"] == 50
+    assert by_id[1]["matchup_glueck"] == by_id[3]["matchup_glueck"] == by_id[4]["matchup_glueck"] == 0
     assert by_id[1]["efficiency"] == 100  # der ganze Kader ist Starter: PF = Optimal
     teams = {t["team_id"]: t for t in compute.compute_teams(fake, [1], rows, Decimal(35))}
-    # Win % = (W + 0,5·T)/G; All-Play = (1 + 0,5)/3; Luck = 0,5 − 0,5 = 0
+    # Win % = (W + 0,5·T)/G; All-Play = (1 + 0,5)/3; PF = Median zählt nicht als Median-Sieg
     assert teams[1]["win_pct"] == 50 and teams[1]["t"] == 1
-    assert teams[1]["allplay_pct"] == 50 and teams[1]["luck"] == 0
+    assert teams[1]["allplay_pct"] == 50 and teams[1]["matchup_glueck"] == 0 and teams[1]["median_l"] == 1
     assert teams[1]["streak"] == "T1"
     assert (teams[3]["rang"], teams[4]["rang"]) == (1, 4)
     assert {teams[1]["rang"], teams[2]["rang"]} == {2, 3}  # 0,5 Siege und gleiche PF

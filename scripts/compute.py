@@ -24,7 +24,7 @@ import powerranking
 import rawdata
 import records
 from lineup import SLOT_BENCH, SLOT_IR, optimal_points  # noqa: F401 (optimal_points: öffentliche Funktion des Rechenwerks)
-from zahlen import HALF, HUNDRED, ZERO, dec, rounded  # noqa: F401 (dec: bisherige Schnittstelle)
+from zahlen import HALF, HUNDRED, ONE, ZERO, dec, rounded  # noqa: F401 (dec: bisherige Schnittstelle)
 
 # Score-Kennzahlen (alle: höher = besser) und Gewichtungsprofile laut CLAUDE.md und Auftrag Session 4 (Frage 1)
 METRICS = ("pf", "allplay", "win", "coaching", "kader", "floor", "form")
@@ -39,7 +39,6 @@ FORM_WEEKS = 3
 # Gepoolte Wochenstreuung σ: Startwert 35 mit dem Gewicht von 20 Freiheitsgraden, läuft mit der Saison aus (Frage 8)
 SIGMA_PRIOR, SIGMA_PRIOR_DF = Decimal(35), 20
 JSON_PRECISION = {"z": 3}  # z-Normwerte mit drei Stellen (Frage 11 a), sonst zwei
-RESULT_WINS = {"W": Decimal(1), "T": HALF, "L": ZERO}  # Siegwert eines Ergebnisses (Unentschieden halb)
 
 
 # ---------------------------------------------------------------- Aufstellung
@@ -140,17 +139,32 @@ def compute_team_weeks(ssn: rawdata.Season, weeks: list[int]) -> list[dict]:
             r["allplay_t"] = sum(1 for pf in others if pf == r["pf"])
             r["wochenrang"] = 1 + r["allplay_l"]  # Gleichstand teilt sich den besseren Rang
             r["median_win"] = r["pf"] > median
-            # All-Play-Anteil der Woche pₜ (in %) und Luck-Beitrag = Ergebnis − pₜ: ein Sieg als Wochen-4. bringt
-            # +3/9, eine Niederlage als Wochen-5. −5/9; die Beiträge summieren sich zum Luck des Teams und sind je
-            # Woche über alle Teams eine Nullsumme
-            r["allplay_pct"] = (r["allplay_w"] + HALF * r["allplay_t"]) / len(others) * HUNDRED
-            r["luck"] = RESULT_WINS[r["result"]] - r["allplay_pct"] / HUNDRED
+            r["median_abstand"] = r["pf"] - median  # Punkte über (+) oder unter (−) dem Wochenmedian
+            r["allplay_pct"] = (r["allplay_w"] + HALF * r["allplay_t"]) / len(others) * HUNDRED  # All-Play-Anteil pₜ
+            r["gegner_pkt"] = statistics.mean(o["pf"] for o in week_rows) - r["pa"]  # Ligaschnitt − Gegnerpunkte
         rows.extend(sorted(week_rows, key=lambda r: r["team_id"]))
-    running: dict[int, Decimal] = {}  # Luck kumuliert je Team (Zeilen liegen nach Woche sortiert vor)
-    for r in rows:
-        running[r["team_id"]] = running.get(r["team_id"], ZERO) + r["luck"]
-        r["luck_kum"] = running[r["team_id"]]
     return rows
+
+
+def add_matchup(team_weeks: list[dict], sigma: Decimal) -> None:
+    """Matchup-Glück je Team-Woche (Beschluss 29.09.2026) und laufende Summe, in place.
+
+    Zählt nur, wenn das Ergebnis der Punkteseite widerspricht: Sieg unter dem Wochenmedian = Glück (+), Niederlage
+    über dem Median = Pech (−); Gewicht = Abstand zum Median / σ, gekappt bei 1. Sieg über oder Niederlage unter
+    dem Median und Unentschieden = 0 (verdient). Ein Sieg als Wochen-4. ist damit kein Glück; der Wochen-2., der
+    gegen den Wochenbesten verliert, hat fast ein volles Spiel Pech.
+    """
+    running: dict[int, Decimal] = {}
+    for r in team_weeks:  # nach Woche sortiert
+        weight = min(ONE, abs(r["median_abstand"]) / sigma)
+        if r["result"] == "W" and r["median_abstand"] < 0:
+            r["matchup_glueck"] = weight
+        elif r["result"] == "L" and r["median_abstand"] > 0:
+            r["matchup_glueck"] = -weight
+        else:
+            r["matchup_glueck"] = ZERO
+        running[r["team_id"]] = running.get(r["team_id"], ZERO) + r["matchup_glueck"]
+        r["matchup_kum"] = running[r["team_id"]]
 
 
 def league_efficiency(rows: list[dict]) -> Decimal | None:
@@ -262,15 +276,14 @@ def compute_teams(ssn: rawdata.Season, weeks: list[int], team_weeks: list[dict],
             "allplay_w": allplay_w, "allplay_l": sum(r["allplay_l"] for r in rows), "allplay_t": allplay_t,
             "allplay_pct": (allplay_w + HALF * allplay_t) / ((len(snapshot) - 1) * games) * HUNDRED,
             "median_w": sum(1 for r in rows if r["median_win"]),
+            "median_l": sum(1 for r in rows if not r["median_win"]),
+            # Matchup-Glück = Σ Wochenwerte (add_matchup); Spielplan = Σ (Ligaschnitt − Gegnerpunkte), + = leichte Gegner
+            "matchup_glueck": sum((r["matchup_glueck"] for r in rows), ZERO),
+            "spielplan_pkt": sum((r["gegner_pkt"] for r in rows), ZERO),
             "optimal": optimal, "verschenkt": optimal - pf,
             "efficiency": pf / optimal * HUNDRED, "kader_potenzial": kader_potenzial,
             "kader_projektion": kader_projection.get(info["id"]) if kader_projection else None,
             "bench": sum((r["bench"] for r in rows), ZERO),
-            # Luck = Σ Wochenbeiträge (= (W + 0,5·T) − All-Play-Anteil × Spiele); Zufallsstreuung: je Woche gewinnt
-            # ein Team mit All-Play-Anteil p gegen einen zufälligen Gegner mit Wahrscheinlichkeit p, Varianz
-            # p·(1 − p); Luck innerhalb ±Band ist nicht vom Zufall zu unterscheiden
-            "luck": sum((r["luck"] for r in rows), ZERO),
-            "luck_band": sum((p * (1 - p) for p in (r["allplay_pct"] / HUNDRED for r in rows)), ZERO).sqrt(),
             "floor": min(r["pf"] for r in rows), "form": form, "form_delta": form - pf / games,
             "form_band": form_band(sigma, games),
             "streak": streak(results),
@@ -373,6 +386,7 @@ def compute_season(season: int = ef.DEFAULT_SEASON, through: int | None = None) 
     ssn = rawdata.Season(season, weeks[-1])
     team_weeks = compute_team_weeks(ssn, weeks)
     sigma = pooled_sigma(team_weeks)
+    add_matchup(team_weeks, sigma)
     faktor = players.ligafaktor(team_weeks)
     kader = players.kader_projection(ssn, faktor)
     teams = compute_teams(ssn, weeks, team_weeks, sigma, kader_projection=kader["teams"] if kader else None)

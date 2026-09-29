@@ -17,7 +17,7 @@ export async function render(box, ctx, r) {
     h('div', {class: 'tiles'},
       U.tile('PF/Spiel', U.num(t.pf_per_game), `PF ${U.num(t.pf)} · PA ${U.num(t.pa)}`, 'pfspiel'),
       U.tile('All-Play %', U.pct(t.allplay_pct), `AP ${U.nn(t.allplay_w)}-${U.nn(t.allplay_l)}`, 'allplay'),
-      U.tile('Luck', U.sgn(t.luck), U.ok(t.luck_band) ? `Zufall ±${U.num(t.luck_band)}` : null, 'luck'),
+      U.tile('Matchup-Glück', U.sgn(t.matchup_glueck), `Median ${t.median_w}-${t.median_l} · Spielplan ${U.sgn(t.spielplan_pkt, 0)} Pkt`, 'matchup'),
       U.tile('Effizienz', U.pct(t.efficiency), `verschenkt ${U.num(t.verschenkt)}`, 'effizienz'),
       U.tile('Form Δ', t.form_band == null ? U.na('ab 4 Spielen') : [U.sgn(t.form_delta), svg.mini(t.form_delta, t.form_band)],
         t.form_band == null ? 'ab 4 Spielen' : `Band ±${U.num(t.form_band)}`, 'form-delta'),
@@ -62,12 +62,13 @@ function weekList(t) {
     {k: 'e', l: 'Erg.', f: x => played(x) ? U.res(wk.ergebnis[x.i]) : x.p != null && x.st !== 'laeuft' ? U.po(x.p) : ''},
     {k: 'wr', l: 'W-Rang', num: 1, f: x => played(x) ? wk.wochenrang[x.i] + '.' : ''},
     {k: 'ap', l: 'AP', num: 1, f: x => played(x) ? U.apwl(wk.allplay_w[x.i], wk.allplay_l[x.i], wk.allplay_t[x.i], anyT) : ''},
-    {k: 'lk', l: 'Luck', num: 1, f: x => played(x) ? U.sgn(wk.luck[x.i]) : ''},
+    {k: 'md', l: 'zum Median', num: 1, f: x => played(x) ? U.sgn(wk.median_abstand[x.i], 1) : ''},
+    {k: 'mg', l: 'Matchup-Glück', num: 1, f: x => played(x) ? U.sgn(wk.matchup_glueck[x.i]) : ''},
     {k: 'ef', l: 'Eff. %', num: 1, f: x => played(x) ? U.pct(wk.efficiency[x.i]) : ''},
     {k: 'vs', l: 'Verschenkt', num: 1, f: x => played(x) ? U.num(wk.verschenkt[x.i]) : ''},
     {k: 'bk', l: 'Bank', num: 1, f: x => played(x) ? U.num(wk.bank[x.i]) : ''}],
-  note: '@ = auswärts. Luck = Beitrag der Woche (Ergebnis − All-Play-Anteil), Summe = Luck-Kachel. Bei offenen Spielen steht unter „Erg.“ die Siegchance.'}),
-  U.legend(['wochenrang', 'ap-wl', 'luck-beitrag', 'eff-woche', 'verschenkt', 'bank']));
+  note: '@ = auswärts. Matchup-Glück: Sieg unter dem Wochenmedian +, Niederlage über dem Median −, sonst 0; Summe = Kachel. Bei offenen Spielen steht unter „Erg.“ die Siegchance.'}),
+  U.legend(['wochenrang', 'ap-wl', 'median', 'matchup-woche', 'eff-woche', 'verschenkt', 'bank']));
 }
 
 // Anteile: Vertrag ohne Einheit – Summe ≈ 1 heißt Anteil 0–1, sonst Prozent
