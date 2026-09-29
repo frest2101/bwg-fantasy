@@ -191,7 +191,9 @@ export function infoPop(btn) {        // i-Knopf: Begriff und Erklärung aus dem
 // ---------------------------------------------------------------- sortierbare Tabelle
 // o = {cap, cols: [{k, l, v: Zeile → Sortierwert, f: Zeile → Inhalt, num, d (1 auf-, −1 absteigend), cls}],
 //      rows, sort: [key, dir], cls (z. B. 'rk': Rang und Team fest, auf dem Handy Kürzel), rh (Index der Zeilenkopf-Spalte), rc (Zeile → Klasse), limit,
-//      filter (true: Knopf „Spalten filtern“ blendet eine Filterzeile ein; Zahlenspalten „≥ 15“, „< 5“, „10-20“, Textspalten Teiltext)}
+//      filter (true: Knopf „Filter“ öffnet ein Blatt mit einem Dropdown je Spalte – Zahlen als Stufen „≥ 15“ bzw. „≤ 5“ bei d = 1,
+//      Texte und Spalten mit cat als Werteliste; flt: false nimmt eine Spalte heraus), filters (zusätzliche Filter ohne Spalte,
+//      z. B. {k, l, v, cat}), fstate (Objekt des Aufrufers, in dem die Auswahl über einen Neuaufbau hinweg erhalten bleibt)}
 export function table(o) {
   const capId = id('c');
   const cols = o.cols;
@@ -206,48 +208,85 @@ export function table(o) {
     return th;
   });
   const tb = h('tbody'), fn = h('p', {class: 'fn', id: id('f')}), more = h('div');
-  // Spaltenfilter: je Spalte mit Sortierwert ein Eingabefeld; Zahlenspalten als Bedingung, Textspalten als Teiltext des Zellinhalts
-  const flt = {}, ftr = o.filter ? h('tr', {class: 'flt', hidden: true}) : null;
-  let fbtn = null, fclr = null;
-  if (ftr) {
-    cols.forEach((c, i) => {
-      const th = h('th', {scope: 'col', class: c.num ? 'n' : null});
-      if (c.v) {
-        const label = typeof c.l === 'string' ? c.l : `Spalte ${i + 1}`;
-        let timer;
-        th.append(h('input', {type: 'search', inputmode: c.num ? 'decimal' : null, placeholder: c.num ? '≥ …' : '…', 'aria-label': `Filter ${label}`,
-          oninput: e => { clearTimeout(timer); timer = setTimeout(() => { flt[c.k] = e.target.value; draw(); }, 150); }}));
-      }
-      ftr.append(th);
-    });
-    fbtn = h('button', {type: 'button', class: 'btn', 'aria-expanded': 'false', onclick: () => {
-      ftr.hidden = !ftr.hidden;
-      fbtn.setAttribute('aria-expanded', String(!ftr.hidden));
-      if (!ftr.hidden) ftr.querySelector('input')?.focus();
-    }}, 'Spalten filtern');
-    fclr = h('button', {type: 'button', class: 'btn', hidden: true, onclick: () => {
-      for (const k in flt) delete flt[k];
-      ftr.querySelectorAll('input').forEach(i => { i.value = ''; });
-      draw();
-    }}, 'Filter löschen');
+  // Filter: ein Dropdown je Spalte in einem Blatt (Handy: von unten, Desktop: Karte unter der Leiste); Auswahl als Chips über der Tabelle
+  const flt = o.fstate || {};
+  const fdefs = o.filter ? [...cols.filter(c => c.v && c.flt !== false), ...(o.filters || [])] : [];
+  let fbar = null, fpan = null, fbtn = null, fchips = null, fback = null;
+  const cellText = (c, r) => c.f ? h('td', null, c.f(r, 0)).textContent.trim() : String(c.v(r) ?? '');
+  const isNum = c => c.num && !c.cat;
+  // Optionen je Filter aus den aktuellen Zeilen: Zahlen als „schöne“ Stufen, sonst die vorkommenden Werte (bis 40, danach kein Filter)
+  const options = c => {
+    if (isNum(c)) {
+      const vals = o.rows.map(c.v).filter(ok);
+      const asc = c.d === 1, st = steps(vals, asc);
+      return st.map(x => ({key: String(x), label: (asc ? '≤ ' : '≥ ') + fmtStep(x, st), test: r => ok(c.v(r)) && (asc ? c.v(r) <= x : c.v(r) >= x)}));
+    }
+    const seen = new Map();
+    o.rows.forEach(r => { const s = cellText(c, r); if (s && s !== '–' && !seen.has(s)) seen.set(s, c.v(r)); });
+    if (seen.size > 40 || seen.size < 2) return null;
+    return sortRows([...seen], x => x[1], c.d ?? 1).map(([s]) => ({key: s, label: s, test: r => cellText(c, r) === s}));
+  };
+  const active = () => fdefs.filter(c => flt[c.k]?.key);
+  if (o.filter) {
+    fchips = h('div', {class: 'fcs', role: 'group', 'aria-label': 'Aktive Filter'});
+    fbtn = h('button', {type: 'button', class: 'btn fb', 'aria-expanded': 'false', onclick: () => openPanel()},
+      h('span', {'aria-hidden': 'true'}, '⚲'), 'Filter', h('span', {class: 'cnt'}));
+    fbar = h('div', {class: 'fbar'}, fbtn, fchips);
   }
-  const tbl = h('table', {class: o.cls}, h('caption', {id: capId}, o.cap), h('thead', null, h('tr', null, heads), ftr), tb);
+  function openPanel() {
+    if (fpan) return closePanel();
+    const rowsEl = fdefs.map(c => {
+      const opts = options(c);
+      if (!opts) return null;
+      const cur = flt[c.k]?.key || '';
+      const label = typeof c.l === 'string' ? c.l : `Spalte ${cols.indexOf(c) + 1}`;
+      const sel = h('select', {'aria-label': label, onchange: e => {
+        const op = opts.find(x => x.key === e.target.value);
+        if (op) flt[c.k] = {key: op.key, label: `${label} ${isNum(c) ? op.label : '· ' + op.label}`, test: op.test}; else delete flt[c.k];
+        draw();
+      }}, h('option', {value: ''}, 'Alle'), opts.map(x => h('option', {value: x.key, selected: x.key === cur}, x.label)));
+      return h('label', {class: 'fr'}, h('span', null, label), sel);
+    }).filter(Boolean);
+    fpan = h('div', {class: 'fp', role: 'dialog', 'aria-label': 'Filter', tabindex: '-1'},
+      h('div', {class: 'ph'}, h('strong', null, 'Filter'), h('button', {type: 'button', class: 'x', 'aria-label': 'Schließen', onclick: closePanel}, '×')),
+      rowsEl.length ? h('div', {class: 'fg'}, rowsEl) : h('p', {class: 'note'}, 'Keine filterbaren Spalten.'),
+      h('div', {class: 'row fa'}, h('button', {type: 'button', class: 'btn', onclick: () => { clearAll(); closePanel(); }}, 'Zurücksetzen'),
+        h('button', {type: 'button', class: 'btn pri', onclick: closePanel}, 'Fertig')));
+    fback = h('div', {class: 'fbd', onclick: closePanel});
+    fbar.after(fpan);
+    D.body.append(fback);
+    D.body.classList.add('fp-open');
+    fbtn.setAttribute('aria-expanded', 'true');
+    fpan.addEventListener('keydown', e => { if (e.key === 'Escape') closePanel(); });
+    fpan.focus({preventScroll: true});
+  }
+  function closePanel() {
+    if (!fpan) return;
+    fpan.remove(); fback.remove(); fpan = fback = null;
+    D.body.classList.remove('fp-open');
+    fbtn.setAttribute('aria-expanded', 'false');
+    fbtn.focus({preventScroll: true});
+  }
+  function clearAll() { for (const k in flt) delete flt[k]; draw(); }
+  const tbl = h('table', {class: o.cls}, h('caption', {id: capId}, o.cap), h('thead', null, h('tr', null, heads)), tb);
   const wrap = scrollHint(h('div', {class: 'tw', role: 'region', tabindex: '0', 'aria-labelledby': capId}, tbl));
-  const box = h('div', {class: 'tbox'}, ftr ? h('div', {class: 'row tt'}, fbtn, fclr) : null, wrap, fn, more);
+  const box = h('div', {class: 'tbox'}, fbar, wrap, fn, more);
   const rh = o.rh ?? 1;
   function draw() {
     let rows = o.rows;
-    const active = ftr ? cols.filter(x => x.v && (flt[x.k] || '').trim()) : [];
+    const act = active();
     let fdrop = 0;
-    if (active.length) {
-      const tests = active.map(x => [x, x.num ? numTest(flt[x.k]) : textTest(flt[x.k])]).filter(x => x[1]);
+    if (act.length) {
       const all = rows.length;
-      rows = rows.filter(r => tests.every(([x, fn]) => fn(x.num ? x.v(r) : h('td', null, x.f(r, 0)).textContent)));
+      rows = rows.filter(r => act.every(c => flt[c.k].test(r)));
       fdrop = all - rows.length;
     }
     if (fbtn) {
-      fbtn.textContent = active.length ? `Spalten filtern (${active.length})` : 'Spalten filtern';
-      fclr.hidden = !active.length;
+      fbtn.querySelector('.cnt').textContent = act.length ? ` ${act.length}` : '';
+      fbtn.classList.toggle('on', act.length > 0);
+      fchips.replaceChildren(...act.map(c => h('button', {type: 'button', class: 'fc', onclick: () => { delete flt[c.k]; draw(); },
+        'aria-label': `Filter entfernen: ${flt[c.k].label}`}, flt[c.k].label, h('span', {'aria-hidden': 'true'}, ' ×'))),
+      act.length > 1 ? h('button', {type: 'button', class: 'fc all', onclick: clearAll}, 'Alle löschen') : null);
     }
     const c = cols.find(x => x.k === sk);
     if (c?.v) rows = sortRows(rows, c.v, sd);
@@ -262,7 +301,7 @@ export function table(o) {
     const reasons = [...naSet];
     naSet = null;
     // leere Auswahl (z. B. Filter ohne Treffer) sichtbar machen, statt nur einen leeren Tabellenkörper zu zeigen
-    const txt = [rows.length ? '' : 'Keine Einträge für diese Auswahl.', fdrop ? `Spaltenfilter: ${rows.length} von ${rows.length + fdrop}.` : '',
+    const txt = [rows.length ? '' : 'Keine Einträge für diese Auswahl.', fdrop ? `Filter: ${rows.length} von ${rows.length + fdrop}.` : '',
       reasons.length ? '„–“: ' + reasons.join(' · ') : ''].filter(Boolean).join(' ');
     fn.replaceChildren(txt);
     fn.hidden = !txt && !o.note;
@@ -277,29 +316,22 @@ export function table(o) {
   draw();
   return box;
 }
-// Zahlenfilter: „15“ oder „≥ 15“ = mindestens, „> 15“, „≤ 5“, „< 5“, „= 10“, „10-20“ (Bereich); Komma als Dezimalzeichen erlaubt.
-// Ungültige Eingabe filtert nicht; fehlende Werte fallen bei aktivem Filter immer heraus.
-export function numTest(s) {
-  s = String(s).replace(/\s+/g, '').replace(/,/g, '.').replace('≥', '>=').replace('≤', '<=');
-  let m;
-  if ((m = s.match(/^(-?\d*\.?\d+)(?:-|–|\.\.)(-?\d*\.?\d+)$/))) {
-    const a = Math.min(+m[1], +m[2]), b = Math.max(+m[1], +m[2]);
-    return v => ok(v) && v >= a && v <= b;
-  }
-  if (!(m = s.match(/^(>=|<=|>|<|=)?(-?\d*\.?\d+)$/))) return null;
-  const n = +m[2];
-  switch (m[1]) {
-    case '<': return v => ok(v) && v < n;
-    case '<=': return v => ok(v) && v <= n;
-    case '>': return v => ok(v) && v > n;
-    case '=': return v => ok(v) && Math.abs(v - n) < 1e-9;
-    default: return v => ok(v) && v >= n;
-  }
+// „Schöne“ Stufen für Zahlenfilter: Spanne der Werte in etwa zehn Schritte (1 · 2 · 2,5 · 5 × 10ⁿ); die Stufe, die nichts
+// herausfiltern würde (Minimum bei „≥“, Maximum bei „≤“), entfällt.
+export function steps(vals, asc) {
+  if (vals.length < 2) return [];
+  const lo = Math.min(...vals), hi = Math.max(...vals);
+  if (!(hi > lo)) return [];
+  const raw = (hi - lo) / 10, p = 10 ** Math.floor(Math.log10(raw)), m = raw / p;
+  const step = (m <= 1 ? 1 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 5 ? 5 : 10) * p;
+  const out = [];
+  for (let x = Math.ceil(lo / step) * step; x <= hi + 1e-9; x += step) out.push(+x.toFixed(6));
+  return out.filter(x => asc ? x < hi - 1e-9 : x > lo + 1e-9).slice(0, 12);
 }
-export function textTest(s) {
-  const q = String(s).trim().toLowerCase();
-  return q ? v => String(v).toLowerCase().includes(q) : null;
-}
+const fmtStep = (x, st) => {
+  const d = Math.max(0, ...st.map(s => (String(s).split('.')[1] || '').length));
+  return num(x, Math.min(d, 3));
+};
 export function sortRows(rows, fn, dir) {
   const miss = x => x == null || x === '' || Number.isNaN(x);
   return rows.map((r, i) => [fn(r), i, r]).sort((a, b) => {

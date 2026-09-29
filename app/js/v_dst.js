@@ -42,10 +42,10 @@ function streaming(box, D, r) {
     cls: t => 'fz ' + (t.naechste?.[i]?.opp ? fcls(t.naechste[i].f) : 'bye'),
     f: t => { const x = t.naechste?.[i]; if (!x) return '–'; return x.opp ? [x.opp, oflag(x.opp), h('small', null, U.num(x.f, 2))] : ['Bye', h('small', null, '·')]; }});
   const cols = [
-    {k: 'd', l: 'D/ST', v: t => t.abbrev, d: 1, f: t => h('a', {href: '#spieler/' + -(16000 + t.id), class: 'tl2', 'aria-label': t.abbrev + ' D/ST'}, t.abbrev)},
+    {k: 'd', l: 'D/ST', v: t => t.abbrev, d: 1, flt: false, f: t => h('a', {href: '#spieler/' + -(16000 + t.id), class: 'tl2', 'aria-label': t.abbrev + ' D/ST'}, t.abbrev)},
     {k: 'b', l: 'Besitzer', v: t => t.besitzer > 0 ? U.kz(t.besitzer) : 'zz' + (OWN[t.status] || 'FA'), d: 1,
       f: t => t.besitzer > 0 ? h('a', {href: '#team/' + t.besitzer, class: 'tl2', 'aria-label': U.team(t.besitzer)?.name}, U.kz(t.besitzer)) : (OWN[t.status] || 'FA')},
-    {k: 'bye', l: 'Bye', num: 1, v: t => t.bye, d: 1, f: t => U.val(t.bye, v => 'W' + v)},
+    {k: 'bye', l: 'Bye', num: 1, cat: 1, v: t => t.bye, d: 1, f: t => U.val(t.bye, v => 'W' + v)},
     next(0), next(1), next(2),
     {k: 'n3', l: 'Ø nächste 3', num: 1, v: t => t.naechste3, cls: t => 'fz ' + fcls(t.naechste3), f: t => fcell(t.naechste3)},
     {k: 'rest', l: `Rest bis W14`, num: 1, v: t => t.rest, cls: t => 'fz ' + fcls(t.rest), f: t => fcell(t.rest)},
@@ -57,12 +57,12 @@ function streaming(box, D, r) {
     tbl.upd(rows());
     U.setQ('dst', {frei: frei ? 1 : null});
   }}), 'nur freie D/ST (FA und Waivers)')), tbl,
-  U.legend(['spaltenfilter', 'f', 'naechste3', 'rest', 'sos', 'ausloeser']));
+  U.legend(['filter', 'f', 'naechste3', 'rest', 'sos', 'ausloeser']));
 }
 
 function offense(box, D) {
   const cols = [
-    {k: 'o', l: 'Offense', v: t => t.abbrev, d: 1, f: t => h('strong', null, t.abbrev)},
+    {k: 'o', l: 'Offense', v: t => t.abbrev, d: 1, flt: false, f: t => h('strong', null, t.abbrev)},
     {k: 'f', l: 'F', num: 1, v: t => t.f, cls: t => 'fz ' + fcls(t.f), f: t => U.num(t.f, 3)},
     {k: 'd', l: 'ΔF', num: 1, v: t => t.delta, f: t => U.val(t.delta, v => U.sgn(v, 3), 'keine Vorwoche')},
     {k: 'r', l: 'Rang', num: 1, v: t => t.rang, d: 1, f: t => [t.rang + '.', h('span', {class: 'sub'}, U.ok(t.rang_vorwoche) ? `Vorw. ${t.rang_vorwoche}.` : '')]},
@@ -78,5 +78,5 @@ function offense(box, D) {
   const L = D.ausloeser_legende || {};
   U.ap(box, U.table({cap: 'Offenses: Off. zugelassen und Faktor F', cls: 'nr', rh: 0, rows: D.teams || [], sort: ['f', -1], filter: true, cols}),
     Object.keys(L).length ? h('ul', {class: 'leg', 'aria-label': 'Auslöser'}, Object.entries(L).map(([k, v]) => h('li', null, h('strong', null, '⚑ ' + (AUS[k] || k) + ': '), v))) : null,
-    U.legend(['spaltenfilter', 'z-dst', 'r', 'f', 'delta-f', 'ausloeser', 'beobachten']));
+    U.legend(['filter', 'z-dst', 'r', 'f', 'delta-f', 'ausloeser', 'beobachten']));
 }
