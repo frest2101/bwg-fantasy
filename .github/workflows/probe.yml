@@ -1,0 +1,29 @@
+# Probe (Session 6): fragt Open-Meteo und die ESPN-Site-API (Scoreboard mit Wetter und Spielort, News je Spieler)
+# einmal ab und schreibt die Antworten gekürzt ins Log. Nur von Hand, ohne Commit, ohne Schreibrecht – dient der
+# Entscheidung, welche Wetter- und News-Quelle der Tageslauf nutzt (aus der Claude-Session sind die Quellen nicht
+# immer erreichbar, aus der Action schon). Start: gh workflow run probe.yml, Log: gh run view --log.
+name: Probe
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Pakete installieren
+        run: python -m pip install -r requirements.txt
+
+      - name: Quellen abfragen
+        run: python scripts/probe.py
