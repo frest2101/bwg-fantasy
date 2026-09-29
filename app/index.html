@@ -50,7 +50,7 @@
 <div><dt id="g-allplay">All-Play %</dt><dd>All-Play-Siege / (9 × Spiele).</dd></div>
 <div><dt id="g-median">Median-Sieg</dt><dd>Eine Woche mit PF über dem Wochenmedian der Liga.</dd></div>
 <div><dt id="g-wochenrang">Wochenrang</dt><dd>Platz der PF in der jeweiligen Woche (1 = beste).</dd></div>
-<div><dt id="g-luck">Luck</dt><dd>(W + 0,5 · T) − All-Play-Quote × Spiele; positiv heißt mehr Siege, als die eigenen Punkte gegen das ganze Feld erwarten ließen.</dd></div>
+<div><dt id="g-luck">Luck</dt><dd>(W + 0,5 · T) − All-Play-Quote × Spiele. Misst Paarungsglück, nicht Kaderstärke: positiv heißt mehr Siege, als die eigenen Wochenpunkte gegen das ganze Feld erwarten ließen. ± ist die reine Zufallsstreuung √Σ p · (1 − p) mit p = All-Play-Anteil der Woche; Werte innerhalb des Bands (grau) sind nicht vom Zufall zu unterscheiden – in den ersten Wochen fast immer.</dd></div>
 <div><dt id="g-optimal">Optimal</dt><dd>Die im Rückblick beste mögliche Aufstellung aus allen Kaderspielern außer IR.</dd></div>
 <div><dt id="g-verschenkt">Verschenkt</dt><dd>Optimal − PF; dazu Ø je Woche und die schlechteste Woche.</dd></div>
 <div><dt id="g-effizienz">Coaching-Effizienz</dt><dd>Σ PF / Σ Optimal. Die Linie im Diagramm ist der Ligawert.</dd></div>
@@ -76,11 +76,11 @@
 <div><dt id="g-pr-rang">Rang Power Ranking</dt><dd>Platz nach μ.</dd></div>
 <div><dt id="g-trend">Trend</dt><dd>Rangänderung gegenüber der Vorwoche (↑ besser, ↓ schlechter). Der erste Vergleich mit Projektion ist W3 → W4.</dd></div>
 <div><dt id="g-kernsatz">Kernsatz</dt><dd>Redaktioneller Kurztext; erscheint erst nach Freigabe, sonst „folgt“.</dd></div>
-<div data-b="Playoffs"><dt id="g-playoff">Playoff-%</dt><dd>Anteil von 10 000 simulierten Restsaisons, in denen das Team unter die besten sechs kommt.</dd></div>
+<div data-b="Playoffs"><dt id="g-playoff">Playoff-%</dt><dd>Anteil von 10 000 simulierten Restsaisons, in denen das Team die Playoffs erreicht – nach der Liga-Regel 2026 die besten drei je Division.</dd></div>
 <div><dt id="g-div-pct">Division-%</dt><dd>Anteil der Läufe mit Divisionssieg.</dd></div>
-<div><dt id="g-bye">Bye-%</dt><dd>Anteil der Läufe mit Seed 1 oder 2, also Freilos in W15.</dd></div>
+<div><dt id="g-bye">Bye-%</dt><dd>Anteil der Läufe mit Seed 1 oder 2 – nach der Liga-Regel die beiden Divisionssieger –, also Freilos in W15.</dd></div>
 <div><dt id="g-restsiege">Erwartete Restsiege</dt><dd>Ø Siege in den offenen Wochen der Regular Season (Unentschieden halb).</dd></div>
-<div><dt id="g-seeding">Seeding</dt><dd>„ESPN“: nach Siegen, dann PF. „Divisionssieger“: die beiden Divisionssieger auf 1–2, der Rest nach Siegen, dann PF (Tradition bis 2025, bei ESPN 2026 unbelegt).</dd></div>
+<div><dt id="g-seeding">Seeding</dt><dd>„Liga“ (Standard, Regel 2026): je Division die besten drei nach Siegen, dann PF; die Divisionssieger auf Seed 1–2 mit Freilos, die übrigen vier nach Siegen, dann PF. Setzt ESPN anders, korrigiert der Commissioner nach W14. „ESPN“: die besten sechs der Gesamttabelle, so wie ESPN ohne Korrektur setzt.</dd></div>
 <div><dt id="g-simulation">Simulation</dt><dd>Je Lauf wird zuerst die Stärke um μ gestreut (Varianz σ²/(n + 4)), dann jede Woche PF ~ N(μ̃ + Wochenabweichung der Kader-Projektion, σ²).</dd></div>
 <div><dt id="g-siegchance">Siegchance</dt><dd>Für offene Paarungen: Φ((μ Heim + ΔP Heim − μ Gast − ΔP Gast)/(σ√2)); ΔP = Abweichung der Kader-Projektion dieser Woche vom eigenen Ø (z. B. Bye), 0, solange P aus dem Vorjahr kommt.</dd></div>
 <div data-b="Spieler"><dt id="g-spiele">Spiele</dt><dd>Wochen, in denen der Spieler laut ESPN gespielt hat (Stat 210 = 1); Byes und Inaktive zählen nicht.</dd></div>

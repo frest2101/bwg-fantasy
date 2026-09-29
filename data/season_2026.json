@@ -40,6 +40,7 @@
    "moves": 5,
    "kader_quelle": "projektion",
    "luck": 0.78,
+   "luck_band": 0.42,
    "rang": 1,
    "rang_division": 1,
    "norm": {
@@ -124,6 +125,7 @@
    "moves": 6,
    "kader_quelle": "projektion",
    "luck": 0.44,
+   "luck_band": 0.57,
    "rang": 2,
    "rang_division": 1,
    "norm": {
@@ -208,6 +210,7 @@
    "moves": 0,
    "kader_quelle": "projektion",
    "luck": 0.0,
+   "luck_band": 0.61,
    "rang": 3,
    "rang_division": 2,
    "norm": {
@@ -292,6 +295,7 @@
    "moves": 5,
    "kader_quelle": "projektion",
    "luck": 0.0,
+   "luck_band": 0.8,
    "rang": 4,
    "rang_division": 3,
    "norm": {
@@ -376,6 +380,7 @@
    "moves": 5,
    "kader_quelle": "projektion",
    "luck": 0.44,
+   "luck_band": 0.83,
    "rang": 5,
    "rang_division": 4,
    "norm": {
@@ -460,6 +465,7 @@
    "moves": 3,
    "kader_quelle": "projektion",
    "luck": -0.22,
+   "luck_band": 0.7,
    "rang": 6,
    "rang_division": 2,
    "norm": {
@@ -544,6 +550,7 @@
    "moves": 1,
    "kader_quelle": "projektion",
    "luck": -0.56,
+   "luck_band": 0.77,
    "rang": 7,
    "rang_division": 3,
    "norm": {
@@ -628,6 +635,7 @@
    "moves": 1,
    "kader_quelle": "projektion",
    "luck": 0.56,
+   "luck_band": 0.57,
    "rang": 8,
    "rang_division": 4,
    "norm": {
@@ -712,6 +720,7 @@
    "moves": 1,
    "kader_quelle": "projektion",
    "luck": -0.89,
+   "luck_band": 0.7,
    "rang": 9,
    "rang_division": 5,
    "norm": {
@@ -796,6 +805,7 @@
    "moves": 0,
    "kader_quelle": "projektion",
    "luck": -0.56,
+   "luck_band": 0.59,
    "rang": 10,
    "rang_division": 5,
    "norm": {

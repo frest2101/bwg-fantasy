@@ -8,7 +8,7 @@ export async function render(box, ctx, r) {
   if (!t) { U.ap(box, h('h1', null, 'Team nicht gefunden'), h('p', null, h('a', {href: '#tabelle'}, 'Zur Tabelle'))); return; }
   const svg = await ctx.mod('svg');
   const div = S.meta.divisions?.[t.division] ?? 'Division ' + t.division;
-  const sim = t.sim?.espn;
+  const sim = t.sim?.liga;
   U.ap(box, h('h1', null, t.name),
     h('p', {class: 'note'}, `${t.kuerzel} · ${div} · Rang ${t.rang} (Division ${t.rang_division}) · ${U.rec(t)} · Streak ${t.streak ?? '–'}`),
     t.pr ? h('p', null, h('a', {href: '#ranking'}, 'Power Ranking'), ` ${t.pr.rang}. `, U.ok(t.pr.trend) ? U.trend(t.pr.trend) : null,
@@ -17,7 +17,7 @@ export async function render(box, ctx, r) {
     h('div', {class: 'tiles'},
       U.tile('PF/Spiel', U.num(t.pf_per_game), `PF ${U.num(t.pf)} · PA ${U.num(t.pa)}`, 'pfspiel'),
       U.tile('All-Play %', U.pct(t.allplay_pct), `AP ${U.nn(t.allplay_w)}-${U.nn(t.allplay_l)}`, 'allplay'),
-      U.tile('Luck', U.sgn(t.luck), null, 'luck'),
+      U.tile('Luck', U.sgn(t.luck), U.ok(t.luck_band) ? `Zufall ±${U.num(t.luck_band)}` : null, 'luck'),
       U.tile('Effizienz', U.pct(t.efficiency), `verschenkt ${U.num(t.verschenkt)}`, 'effizienz'),
       U.tile('Form Δ', t.form_band == null ? U.na('ab 4 Spielen') : [U.sgn(t.form_delta), svg.mini(t.form_delta, t.form_band)],
         t.form_band == null ? 'ab 4 Spielen' : `Band ±${U.num(t.form_band)}`, 'form-delta'),

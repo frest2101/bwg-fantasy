@@ -30,7 +30,7 @@ function streakVal(s) {
 
 function gesamt(box) {
   const tbl = U.table({cap: `Tabelle Gesamt nach W${S.tw}`, cls: 'rk', rows: S.teams, sort: ['rang', 1], cols: [
-    c.rang(), c.team(), c.wl(), c.n('pf', 'PF'), c.po('espn'), c.pct('allplay_pct', 'AP %'), c.n('pa', 'PA'),
+    c.rang(), c.team(), c.wl(), c.n('pf', 'PF'), c.po('liga'), c.pct('allplay_pct', 'AP %'), c.n('pa', 'PA'),
     c.n('diff', 'Diff', U.sgn), c.pct('efficiency', 'Eff. %'), c.streak()]});
   const last = S.weeks.filter(w => w.status === 'final').at(-1);
   const strip = last ? h('section', {'aria-labelledby': 'wk-h'},
@@ -50,7 +50,7 @@ function division(box) {
     const rows = S.teams.filter(t => String(t.division) === d);
     U.ap(box, h('div', {class: 'card'}, U.table({cap: `${name} nach W${S.tw}`, cls: 'rk', rows, sort: ['rd', 1], cols: [
       {k: 'rd', l: '#', v: t => t.rang_division, d: 1, f: t => t.rang_division}, c.team(), c.wl(), c.n('pf', 'PF'), c.n('pa', 'PA'),
-      c.po('espn'), {k: 'dv', l: 'Div %', num: 1, v: t => U.sp(t.sim?.espn?.division), f: t => U.pbar(U.sp(t.sim?.espn?.division))},
+      c.po('liga'), {k: 'dv', l: 'Div %', num: 1, v: t => U.sp(t.sim?.liga?.division), f: t => U.pbar(U.sp(t.sim?.liga?.division))},
       c.pct('allplay_pct', 'AP %'), c.streak(), {k: 'rg', l: 'Gesamt', num: 1, v: t => t.rang, d: 1, f: t => t.rang + '.'}]})));
   }
   U.ap(box, U.legend(['rang-div', 'wlt', 'pf', 'playoff', 'div-pct', 'allplay', 'streak']));
@@ -61,14 +61,24 @@ function allplay(box, r, svg) {
   const apwl = t => `${U.nn(t.allplay_w)}-${U.nn(t.allplay_l)}` + (anyT ? `-${U.nn(t.allplay_t)}` : '');
   U.ap(box, U.table({cap: `All-Play und Luck nach W${S.tw}`, cls: 'rk', rows: S.teams, sort: ['allplay_pct', -1], cols: [
     c.rang(), c.team(), {k: 'apwl', l: anyT ? 'AP W-L-T' : 'AP W-L', num: 1, v: t => t.allplay_pct, f: apwl},
-    c.pct('allplay_pct', 'AP %'), c.n('median_w', 'Median-S.', U.nn), c.wl(), c.n('luck', 'Luck', U.sgn)]}),
+    c.pct('allplay_pct', 'AP %'), c.n('median_w', 'Median-S.', U.nn), c.wl(),
+    {k: 'luck', l: 'Luck ± Zufall', num: 1, v: t => t.luck, f: luckCell}]}),
   U.legend(['ap-wl', 'allplay', 'median', 'luck']));
   const rows = U.sortRows(S.teams, t => t.luck, -1);
   const most = rows[0], least = rows.at(-1);
   U.ap(box, svg.fig('Luck je Team', svg.hbars({title: 'Luck je Team', fmt: v => U.sgn(v),
-    desc: `Sortiert von ${most.name} (${U.sgn(most.luck)}) bis ${least.name} (${U.sgn(least.luck)}); positiv = mehr Siege als die Punkte erwarten ließen.`,
+    desc: `Sortiert von ${most.name} (${U.sgn(most.luck)}) bis ${least.name} (${U.sgn(least.luck)}); positiv = mehr Siege als die Punkte erwarten ließen. ${inBand(S.teams)} von ${S.teams.length} Teams liegen innerhalb ihres Zufallsbands.`,
     rows: rows.map(t => ({label: t.kuerzel, v: t.luck}))}),
-  {heads: ['Team', 'Luck', 'W-L', 'AP %'], rows: rows.map(t => [t.name, U.sgn(t.luck), U.rec(t), U.pct(t.allplay_pct)])}));
+  {heads: ['Team', 'Luck', '± Zufall', 'W-L', 'AP %'], rows: rows.map(t => [t.name, U.sgn(t.luck), U.val(t.luck_band, v => '±' + U.num(v)), U.rec(t), U.pct(t.allplay_pct)])}));
+}
+// Luck mit Zufallsband: innerhalb ±Band grau (nicht vom Zufall zu unterscheiden)
+const within = t => U.ok(t.luck) && U.ok(t.luck_band) && Math.abs(t.luck) <= t.luck_band;
+const inBand = teams => teams.filter(within).length;
+function luckCell(t) {
+  if (!U.ok(t.luck)) return '–';
+  const band = U.ok(t.luck_band) ? ` ±${U.num(t.luck_band)}` : '';
+  return h('span', within(t) ? {class: 'note', title: 'innerhalb der Zufallsstreuung'} : null, U.sgn(t.luck) + band,
+    within(t) ? h('span', {class: 'vh'}, ' (innerhalb der Zufallsstreuung)') : null);
 }
 
 function punkte(box, r, svg) {
@@ -99,7 +109,7 @@ function coaching(box, r, svg) {
 }
 
 function ausblick(box, r, svg) {
-  let seeding = r.q.get('seeding') === 'div' ? 'div' : 'espn';
+  let seeding = r.q.get('seeding') === 'espn' ? 'espn' : 'liga';
   const has = S.teams.some(t => t.sim);
   const espn = S.teams.some(t => U.ok(t.espn_sim?.playoff));
   const cols = () => [c.rang(), c.team(), c.wl(), c.po(seeding),
@@ -111,7 +121,7 @@ function ausblick(box, r, svg) {
   const wrap = h('div');
   const chart = h('div');
   const draw = () => {
-    wrap.replaceChildren(U.table({cap: `Ausblick – Playoff-Simulation (Seeding ${seeding === 'div' ? 'Divisionssieger 1–2' : 'ESPN'})`,
+    wrap.replaceChildren(U.table({cap: `Ausblick – Playoff-Simulation (${seeding === 'espn' ? 'ESPN: Top 6 gesamt' : 'Liga: Top 3 je Division'})`,
       cls: 'rk kurz', rows: S.teams, sort: ['po', -1], cols: cols()}));
     if (!has) return;
     const rows = U.sortRows(S.teams, t => t.sim?.[seeding]?.playoff, -1);
@@ -124,9 +134,9 @@ function ausblick(box, r, svg) {
     svg.swatches(names, j => j < 6 ? 's' + (j + 1) : 's0')));
   };
   U.ap(box, h('div', {class: 'row'}, h('span', {class: 'note'}, 'Seeding'),
-    U.seg('Seeding der Simulation', [['espn', 'ESPN (W, dann PF)'], ['div', 'Divisionssieger 1–2']], seeding, v => {
+    U.seg('Seeding der Simulation', [['liga', 'Liga: Top 3 je Division'], ['espn', 'ESPN: Top 6 gesamt']], seeding, v => {
       seeding = v;
-      U.setQ('tabelle/ausblick', {seeding: v === 'div' ? 'div' : null});
+      U.setQ('tabelle/ausblick', {seeding: v === 'espn' ? 'espn' : null});
       draw();
     }), U.ib('seeding', '')),
   has ? null : h('p', {class: 'warn'}, 'Die Playoff-Simulation liegt noch nicht vor.'),

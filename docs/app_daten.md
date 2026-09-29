@@ -32,13 +32,13 @@ Die App lädt `data/manifest.json?t=<jetzt>` und danach jede Datei mit `?v=<v>`.
   - Tabelle:
     - Stammdaten: `team_id, name, kuerzel, division, games, w, l, t`
     - Punkte: `pf, pa, diff, pf_per_game, pa_per_game`
-    - All-Play: `win_pct, allplay_w, allplay_l, allplay_t, allplay_pct, median_w, luck`
+    - All-Play: `win_pct, allplay_w, allplay_l, allplay_t, allplay_pct, median_w, luck, luck_band` (Zufallsband von Luck)
     - Coaching: `optimal, verschenkt, verschenkt_avg, verschenkt_max, efficiency, kader_potenzial, kader_projektion, bench`
     - Form und Projektion: `floor, form, form_delta, form_band, streak, projection, projektions_delta`
     - Ränge und Liga: `waiver_prio, moves, rang, rang_division, rang_score`
   - Score: `norm` `{z, minmax, rank}` je Kennzahl; `score_ref` je Profil und Normierung (Python-Wert, damit der Test die Browserformel prüfen kann).
   - Power Ranking `pr`: `{mu, se, p, p_quelle, e, rang, rang_vorwoche, trend, kernsatz}`
-  - Simulation `sim`: `{espn: {playoff, division, bye, restsiege, seeds: [6]}, div: {…}}`, dazu `espn_sim` (ESPN-Vergleich oder `null`)
+  - Simulation `sim`: `{liga: {playoff, division, bye, restsiege, seeds: [6]}, espn: {…}}` – `liga` = Regel 2026 (Top 3 je Division), `espn` = Top 6 gesamt; dazu `espn_sim` (ESPN-Vergleich oder `null`)
   - `positionen`: `{nach_position: {"QB": {pts, anteil, rang}, …}, nach_slot: {"QB", "RB", "WR", "TE", "FLEX", "OP", "D/ST", "K"}}`
   - `wochen`: Arrays in der Reihenfolge von `meta.weeks`: `gegner, heim, pf, pa, ergebnis, wochenrang, allplay_w, median_win, optimal, verschenkt, bank, projektion, mu, pr_rang`
 

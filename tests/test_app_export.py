@@ -74,7 +74,7 @@ def test_teams_vertrag(data):
                     "sim", "positionen", "wochen"):
             assert key in t, key
         assert all(isinstance(v, int) for v in t["norm"]["rank"].values())
-        assert set(t["sim"]) == {"espn", "div"} and len(t["sim"]["espn"]["seeds"]) == 6
+        assert set(t["sim"]) == {"liga", "espn"} and len(t["sim"]["liga"]["seeds"]) == 6
         assert all(len(v) == len(meta["weeks"]) for v in t["wochen"].values())
 
 

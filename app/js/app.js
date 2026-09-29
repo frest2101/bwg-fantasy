@@ -67,7 +67,7 @@ function setup(teams, sched) {
   S.weeks = sched.weeks || [];
   S.tw = S.man.through_week ?? S.meta.weeks?.at(-1) ?? 0;
   S.hasT = S.teams.some(t => t.t > 0);
-  const po = S.teams.map(t => t.sim?.espn?.playoff).filter(U.ok);
+  const po = S.teams.map(t => t.sim?.liga?.playoff).filter(U.ok);
   S.simFrac = po.length ? po.every(v => v <= 1) : true;
 }
 

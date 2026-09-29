@@ -61,7 +61,7 @@ def pick(source: dict | None, keys) -> dict | None:
 # ---------------------------------------------------------------- teams.json
 
 TEAM_FIELDS = ("team_id", "name", "division", "games", "w", "l", "t", "pf", "pa", "pf_per_game", "win_pct",
-               "allplay_w", "allplay_l", "allplay_t", "allplay_pct", "median_w", "luck", "optimal", "verschenkt",
+               "allplay_w", "allplay_l", "allplay_t", "allplay_pct", "median_w", "luck", "luck_band", "optimal", "verschenkt",
                "efficiency", "kader_potenzial", "kader_projektion", "bench", "floor", "form", "form_delta",
                "form_band", "streak", "projection", "projektions_delta", "waiver_prio", "moves", "rang",
                "rang_division", "rang_score", "norm", "score")
@@ -89,7 +89,7 @@ def build_teams(result: dict) -> dict:
         row["pr"] = pick(pr.get(tid), PR_FIELDS)
         if row["pr"] and row["pr"]["trend"] is None:
             row["pr"]["rang_vorwoche"] = None  # kein gültiger Vergleich (Quellwechsel Vorjahr → Projektion, W1)
-        row["sim"] = {seeding: pick(sim.get(seeding, {}).get(tid), SIM_FIELDS) for seeding in ("espn", "div")} \
+        row["sim"] = {seeding: pick(sim.get(seeding, {}).get(tid), SIM_FIELDS) for seeding in ("liga", "espn")} \
             if sim else None
         row["espn_sim"] = ((result.get("power_ranking") or {}).get("espn_sim") or {}).get(tid)
         row["positionen"] = positions.get(tid)
@@ -208,7 +208,7 @@ def build_claude(result: dict, teams: dict, schedule: dict, players: dict | None
     k = KUERZEL.get
     tabelle = []
     for t in teams["teams"]:
-        pr, sim = t.get("pr") or {}, (t.get("sim") or {}).get("espn") or {}
+        pr, sim = t.get("pr") or {}, (t.get("sim") or {}).get("liga") or {}
         tabelle.append([t["rang"], k(t["team_id"]), t["name"], f"{t['w']}-{t['l']}-{t['t']}", t["pf"],
                         t["allplay_pct"], t["luck"], t["efficiency"], t["form"],
                         50 + 10 * t["score_ref"]["Stärke"]["z"], t["kader_projektion"] or t["kader_potenzial"],

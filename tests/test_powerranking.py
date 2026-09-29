@@ -258,14 +258,14 @@ def test_simulation_summen(result):
 
 
 def test_simulation_stimmig(result):
-    espn, div = result["sim"]["espn"], result["sim"]["div"]
+    espn, div = result["sim"]["espn"], result["sim"]["liga"]
     for team_id in espn:
         for sim in (espn[team_id], div[team_id]):
             assert sim["playoff"] == sum(sim["seeds"])
             assert sim["bye"] == sum(sim["seeds"][:2])
             assert all(0 <= v <= 1 for v in (sim["playoff"], sim["division"], sim["bye"], *sim["seeds"]))
             assert 0 <= sim["restsiege"] <= 12
-        # dieselben Läufe: Division und Restsiege hängen nicht vom Seeding ab; bei „div“ haben genau die
+        # dieselben Läufe: Division und Restsiege hängen nicht vom Seeding ab; bei „liga“ haben genau die
         # Divisionssieger ein Freilos
         assert espn[team_id]["division"] == div[team_id]["division"]
         assert espn[team_id]["restsiege"] == div[team_id]["restsiege"]
@@ -311,20 +311,31 @@ def konstruiert(wins: dict[int, int], division: dict[int, int]) -> list[dict]:
              "pf": Decimal(500 - t)} for t, w in wins.items()]
 
 
-def test_seeding_div_setzt_divisionssieger_auf_1_und_2():
-    """Konstruiert: Division 1 (ungerade IDs) gewinnt alles, der Beste von Division 2 steht nach W erst auf Platz 6."""
+def test_simulation_liga_drei_je_division(result):
+    """Regel 2026: in jedem Lauf genau 3 Teams je Division, also Σ Playoff je Division = 3."""
+    division = {t["id"]: t["divisionId"] for t in ef.load_json(ef.week_dir(2026, 2) / "mTeam.json")["teams"]}
+    liga = result["sim"]["liga"]
+    for d in (1, 2):
+        assert sum(v["playoff"] for t, v in liga.items() if division[t] == d) == 3
+
+
+def test_seeding_liga_top3_je_division():
+    """Konstruiert: Division 1 (ungerade IDs) gewinnt alles, der Beste von Division 2 steht nach W erst auf Platz 6.
+
+    „liga“: Divisionssieger 1 und 10 auf Seed 1–2, dann je Division Platz 2 und 3 nach Stand (3, 5 aus Division 1,
+    2, 4 aus Division 2); 7 und 9 sind trotz 2-0 draußen. „espn“: die besten sechs nach W, dann PF."""
     division = {t: 1 if t % 2 else 2 for t in range(1, 11)}
     wins = {t: 2 if t % 2 else 0 for t in range(1, 11)}
     wins[10] = 1   # Divisionssieger 2 trotz schlechterer PF als Team 2
     teams = konstruiert(wins, division)
     mu = {t: Decimal(200) for t in range(1, 11)}
     res = pr.simulate(teams, [], mu, Decimal(35), runs=5, seed=1)   # keine offenen Spiele: Stand ist endgültig
-    espn, div = res["espn"], res["div"]
-    # ESPN: 1, 3, 5, 7, 9 (2-0, nach PF), dann 10 (1-1); Divisionssieger 1 und 10
+    espn, liga = res["espn"], res["liga"]
     assert [next(t for t in espn if espn[t]["seeds"][pos] == 1) for pos in range(6)] == [1, 3, 5, 7, 9, 10]
-    assert [next(t for t in div if div[t]["seeds"][pos] == 1) for pos in range(6)] == [1, 10, 3, 5, 7, 9]
-    assert espn[10]["bye"] == 0 and div[10]["bye"] == 1 and div[3]["bye"] == 0 and espn[3]["bye"] == 1
-    assert {t for t in div if div[t]["division"] == 1} == {1, 10}
+    assert [next(t for t in liga if liga[t]["seeds"][pos] == 1) for pos in range(6)] == [1, 10, 3, 5, 2, 4]
+    assert espn[10]["bye"] == 0 and liga[10]["bye"] == 1 and liga[3]["bye"] == 0 and espn[3]["bye"] == 1
+    assert liga[7]["playoff"] == 0 and liga[9]["playoff"] == 0 and liga[2]["playoff"] == 1
+    assert {t for t in liga if liga[t]["division"] == 1} == {1, 10}
     assert espn[2]["playoff"] == 0 and all(v["restsiege"] == 0 for v in espn.values())
 
 
@@ -337,7 +348,7 @@ def test_seeding_gleichstand_nach_pf_und_unentschieden():
     mu = {t: Decimal(200) for t in range(1, 5)}
     res = pr.simulate(teams, [], mu, Decimal(35), runs=1, seed=1, playoff_teams=2)
     assert res["espn"][2]["seeds"] == [1, 0] and res["espn"][1]["seeds"] == [0, 1]
-    assert res["div"][2]["seeds"] == [1, 0] and res["div"][3]["seeds"] == [0, 1]
+    assert res["liga"][2]["seeds"] == [1, 0] and res["liga"][3]["seeds"] == [0, 1]
 
 
 def test_seeding_pf_und_unentschieden_halb():
@@ -350,7 +361,7 @@ def test_seeding_pf_und_unentschieden_halb():
     res = pr.simulate(teams, [], mu, Decimal(35), runs=1, seed=1, playoff_teams=4)
     seeds = {name: [next(t for t, v in res[name].items() if v["seeds"][pos] == 1) for pos in range(4)]
              for name in pr.SEEDINGS}
-    assert seeds == {"espn": [4, 3, 2, 1], "div": [4, 2, 3, 1]}   # 2,0 > 1,5 > 1,0 (400 PF) > 1,0 (300 PF)
+    assert seeds == {"espn": [4, 3, 2, 1], "liga": [4, 2, 3, 1]}   # 2,0 > 1,5 > 1,0 (400 PF) > 1,0 (300 PF)
     assert {t for t, v in res["espn"].items() if v["division"] == 1} == {2, 4}
 
 
