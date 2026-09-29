@@ -1,7 +1,7 @@
 {
 "season":2026,
 "woche":4,
-"stand":"2026-09-29T2136Z",
+"stand":"2026-09-29T2151Z",
 "quelle":"kona_player_info mit filterStatsForCurrentSeasonScoringPeriodId = [4], Auszug je Spieler; stand = Abrufzeit (UTC) des letzten Laufs, der etwas geändert hat",
 "players":[
 {"id":-16034,"status":"ONTEAM","onTeamId":10,"injuryStatus":null,"percentOwned":92.38,"percentChange":-0.11,"percentStarted":76.18,"waiverProcessDate":null,"lastNewsDate":null,"proj_naechste_woche":14.21484847},
@@ -808,7 +808,7 @@
 {"id":4569603,"status":"ONTEAM","onTeamId":4,"injuryStatus":"ACTIVE","percentOwned":13.37,"percentChange":0.0,"percentStarted":3.27,"waiverProcessDate":null,"lastNewsDate":1790050343000,"proj_naechste_woche":10.18959079},
 {"id":4569609,"status":"WAIVERS","onTeamId":0,"injuryStatus":"ACTIVE","percentOwned":0.01,"percentChange":0.0,"percentStarted":0.0,"waiverProcessDate":1790751600000,"lastNewsDate":1785800311000,"proj_naechste_woche":null},
 {"id":4569618,"status":"ONTEAM","onTeamId":4,"injuryStatus":"ACTIVE","percentOwned":98.84,"percentChange":-0.02,"percentStarted":91.18,"waiverProcessDate":null,"lastNewsDate":1790547263000,"proj_naechste_woche":15.79054652},
-{"id":4569682,"status":"WAIVERS","onTeamId":0,"injuryStatus":"QUESTIONABLE","percentOwned":0.04,"percentChange":0.0,"percentStarted":0.0,"waiverProcessDate":1790751600000,"lastNewsDate":1790122123000,"proj_naechste_woche":null},
+{"id":4569682,"status":"WAIVERS","onTeamId":0,"injuryStatus":"ACTIVE","percentOwned":0.04,"percentChange":0.0,"percentStarted":0.0,"waiverProcessDate":1790751600000,"lastNewsDate":1790122123000,"proj_naechste_woche":null},
 {"id":4569923,"status":"WAIVERS","onTeamId":0,"injuryStatus":"ACTIVE","percentOwned":2.12,"percentChange":-0.04,"percentStarted":1.53,"waiverProcessDate":1790751600000,"lastNewsDate":1790637983000,"proj_naechste_woche":7.05697628},
 {"id":4569987,"status":"ONTEAM","onTeamId":3,"injuryStatus":"ACTIVE","percentOwned":89.0,"percentChange":-0.01,"percentStarted":49.4,"waiverProcessDate":null,"lastNewsDate":1790545668000,"proj_naechste_woche":14.51441895},
 {"id":4570037,"status":"WAIVERS","onTeamId":0,"injuryStatus":"DOUBTFUL","percentOwned":33.82,"percentChange":-1.19,"percentStarted":7.97,"waiverProcessDate":1790751600000,"lastNewsDate":1790636520000,"proj_naechste_woche":0.0},
@@ -866,7 +866,7 @@
 {"id":4678008,"status":"WAIVERS","onTeamId":0,"injuryStatus":"INJURY_RESERVE","percentOwned":56.71,"percentChange":-0.59,"percentStarted":1.05,"waiverProcessDate":1790751600000,"lastNewsDate":1790171320000,"proj_naechste_woche":0.0},
 {"id":4682509,"status":"WAIVERS","onTeamId":0,"injuryStatus":"ACTIVE","percentOwned":0.0,"percentChange":0.0,"percentStarted":0.0,"waiverProcessDate":1790751600000,"lastNewsDate":1790121519000,"proj_naechste_woche":null},
 {"id":4682648,"status":"ONTEAM","onTeamId":3,"injuryStatus":"ACTIVE","percentOwned":10.17,"percentChange":-0.14,"percentStarted":0.87,"waiverProcessDate":null,"lastNewsDate":1790050880000,"proj_naechste_woche":7.94779223},
-{"id":4682652,"status":"WAIVERS","onTeamId":0,"injuryStatus":"QUESTIONABLE","percentOwned":0.03,"percentChange":0.0,"percentStarted":0.0,"waiverProcessDate":1790751600000,"lastNewsDate":1788478722000,"proj_naechste_woche":0.0},
+{"id":4682652,"status":"WAIVERS","onTeamId":0,"injuryStatus":"ACTIVE","percentOwned":0.03,"percentChange":0.0,"percentStarted":0.0,"waiverProcessDate":1790751600000,"lastNewsDate":1788478722000,"proj_naechste_woche":0.0},
 {"id":4682745,"status":"WAIVERS","onTeamId":0,"injuryStatus":"QUESTIONABLE","percentOwned":1.76,"percentChange":0.09,"percentStarted":0.09,"waiverProcessDate":1790751600000,"lastNewsDate":1790622899000,"proj_naechste_woche":7.17159945},
 {"id":4683062,"status":"ONTEAM","onTeamId":8,"injuryStatus":"ACTIVE","percentOwned":76.35,"percentChange":-0.24,"percentStarted":19.89,"waiverProcessDate":null,"lastNewsDate":1790642897000,"proj_naechste_woche":10.01577207},
 {"id":4683151,"status":"WAIVERS","onTeamId":0,"injuryStatus":"ACTIVE","percentOwned":0.02,"percentChange":0.0,"percentStarted":0.0,"waiverProcessDate":1790751600000,"lastNewsDate":1777158268000,"proj_naechste_woche":0.22860039},
