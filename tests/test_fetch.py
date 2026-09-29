@@ -8,7 +8,7 @@ Aufruf: python -m pytest
 import itertools
 import json
 import shutil
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import pytest
 
@@ -584,3 +584,164 @@ def test_parse_args_gueltig():
     assert ef.parse_args(["--due"]).due
     assert ef.parse_args(["--transactions"]).transactions
     assert ef.parse_args(["--weeks", "3", "1", "3"]).weeks == [1, 3]
+
+
+# ---------------------------------------------------------------- Pool-Auszug und Tageslauf (Session 6)
+
+@pytest.mark.parametrize("day, week", [(date(2026, 9, 1), 1), (date(2026, 9, 29), 4), (date(2027, 2, 1), 17)])
+def test_pool_week(day, week):
+    assert ef.pool_week(2026, day) == week
+
+
+def test_pool_extract_felder():
+    data = fake_pool([4])
+    first = data["players"][0]
+    first.update(status="WAIVERS", waiverProcessDate=1790751600000)
+    first["player"].update(ownership={"percentOwned": 64.66, "percentChange": -0.07, "percentStarted": 58.81},
+                           injuryStatus="ACTIVE", lastNewsDate=1790569213000)
+    extract = ef.pool_extract(data, 2026, 4, "2026-09-29T0645Z")
+    assert (extract["season"], extract["woche"], extract["stand"]) == (2026, 4, "2026-09-29T0645Z")
+    assert [p["id"] for p in extract["players"]] == list(range(1, 301))
+    row = extract["players"][0]
+    assert tuple(row) == ef.POOL_KEYS
+    assert (row["status"], row["onTeamId"], row["injuryStatus"], row["percentOwned"], row["percentChange"],
+            row["percentStarted"], row["waiverProcessDate"], row["lastNewsDate"], row["proj_naechste_woche"]) \
+        == ("WAIVERS", 0, "ACTIVE", 64.66, -0.07, 58.81, 1790751600000, 1790569213000, 4.1)
+    second = extract["players"][1]
+    assert second["percentOwned"] is None and second["status"] is None and second["proj_naechste_woche"] == 4.2
+    # ohne Projektion der Woche: None; unvollständiger Pool: Fehler
+    assert all(p["proj_naechste_woche"] is None for p in ef.pool_extract(fake_pool([5]), 2026, 4, "x")["players"])
+    with pytest.raises(ef.FetchError, match="unvollständig"):
+        ef.pool_extract({"players": data["players"][:10]}, 2026, 4, "x")
+
+
+def test_pool_dumps_und_same_pool():
+    extract = ef.pool_extract(fake_pool([4]), 2026, 4, "2026-09-29T0645Z")
+    raw = ef.pool_dumps(extract)
+    assert json.loads(raw) == extract
+    assert sum(1 for line in raw.decode("utf-8").splitlines() if line.startswith('{"id":')) == 300
+    later = dict(extract, stand="2026-09-29T0745Z")
+    assert ef.same_pool(extract, later) and not ef.same_pool(None, extract)
+    changed = json.loads(raw)
+    changed["players"][0]["percentOwned"] = 1.0
+    assert not ef.same_pool(extract, changed)
+
+
+class FakePoolSession:
+    """Beantwortet nur den Spielerpool (kona) mit erfundenen Spielern; owned setzt den Besitz von Spieler 1."""
+
+    def __init__(self):
+        self.owned, self.broken, self.weeks = None, False, []
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def get(self, url, params=None, headers=None, timeout=None):
+        assert params["view"] == ef.KONA_VIEW
+        if self.broken:
+            return FakeResponse(503, b"down")
+        week = json.loads(headers["X-Fantasy-Filter"])["players"]["filterStatsForCurrentSeasonScoringPeriodId"]["value"][0]
+        self.weeks.append(week)
+        data = fake_pool([week])
+        if self.owned is not None:
+            data["players"][0]["player"]["ownership"] = {"percentOwned": self.owned}
+        return ok(data)
+
+
+def test_update_pool_schreibt_nur_bei_aenderung(raw):
+    session = FakePoolSession()
+    now = datetime(2026, 9, 29, 6, 45, tzinfo=timezone.utc)
+    path = ef.pool_dir(2026) / ef.POOL_FILE
+    errors, current = ef.update_pool(session, 2026, now, "2026-09-29T0645Z")
+    assert (errors, current["stand"], session.weeks) == (0, "2026-09-29T0645Z", [4])
+    first = path.read_bytes()
+    assert json.loads(first)["woche"] == 4
+    # unverändert: keine neue Datei, der alte Stand bleibt (stand = letzte Änderung)
+    errors, current = ef.update_pool(session, 2026, now + timedelta(hours=1), "2026-09-29T0745Z")
+    assert errors == 0 and path.read_bytes() == first and current["stand"] == "2026-09-29T0645Z"
+    # Besitz ändert sich: neue Datei mit neuem Stand
+    session.owned = 50.0
+    errors, current = ef.update_pool(session, 2026, now + timedelta(hours=2), "2026-09-29T0845Z")
+    assert errors == 0 and json.loads(path.read_bytes())["stand"] == "2026-09-29T0845Z"
+    assert current["players"][0]["percentOwned"] == 50.0
+    # ESPN-Fehler: Datei bleibt, kein aktueller Auszug
+    session.broken = True
+    errors, current = ef.update_pool(session, 2026, now, "x")
+    assert errors == 1 and current is None and json.loads(path.read_bytes())["stand"] == "2026-09-29T0845Z"
+
+
+class FakeDailySession(FakePoolSession):
+    """Tageslauf-Fake: Spielerpool wie FakePoolSession, Transaktionen und Aktivitäten über FakeEspn."""
+
+    def __init__(self, espn: FakeEspn):
+        super().__init__()
+        self.espn = espn
+
+    def get(self, url, params=None, headers=None, timeout=None):
+        if params["view"] == ef.KONA_VIEW:
+            return super().get(url, params, headers, timeout)
+        content, _ = self.espn.fetch(params)
+        return FakeResponse(200, content)
+
+
+def test_cmd_daily_transaktionen_und_pool(raw, monkeypatch):
+    session = FakeDailySession(FakeEspn({0: tx("t0"), 1: tx("t1")}, topics=[topic("k1")], current=1))
+    monkeypatch.setattr(ef.requests, "Session", lambda: session)
+    now = datetime(2026, 9, 29, 6, 45, tzinfo=timezone.utc)
+    assert ef.cmd_daily(2026, now, transactions=True, pool=True) == 0
+    assert (ef.pool_dir(2026) / ef.POOL_FILE).exists()
+    assert files(ef.tx_dir(2026)) == ["kona_league_communication_2026-09-29T0645Z.json",
+                                      "mTransactions2_p00.json", "mTransactions2_p01.json"]
+    # Pool-Fehler macht den Lauf rot, das Archiv wird trotzdem fortgeschrieben
+    session.broken = True
+    session.espn.periods[1] = tx("t1", "t2")
+    assert ef.cmd_daily(2026, now, transactions=True, pool=True) == 1
+    assert len(read(ef.tx_dir(2026) / "mTransactions2_p01.json")["transactions"]) == 2
+    # nur --transactions: kein Pool-Aufruf
+    session.broken = False
+    calls = len(session.weeks)
+    assert ef.cmd_daily(2026, now, transactions=True) == 0 and len(session.weeks) == calls
+
+
+def test_cmd_daily_nach_saisonende(raw):
+    assert ef.cmd_daily(2026, datetime(2027, 8, 2, 5, 17, tzinfo=timezone.utc), pool=True) == 1
+
+
+def test_parse_args_tageslauf():
+    args = ef.parse_args(["--transactions", "--pool", "--wetter"])
+    assert (args.transactions, args.pool, args.wetter, args.news) == (True, True, True, False)
+    assert ef.parse_args(["--pool", "--news"]).news and ef.parse_args(["--wetter"]).wetter
+    for argv in (["--news"], ["--pool", "--due"], ["--wetter", "--weeks", "1"], ["--summary", "--pool"]):
+        with pytest.raises(SystemExit):
+            ef.parse_args(argv)
+
+
+def test_update_pool_unlesbare_datei_wird_ersetzt(raw, capsys):
+    path = ef.pool_dir(2026) / ef.POOL_FILE
+    path.parent.mkdir(parents=True)
+    path.write_text("{kaputt", encoding="utf-8")
+    errors, current = ef.update_pool(FakePoolSession(), 2026, datetime(2026, 9, 29, 6, 45, tzinfo=timezone.utc), "x")
+    assert errors == 0 and current["woche"] == 4 and json.loads(path.read_bytes())["woche"] == 4
+    assert "unlesbar" in capsys.readouterr().out
+
+
+def test_update_pool_faengt_alle_fehler(raw, capsys):
+    """Unbekannter Saisonkalender und Datei mit falscher Struktur enden als FEHLER-Zeile bzw. Neuschreiben, nie als Traceback."""
+    assert ef.update_pool(FakePoolSession(), 2031, datetime(2031, 9, 9, tzinfo=timezone.utc), "x") == (1, None)
+    assert "Wochenkalender" in capsys.readouterr().err
+    path = ef.pool_dir(2026) / ef.POOL_FILE
+    path.parent.mkdir(parents=True)
+    for content in ("[1, 2, 3]", "null", '{"players": {}}', '{"players": []}'):
+        path.write_text(content, encoding="utf-8")
+        errors, current = ef.update_pool(FakePoolSession(), 2026, datetime(2026, 9, 29, 6, 45, tzinfo=timezone.utc), "x")
+        assert errors == 0 and current["woche"] == 4 and json.loads(path.read_bytes())["woche"] == 4, content
+
+
+def test_pool_extract_verlangt_32_dst():
+    data = fake_pool([4])
+    data["players"][0]["player"]["defaultPositionId"] = 2  # nur noch 31 D/ST
+    with pytest.raises(ef.FetchError, match="31 statt 32"):
+        ef.pool_extract(data, 2026, 4, "x")

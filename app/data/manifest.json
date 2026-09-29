@@ -2,7 +2,7 @@
 "schema":1,
 "season":2026,
 "through_week":3,
-"datenstand":{"woche_final":3,"ros_nach_woche":3,"pool_woche":3,"transaktionen_bis":1790526720083},
+"datenstand":{"woche_final":3,"ros_nach_woche":3,"pool_woche":3,"transaktionen_bis":1790526720083,"pool_stand":null,"wetter_stand":null},
 "files":{
 "claude.json":{"v":"c9a30d7c581e","bytes":26261,"lazy":true},
 "dst.json":{"v":"c33b2db7e87e","bytes":12966,"lazy":true},

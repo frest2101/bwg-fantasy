@@ -16,7 +16,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: daten-commit      # gemeinsam mit dem Transaktions-Archiv: nie zwei Commits gleichzeitig
+  group: daten-commit      # gemeinsam mit dem Tageslauf: nie zwei Commits gleichzeitig
   cancel-in-progress: false
 
 jobs:

@@ -23,6 +23,7 @@ import players
 import powerranking
 import rawdata
 import records
+import wetter
 from lineup import SLOT_BENCH, SLOT_IR, optimal_points  # noqa: F401 (optimal_points: öffentliche Funktion des Rechenwerks)
 from zahlen import HALF, HUNDRED, ONE, ZERO, dec, rounded  # noqa: F401 (dec: bisherige Schnittstelle)
 
@@ -408,7 +409,11 @@ def compute_season(season: int = ef.DEFAULT_SEASON, through: int | None = None) 
             "transactions": transactions, "transactions_until": transactions.get("bis"),
             "dst": dst.compute_dst(ssn, weeks), "history": history.compute_history(ssn),
             "players": spieler, "ros_after_week": spieler["ros_after_week"],
-            "pool_week": weeks[-1] if ssn.pool(weeks[-1]) is not None else None}
+            "pool_week": weeks[-1] if ssn.pool(weeks[-1]) is not None else None,
+            # Tageslauf (Session 6): Pool-Auszug und Wetter, Stand des jüngsten Laufs – None, solange er nicht lief
+            "pool_latest": ssn.pool_latest(),
+            "wetter": wetter.compute_wetter(ssn.wetter_prognose(), ssn.wetter_ist(),
+                                            {tid: t.abbrev for tid, t in ssn.nfl().items()})}
 
 
 # ---------------------------------------------------------------- Ausgabe
