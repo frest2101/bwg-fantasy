@@ -89,13 +89,13 @@ export function setQ(path, params) {
 }
 
 // ---------------------------------------------------------------- Chips, Umschalter, Kacheln
-// Waagerecht scrollende Bereiche (Tabellen, Chipleisten): Klasse „more“, solange rechts etwas verborgen ist (CSS blendet
-// die Kante aus), „scrolled“ ab dem ersten Wischen (Schatten an der festen Team-Spalte). Auf dem Handy ist sonst nicht
+// Waagerecht scrollende Bereiche (Tabellen, Chipleisten): Klasse „sc-more“, solange rechts etwas verborgen ist (CSS
+// blendet die Kante aus), „sc-scrolled“ ab dem ersten Wischen (Schatten an der festen Team-Spalte). Auf dem Handy ist sonst nicht
 // zu erkennen, dass eine Tabelle weitere Spalten hat.
 export function scrollHint(el) {
   const upd = () => {
-    el.classList.toggle('more', el.scrollWidth - el.clientWidth - el.scrollLeft > 2);
-    el.classList.toggle('scrolled', el.scrollLeft > 2);
+    el.classList.toggle('sc-more', el.scrollWidth - el.clientWidth - el.scrollLeft > 2);
+    el.classList.toggle('sc-scrolled', el.scrollLeft > 2);
   };
   el.addEventListener('scroll', upd, {passive: true});
   new ResizeObserver(upd).observe(el);

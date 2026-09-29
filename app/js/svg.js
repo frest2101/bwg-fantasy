@@ -58,10 +58,10 @@ function dataTable(title, tab) {
     if (!d.open || d.dataset.done) return;
     d.dataset.done = '1';
     const {h} = U, t = typeof tab === 'function' ? tab() : tab;
-    d.append(h('div', {class: 'tw', role: 'region', tabindex: '0', 'aria-label': title + ' als Tabelle'},
+    d.append(U.scrollHint(h('div', {class: 'tw', role: 'region', tabindex: '0', 'aria-label': title + ' als Tabelle'},
       h('table', null, h('caption', {class: 'vh'}, title),
         h('thead', null, h('tr', null, t.heads.map(x => h('th', {scope: 'col', class: 'n'}, x)))),
-        h('tbody', null, t.rows.map(r => h('tr', null, r.map((c, i) => i ? h('td', {class: 'n'}, c) : h('th', {scope: 'row'}, c))))))));
+        h('tbody', null, t.rows.map(r => h('tr', null, r.map((c, i) => i ? h('td', {class: 'n'}, c) : h('th', {scope: 'row'}, c)))))))));
   });
   return d;
 }

@@ -62,8 +62,8 @@ html:not(.js) main .loading,html:not(.js) .tabs{display:none}
 .wk a:first-child{min-width:5.4rem}
 /* Scroll-Hinweis (ui.js scrollHint): rechte Kante ausblenden, solange dort Spalten oder Chips verborgen sind; nach dem
    ersten Wischen ein Schatten an der festen Team-Spalte */
-.more{-webkit-mask-image:linear-gradient(to right,#000 calc(100% - 44px),transparent);mask-image:linear-gradient(to right,#000 calc(100% - 44px),transparent)}
-.tw.scrolled .rk tr>:nth-child(2),.tw.scrolled .nr tr>:first-child{box-shadow:2px 0 0 var(--bd),8px 0 8px -6px rgba(0,0,0,.2)}
+.sc-more{-webkit-mask-image:linear-gradient(to right,#000 calc(100% - 44px),transparent);mask-image:linear-gradient(to right,#000 calc(100% - 44px),transparent)}
+.tw.sc-scrolled .rk tr>:nth-child(2),.tw.sc-scrolled .nr tr>:first-child{box-shadow:2px 0 0 var(--bd),8px 0 8px -6px rgba(0,0,0,.2)}
 .wk a{flex-direction:column;justify-content:center;gap:0;line-height:1.1;padding:0 .7rem}
 .wk small{font-weight:400;font-size:.72rem}
 .wk .po{border-style:dashed}
@@ -126,7 +126,7 @@ td a,th a{min-width:44px}
 .pl{display:flex;flex-direction:column;justify-content:center;align-items:flex-start;min-height:44px;text-decoration:none;color:var(--tx);font-weight:600;line-height:1.2}
 .pl:hover>span:first-child{text-decoration:underline}
 .tk{display:none}
-@media (max-width:599px){th,td{padding:0 .38rem;height:40px}thead th{height:40px}thead th button{padding:0 .38rem;min-height:40px}.pb{min-width:2.9rem}}
+@media (max-width:599px){th,td{padding:0 .38rem;height:40px}thead th{height:44px}thead th button{padding:0 .38rem}.pb{min-width:2.9rem}}
 .chips{scrollbar-width:none}.chips::-webkit-scrollbar{display:none}
 @media (max-width:599px){.rk .tn,.kurz .tn{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}.rk .tk,.kurz .tk{display:inline}}
 .sub{display:block;font-size:.78rem;color:var(--mu);font-weight:400;white-space:nowrap}
@@ -199,7 +199,7 @@ details.sec>summary::marker{color:var(--mu)}
 .sl label{font-weight:600;font-size:.92rem;display:flex;align-items:center}
 .sl output{font-variant-numeric:tabular-nums;color:var(--mu);font-size:.9rem;min-width:5.5rem;text-align:right}
 .sl input{grid-column:1/-1;width:100%;min-height:44px;accent-color:var(--ac);margin:0}
-@media (max-width:599px){.sl{grid-template-columns:6.8rem minmax(0,1fr) 4.4rem;padding:2px 0}.sl label{font-size:.85rem;line-height:1.15}.sl input{grid-column:auto;order:2}.sl output{order:3;min-width:0;font-size:.8rem}}
+@media (max-width:599px){.sl{grid-template-columns:7rem minmax(0,1fr) 4.4rem;padding:2px 0}.sl>.row{flex-wrap:nowrap;gap:0}.sl label{font-size:.85rem;line-height:1.15;min-width:0}.sl button.i{margin-right:0}.sl input{grid-column:auto;order:2}.sl output{order:3;min-width:0;font-size:.8rem}}
 /* H2H-Matrix */
 .mx td{text-align:center;min-width:3.2rem}
 @media (max-width:599px){.mx td{min-width:2.4rem;padding:0 .2rem;font-size:.85rem}.mx th{padding:0 .3rem}}

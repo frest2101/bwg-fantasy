@@ -108,7 +108,7 @@ function scoreView(box, r) {
     return h('div', {class: 'sl'}, h('div', {class: 'row', style: 'margin:0'}, h('label', {for: i}, m.label), U.ib(gid(m.key), '')), outs[m.key], ins[m.key]);
   });
   const block = h('p', {class: 'note', 'aria-live': 'polite'});
-  const top3 = h('p', {class: 'note'});  // Spitze live im Regler-Feld: auf dem Handy liegt die Tabelle darunter außer Sicht
+  const top3 = h('p', {class: 'note', 'aria-live': 'polite'});  // Spitze live im Regler-Feld: auf dem Handy liegt die Tabelle darunter außer Sicht
   const panel = h('details', {class: 'gw', open: matchMedia('(min-width:900px)').matches},
     h('summary', null, 'Gewichte anpassen'), sliders,
     h('div', {class: 'row'}, h('button', {type: 'button', class: 'btn', onclick: () => {
