@@ -57,7 +57,7 @@ function list(box, P, r, rosWhy) {
   const sortKey = {saison: 'pts', ros: 'ros_g', besitz: 'own'};
   let tbl;
   const build = () => {
-    tbl = U.table({cap: 'Spielerliste', cls: 'nr', rh: 0, rows: rows(), sort: [sortKey[st.sicht], -1], limit: 50, cols: [...base, ...extra[st.sicht]]});
+    tbl = U.table({cap: 'Spielerliste', cls: 'nr', rh: 0, rows: rows(), sort: [sortKey[st.sicht], -1], limit: 50, filter: true, cols: [...base, ...extra[st.sicht]]});
     slotBox.replaceChildren(tbl);
   };
   const refresh = (rebuild) => {
@@ -78,7 +78,7 @@ function list(box, P, r, rosWhy) {
       }})),
     U.seg('Spalten', [['saison', 'Saison'], ['ros', 'ROS'], ['besitz', 'Besitz']], st.sicht, v => { st.sicht = v; refresh(true); })),
     count, slotBox,
-    U.legend(['avg', 'form-sp', 'trendpfeil', 'ros-spiel', 'spiele', 'floor-ceil', 'konstanz', 'starts', 'proj-delta-sp', 'ros', 'restspiele', 'ros-po', 'ros-rang', 'ros-ue', 'projektionen']));
+    U.legend(['spaltenfilter', 'avg', 'form-sp', 'trendpfeil', 'ros-spiel', 'spiele', 'floor-ceil', 'konstanz', 'starts', 'proj-delta-sp', 'ros', 'restspiele', 'ros-po', 'ros-rang', 'ros-ue', 'projektionen']));
   refresh(true);
 }
 

@@ -112,6 +112,10 @@ thead th[aria-sort] button{color:var(--tx)}
 th[scope=row]{font-weight:600}
 .n{text-align:right;font-variant-numeric:tabular-nums}
 thead th.n button{flex-direction:row-reverse;justify-content:flex-start}
+thead tr.flt th{height:auto;padding:3px 4px;background:var(--sf)}
+thead tr.flt input{min-height:36px;width:100%;min-width:4.6rem;box-sizing:border-box;padding:0 .4rem;font-size:16px;border:1px solid var(--bd);border-radius:6px;background:var(--sf)}
+thead tr.flt th.n input{text-align:right}
+.tt{margin:.25rem 0}
 .rk tr>:first-child{position:sticky;left:0;z-index:1;width:2.75rem;min-width:2.75rem;max-width:2.75rem;padding:0 .4rem 0 .3rem;text-align:right}
 .rk thead tr>:first-child{padding:0}
 .rk thead tr>:first-child button{padding:0 .4rem 0 .2rem;justify-content:flex-end}
