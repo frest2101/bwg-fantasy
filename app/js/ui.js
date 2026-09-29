@@ -286,7 +286,7 @@ export function table(o) {
       fbtn.classList.toggle('on', act.length > 0);
       fchips.replaceChildren(...act.map(c => h('button', {type: 'button', class: 'fc', onclick: () => { delete flt[c.k]; draw(); },
         'aria-label': `Filter entfernen: ${flt[c.k].label}`}, flt[c.k].label, h('span', {'aria-hidden': 'true'}, ' ×'))),
-      act.length > 1 ? h('button', {type: 'button', class: 'fc all', onclick: clearAll}, 'Alle löschen') : null);
+      ...(act.length > 1 ? [h('button', {type: 'button', class: 'fc all', onclick: clearAll}, 'Alle löschen')] : []));
     }
     const c = cols.find(x => x.k === sk);
     if (c?.v) rows = sortRows(rows, c.v, sd);
