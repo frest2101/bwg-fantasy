@@ -240,9 +240,11 @@ def test_sigma_gepoolt_mit_startwert(season):
 
 
 def test_matchup_glueck(season, teams):
-    """Matchup-Glück je Woche: nur, wenn das Ergebnis der Punkteseite widerspricht, Gewicht = |PF − Median| / σ ≤ 1.
-    Nach W2: Hugh Jass 0 (beide Siege über dem Median); gloane W1 Niederlage 9,91 über dem Median → −9,91/σ;
-    4th Down W2 Sieg 36,40 unter dem Median → gekappt +1; cool runnings W1 Sieg 14,75 unter dem Median → +14,75/σ."""
+    """Matchup-Glück je Woche: nur, wenn das Ergebnis der Punkteseite widerspricht, Gewicht = (|PF − Median| +
+    |PA − Median|) / (2σ) ≤ 1. Nach W2: Hugh Jass 0 (beide Siege über dem Median); gloane W1 Niederlage 9,91 über dem
+    Median gegen Hugh Jass 22,63 darüber → −(9,91 + 22,63)/(2σ); 4th Down W2 Sieg 36,40 unter dem Median gegen
+    TeamTy 67,74 darunter → gekappt +1; cool runnings W1 Sieg 14,75 unter dem Median gegen SaureGurken 58,55
+    darunter → (14,75 + 58,55)/(2σ) > 1 → +1."""
     sigma, eps = season["sigma"], Decimal("1e-12")
     medians = {w["week"]: w["median"] for w in season["weeks"]}
     for t in teams.values():
@@ -250,8 +252,9 @@ def test_matchup_glueck(season, teams):
         running = Decimal(0)
         for r in rows:
             assert r["median_abstand"] == r["pf"] - medians[r["week"]]
+            assert r["gegner_abstand"] == r["pa"] - medians[r["week"]]
             assert (r["median_abstand"] > 0) == r["median_win"]
-            expect = min(Decimal(1), abs(r["median_abstand"]) / sigma)
+            expect = min(Decimal(1), (abs(r["median_abstand"]) + abs(r["gegner_abstand"])) / (2 * sigma))
             if r["result"] == "W" and r["median_abstand"] < 0:
                 assert r["matchup_glueck"] == expect
             elif r["result"] == "L" and r["median_abstand"] > 0:
@@ -265,9 +268,9 @@ def test_matchup_glueck(season, teams):
         assert t["median_w"] + t["median_l"] == t["games"]
         assert abs(t["spielplan_pkt"] - sum(r["gegner_pkt"] for r in rows)) < eps
     assert teams["Hugh Jass"]["matchup_glueck"] == 0 and teams["Hugh Jass"]["median_w"] == 2
-    assert abs(team_week(season, "gloane saubande", 1)["matchup_glueck"] + Decimal("9.91") / sigma) < Decimal("1e-9")
+    assert abs(team_week(season, "gloane saubande", 1)["matchup_glueck"] + Decimal("32.54") / (2 * sigma)) < Decimal("1e-9")
     assert team_week(season, "4th Down Syndrom", 2)["matchup_glueck"] == 1
-    assert abs(team_week(season, "cool runnings", 1)["matchup_glueck"] - Decimal("14.75") / sigma) < Decimal("1e-9")
+    assert team_week(season, "cool runnings", 1)["matchup_glueck"] == 1
 
 
 def test_gegner_punkte(season):

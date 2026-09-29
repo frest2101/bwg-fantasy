@@ -76,7 +76,7 @@ def test_teams_vertrag(data):
         assert all(isinstance(v, int) for v in t["norm"]["rank"].values())
         assert set(t["sim"]) == {"liga", "espn"} and len(t["sim"]["liga"]["seeds"]) == 6
         assert set(t["wochen"]) == {"gegner", "heim", "pf", "pa", "ergebnis", "wochenrang", "allplay_w", "allplay_l",
-                                    "allplay_t", "allplay_pct", "median_win", "median_abstand", "matchup_glueck",
+                                    "allplay_t", "allplay_pct", "median_win", "median_abstand", "gegner_abstand", "matchup_glueck",
                                     "matchup_kum", "gegner_pkt", "optimal", "verschenkt", "efficiency", "bank",
                                     "projektion", "projektions_delta", "mu", "pr_rang"}
         assert all(len(v) == len(meta["weeks"]) for v in t["wochen"].values())
