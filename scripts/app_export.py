@@ -12,7 +12,7 @@ from pathlib import Path
 
 import espn_fetch as ef
 from lineup import POSITION_NAMES, SLOT_NAMES
-from zahlen import round_to, rounded
+from zahlen import dec, round_to, rounded
 
 SCHEMA = 1
 APP_DATA = ef.REPO_DIR / "app" / "data"
@@ -23,8 +23,10 @@ METRIC_LABELS = {"pf": "PF/Spiel", "allplay": "All-Play-Quote", "win": "Win %", 
                  "floor": "Floor", "form": "Form"}
 # Stellen je Schlüssel (gilt für den Teilbaum), sonst zwei (Frage 11 a); Anteile in % mit einer Stelle wie in der Anzeige
 PRECISION = {"z": 3, "e": 3, "f": 3, "f_vorwoche": 3, "delta": 3, "r25": 3, "r26": 3, "naechste3": 3, "rest": 3,
-             "sos_po": 3, "playoff": 4, "division": 4, "bye": 4, "seeds": 4, "p_home": 4, "anteil": 1}
-LAZY = ("players.json", "dst.json", "history.json", "transactions.json", "claude.json")
+             "sos_po": 3, "playoff": 4, "division": 4, "bye": 4, "seeds": 4, "p_home": 4, "anteil": 1,
+             # Wetter (wetter.json): eine Stelle wie Open-Meteo, Regenwahrscheinlichkeit ganzzahlig
+             "temp": 1, "wind": 1, "boeen": 1, "niederschlag": 1, "schnee": 1, "regen_wahrsch": 0}
+LAZY = ("players.json", "dst.json", "history.json", "transactions.json", "waiver.json", "wetter.json", "claude.json")
 
 
 # ---------------------------------------------------------------- Hilfen
@@ -151,17 +153,28 @@ def build_schedule(result: dict) -> dict:
 FREE_AGENTS_PER_POS = 20
 
 
-def build_players(result: dict) -> dict | None:
-    """Spieler mit mindestens einem Spiel oder im Kader, dazu die 20 besten Free Agents je Position nach ROS/Spiel."""
+def player_selection(result: dict) -> set[int]:
+    """Spieler der App: mindestens ein Spiel oder im Kader (Wochenstand), dazu die 20 besten Free Agents je Position
+    nach ROS/Spiel. Leer ohne Spielerdaten."""
     data = result.get("players")
     if not data:
-        return None
+        return set()
     pool = data["players"]
     keep = {pid for pid, p in pool.items() if p["team_id"] or p["games"]}
     for pos in POSITION_NAMES:
         free = sorted((p for p in pool.values() if not p["team_id"] and p["pos"] == pos
                        and p["ros_pro_spiel"] is not None), key=lambda p: (-p["ros_pro_spiel"], p["player_id"]))
         keep |= {p["player_id"] for p in free[:FREE_AGENTS_PER_POS]}
+    return keep
+
+
+def build_players(result: dict) -> dict | None:
+    """Spieler mit mindestens einem Spiel oder im Kader, dazu die 20 besten Free Agents je Position nach ROS/Spiel."""
+    data = result.get("players")
+    if not data:
+        return None
+    pool = data["players"]
+    keep = player_selection(result)
     rows = []
     for pid in sorted(keep):
         p = pool[pid]
@@ -198,6 +211,38 @@ def build_dst(result: dict) -> dict | None:
 def build_transactions(result: dict) -> dict | None:
     data = result.get("transactions")
     return {k: data[k] for k in ("spieler", "items", "aufstellungswechsel", "draft")} if data else None
+
+
+def build_waiver(result: dict) -> dict | None:
+    """Tagesstand je Spieler aus dem Pool-Auszug des Tageslaufs (Session 6): Status, Fantasy-Team, Verletzung,
+    Besitz ESPN-weit mit Trend, Waiver-Frist, Projektion der nächsten Woche, letzte ESPN-News.
+
+    Spieler: die Auswahl von players.json (Kader, mit Spiel, 20 beste Free Agents je Position) plus alle, die laut
+    Tagesstand in einem Kader stehen. Grundlage des Waiver-Tabs (Session 7); None ohne Pool-Auszug oder Spielerdaten.
+    """
+    pool = result.get("pool_latest")
+    selection = player_selection(result)
+    if not pool or not selection:
+        return None
+    keep = selection | {p["id"] for p in pool["players"] if p.get("onTeamId")}
+    weekly = result["players"]["players"]  # ganzer Wochenpool mit Stammdaten (Name, Position, NFL-Team)
+    number = lambda v: dec(v) if v is not None else None  # noqa: E731 – ESPN-Floats erst beim Schreiben runden
+    rows = []
+    for p in pool["players"]:
+        if p["id"] not in keep:
+            continue
+        row = {"id": p["id"], "team": p.get("onTeamId") or 0, "status": p.get("status"), "inj": p.get("injuryStatus"),
+               "own": number(p.get("percentOwned")), "own_d": number(p.get("percentChange")),
+               "started": number(p.get("percentStarted")), "waiver_bis": p.get("waiverProcessDate"),
+               "proj": number(p.get("proj_naechste_woche")), "news": p.get("lastNewsDate")}
+        if p["id"] not in selection:
+            # Kaderspieler, den players.json nicht führt (unter der Woche geholt, ohne Spiel, nicht Top 20 seiner
+            # Position): Stammdaten aus dem Wochenpool, damit die App ihn benennen kann; None, wenn auch dort unbekannt
+            w = weekly.get(p["id"])
+            row.update(name=w["name"] if w else None, pos=POSITION_NAMES.get(w["pos"], str(w["pos"])) if w else None,
+                       nfl=w["nfl"] if w else None)
+        rows.append(row)
+    return {"stand": pool["stand"], "woche": pool["woche"], "spieler": rows}
 
 
 CLAUDE_PLAYER_COLS = ("name", "pos", "nfl", "inj", "avg", "form", "trend", "ros_g", "ros_rang")
@@ -260,7 +305,8 @@ def build(result: dict) -> dict[str, dict]:
     files = {"teams.json": teams, "schedule.json": schedule}
     players, dst = build_players(result), build_dst(result)
     optional = {"players.json": players, "dst.json": dst, "history.json": result.get("history"),
-                "transactions.json": build_transactions(result)}
+                "transactions.json": build_transactions(result),
+                "waiver.json": build_waiver(result), "wetter.json": result.get("wetter")}
     files.update({name: obj for name, obj in optional.items() if obj})
     files["claude.json"] = build_claude(result, teams, schedule, players, dst, result.get("transactions"))
     return files
@@ -284,7 +330,10 @@ def render(files: dict[str, dict], result: dict) -> dict[str, bytes]:
     manifest = {"schema": SCHEMA, "season": result["season"], "through_week": result["through_week"],
                 "datenstand": {"woche_final": result["through_week"], "ros_nach_woche": result.get("ros_after_week"),
                                "pool_woche": result.get("pool_week"),
-                               "transaktionen_bis": result.get("transactions_until")},
+                               "transaktionen_bis": result.get("transactions_until"),
+                               # Tageslauf: Abrufzeit (UTC, ISO) des jüngsten Pool-Auszugs bzw. Wetterabrufs
+                               "pool_stand": (result.get("pool_latest") or {}).get("stand"),
+                               "wetter_stand": (result.get("wetter") or {}).get("stand")},
                 "files": {name: {"v": hashlib.sha256(data).hexdigest()[:12], "bytes": len(data),
                                  "lazy": name in LAZY} for name, data in content.items()}}
     content["manifest.json"] = dumps(manifest).encode("utf-8")

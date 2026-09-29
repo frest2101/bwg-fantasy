@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 import espn_fetch as ef
+import wetter
 from zahlen import ZERO, dec
 
 STAT_ACTUAL, STAT_PROJECTION, SPLIT_WEEK = 0, 1, 1   # statSourceId, statSplitTypeId
@@ -186,6 +187,23 @@ class Season:
     def standings(self) -> dict | None:
         """ESPN-Simulation (mStandings) nach Woche through, nur zum Vergleich; None, wenn sie fehlt."""
         return self._get("standings", lambda: self._optional(ef.week_dir(self.season, self.through) / ef.STANDINGS_FILE))
+
+    # -------------------------------------------------------- Tageslauf (Pool-Auszug, Wetter) – Stand des jüngsten Laufs
+    def pool_latest(self) -> dict | None:
+        """Pool-Auszug des Tageslaufs (pool/latest.json): Status, Besitz, Verletzung, Waiver-Frist, Projektion der
+        nächsten Woche, letzte ESPN-News je Spieler; None, solange der Tageslauf ihn nicht geschrieben hat."""
+        return self._get("pool_latest", lambda: self._optional(ef.pool_dir(self.season) / ef.POOL_FILE))
+
+    def wetter_prognose(self) -> dict | None:
+        """Jüngste Wetterprognose (wetter/prognose/wNN_<UTC>.json, nur die laufende Woche); None ohne Datei."""
+        def load():
+            path = ef.latest(wetter.prognose_dir(self.season), "w[0-9][0-9]_*.json")
+            return ef.load_json(path) if path else None
+        return self._get("wetter_prognose", load)
+
+    def wetter_ist(self) -> dict | None:
+        """Ist-Wetter aller gespielten Spiele (wetter/ist_<saison>.json); None ohne Datei."""
+        return self._get("wetter_ist", lambda: self._optional(wetter.ist_path(self.season)))
 
     # -------------------------------------------------------- Saisondateien
     def nfl(self) -> dict[int, NflTeam]:

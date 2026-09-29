@@ -34,8 +34,10 @@ def data(content):
 
 
 def test_alle_dateien_und_gueltiges_json(data):
-    assert set(data) == {"manifest.json", "teams.json", "schedule.json", "players.json", "dst.json",
-                         "history.json", "transactions.json", "claude.json"}
+    immer = {"manifest.json", "teams.json", "schedule.json", "players.json", "dst.json", "history.json",
+             "transactions.json", "claude.json"}
+    tageslauf = {"waiver.json", "wetter.json"}  # erst, wenn der Tageslauf Pool-Auszug und Wetter geliefert hat
+    assert immer <= set(data) <= immer | tageslauf
 
 
 def test_manifest(content, data):
@@ -46,6 +48,57 @@ def test_manifest(content, data):
         assert info["v"] == hashlib.sha256(content[name]).hexdigest()[:12]
         assert info["bytes"] == len(content[name])
         assert info["lazy"] == (name not in FIRST_LOAD)
+    ds = m["datenstand"]
+    assert {"woche_final", "ros_nach_woche", "pool_woche", "transaktionen_bis", "pool_stand", "wetter_stand"} <= set(ds)
+    assert all(ds[k] is None or isinstance(ds[k], str) for k in ("pool_stand", "wetter_stand"))
+    assert (ds["pool_stand"] is None) == ("waiver.json" not in data)
+    assert (ds["wetter_stand"] is None) == ("wetter.json" not in data)
+
+
+def test_waiver_vertrag(result):
+    """waiver.json aus einem erfundenen Pool-Auszug: Auswahl = players.json-Spieler plus aktuelle Kaderspieler."""
+    keep = app_export.player_selection(result)
+    inside = sorted(keep)[0]
+    outside = max(result["players"]["players"]) + 1  # nicht in players.json, aber laut Tagesstand im Kader
+    ignored = outside + 1                              # weder noch: bleibt draußen
+    row = {"status": "WAIVERS", "injuryStatus": "QUESTIONABLE", "percentOwned": 64.66, "percentChange": -0.07,
+           "percentStarted": 58.81, "waiverProcessDate": 1790751600000, "lastNewsDate": 1790569213000,
+           "proj_naechste_woche": 8.7201752}
+    pool = {"season": 2026, "woche": 3, "stand": "2026-09-29T0645Z",
+            "players": [dict(row, id=inside, onTeamId=0), dict(row, id=outside, onTeamId=2, status="ONTEAM"),
+                        dict(row, id=ignored, onTeamId=0)]}
+    out = app_export.round_file("waiver.json", app_export.build_waiver(dict(result, pool_latest=pool)))
+    assert (out["stand"], out["woche"]) == ("2026-09-29T0645Z", 3)
+    assert [p["id"] for p in out["spieler"]] == [inside, outside]
+    first = out["spieler"][0]
+    assert set(first) == {"id", "team", "status", "inj", "own", "own_d", "started", "waiver_bis", "proj", "news"}
+    assert (first["team"], first["status"], first["inj"], first["own"], first["own_d"], first["started"],
+            first["waiver_bis"], first["proj"], first["news"]) \
+        == (0, "WAIVERS", "QUESTIONABLE", 64.66, -0.07, 58.81, 1790751600000, 8.72, 1790569213000)
+    extra = out["spieler"][1]
+    assert extra["team"] == 2 and set(extra) == set(first) | {"name", "pos", "nfl"}
+    assert (extra["name"], extra["pos"], extra["nfl"]) == (None, None, None)  # nicht einmal im Wochenpool
+    known = next(pid for pid in sorted(result["players"]["players"]) if pid not in keep)  # im Wochenpool, nicht in players.json
+    out = app_export.build_waiver(dict(result, pool_latest=dict(pool, players=[dict(row, id=known, onTeamId=3)])))
+    assert out["spieler"][0]["name"] == result["players"]["players"][known]["name"] and out["spieler"][0]["pos"]
+    assert app_export.build_waiver(dict(result, pool_latest=None)) is None
+
+
+def test_wetter_vertrag():
+    """wetter.json: Verdichtung je Spiel mit einer Stelle, Regenwahrscheinlichkeit ganzzahlig."""
+    import wetter
+    site = {"stadion": "S", "ort": "O", "lat": 1, "lon": 2, "dach": "offen", "zeitzone": "UTC", "neutral": False}
+    stunden = {"zeit": ["a"] * 4, "temp": [10.04, 10.06, 10.0, 10.0], "wind": [1, 2, 3, 4], "boeen": [5, 6, 7, 8],
+               "regen_wahrsch": [10, 55, 30, 0], "niederschlag": [0.1, 0.25, 0, 0], "schnee": [0, 0, 0, 0]}
+    prognose = {"woche": 4, "stand": "2026-09-29T0645Z",
+                "spiele": [dict(site, id=1, woche=4, kickoff="2026-10-02T00:15Z", heim=12, gast=7, stunden=stunden)]}
+    out = app_export.round_file("wetter.json", wetter.compute_wetter(prognose, None, {12: "KC", 7: "DEN"}))
+    game = out["prognose"][0]
+    assert (game["heim"], game["gast"], game["temp"], game["wind"], game["boeen"], game["regen_wahrsch"],
+            game["niederschlag"], game["schnee"]) == ("KC", "DEN", 10.0, 2.5, 8.0, 55, 0.4, 0.0)
+    assert isinstance(game["regen_wahrsch"], int) and out["ist"] == [] and out["stand"] == "2026-09-29T0645Z"
+    assert set(game) == {"id", "woche", "kickoff", "tbd", "heim", "gast", "stadion", "ort", "dach", "neutral",
+                         "temp", "wind", "boeen", "regen_wahrsch", "niederschlag", "schnee"}
 
 
 def test_deterministisch(result, content):

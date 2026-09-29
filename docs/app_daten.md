@@ -17,10 +17,12 @@
 ## `manifest.json` (immer frisch geladen)
 ```json
 {"schema": 1, "season": 2026, "through_week": 2,
- "datenstand": {"woche_final": 2, "ros_nach_woche": null, "pool_woche": 2, "transaktionen_bis": 1790000000000},
+ "datenstand": {"woche_final": 2, "ros_nach_woche": null, "pool_woche": 2, "transaktionen_bis": 1790000000000,
+                "pool_stand": "2026-09-29T0645Z", "wetter_stand": "2026-09-29T0645Z"},
  "files": {"teams.json": {"v": "<sha256, 12 Zeichen>", "bytes": 13000, "lazy": false}, "…": {}}}
 ```
 Die App lädt `data/manifest.json?t=<jetzt>` und danach jede Datei mit `?v=<v>`. Ist `schema` größer als die Schema-Version der App, zeigt sie „Neue Version – bitte neu laden“.
+`pool_stand` und `wetter_stand` sind die Abrufzeit (UTC, `JJJJ-MM-TTThhmmZ`) des jüngsten Tageslaufs, der Pool-Auszug bzw. Wetter geändert hat; `null`, solange der Tageslauf nichts geliefert hat (dann fehlen auch `waiver.json` und `wetter.json`).
 
 ## `teams.json` (Erstaufruf)
 - **`meta`:**
@@ -79,6 +81,23 @@ Die App lädt `data/manifest.json?t=<jetzt>` und danach jede Datei mit `?v=<v>`.
 - `spieler` (id → Name), `aufstellungswechsel` (team_id → Zahl).
 - `items`: `{id, type, team_id, datum (Epoch-ms), periode, items: [{type ADD/DROP, player_id, name, from_team_id, to_team_id}]}`. `type` ist WAIVER, FREEAGENT, ROSTER (reine Drops) oder TRADE_ACCEPT (ohne Spieler).
 - `draft`: `{pick, runde, runden_pick, team_id, player_id, name, keeper}`.
+
+## `waiver.json` (lazy, Tagesstand je Spieler – Grundlage des Waiver-Tabs ab Session 7)
+- **Kopf:** `stand` (Abrufzeit des Pool-Auszugs, UTC), `woche` (die Woche der Projektion `proj`: die Kalenderwoche, deren Spiele als Nächstes anstehen).
+- **`spieler`:** Liste der Spieler aus `players.json` plus alle, die laut Tagesstand in einem Kader stehen; Namen, Position und ROS kommen aus `players.json` (Schlüssel `id`). Felder je Spieler:
+  - `id, team` (team_id oder 0), `status` (`ONTEAM`, `WAIVERS`, `FREEAGENT`), `inj` (ESPN-Verletzungsstatus, Stand des Abrufs)
+  - Besitz ESPN-weit in %: `own` (Anteil der Ligen), `own_d` (Änderung gegenüber dem Vortag), `started` (Anteil gestartet)
+  - `waiver_bis` (Epoch-ms, Ende der Waiver-Frist; `null` bei Free Agents und Kaderspielern), `proj` (ESPN-Projektion der Woche `woche`, 2 Stellen), `news` (Epoch-ms der letzten ESPN-Meldung, `null` ohne)
+  - Kaderspieler, die `players.json` nicht führt (unter der Woche geholt, ohne Spiel, nicht unter den 20 besten Free Agents), tragen zusätzlich `name, pos, nfl` aus dem Wochenpool (`null`, wenn auch dort unbekannt).
+- Quelle: `data/raw/2026/pool/latest.json` (Tageslauf, stündlich vormittags und abends); Besitz, Verletzung und Status sind der Stand des Abrufs, ESPN führt keine Historie.
+
+## `wetter.json` (lazy, Wetter je Spiel – Anzeige ab Session 8)
+- **Kopf:** `stand` (jüngster Wetterabruf, UTC), `woche` (Woche der Prognose oder `null`), `einheiten` (`temp` °C, `wind` und `boeen` km/h, `regen_wahrsch` %, `niederschlag` mm, `schnee` cm).
+- **`prognose`:** die Spiele der laufenden NFL-Woche (W1–17: die erste Woche mit einem noch nicht beendeten Spiel; nach dem letzten Spiel der W17 leer). **`ist`:** alle gespielten Spiele der Saison (ohne `regen_wahrsch`). Felder je Spiel:
+  - `id` (ESPN-Spiel-ID), `woche`, `kickoff` (UTC, `JJJJ-MM-TTThh:mmZ`; `null`, wenn ESPN den Anstoß noch offen führt), `tbd` (Anstoß offen, Flex-Spiele der späten Wochen), `heim`, `gast` (NFL-Kürzel), `stadion`, `ort`, `dach` (`offen`, `fest`, `beweglich`), `neutral` (Auslandsspiel)
+  - Werte über die Kickoff-Stunde und drei Stunden danach: `temp` (Ø), `wind` (Ø), `boeen` (max), `regen_wahrsch` (max, ganzzahlig), `niederschlag` (Σ), `schnee` (Σ); eine Stelle. Alle `null`, wenn `tbd`.
+  - Dachspiele (`fest`, `beweglich`) tragen dieselben Werte; die App zeigt sie dort nicht als Wetter an.
+- Quelle: Open-Meteo (Modellwerte, kein Stationsmesswert), Spielorte aus `data/raw/2026/nfl/stadien.json` (von Hand, gegen die ESPN-Scoreboard-API geprüft). Rohdaten: `data/raw/2026/wetter/prognose/wNN_<UTC>.json` (nur laufende Woche) und `wetter/ist_2026.json` (dauerhaft).
 
 ## `claude.json` (kompakt, < 50 KB, für Claude-Sessions unterwegs)
 - **Stand:** `legende`, `stand`.

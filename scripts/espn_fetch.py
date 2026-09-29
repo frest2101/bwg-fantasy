@@ -3,7 +3,7 @@
 Nutzt nur die öffentlichen Lese-Endpoints von ESPN und speichert jede Antwort
 byte-genau unter data/raw/<saison>/wNN/<view>.json, das Transaktions-Archiv
 unter data/raw/<saison>/transactions/. Ausnahmen (Auszüge statt Rohantwort):
-kona_league_communication ohne Chat-Themen, wNN/ros.json (Projektionen der Restwochen).
+kona_league_communication ohne Chat-Themen, wNN/ros.json (Projektionen der Restwochen), pool/latest.json (Pool-Auszug).
 
 Ablage je Saison (--due):
     wNN/  mSettings, mTeam, mMatchupScore, mRoster        Kern: bestimmen, ob die Woche final ist
@@ -11,12 +11,18 @@ Ablage je Saison (--due):
     nfl/proTeamSchedules_wl.json                           NFL-Spielplan mit Byes, wird aktualisiert
     draft/mDraftDetail.json                                Draft und Keeper, einmalig
     basis/kona_dst_<vorjahr>.json, proTeamSchedules_wl_<vorjahr>.json   D/ST-Grundlage des Vorjahrs, einmalig
+Tageslauf (--transactions --pool --wetter, Action stündlich vormittags und abends):
+    transactions/                                          Transaktions-Archiv (mTransactions2 je Periode, Aktivitäten)
+    pool/latest.json                                       Pool-Auszug: Status, Besitz, Verletzung, Waiver-Frist, Projektion
+    wetter/prognose/wNN_<UTC>.json, wetter/ist_<saison>.json   Wetter je Spiel (scripts/wetter.py, Open-Meteo)
+    news/<UTC>.json                                        News je Spieler (scripts/news.py, --news, vorbereitet, aus)
 
 Aufrufe:
     python scripts/espn_fetch.py --weeks 1 2 3            # Kern-Views abrufen, Vorhandenes bleibt stehen
     python scripts/espn_fetch.py --weeks 3 --force        # vorhandene Dateien überschreiben
     python scripts/espn_fetch.py --due                    # alles Fällige (Action dienstags), siehe cmd_due
-    python scripts/espn_fetch.py --transactions           # Transaktions-Archiv fortschreiben
+    python scripts/espn_fetch.py --transactions --pool --wetter   # Tageslauf (Action stündlich), siehe cmd_daily
+    python scripts/espn_fetch.py --transactions           # nur das Transaktions-Archiv fortschreiben
     python scripts/espn_fetch.py --summary                # Matchups aller lokalen Wochen ausgeben
     python scripts/espn_fetch.py --summary --weeks 1 2    # nur bestimmte Wochen
 """
@@ -47,6 +53,7 @@ KEYS = dict(VIEWS, mStandings="teams")
 TX_VIEW, COMM_VIEW = "mTransactions2", "kona_league_communication"
 KONA_VIEW = "kona_player_info"
 KONA_FILE, ROS_FILE, STANDINGS_FILE = f"{KONA_VIEW}.json", "ros.json", "mStandings.json"
+POOL_FILE = "latest.json"   # Pool-Auszug des Tageslaufs unter pool/ (je Lauf überschrieben, Historie in Git)
 MIN_POOL = 300              # ein vollständiger Spielerpool hat rund 1050 aktive Spieler
 DST_POSITION, NFL_TEAMS, NFL_GAMES = 16, 32, 17
 STAT_ACTUAL, STAT_PROJECTION, SPLIT_WEEK, STAT_PLAYED = 0, 1, 1, "210"  # statSourceId, statSplitTypeId, „hat gespielt“
@@ -68,6 +75,10 @@ def week_dir(season: int, week: int) -> Path:
 
 def tx_dir(season: int) -> Path:
     return RAW_DIR / str(season) / "transactions"
+
+
+def pool_dir(season: int) -> Path:
+    return RAW_DIR / str(season) / "pool"
 
 
 def season_files(season: int) -> dict[str, Path]:
@@ -546,7 +557,7 @@ def cmd_due(season: int, today: date) -> int:
     return 0
 
 
-# ---------------------------------------------------------------- Transaktions-Archiv (Action täglich)
+# ---------------------------------------------------------------- Transaktions-Archiv (Teil des Tageslaufs)
 
 def current_period(status_data: dict, season: int) -> int:
     """Laufende Scoring-Periode aus einer mStatus-Antwort: latestScoringPeriod, höchstens finalScoringPeriod.
@@ -665,19 +676,139 @@ def archive_transactions(season: int, fetch, stamp: str) -> tuple[int, list[str]
 
 
 def cmd_transactions(season: int, now: datetime) -> int:
+    """Nur das Transaktions-Archiv (bisheriger Aufruf); der Tageslauf nutzt cmd_daily."""
+    return cmd_daily(season, now, transactions=True)
+
+
+# ---------------------------------------------------------------- Pool-Auszug (Tageslauf, Session 6)
+
+POOL_KEYS = ("id", "status", "onTeamId", "injuryStatus", "percentOwned", "percentChange", "percentStarted",
+             "waiverProcessDate", "lastNewsDate", "proj_naechste_woche")
+
+
+def pool_week(season: int, today: date) -> int:
+    """Woche, deren Spiele als Nächstes anstehen: die Kalenderwoche (Di–Mo); vor der Saison W1, nach W17 W17."""
+    return min(max(calendar_week(season, today), 1), MAX_WEEK)
+
+
+def pool_extract(data: dict, season: int, week: int, stamp: str) -> dict:
+    """Pool-Auszug aus einer kona-Antwort: je Spieler Status, Fantasy-Team, Verletzung, Besitz ESPN-weit (Anteil,
+    Änderung, gestartet), Waiver-Frist, letzte ESPN-News und die Wochenprojektion der Woche week.
+
+    Rund 80 KB statt 2,8 MB; Besitz, Verletzung und Status sind der Stand des Abrufs (ESPN führt keine Historie).
+    Kein members-Feld, keine Texte – die Datei bleibt öffentlich unbedenklich.
+    """
+    rows = []
+    for entry in check_pool(data):
+        player = entry["player"]
+        own = player.get("ownership") or {}
+        proj = next((s.get("appliedTotal") for s in player.get("stats", [])
+                     if (s.get("seasonId"), s.get("scoringPeriodId"), s.get("statSourceId"), s.get("statSplitTypeId"))
+                     == (season, week, STAT_PROJECTION, SPLIT_WEEK)), None)
+        rows.append({"id": entry["id"], "status": entry.get("status"), "onTeamId": entry.get("onTeamId", 0),
+                     "injuryStatus": player.get("injuryStatus"), "percentOwned": own.get("percentOwned"),
+                     "percentChange": own.get("percentChange"), "percentStarted": own.get("percentStarted"),
+                     "waiverProcessDate": entry.get("waiverProcessDate"), "lastNewsDate": player.get("lastNewsDate"),
+                     "proj_naechste_woche": proj})
+    rows.sort(key=lambda r: r["id"])
+    return {"season": season, "woche": week, "stand": stamp,
+            "quelle": f"{KONA_VIEW} mit filterStatsForCurrentSeasonScoringPeriodId = [{week}], Auszug je Spieler; "
+                      f"stand = Abrufzeit (UTC) des letzten Laufs, der etwas geändert hat",
+            "players": rows}
+
+
+def pool_dumps(extract: dict) -> bytes:
+    """JSON mit einer Zeile je Spieler – Diffs zwischen zwei Läufen bleiben lesbar."""
+    head = ",\n".join(f"{json.dumps(k)}:{json.dumps(v, ensure_ascii=False)}" for k, v in extract.items() if k != "players")
+    rows = ",\n".join(json.dumps(r, ensure_ascii=False, separators=(",", ":")) for r in extract["players"])
+    return f'{{\n{head},\n"players":[\n{rows}\n]\n}}\n'.encode("utf-8")
+
+
+def same_pool(old: dict | None, new: dict) -> bool:
+    """Gleicher Inhalt bis auf den Stand (der ändert sich mit jedem Abruf)."""
+    return old is not None and {k: v for k, v in old.items() if k != "stand"} == {k: v for k, v in new.items() if k != "stand"}
+
+
+def fetch_pool(session: requests.Session, season: int, week: int) -> dict:
+    """Ganzer Spielerpool mit den Wochenwerten (Ist und Projektion) der Woche week, ungeprüft (pool_extract prüft)."""
+    _, data = get_json(session, league_url(season), {"view": KONA_VIEW}, kona_filter([week]))
+    return data
+
+
+def update_pool(session: requests.Session, season: int, now: datetime, stamp: str) -> tuple[int, dict | None]:
+    """Holt den Pool-Auszug und schreibt pool/latest.json, wenn sich außer dem Stand etwas geändert hat.
+
+    Rückgabe (Fehler, aktueller Auszug oder None bei Fehler); bei unverändertem Inhalt ist es der gespeicherte Auszug
+    mit seinem alten Stand. Den aktuellen Auszug braucht --news.
+    """
+    path = pool_dir(season) / POOL_FILE
+    try:
+        week = pool_week(season, now.date())
+        previous = None
+        if path.exists():
+            try:
+                previous = load_json(path)
+                if not isinstance(previous, dict) or "stand" not in previous or not isinstance(previous.get("players"), list):
+                    raise FetchError("kein Pool-Auszug")
+            except FetchError as exc:
+                warn(f"{rel(path)} unlesbar ({exc}) – wird neu geschrieben")
+                previous = None
+        extract = pool_extract(fetch_pool(session, season, week), season, week, stamp)
+        if same_pool(previous, extract):
+            print(f"  {POOL_FILE:<22} unverändert (W{week}, {len(extract['players'])} Spieler, Stand {previous['stand']})")
+            return 0, previous
+        save_atomic(path, pool_dumps(extract))
+    except (FetchError, KeyError, OSError) as exc:
+        print(f"  {POOL_FILE:<22} FEHLER – {exc}", file=sys.stderr)
+        return 1, None
+    print(f"  {POOL_FILE:<22} W{week}, {len(extract['players']):,} Spieler -> {rel(path)}")
+    return 0, extract
+
+
+# ---------------------------------------------------------------- Tageslauf (Action stündlich)
+
+def cmd_daily(season: int, now: datetime, transactions: bool = False, pool: bool = False, wetter: bool = False,
+              news: bool = False) -> int:
+    """Tageslauf: Transaktions-Archiv, Pool-Auszug, Wetter und – vorbereitet, noch aus – News je Spieler.
+
+    Jeder Teil läuft für sich, geschriebene Rohdaten bleiben auch stehen, wenn ein anderer Teil scheitert. Fehler bei
+    ESPN (Transaktionen, Pool) und fehlende Grundlagen machen den Lauf rot; Ausfälle von Open-Meteo und der News-
+    Abfrage sind Warnungen, denn der nächste Lauf folgt spätestens eine Stunde später.
+    """
     stamp = now.strftime("%Y-%m-%dT%H%MZ")
+    errors, warnings = 0, []
+    try:
+        check_season_open(season, now.date())
+    except FetchError as exc:
+        print(f"FEHLER – {exc}", file=sys.stderr)
+        return 1
     with requests.Session() as session:
-        try:
-            check_season_open(season, now.date())
-            errors, warnings = archive_transactions(season, lambda params: get_json(session, league_url(season), params),
-                                                    stamp)
-        except FetchError as exc:
-            print(f"FEHLER – {exc}", file=sys.stderr)
-            return 1
+        if transactions:
+            print("Transaktionen")
+            try:
+                tx_errors, tx_warnings = archive_transactions(
+                    season, lambda params: get_json(session, league_url(season), params), stamp)
+            except FetchError as exc:
+                tx_errors, tx_warnings = 1, []
+                print(f"  FEHLER – {exc}", file=sys.stderr)
+            errors, warnings = errors + tx_errors, warnings + tx_warnings
+        current = None
+        if pool:
+            print("Pool-Auszug")
+            pool_errors, current = update_pool(session, season, now, stamp)
+            errors += pool_errors
+        if wetter:
+            import wetter as wetter_module  # erst hier: das Modul importiert espn_fetch
+            print("Wetter")
+            w_errors, w_warnings = wetter_module.run(session, season, now, stamp)
+            errors, warnings = errors + w_errors, warnings + w_warnings
+        if news and current is not None:
+            import news as news_module  # erst hier: das Modul importiert espn_fetch
+            print("News")
+            n_errors, n_warnings = news_module.run(session, season, current, stamp)
+            errors, warnings = errors + n_errors, warnings + n_warnings
     for warning in warnings:
-        # in der GitHub Action erscheint die Warnung als Hinweis am Lauf
-        prefix = "::warning::" if os.environ.get("GITHUB_ACTIONS") == "true" else "Warnung: "
-        print(prefix + warning)
+        warn(warning)
     if errors:
         print(f"\n{errors} Fehler – betroffene Dateien wurden nicht geschrieben.", file=sys.stderr)
         return 1
@@ -696,19 +827,28 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--due", action="store_true",
                         help="alles Fällige: Saisondateien, nicht finale Wochen samt Stand-Dateien, fehlende Spielerpools")
     parser.add_argument("--transactions", action="store_true",
-                        help="Transaktions-Archiv fortschreiben (mTransactions2 je Periode, kona_league_communication)")
+                        help="Tageslauf: Transaktions-Archiv fortschreiben (mTransactions2 je Periode, kona_league_communication)")
+    parser.add_argument("--pool", action="store_true",
+                        help="Tageslauf: Pool-Auszug pool/latest.json (Status, Besitz, Verletzung, Waiver-Frist, Projektion)")
+    parser.add_argument("--wetter", action="store_true",
+                        help="Tageslauf: Wetterprognose der laufenden Woche und Ist-Wetter gespielter Spiele (Open-Meteo)")
+    parser.add_argument("--news", action="store_true",
+                        help="Tageslauf: News je Spieler mit geändertem lastNewsDate (nur mit --pool; Stufe 2, noch aus)")
     args = parser.parse_args(argv)
     if args.weeks:
         bad = [w for w in args.weeks if not 1 <= w <= MAX_WEEK]
         if bad:
             parser.error(f"ungültige Woche(n) {bad}, erlaubt 1–{MAX_WEEK}")
         args.weeks = sorted(set(args.weeks))
-    modes = [flag for flag, on in (("--summary", args.summary), ("--due", args.due),
-                                   ("--transactions", args.transactions)) if on]
+    daily = [flag for flag, on in (("--transactions", args.transactions), ("--pool", args.pool),
+                                   ("--wetter", args.wetter), ("--news", args.news)) if on]
+    modes = [flag for flag, on in (("--summary", args.summary), ("--due", args.due)) if on] + daily[:1]
     if len(modes) > 1:
         parser.error(f"{' und '.join(modes)} schließen sich aus")
-    if (args.due or args.transactions) and (args.weeks or args.force):
+    if (args.due or daily) and (args.weeks or args.force):
         parser.error(f"{modes[0]} wählt selbst, was es holt – ohne --weeks und --force aufrufen")
+    if args.news and not args.pool:
+        parser.error("--news braucht --pool (Grundlage ist der aktuelle Pool-Auszug mit lastNewsDate je Spieler)")
     if args.summary and args.force:
         parser.error("--force passt nicht zu --summary (Summary ruft nichts ab)")
     if not modes and not args.weeks:
@@ -725,8 +865,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_summary(args.season, args.weeks)
     if args.due:
         return cmd_due(args.season, datetime.now(timezone.utc).date())
-    if args.transactions:
-        return cmd_transactions(args.season, datetime.now(timezone.utc))
+    if args.transactions or args.pool or args.wetter or args.news:
+        return cmd_daily(args.season, datetime.now(timezone.utc), args.transactions, args.pool, args.wetter, args.news)
     return cmd_fetch(args.season, args.weeks, args.force)
 
 

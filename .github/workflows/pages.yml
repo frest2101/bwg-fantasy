@@ -1,7 +1,8 @@
 # Pages (Baustein 4): veröffentlicht die App auf GitHub Pages – nur app/ (Code und app/data), nie Rohdaten.
-# Auslöser: Pushes auf die App, nach jedem erfolgreichen Wochenabruf bzw. Transaktions-Archiv (deren Bot-Commits
+# Auslöser: Pushes auf die App, nach jedem erfolgreichen Wochenabruf bzw. Tageslauf (deren Bot-Commits
 # mit GITHUB_TOKEN lösen selbst keinen push-Lauf aus) und von Hand. Die App-Daten committen die beiden
 # Daten-Actions; dieser Workflow rechnet nichts. Actions per Commit-SHA gepinnt (Dependabot hält sie aktuell).
+# Der Name unter workflow_run muss dem name: des jeweiligen Workflows entsprechen, sonst baut Pages nicht mehr.
 name: Pages
 
 on:
@@ -12,7 +13,7 @@ on:
       - "scripts/check_public.py"
       - ".github/workflows/pages.yml"
   workflow_run:
-    workflows: ["Wochenabruf", "Transaktions-Archiv"]
+    workflows: ["Wochenabruf", "Tageslauf"]
     types: [completed]
     branches: [main]
   workflow_dispatch:          # von Hand: gh workflow run pages.yml

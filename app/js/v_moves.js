@@ -46,7 +46,7 @@ export async function render(box, ctx, r) {
     U.setQ(draft ? 'moves/draft' : 'moves', {team: team || null});
     draw();
   }}, h('option', {value: 0}, 'Alle Teams'), S.teams.map(t => h('option', {value: t.team_id, selected: t.team_id === team}, t.name))))),
-  S.man.datenstand?.transaktionen_bis ? h('p', {class: 'note'}, `Letzte Transaktion ${U.datum(S.man.datenstand.transaktionen_bis)} ${U.zeit(S.man.datenstand.transaktionen_bis)} · Abruf täglich`) : null,
+  S.man.datenstand?.transaktionen_bis ? h('p', {class: 'note'}, `Letzte Transaktion ${U.datum(S.man.datenstand.transaktionen_bis)} ${U.zeit(S.man.datenstand.transaktionen_bis)} · Abruf stündlich vormittags und abends`) : null,
   wrap);
   draw();
 }
