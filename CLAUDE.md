@@ -16,7 +16,7 @@ Fantasy-Football-Rechenwerk für die BWG Fantasy Liga (ESPN, League-ID 116655585
 - Nie in ESPN schreiben. Nur lesende Endpoints.
 - Notion: nur lesen. Schreiben ausschließlich in den Ausnahmen unter „Gelernt“ und immer erst nach Stephans Freigabe des Textes.
 - Keine destruktiven Git-Kommandos (kein force-push, kein reset --hard) ohne Rückfrage. Commit-Messages Deutsch, ein Satz.
-- Die Actions committen auf `main`: vor lokaler Arbeit `git pull`. Wochen nicht mehr lokal abrufen und committen, das macht der Wochenabruf; sonst gibt es Konflikte in den binären Rohdaten.
+- Die Actions committen Rohdaten und App-Daten auf `main`, bald mehrmals täglich. Deshalb gilt lokal wie in der Cloud gleich: auf einem Branch von aktuellem `main` arbeiten (`git pull` vor dem Abzweigen), vor dem Pull Request `main` nachziehen und `compute.py` neu laufen lassen. Rohdaten nie von Hand abrufen und committen, das machen die Actions; sonst gibt es Konflikte.
 - Vor dem Installieren von Paketen fragen. Ziel: Python 3.11+, Standardbibliothek plus `requests`; keine Frameworks, solange es ohne geht.
 - Zahlen: ESPN liefert Drittel-Nachkommastellen; ungerundet rechnen (Decimal), erst bei der Ausgabe runden (round half up): Punkte zwei Stellen; z-Normwerte, F, r und E drei; Anteile der Simulation vier. Ausgabe mit Komma nur in der App-Anzeige.
 - Vor jedem Commit `python scripts/compute.py` und `pytest`: Der Test `test_committete_app_daten_sind_aktuell` schlägt an, wenn `app/data` nicht zum Code passt; `scripts/check_public.py` hält Manager-Namen, ESPN-Texte und Chat aus der App.
