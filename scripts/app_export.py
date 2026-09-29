@@ -67,7 +67,9 @@ TEAM_FIELDS = ("team_id", "name", "division", "games", "w", "l", "t", "pf", "pa"
                "rang_division", "rang_score", "norm", "score")
 PR_FIELDS = ("mu", "se", "p", "p_quelle", "e", "rang", "rang_vorwoche", "trend", "kernsatz")
 SIM_FIELDS = ("playoff", "division", "bye", "restsiege", "seeds")
-WEEK_FIELDS = ("pf", "pa", "optimal", "verschenkt", "wochenrang", "allplay_w", "median_win")
+# je Woche (Arrays in teams.json › wochen); Luck-Beitrag, laufende Summe und Effizienz kommen aus compute_team_weeks
+WEEK_FIELDS = ("pf", "pa", "optimal", "verschenkt", "efficiency", "wochenrang", "allplay_w", "allplay_l", "allplay_t",
+               "allplay_pct", "luck", "luck_kum", "median_win", "projektions_delta")
 
 
 def build_teams(result: dict) -> dict:
@@ -105,6 +107,7 @@ def build_teams(result: dict) -> dict:
     metrics = [{"key": m, "label": METRIC_LABELS[m][kader_quelle] if m == "kader" else METRIC_LABELS[m]}
                for m in compute.METRICS]
     meta = {"weeks": weeks, "sigma": result["sigma"], "ligafaktor": result.get("ligafaktor"),
+            "effizienz_liga": compute.league_efficiency(result["team_weeks"]),
             "kader_quelle": kader_quelle, "metrics": metrics, "profiles": compute.PROFILES,
             "profil_standard": compute.ACTIVE_PROFILE, "norm_standard": compute.ACTIVE_NORM,
             "divisions": result.get("divisions", {}), "kuerzel": KUERZEL}
@@ -128,7 +131,8 @@ def build_schedule(result: dict) -> dict:
             rows = [r for r in result["team_weeks"] if r["week"] == week]
             high, low = max(rows, key=lambda r: r["pf"]), min(rows, key=lambda r: r["pf"])
             worst = max(rows, key=lambda r: r["verschenkt"])
-            entry.update(ligaschnitt=w["ligaschnitt"], median=w["median"], top_team_id=w["top_team_id"],
+            entry.update(ligaschnitt=w["ligaschnitt"], median=w["median"], effizienz_liga=w["effizienz_liga"],
+                         top_team_id=w["top_team_id"],
                          high={"team_id": high["team_id"], "pf": high["pf"]},
                          low={"team_id": low["team_id"], "pf": low["pf"]},
                          bank_suende={"team_id": worst["team_id"], "verschenkt": worst["verschenkt"]},

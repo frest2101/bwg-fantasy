@@ -14,8 +14,7 @@ export async function render(box, ctx, r) {
     [`W${w.week}`, h('small', null, (w.playoff ? 'PO · ' : '') + U.spanne(w.start))], w.week, w.playoff ? 'po' : null]), wk, 'wk');
   U.ap(box, h('h1', null, `Spielplan – W${wk}`),
     h('p', {class: 'note'}, `${W.playoff ? 'Playoffs · ' : ''}${STATUS[W.status] || W.status} · ${U.datum(W.start)} bis ${U.datum(end)}`), nav);
-  const cur = nav.querySelector('[aria-current]');
-  if (cur) nav.scrollLeft += cur.getBoundingClientRect().left - nav.getBoundingClientRect().left - (nav.clientWidth - cur.offsetWidth) / 2;
+  U.centerChip(nav);
 
   const games = S.sched.games.filter(g => g.week === wk);
   const svg = await ctx.mod('svg');
@@ -39,23 +38,25 @@ function tiles(W) {
 }
 
 function weekTable(i, wk) {
-  const w = t => t.wochen;
-  // Proj.-Δ nur, wenn beide Werte da sind (null würde sonst als 0 gerechnet)
-  const pd = t => U.ok(w(t).pf[i]) && U.ok(w(t).projektion[i]) ? w(t).pf[i] - w(t).projektion[i] : null;
-  return h('div', null, U.table({cap: `Wochentabelle W${wk}`, cls: 'rk kurz', rows: S.teams, sort: ['wr', 1], cols: [
+  const w = t => t.wochen, anyT = S.teams.some(t => w(t).allplay_t[i] > 0);
+  const val = (k, f) => ({v: t => w(t)[k][i], f: t => U.val(w(t)[k][i], f, 'kein Spiel')});
+  return h('div', null, U.table({cap: h('span', null, `Wochentabelle W${wk}`, h('span', {class: 'sub'}, h('a', {href: '#tabelle/allplay/w' + wk}, 'All-Play und Luck dieser Woche'), ' · ',
+    h('a', {href: '#tabelle/coaching/w' + wk}, 'Coaching'))), cls: 'rk', rows: S.teams, sort: ['wr', 1], cols: [
     {k: 'wr', l: '#', v: t => w(t).wochenrang[i], d: 1, f: t => w(t).wochenrang[i]},
     {k: 'team', l: 'Team', v: t => t.name.toLowerCase(), d: 1, f: t => U.tl(t.team_id)},
-    {k: 'opp', l: 'Gegner', v: t => U.kz(w(t).gegner[i]), d: 1, f: t => h('a', {href: '#team/' + w(t).gegner[i], class: 'tl2'}, U.kz(w(t).gegner[i]))},
-    {k: 'pf', l: 'PF', num: 1, v: t => w(t).pf[i], f: t => U.num(w(t).pf[i])},
-    {k: 'pa', l: 'PA', num: 1, v: t => w(t).pa[i], f: t => U.num(w(t).pa[i])},
+    {k: 'opp', l: 'Gegner', v: t => U.kz(w(t).gegner[i]), d: 1, f: t => h('a', {href: '#team/' + w(t).gegner[i], class: 'tl2', 'aria-label': U.team(w(t).gegner[i])?.name}, U.kz(w(t).gegner[i]))},
+    {k: 'pf', l: 'PF', num: 1, ...val('pf', U.num)},
+    {k: 'pa', l: 'PA', num: 1, ...val('pa', U.num)},
     {k: 'e', l: 'Erg.', v: t => w(t).ergebnis[i], f: t => U.res(w(t).ergebnis[i])},
-    {k: 'ap', l: 'AP-W', num: 1, v: t => w(t).allplay_w[i], f: t => U.nn(w(t).allplay_w[i])},
+    {k: 'ef', l: 'Eff. %', num: 1, ...val('efficiency', U.pct)},
+    {k: 'ap', l: anyT ? 'AP W-L-T' : 'AP W-L', num: 1, v: t => w(t).allplay_pct[i], f: t => U.apwl(w(t).allplay_w[i], w(t).allplay_l[i], w(t).allplay_t[i], anyT)},
     {k: 'md', l: 'Median', v: t => +!!w(t).median_win[i], f: t => w(t).median_win[i] ? h('span', {class: 'W'}, '✓', h('span', {class: 'vh'}, 'ja')) : h('span', {class: 'na'}, '–', h('span', {class: 'vh'}, 'nein'))},
-    {k: 'vs', l: 'Verschenkt', num: 1, v: t => w(t).verschenkt[i], f: t => U.num(w(t).verschenkt[i])},
-    {k: 'bk', l: 'Bank', num: 1, v: t => w(t).bank[i], f: t => U.num(w(t).bank[i])},
-    {k: 'pr', l: 'Proj.', num: 1, v: t => w(t).projektion[i], f: t => U.num(w(t).projektion[i])},
-    {k: 'pd', l: 'Proj.-Δ', num: 1, v: t => pd(t), f: t => U.val(pd(t), U.sgn, 'keine Projektion')}]}),
-  U.legend(['wochenrang', 'ap-wl', 'median', 'verschenkt', 'bank', 'proj-delta']));
+    {k: 'lk', l: 'Luck', num: 1, ...val('luck', U.sgn)},
+    {k: 'vs', l: 'Verschenkt', num: 1, ...val('verschenkt', U.num)},
+    {k: 'bk', l: 'Bank', num: 1, ...val('bank', U.num)},
+    {k: 'pd', l: 'Proj.-Δ', num: 1, ...val('projektions_delta', U.sgn)}],
+  note: 'Luck = Beitrag der Woche (Ergebnis − All-Play-Anteil).'}),
+  U.legend(['wochenrang', 'eff-woche', 'ap-wl', 'median', 'luck-beitrag', 'verschenkt', 'bank', 'proj-delta']));
 }
 
 function topScorer(W) {

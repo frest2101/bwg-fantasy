@@ -9,7 +9,7 @@ export async function render(box, ctx, r) {
   U = ctx.ui; S = U.S; h = U.h;
   const score = r.sub === 'score';
   U.ap(box, h('h1', null, score ? 'Ranking – Score' : 'Ranking – Power Ranking'),
-    U.chips('Ansichten des Rankings', [['#ranking', 'Power Ranking', ''], ['#ranking/score', 'Score („Echter Tabellenführer“)', 'score']], score ? 'score' : ''),
+    U.chips('Ansichten des Rankings', [['#ranking', 'Power Ranking', ''], ['#ranking/score', 'Score', 'score']], score ? 'score' : ''),
     S.tw <= 4 ? h('p', {class: 'warn'}, `Nach ${S.tw} Wochen sind die Unterschiede noch stark zufallsgeprägt.`) : null);
   const svg = await ctx.mod('svg');
   (score ? scoreView : power)(box, r, svg);
@@ -89,7 +89,7 @@ function scoreView(box, r) {
       f: t => raw ? U.val(t[rawVal[m.key]], v => rawTxt(m.key, v), 'ab Wochenabruf W' + (S.tw + 1)) : normTxt(t.norm[st.norm][m.key])})),
     {k: 'rg', l: 'Tabelle', num: 1, v: t => t.rang, d: 1, f: t => t.rang + '.'}];
   calc();
-  const tbl = U.table({cap: 'Score je Team', cls: 'rk kurz sc', rows: S.teams, sort: ['score', -1], cols});
+  const tbl = U.table({cap: 'Score je Team', cls: 'rk sc', rows: S.teams, sort: ['score', -1], cols});
 
   // Bedienung: Profile, Normierung, Regler
   const profSeg = U.seg('Profil', [...PN.map(p => [slug(p), p + (p === std ? ' (Standard)' : '')]), ['eigene', 'Eigene']], slug(match(st.w)), v => {
@@ -108,13 +108,14 @@ function scoreView(box, r) {
     return h('div', {class: 'sl'}, h('div', {class: 'row', style: 'margin:0'}, h('label', {for: i}, m.label), U.ib(gid(m.key), '')), outs[m.key], ins[m.key]);
   });
   const block = h('p', {class: 'note', 'aria-live': 'polite'});
+  const top3 = h('p', {class: 'note'});  // Spitze live im Regler-Feld: auf dem Handy liegt die Tabelle darunter außer Sicht
   const panel = h('details', {class: 'gw', open: matchMedia('(min-width:900px)').matches},
     h('summary', null, 'Gewichte anpassen'), sliders,
     h('div', {class: 'row'}, h('button', {type: 'button', class: 'btn', onclick: () => {
       const p = match(st.w);
       st.w = {...P[p === 'eigene' ? std : p]};
       sync(true);
-    }}, 'Zurücksetzen'), U.ib('redundanz', 'Redundanz')), block);
+    }}, 'Zurücksetzen'), U.ib('redundanz', 'Redundanz')), block, top3);
   const rawSeg = U.seg('Werte in der Tabelle', [['norm', 'Normwerte'], ['raw', 'Rohwerte']], 'norm', v => { raw = v === 'raw'; tbl.upd(S.teams); });
   function sync(setSliders) {
     const sw = sum();
@@ -133,6 +134,8 @@ function scoreView(box, r) {
   function update() {
     calc();
     tbl.upd(S.teams);
+    const lead = S.teams.filter(t => rk.has(t.team_id)).sort((a, b) => rk.get(a.team_id) - rk.get(b.team_id)).slice(0, 3);
+    top3.textContent = lead.length ? 'Spitze: ' + lead.map(t => `${t.kuerzel} ${U.num(sc.get(t.team_id), 1)}`).join(' · ') : '';
     const p = match(st.w);
     U.setQ('ranking/score', {profil: slug(p), w: p === 'eigene' ? M.map(m => st.w[m.key]).join(',') : null, norm: st.norm !== 'z' ? st.norm : null});
     U.store.set('bwg-score', st);
