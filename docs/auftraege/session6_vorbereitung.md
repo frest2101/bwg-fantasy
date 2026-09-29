@@ -31,16 +31,18 @@ für den Auftrag `session6.md`.
 |---|---|
 | Frequenz | Die Läufe werden dichter, keine neue Architektur. Wochenabruf (Di 08:30, Nachläufe Di 16:30, Mi 08:30 UTC) bleibt unverändert, er sichert den finalen Wochenstand. |
 | Tageslauf | Der Transaktions-Lauf wird zum **Tageslauf** und wandert von 05:17 auf **10:45 UTC** (12:45 MESZ / 11:45 MEZ): nach der Waiver-Verarbeitung, auch im Winter nach 11:00 Uhr. Er holt zusätzlich einen **Pool-Auszug** und das **Wetter**. |
-| Wetter Do | Donnerstag wegen TNF, **mit Prognose für Sonntag und Montag** im selben Lauf (Open-Meteo liefert 7 Tage; ein Abruf je Spielort deckt die ganze Woche). Der Tageslauf um 10:45 UTC erfüllt das (≈ 13,5 h vor TNF-Kickoff). |
-| Wetter Mo | Montag nochmal (MNF) – ebenfalls der Tageslauf. |
-| Wetter So | Der Tageslauf um 10:45 UTC = 12:45 MESZ liegt gut vor dem 1-Uhr-Kickoff (17:00 UTC). **Offen (Vorschlag):** zweiter Sonntagslauf 15:40 UTC (17:40 MESZ), nach den Inactives (90 min vor Kickoff) – bringt frische `injuryStatus` für die Aufstellung, ist aber knapp. |
+| Wetter Do | Donnerstag wegen TNF, **mit Prognose für Sonntag und Montag** im selben Lauf (Open-Meteo liefert 7 Tage; ein Abruf je Spielort deckt die ganze Woche). Der Tageslauf um 10:45 UTC erfüllt das (≈ 13,5 h vor TNF-Kickoff), der zweite Lauf um 15:40 UTC frischt auf. |
+| Wetter Mo | Montag nochmal (MNF) – ebenfalls die beiden Tagesläufe. |
+| Wetter-Umfang | Nur W1–17, **kein W18** (Beschluss Stephan 29.09.). |
+| Wetter-Ablage | **Prognosen nur für die laufende Woche** behalten (je Lauf eine Datei), beim Wochenwechsel wird der Ordner geleert (Git-Historie bleibt). **Das tatsächliche Wetter je Spiel wird dauerhaft archiviert** – Grundlage für die spätere Frage, welche Positionen wie stark vom Wetter abhängen, und als Hilfe für Aufstellungsentscheidungen (Beschluss Stephan 29.09.). |
+| Zweiter Tageslauf | **Täglich 15:40 UTC** (17:40 MESZ / 16:40 MEZ), Beschluss Stephan 29.09.: frische `injuryStatus`, Pool und Wetter am Nachmittag; sonntags liegt er nach den Inactives (90 min vor dem 1-Uhr-Kickoff) und vor dem Anstoß. Ab der US-Zeitumstellung (01.11.2026) rückt der 1-Uhr-Kickoff auf 18:00 UTC, die Inactives auf 16:30 UTC – deshalb zusätzlich **sonntags 16:40 UTC in den Monaten 11, 12 und 1** (`40 16 * 11,12,1 0`). Jeder Lauf committet nur bei Änderung. |
 | Waiver-Tab | Bauen (Session 7): beste verfügbare Spieler je Position nach ROS über Ersatz, Bye, Verletzung, Projektion nächste Woche, Positions-Matchup; Besitz-Trend; Bedarf je Team (Starter unter Ersatzniveau); Waiver-Reihenfolge; Claims der Vorwoche. |
 | Positions-Matchup | Bauen (Session 7/8): Faktor je Defense und Position analog D/ST-Faktor (Vorjahr als Prior), Rang nächste Woche und Rest je Spieler. Ehrlich beschriftet als „Position gegen Defense“, nicht als Einzelduell. |
 | CB vs WR | Nicht bauen, solange niemand die wöchentliche Pflege einer redaktionellen CSV zusagt. |
 | ESPN-Texte | Bleiben aus der App (Öffentlichkeits-Check unverändert). |
 
 ## 3 Plan Session 6 (Infrastruktur, eine Session)
-1. **Workflow `transaktionen.yml` → Tageslauf:** cron `45 10 * * *`, Name „Tageslauf“; Aufruf
+1. **Workflow `transaktionen.yml` → Tageslauf:** cron `45 10 * * *`, `40 15 * * *` und `40 16 * 11,12,1 0`, Name „Tageslauf“; Aufruf
    `espn_fetch.py --transactions --pool --wetter`. Commit-Regel bleibt: Rohdaten immer, abgeleitete Dateien nur bei
    grünem Rechenwerk und grünen Tests. `concurrency: daten-commit` bleibt.
 2. **Pool-Auszug** `data/raw/2026/pool/latest.json` (überschrieben je Lauf, Historie liegt in Git): je Spieler `id,
@@ -50,12 +52,18 @@ für den Auftrag `session6.md`.
 3. **Stadion-Tabelle** `data/raw/2026/nfl/stadien.json` (einmalig von Hand, aus öffentlichem Wissen): je proTeamId
    Stadion, Breite/Länge, Dach (`offen` / `fest` / `beweglich`), Zeitzone. Dazu eine Liste der Auswärts-Sonderspiele
    2026 (London, Deutschland, Mexiko, Madrid …) mit Woche, Teams und Ort – wenige Einträge, von Hand.
-4. **Wetter-Abruf** aus Open-Meteo (frei, ohne Schlüssel): je Spiel der laufenden Woche (aus
+4. **Wetter-Abruf** aus Open-Meteo (frei, ohne Schlüssel): je Spiel der laufenden Woche W1–17 (aus
    `proTeamSchedules_wl.json`: Heimteam, Anstoß) Stundenwert zum Kickoff und für die drei Stunden danach:
    Temperatur, Wind (Mittel und Böen), Niederschlagswahrscheinlichkeit, Niederschlag, Schnee. Dachspiele bekommen
-   `dach: true` und keine Wetterwerte in der Anzeige. Ablage `data/raw/2026/wetter/wNN_<UTC>.json` (klein, je Lauf
-   eine Datei, damit die Prognose-Änderungen nachvollziehbar bleiben). **Probe zuerst:** ein `workflow_dispatch`-Lauf,
-   der Open-Meteo und als Alternative die ESPN-Site-API (Scoreboard mit `weather`) abfragt; danach Quelle festlegen.
+   `dach: true` und keine Wetterwerte in der Anzeige. Ablage der **Prognosen** unter `data/raw/2026/wetter/prognose/
+   wNN_<UTC>.json` (je Lauf eine kleine Datei); beim ersten Lauf einer neuen Woche löscht das Script die Dateien der
+   Vorwoche (Git-Historie bleibt). **Ist-Wetter:** Für jedes Spiel, dessen Anstoß mindestens vier Stunden zurückliegt,
+   holt derselbe Lauf die tatsächlichen Stundenwerte (Open-Meteo `past_days`, Analysewerte, kein Stationsmesswert) und
+   schreibt sie einmalig nach `data/raw/2026/wetter/ist_2026.json` (je Spiel: Woche, Teams, Ort, Dach, Kickoff,
+   Temperatur, Wind, Böen, Niederschlag, Schnee); vorhandene Einträge werden nie überschrieben. Diese Datei bleibt
+   dauerhaft und wächst auf rund 270 Einträge je Saison. **Probe zuerst:** ein `workflow_dispatch`-Lauf, der Open-Meteo
+   (Prognose und `past_days`) und als Alternative die ESPN-Site-API (Scoreboard mit `weather`) abfragt; danach Quelle
+   festlegen.
 5. **compute/app_export:** `manifest.datenstand` bekommt `pool_stand` und `wetter_stand`; neue Dateien `waiver.json`
    und `wetter.json` nach `docs/app_daten.md` (Positivliste erweitern). Anzeige kommt in Session 7.
 6. **Tests:** Pool-Auszug (Felder, Anzahl, D/ST 32/32), Wetter (jedes Spiel der Woche hat einen Eintrag, Dach ohne
@@ -63,7 +71,14 @@ für den Auftrag `session6.md`.
 7. **CLAUDE.md:** Abschnitt Automatisierung (Tageslauf statt Transaktions-Archiv), Repo-Struktur (`pool/`, `wetter/`,
    `stadien.json`), Gelernt-Zeile zu Waiver-Sichtbarkeit 10:30–11:00 Uhr.
 
-## 4 Offene Fragen an Stephan
-- Zweiter Sonntagslauf 15:40 UTC (Inactives) – ja oder nein?
-- Wetter auch für die Playoff-Wochen und für W18? (Vorschlag: nur W1–17, wie alles andere.)
-- Sollen die Wetter-Rohdaten je Lauf bleiben (Nachvollziehbarkeit) oder nur der letzte Stand (weniger Commits)?
+## 4 Antworten Stephan (29.09.2026)
+- **Zweiter Lauf:** ja, und zwar **jeden Tag** um 15:40 UTC, nicht nur sonntags (Sommer-/Winterzeit siehe Tabelle).
+- **W18:** kein Wetter für W18.
+- **Wetter-Rohdaten:** Prognosen nur für die laufende Woche behalten, danach überschrieben. Das tatsächliche Wetter
+  jedes Spiels wird dokumentiert und dauerhaft behalten – gibt später Aufschluss, welche Positionen vom Wetter
+  beeinflusst werden, und hilft bei Aufstellungsentscheidungen.
+
+## 5 Später (nicht Session 6)
+- **Wetter-Auswertung:** sobald genug Ist-Spiele vorliegen (frühestens nach einer Saison), Punkte je Position gegen
+  Wind, Niederschlag und Temperatur auswerten (z. B. Ø Punkte Passing-Positionen bei Wind ≥ 25 km/h gegen ohne Wind).
+  Bis dahin zeigt die App nur die Prognose mit Schwellen aus der Literatur (Wind ab etwa 25 km/h relevant für QB, WR, K).
