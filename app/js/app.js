@@ -79,6 +79,15 @@ function banner() {
 }
 
 // ---------------------------------------------------------------- Kopf: Datenstand-Chip, Hell/Dunkel
+// nächster Tageslauf (tageslauf.yml): stündlich 06:45–11:45 und 15:40–21:40 UTC
+export function nextDaily(now = new Date()) {
+  const slots = [...Array(6)].map((_, i) => [6 + i, 45]).concat([...Array(7)].map((_, i) => [15 + i, 40]));
+  for (let day = 0; day < 2; day++) for (const [hh, mm] of slots) {
+    const t = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + day, hh, mm));
+    if (t > now) return t;
+  }
+  return null;
+}
 function header() {
   const ds = S.man.datenstand || {};
   const btn = $('stand');
@@ -92,15 +101,19 @@ function header() {
   btn.setAttribute('aria-label', `Datenstand: nach Woche ${S.tw}${alt ? ', Daten älter als erwartet' : ''}`);
   btn.hidden = false;
   const pool = ds.pool_woche != null ? wk(ds.pool_woche + 1)?.start : null;
+  // Tagesstand (Tageslauf): Besitz, Verletzung, Projektion der nächsten Woche und Wetter; davor nur der Wochenstand
+  const tag = ds.pool_stand ? `Tagesstand ${U.stamp(ds.pool_stand)}` : ds.pool_woche != null ? `nach W${ds.pool_woche}` + (pool ? ` (${U.datum(pool)})` : '') : '–';
   btn.onclick = () => U.showPop(btn, 'Datenstand', [
     alt ? h('p', {class: 'warn'}, 'Daten älter als erwartet – der Wochenabruf ist noch nicht durchgelaufen.') : null,
     h('dl', null,
       h('dt', null, 'Wertung'), h('dd', null, `nach W${ds.woche_final ?? S.tw} (final)`),
-      h('dt', null, 'Projektionen'), h('dd', null, ds.ros_nach_woche != null ? `Stand nach W${ds.ros_nach_woche}` : `ab Wochenabruf W${S.tw + 1}`),
-      h('dt', null, 'Besitz, Verletzung'), h('dd', null, ds.pool_woche != null ? `nach W${ds.pool_woche}` + (pool ? ` (${U.datum(pool)})` : '') : '–'),
-      h('dt', null, 'Transaktionen'), h('dd', null, ds.transaktionen_bis ? `bis ${U.datum(ds.transaktionen_bis)} ${U.zeit(ds.transaktionen_bis)}` : '–'),
-      h('dt', null, 'Nächster Abruf'), h('dd', null, due ? `${U.datum(due)} ${U.zeit(due)} Uhr` : '–')),
-    h('p', {class: 'note'}, 'Alle Zahlen rechnen nur mit abgeschlossenen Wochen. ', h('a', {href: '#lesart/aktualisierung'}, 'Mehr zur Aktualisierung')),
+      h('dt', null, 'Projektionen ROS'), h('dd', null, ds.ros_nach_woche != null ? `Stand nach W${ds.ros_nach_woche}` : `ab Wochenabruf W${S.tw + 1}`),
+      h('dt', null, ds.pool_stand ? 'Besitz, Verletzung, Projektion nächste Woche' : 'Besitz, Verletzung'), h('dd', null, tag),
+      h('dt', null, 'Wetter'), h('dd', null, ds.wetter_stand ? `Tagesstand ${U.stamp(ds.wetter_stand)}` : '–'),
+      h('dt', null, 'Transaktionen'), h('dd', null, ds.transaktionen_bis ? `bis ${U.stamp(ds.transaktionen_bis)}` : '–'),
+      h('dt', null, 'Nächster Tageslauf'), h('dd', null, U.stamp(nextDaily())),
+      h('dt', null, 'Nächster Wochenabruf'), h('dd', null, U.stamp(due))),
+    h('p', {class: 'note'}, 'Wertung und Projektionen rechnen nur mit abgeschlossenen Wochen; der Tageslauf frischt Besitz, Verletzung, Transaktionen und Wetter stündlich vormittags und abends auf. ', h('a', {href: '#lesart/aktualisierung'}, 'Mehr zur Aktualisierung')),
   ]);
   const tb = $('theme');
   const dark = () => document.documentElement.dataset.theme === 'dark' ||
@@ -117,7 +130,7 @@ function header() {
 
 // ---------------------------------------------------------------- Router
 const VIEWS = {tabelle: 'v_tabelle', ranking: 'v_ranking', spielplan: 'v_spielplan', team: 'v_team', spieler: 'v_spieler',
-  dst: 'v_dst', moves: 'v_moves', rekorde: 'v_rekorde', lesart: 'v_lesart'};
+  dst: 'v_dst', moves: 'v_moves', waiver: 'v_waiver', rekorde: 'v_rekorde', lesart: 'v_lesart'};
 const NAV = {team: 'tabelle', dst: 'spieler', moves: 'spieler'};
 let seq = 0, cur = null;
 function parse() {

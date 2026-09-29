@@ -11,6 +11,7 @@ from datetime import timedelta
 from pathlib import Path
 
 import espn_fetch as ef
+import players as players_module
 from lineup import POSITION_NAMES, SLOT_NAMES
 from zahlen import dec, round_to, rounded
 
@@ -179,7 +180,8 @@ def build_players(result: dict) -> dict | None:
     for pid in sorted(keep):
         p = pool[pid]
         rows.append({"id": pid, "name": p["name"], "pos": POSITION_NAMES.get(p["pos"], str(p["pos"])),
-                     "nfl": p["nfl"], "team": p["team_id"] or 0, "status": p["status"], "inj": p["injury"],
+                     "nfl": p["nfl"], "bye": p["bye_week"] or None, "team": p["team_id"] or 0, "status": p["status"],
+                     "inj": p["injury"],
                      "own": p["owned"], "g": p["games"], "pts": p["pts"], "avg": p["avg"], "floor": p["floor"],
                      "ceil": p["ceiling"], "sd": p["sd"], "form": p["form"], "form_d": p["form_delta"],
                      "trend": p["trend"], "spark": p["sparkline"], "starts": p["starts"],
@@ -213,12 +215,45 @@ def build_transactions(result: dict) -> dict | None:
     return {k: data[k] for k in ("spieler", "items", "aufstellungswechsel", "draft")} if data else None
 
 
+def waiver_order(pool: dict, result: dict) -> tuple[list[int] | None, str | None, str | None]:
+    """Waiver-Reihenfolge als Liste der team_ids (1 = zuerst), ihre Quelle und ihr Stand: "tageslauf" aus dem
+    Pool-Auszug (mTeam.waiverRank; Stand = Abrufzeit der letzten Änderung, auch wenn ein späterer Lauf sie nur
+    nachgezogen hat), sonst "wochenabruf" aus dem Wochenstand (teams.waiver_prio, Stand None); (None, None, None) ohne beides."""
+    daily = pool.get("waiver_reihenfolge")
+    if daily:
+        order = [int(tid) for tid, _ in sorted(daily.items(), key=lambda kv: (kv[1], int(kv[0])))]
+        return order, "tageslauf", pool.get("waiver_reihenfolge_stand") or pool["stand"]
+    weekly = sorted((t["waiver_prio"], t["team_id"]) for t in result["teams"] if t.get("waiver_prio") is not None)
+    return ([tid for _, tid in weekly], "wochenabruf", None) if weekly else (None, None, None)
+
+
+def team_needs(pool: dict, result: dict) -> dict | None:
+    """Bedarf je Team (players.team_needs) aus dem Kader laut Tagesstand und ROS/Spiel laut Wochenstand; None ohne
+    Regular-Season-ROS (vor dem ersten ROS-Auszug und nach W14). Positionen als Kürzel, Schlüssel team_id."""
+    data = result["players"]
+    after = data.get("ros_after_week")
+    if after is None or after >= players_module.LAST_REGULAR_WEEK:
+        return None
+    weekly = data["players"]
+    rosters: dict[int, list] = {}
+    for p in pool["players"]:
+        w = weekly.get(p["id"])
+        if p.get("onTeamId") and w:  # ohne Wochenpool-Eintrag ist die Position unbekannt: nicht aufstellbar
+            rosters.setdefault(p["onTeamId"], []).append((p["id"], w["pos"]))
+    per_game = {pid: w["ros_pro_spiel"] for pid, w in weekly.items()}
+    name = lambda pos: POSITION_NAMES.get(pos, str(pos)) if pos is not None else None  # noqa: E731
+    return {tid: {"luecken": [g | {"pos": name(g["pos"])} for g in n["luecken"]],
+                  "ueber_ersatz": {name(pos): v for pos, v in n["ueber_ersatz"].items()}}
+            for tid, n in players_module.team_needs(rosters, per_game, data["ersatz"]).items()}
+
+
 def build_waiver(result: dict) -> dict | None:
     """Tagesstand je Spieler aus dem Pool-Auszug des Tageslaufs (Session 6): Status, Fantasy-Team, Verletzung,
-    Besitz ESPN-weit mit Trend, Waiver-Frist, Projektion der nächsten Woche, letzte ESPN-News.
+    Besitz ESPN-weit mit Trend, Waiver-Frist, Projektion der nächsten Woche, letzte ESPN-News. Dazu (Session 7) die
+    Waiver-Reihenfolge der Teams und der Bedarf je Team.
 
     Spieler: die Auswahl von players.json (Kader, mit Spiel, 20 beste Free Agents je Position) plus alle, die laut
-    Tagesstand in einem Kader stehen. Grundlage des Waiver-Tabs (Session 7); None ohne Pool-Auszug oder Spielerdaten.
+    Tagesstand in einem Kader stehen. Grundlage des Waiver-Tabs; None ohne Pool-Auszug oder Spielerdaten.
     """
     pool = result.get("pool_latest")
     selection = player_selection(result)
@@ -242,7 +277,9 @@ def build_waiver(result: dict) -> dict | None:
             row.update(name=w["name"] if w else None, pos=POSITION_NAMES.get(w["pos"], str(w["pos"])) if w else None,
                        nfl=w["nfl"] if w else None)
         rows.append(row)
-    return {"stand": pool["stand"], "woche": pool["woche"], "spieler": rows}
+    reihenfolge, quelle, stand = waiver_order(pool, result)
+    return {"stand": pool["stand"], "woche": pool["woche"], "reihenfolge": reihenfolge, "reihenfolge_quelle": quelle,
+            "reihenfolge_stand": stand, "bedarf": team_needs(pool, result), "spieler": rows}
 
 
 CLAUDE_PLAYER_COLS = ("name", "pos", "nfl", "inj", "avg", "form", "trend", "ros_g", "ros_rang")

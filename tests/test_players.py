@@ -369,3 +369,30 @@ def test_w03_kader_projektion_echt(ssn3):
         assert list(values) == list(range(4, 15))
         assert all(v > 0 for v in values.values())
         assert abs(sum(result["dev"][tid].values())) < D("1e-18")
+
+
+# ---------------------------------------------------------------- Bedarf je Team (Waiver-Tab, Session 7)
+
+def test_team_needs_von_hand():
+    """Team 1: QB 20/15, RB 9/4, WR 12/7/ohne, TE ohne, ein D/ST 8, K 6; Ersatz QB 18 · RB 8 · WR 7 · TE 5 · K 7.
+    Aufstellung: QB 20, RB 9 und 4, WR 12, 7 und 0, TE 0, D/ST 8 und leer, K 6, FLEX leer, OP = QB2 15 (Reste leer).
+    Lücken: RB 4 < 8, WR ohne Projektion, TE ohne, zweiter D/ST leer, K 6 < 7, zwei FLEX leer, OP 15 < 18;
+    WR 7 = Ersatz ist keine Lücke. Team 2 hat einen tiefen Kader ohne Lücke."""
+    from lineup import K
+    rosters = {1: [(10, QB), (20, QB), (15, RB), (16, RB), (30, WR), (41, WR), (42, WR), (50, TE), (-1, DST), (60, K)],
+               2: [(70, QB), (71, QB), (72, RB), (73, RB), (74, RB), (75, WR), (76, WR), (77, WR), (78, WR),
+                   (79, TE), (80, TE), (-2, DST), (-3, DST), (81, K)]}
+    per_game = {10: D(20), 20: D(15), 15: D(9), 16: D(4), 30: D(12), 41: D(7), 42: None, 50: None, -1: D(8), 60: D(6),
+                70: D(25), 71: D(22), 72: D(10), 73: D(10), 74: D(9), 75: D(9), 76: D(9), 77: D(8), 78: D(8),
+                79: D(6), 80: D(6), -2: D(7), -3: D(5), 81: D(9)}
+    levels = {QB: D(18), RB: D(8), WR: D(7), TE: D(5), K: D(7), DST: None}
+    needs = players.team_needs(rosters, per_game, levels)
+    assert list(needs) == [1, 2]
+    assert needs[1]["luecken"] == [
+        {"slot": "RB", "id": 16, "pos": RB, "ros_g": D(4)}, {"slot": "WR", "id": 42, "pos": WR, "ros_g": None},
+        {"slot": "TE", "id": 50, "pos": TE, "ros_g": None}, {"slot": "D/ST", "id": None, "pos": None, "ros_g": None},
+        {"slot": "K", "id": 60, "pos": K, "ros_g": D(6)}, {"slot": "FLEX", "id": None, "pos": None, "ros_g": None},
+        {"slot": "FLEX", "id": None, "pos": None, "ros_g": None}, {"slot": "OP", "id": 20, "pos": QB, "ros_g": D(15)}]
+    assert needs[1]["ueber_ersatz"] == {QB: 1, RB: 1, WR: 1, TE: 0, K: 0, DST: None}
+    assert needs[2]["luecken"] == [] and needs[2]["ueber_ersatz"] == {QB: 2, RB: 3, WR: 4, TE: 2, K: 1, DST: None}
+    assert players.team_needs({}, per_game, levels) == {}

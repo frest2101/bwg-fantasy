@@ -14,7 +14,7 @@ from decimal import ROUND_HALF_UP, Decimal
 
 import espn_fetch as ef
 import rawdata
-from lineup import DST, K, QB, RB, SLOT_BENCH, TE, WR, is_starter, optimal_points
+from lineup import DST, K, QB, RB, SLOT_BENCH, TE, WR, is_starter, optimal_lineup, optimal_points
 from zahlen import ONE, ZERO, dec
 
 # Positions-CV für die Trendschwelle bei weniger als 6 Spielen (Frage 11 b); am Saisonende neu messen
@@ -245,6 +245,38 @@ def add_ros(players: dict[int, dict], ssn: rawdata.Season, ros: dict,
         p["ros_ueber_ersatz"] = ((p["ros_pro_spiel"] - level) * p["restspiele"]
                                  if p["ros_pro_spiel"] is not None and level is not None else None)
     return levels
+
+
+# ---------------------------------------------------------------- Teil 3: Bedarf je Team (Waiver-Tab, Session 7)
+
+def team_needs(rosters: dict[int, list[tuple[int, int]]], per_game: dict[int, Decimal | None],
+               levels: dict[int, Decimal | None]) -> dict[int, dict]:
+    """Bedarf je Team aus dem aktuellen Kader (Tagesstand) und ROS/Spiel der Regular Season (Wochenstand).
+
+    Je Team die ROS-optimale Aufstellung nach lineup.optimal_lineup mit ROS/Spiel als Wert (ohne Projektion 0).
+    Lücken = Starter, deren ROS/Spiel unter dem Ersatzniveau ihrer Position liegt, dazu unbesetzte Slots; ohne
+    Ersatzniveau der Position (kein verfügbarer Spieler) zählt nur ein leerer Slot. Über Ersatz = je Position die
+    Zahl der Kaderspieler mit ROS/Spiel über dem Ersatzniveau (None ohne Ersatzniveau).
+    rosters: team_id → [(player_id, Position)]; per_game: player_id → ROS/Spiel; levels: Position → Ersatzniveau.
+    Rückgabe team_id → {"luecken": [{"slot", "id", "pos", "ros_g"}], "ueber_ersatz": {Position: Zahl}}.
+    """
+    needs = {}
+    for tid, roster in sorted(rosters.items()):
+        entries = [(pos, per_game.get(pid) or ZERO, pid) for pid, pos in roster]
+        gaps = []
+        for slot, entry in optimal_lineup(entries):
+            if entry is None:
+                gaps.append({"slot": slot, "id": None, "pos": None, "ros_g": None})
+                continue
+            pos, _, pid = entry
+            value, level = per_game.get(pid), levels.get(pos)
+            if level is not None and (value is None or value < level):
+                gaps.append({"slot": slot, "id": pid, "pos": pos, "ros_g": value})
+        above = {pos: (sum(1 for pid, p in roster if p == pos and per_game.get(pid) is not None
+                           and per_game[pid] > levels[pos]) if levels.get(pos) is not None else None)
+                 for pos in POSITION_CV}
+        needs[tid] = {"luecken": gaps, "ueber_ersatz": above}
+    return needs
 
 
 # ---------------------------------------------------------------- Einstiege für compute.py
