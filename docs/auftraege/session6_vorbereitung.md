@@ -30,19 +30,19 @@ für den Auftrag `session6.md`.
 | Thema | Beschluss |
 |---|---|
 | Frequenz | Die Läufe werden dichter, keine neue Architektur. Wochenabruf (Di 08:30, Nachläufe Di 16:30, Mi 08:30 UTC) bleibt unverändert, er sichert den finalen Wochenstand. |
-| Tageslauf | Der Transaktions-Lauf wird zum **Tageslauf** und wandert von 05:17 auf **10:45 UTC** (12:45 MESZ / 11:45 MEZ): nach der Waiver-Verarbeitung, auch im Winter nach 11:00 Uhr. Er holt zusätzlich einen **Pool-Auszug** und das **Wetter**. |
-| Wetter Do | Donnerstag wegen TNF, **mit Prognose für Sonntag und Montag** im selben Lauf (Open-Meteo liefert 7 Tage; ein Abruf je Spielort deckt die ganze Woche). Der Tageslauf um 10:45 UTC erfüllt das (≈ 13,5 h vor TNF-Kickoff), der zweite Lauf um 15:40 UTC frischt auf. |
+| Tageslauf | Der Transaktions-Lauf wird zum **Tageslauf** und läuft **vormittags stündlich** (Beschluss Stephan 29.09.), um den Waiver-Zeitpunkt möglichst zu treffen: cron `45 6-11 * * *` = 08:45–13:45 MESZ bzw. 07:45–12:45 MEZ, also in beiden Zeitregimen der ganze Vormittag bis nach 11:00 Uhr. Der alte Termin 05:17 UTC entfällt. Jeder Lauf holt Transaktionen, **Pool-Auszug** und **Wetter** und committet nur bei Änderung; `concurrency: daten-commit` stellt einen Lauf hinter den Wochenabruf (Di 08:30 UTC), statt ihn abzubrechen. |
+| Wetter Do | Donnerstag wegen TNF, **mit Prognose für Sonntag und Montag** im selben Lauf (Open-Meteo liefert 7 Tage; ein Abruf je Spielort deckt die ganze Woche). Die Vormittagsläufe erfüllen das (der letzte um 11:45 UTC ≈ 12,5 h vor TNF-Kickoff), der Nachmittagslauf um 15:40 UTC frischt auf. |
 | Wetter Mo | Montag nochmal (MNF) – ebenfalls die beiden Tagesläufe. |
 | Wetter-Umfang | Nur W1–17, **kein W18** (Beschluss Stephan 29.09.). |
 | Wetter-Ablage | **Prognosen nur für die laufende Woche** behalten (je Lauf eine Datei), beim Wochenwechsel wird der Ordner geleert (Git-Historie bleibt). **Das tatsächliche Wetter je Spiel wird dauerhaft archiviert** – Grundlage für die spätere Frage, welche Positionen wie stark vom Wetter abhängen, und als Hilfe für Aufstellungsentscheidungen (Beschluss Stephan 29.09.). |
-| Zweiter Tageslauf | **Täglich 15:40 UTC** (17:40 MESZ / 16:40 MEZ), Beschluss Stephan 29.09.: frische `injuryStatus`, Pool und Wetter am Nachmittag; sonntags liegt er nach den Inactives (90 min vor dem 1-Uhr-Kickoff) und vor dem Anstoß. Ab der US-Zeitumstellung (01.11.2026) rückt der 1-Uhr-Kickoff auf 18:00 UTC, die Inactives auf 16:30 UTC – deshalb zusätzlich **sonntags 16:40 UTC in den Monaten 11, 12 und 1** (`40 16 * 11,12,1 0`). Jeder Lauf committet nur bei Änderung. |
+| Nachmittagslauf | **Täglich 15:40 UTC** (17:40 MESZ / 16:40 MEZ), Beschluss Stephan 29.09.: frische `injuryStatus`, Pool und Wetter am Nachmittag; sonntags liegt er nach den Inactives (90 min vor dem 1-Uhr-Kickoff) und vor dem Anstoß. Ab der US-Zeitumstellung (01.11.2026) rückt der 1-Uhr-Kickoff auf 18:00 UTC, die Inactives auf 16:30 UTC – deshalb zusätzlich **sonntags 16:40 UTC in den Monaten 11, 12 und 1** (`40 16 * 11,12,1 0`). Jeder Lauf committet nur bei Änderung. |
 | Waiver-Tab | Bauen (Session 7): beste verfügbare Spieler je Position nach ROS über Ersatz, Bye, Verletzung, Projektion nächste Woche, Positions-Matchup; Besitz-Trend; Bedarf je Team (Starter unter Ersatzniveau); Waiver-Reihenfolge; Claims der Vorwoche. |
 | Positions-Matchup | Bauen (Session 7/8): Faktor je Defense und Position analog D/ST-Faktor (Vorjahr als Prior), Rang nächste Woche und Rest je Spieler. Ehrlich beschriftet als „Position gegen Defense“, nicht als Einzelduell. |
 | CB vs WR | Nicht bauen, solange niemand die wöchentliche Pflege einer redaktionellen CSV zusagt. |
 | ESPN-Texte | Bleiben aus der App (Öffentlichkeits-Check unverändert). |
 
 ## 3 Plan Session 6 (Infrastruktur, eine Session)
-1. **Workflow `transaktionen.yml` → Tageslauf:** cron `45 10 * * *`, `40 15 * * *` und `40 16 * 11,12,1 0`, Name „Tageslauf“; Aufruf
+1. **Workflow `transaktionen.yml` → Tageslauf:** cron `45 6-11 * * *`, `40 15 * * *` und `40 16 * 11,12,1 0` (7 Läufe je Tag, sonntags im Winter 8), Name „Tageslauf“; Aufruf
    `espn_fetch.py --transactions --pool --wetter`. Commit-Regel bleibt: Rohdaten immer, abgeleitete Dateien nur bei
    grünem Rechenwerk und grünen Tests. `concurrency: daten-commit` bleibt.
 2. **Pool-Auszug** `data/raw/2026/pool/latest.json` (überschrieben je Lauf, Historie liegt in Git): je Spieler `id,
@@ -82,3 +82,26 @@ für den Auftrag `session6.md`.
 - **Wetter-Auswertung:** sobald genug Ist-Spiele vorliegen (frühestens nach einer Saison), Punkte je Position gegen
   Wind, Niederschlag und Temperatur auswerten (z. B. Ø Punkte Passing-Positionen bei Wind ≥ 25 km/h gegen ohne Wind).
   Bis dahin zeigt die App nur die Prognose mit Schwellen aus der Literatur (Wind ab etwa 25 km/h relevant für QB, WR, K).
+
+## 6 News-Kasten auf der Spielerseite (Frage Stephan 29.09.2026, Einschätzung)
+Gewünscht: ein Kasten mit den neuesten Nachrichten zu einem Spieler von ESPN, FantasyPros usw., notfalls als Link.
+
+**Stufe 1 – nur Links und Datum (kein Risiko, kein Abruf, halbe Session, passt in Session 7):**
+- Aus den vorhandenen Daten: `player.lastNewsDate` und `lastVideoDate` (kona) – „Letzte ESPN-News: 28.09.“ zeigt, ob
+  es etwas Neues gibt, ohne einen Text zu übernehmen.
+- Deep-Links je Spieler: ESPN-Spielerseite (`espn.com/nfl/player/_/id/<ESPN-ID>`, unsere Spieler-ID ist die
+  ESPN-Athleten-ID; D/ST gesondert), ESPN-Fantasy-Spielerkarte (`fantasy.espn.com/football/player?playerId=<ID>`,
+  öffnet auf dem Handy die App), FantasyPros-Spielerseite (Slug aus dem Namen, klappt bei den meisten, Sonderfälle
+  wie „Jr.“ prüfen), Rotoworld/NBC per Suche. Links sind Verweise, keine Weiterverbreitung von Inhalten.
+
+**Stufe 2 – ESPN-Schlagzeilen (eine Session, nach Probe-Lauf, Entscheidung Stephan nötig):**
+- ESPNs Site-API liefert je Athlet News (Schlagzeile, Datum, Link); Zugriff undokumentiert, aus der Action erreichbar,
+  aus der Claude-Session nicht – Probe im selben `workflow_dispatch`-Lauf wie das Wetter.
+- Abruf nur im letzten Vormittagslauf (11:45 UTC) für Kaderspieler und die 20 besten Free Agents je Position, also rund
+  300 Anfragen je Tag, nicht stündlich.
+- In die App nur **Schlagzeile, Datum und Link**, nie der Text. Das ist das Muster von Nachrichten-Aggregatoren; ein
+  Restrisiko bei ESPNs Nutzungsbedingungen bleibt, kleiner als bei den Outlook-Texten. Stephan entscheidet.
+- **FantasyPros nur als Link:** keine API, das Auslesen der Seite verbieten deren Bedingungen. Rotoworld/NBC ebenso,
+  sofern der Probe-Lauf keinen offenen RSS-Feed findet.
+
+**Empfehlung:** Stufe 1 in Session 7 mit dem Spieler-Tab bauen, Stufe 2 nach dem Probe-Lauf entscheiden.
