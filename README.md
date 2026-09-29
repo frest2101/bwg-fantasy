@@ -6,6 +6,7 @@ Regeln, Entscheidungen und Historie der Liga liegen in Notion, die Arbeitsregeln
 
 ## App
 - Die Seite besteht aus `app/` (HTML, CSS, JavaScript ohne Framework) und den App-Daten `app/data/*.json`, die `compute.py` schreibt. Aufbau der Daten: `docs/app_daten.md`.
+- Tabelle › All-Play, Punkte und Coaching gibt es auch je Einzelwoche (Chips „Saison · W1 · W2 …“, z. B. `#tabelle/allplay/w3`); dort steht je Team der Luck-Beitrag der Woche (Ergebnis − All-Play-Anteil); die ungerundete Summe der Beiträge ist der Luck der Tabelle (die angezeigten Beiträge sind einzeln gerundet und können in Summe um 0,01 abweichen).
 - Lokale Vorschau: `python -m http.server 8000 --directory app`, dann http://localhost:8000 öffnen.
 - Für Claude-Sessions unterwegs gibt es die kompakte Datei `app/data/claude.json` (unter 50 KB), abrufbar unter https://raw.githubusercontent.com/frest2101/bwg-fantasy/main/app/data/claude.json.
 - Öffentlich sind nur Ligadaten: `scripts/check_public.py` prüft vor jedem Commit und vor jeder Veröffentlichung, dass keine Manager-Namen, ESPN-Texte oder Chat in der App stehen.

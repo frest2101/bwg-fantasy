@@ -89,14 +89,40 @@ export function setQ(path, params) {
 }
 
 // ---------------------------------------------------------------- Chips, Umschalter, Kacheln
-export const chips = (label, items, cur, cls) => h('nav', {class: 'chips' + (cls ? ' ' + cls : ''), 'aria-label': label},
-  items.map(([href, text, key, extra]) => h('a', {href, 'aria-current': key === cur ? 'page' : null, class: extra}, text)));
+// Waagerecht scrollende Bereiche (Tabellen, Chipleisten): Klasse „sc-more“, solange rechts etwas verborgen ist (CSS
+// blendet die Kante aus), „sc-scrolled“ ab dem ersten Wischen (Schatten an der festen Team-Spalte). Auf dem Handy ist sonst nicht
+// zu erkennen, dass eine Tabelle weitere Spalten hat.
+export function scrollHint(el) {
+  const upd = () => {
+    el.classList.toggle('sc-more', el.scrollWidth - el.clientWidth - el.scrollLeft > 2);
+    el.classList.toggle('sc-scrolled', el.scrollLeft > 2);
+  };
+  el.addEventListener('scroll', upd, {passive: true});
+  new ResizeObserver(upd).observe(el);
+  return el;
+}
+export const chips = (label, items, cur, cls) => scrollHint(h('nav', {class: 'chips' + (cls ? ' ' + cls : ''), 'aria-label': label},
+  items.map(([href, text, key, extra]) => h('a', {href, 'aria-current': key === cur ? 'page' : null, class: extra}, text))));
+// aktuellen Chip einer scrollenden Chipleiste in die Mitte holen (erst aufrufen, wenn die Leiste im DOM steht)
+export function centerChip(nav) {
+  const cur = nav.querySelector('[aria-current]');
+  if (cur) nav.scrollLeft += cur.getBoundingClientRect().left - nav.getBoundingClientRect().left - (nav.clientWidth - cur.offsetWidth) / 2;
+  return nav;
+}
+// Wochenwahl „Saison · W1 · W2 …“ über die gerechneten Wochen (meta.weeks): Links auf path bzw. path/wN
+export function weekChips(path, cur) {
+  const start = n => S.weeks.find(w => w.week === n)?.start;
+  return chips('Woche wählen', [['#' + path, ['Saison', h('small', null, `nach W${S.tw}`)], 0],
+    ...(S.meta.weeks || []).map(w => ['#' + path + '/w' + w, ['W' + w, h('small', null, start(w) ? spanne(start(w)) : '')], w])], cur, 'wk');
+}
+// All-Play-Bilanz „6-3“, mit Gleichständen „6-2-1“ (showT erzwingt die dritte Zahl, damit eine Spalte einheitlich bleibt)
+export const apwl = (w, l, t, showT) => `${nn(w)}-${nn(l)}` + (showT || t ? `-${nn(t)}` : '');
 
 export const spGroup = cur => chips('Spieler, D/ST und Moves',
   [['#spieler', 'Spieler', 'spieler'], ['#dst', 'D/ST-Faktoren', 'dst'], ['#moves', 'Moves', 'moves']], cur);
 
 export function seg(label, opts, cur, on) {
-  const g = h('div', {class: 'seg', role: 'group', 'aria-label': label});
+  const g = scrollHint(h('div', {class: 'seg', role: 'group', 'aria-label': label}));
   const bs = opts.map(([v, text]) => h('button', {type: 'button', 'aria-pressed': String(v === cur), 'data-v': v}, text));
   g.addEventListener('click', e => {
     const b = e.target.closest('button');
@@ -124,8 +150,8 @@ export function ib(gid, label, extra) {
     'aria-haspopup': 'dialog', 'data-g': gid, 'data-x': extra || null, 'aria-label': 'Erklärung: ' + name},
   text ? [text, h('span', {class: 'i', 'aria-hidden': 'true'}, 'i')] : 'i');
 }
-export const legend = (ids, extra) => h('div', {class: 'lg'}, h('span', null, 'Erklärungen:'),
-  ids.map(g => Array.isArray(g) ? ib(g[0], g[1], g[2]) : ib(g, null, extra?.[g])));
+export const legend = (ids, extra) => scrollHint(h('div', {class: 'lg'}, h('span', null, 'Erklärungen:'),
+  ids.map(g => Array.isArray(g) ? ib(g[0], g[1], g[2]) : ib(g, null, extra?.[g]))));
 
 let popBtn = null;
 const pop = () => D.getElementById('pop');
@@ -164,7 +190,7 @@ export function infoPop(btn) {        // i-Knopf: Begriff und Erklärung aus dem
 
 // ---------------------------------------------------------------- sortierbare Tabelle
 // o = {cap, cols: [{k, l, v: Zeile → Sortierwert, f: Zeile → Inhalt, num, d (1 auf-, −1 absteigend), cls}],
-//      rows, sort: [key, dir], cls (z. B. 'rk kurz'), rh (Index der Zeilenkopf-Spalte), rc (Zeile → Klasse), limit}
+//      rows, sort: [key, dir], cls (z. B. 'rk': Rang und Team fest, auf dem Handy Kürzel), rh (Index der Zeilenkopf-Spalte), rc (Zeile → Klasse), limit}
 export function table(o) {
   const capId = id('c');
   const cols = o.cols;
@@ -180,7 +206,7 @@ export function table(o) {
   });
   const tb = h('tbody'), fn = h('p', {class: 'fn', id: id('f')}), more = h('div');
   const tbl = h('table', {class: o.cls}, h('caption', {id: capId}, o.cap), h('thead', null, h('tr', null, heads)), tb);
-  const wrap = h('div', {class: 'tw', role: 'region', tabindex: '0', 'aria-labelledby': capId}, tbl);
+  const wrap = scrollHint(h('div', {class: 'tw', role: 'region', tabindex: '0', 'aria-labelledby': capId}, tbl));
   const box = h('div', {class: 'tbox'}, wrap, fn, more);
   const rh = o.rh ?? 1;
   function draw() {

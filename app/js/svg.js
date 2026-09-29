@@ -58,16 +58,16 @@ function dataTable(title, tab) {
     if (!d.open || d.dataset.done) return;
     d.dataset.done = '1';
     const {h} = U, t = typeof tab === 'function' ? tab() : tab;
-    d.append(h('div', {class: 'tw', role: 'region', tabindex: '0', 'aria-label': title + ' als Tabelle'},
+    d.append(U.scrollHint(h('div', {class: 'tw', role: 'region', tabindex: '0', 'aria-label': title + ' als Tabelle'},
       h('table', null, h('caption', {class: 'vh'}, title),
         h('thead', null, h('tr', null, t.heads.map(x => h('th', {scope: 'col', class: 'n'}, x)))),
-        h('tbody', null, t.rows.map(r => h('tr', null, r.map((c, i) => i ? h('td', {class: 'n'}, c) : h('th', {scope: 'row'}, c))))))));
+        h('tbody', null, t.rows.map(r => h('tr', null, r.map((c, i) => i ? h('td', {class: 'n'}, c) : h('th', {scope: 'row'}, c)))))))));
   });
   return d;
 }
 
 // ---------------------------------------------------------------- Liniendiagramm (PF-Verlauf, Wochenrang, Wochen-Band)
-// o = {title, desc, x: Labels, series: [{name, vals, hi}], avg, band: [lo, hi], invert, max, yfmt, H}
+// o = {title, desc, x: Labels, series: [{name, vals, hi}], avg, band: [lo, hi], invert, max, yfmt, H, zero (Nulllinie)}
 export function lines(o) {
   return w => {
     const H = o.H || 220, L = 42, R = 50, T = 12, B = 24, nX = o.x.length;
@@ -84,7 +84,7 @@ export function lines(o) {
     }
     const x = nX === 1 ? () => (L + w - R) / 2 : lin(0, nX - 1, L + 8, w - R);
     const g = frame(w, H, o.title, o.desc);
-    for (const t of ticks) g.append(s('line', {x1: L, x2: w - R, y1: y(t), y2: y(t), class: 'gr'}),
+    for (const t of ticks) g.append(s('line', {x1: L, x2: w - R, y1: y(t), y2: y(t), class: o.zero && t === 0 ? 'z0' : 'gr'}),
       s('text', {x: L - 6, y: y(t) + 4, 'text-anchor': 'end'}, o.yfmt ? o.yfmt(t) : t));
     const step = Math.max(1, Math.ceil(nX * 30 / (w - L - R)));
     o.x.forEach((lab, i) => { if ((nX - 1 - i) % step === 0) g.append(s('text', {x: x(i), y: H - 6, 'text-anchor': 'middle'}, lab)); });

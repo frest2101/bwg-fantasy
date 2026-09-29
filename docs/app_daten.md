@@ -10,7 +10,7 @@
   - Quoten in % mit 2 Stellen, Anteile der Positionen (`anteil`) mit 1 Stelle wie in der Anzeige
   - Anteile der Simulation (0–1) mit 4 Stellen
 - **Deterministisch:** kein Zeitstempel der Erzeugung, feste Sortierung. Eine Datei ändert sich nur, wenn sich ihr Inhalt ändert.
-- **Einheiten:** Anteile 0–1 in `sim.*`, `p_home` und `pr.e`; Prozent in `*_pct`, `efficiency`, `positionen.*.anteil` und `own`. Slots als Text (`QB`, `RB`, `WR`, `TE`, `FLEX`, `OP`, `D/ST`, `K`, `Bank`, `IR`), Positionen als Kürzel.
+- **Einheiten:** Anteile 0–1 in `sim.*`, `p_home` und `pr.e`; Prozent in `*_pct`, `efficiency`, `effizienz_liga`, `positionen.*.anteil` und `own` (auch je Woche in `wochen.allplay_pct` und `wochen.efficiency`). Slots als Text (`QB`, `RB`, `WR`, `TE`, `FLEX`, `OP`, `D/ST`, `K`, `Bank`, `IR`), Positionen als Kürzel.
 - **Fehlende Werte:** `null`. Die App zeigt dafür „–“, sortiert solche Werte ans Ende und nennt im i-Text den Grund, z. B. „ab Wochenabruf W3“ oder „ab 4 Spielen“.
 - **Schlüssel:** Team-Schlüssel ist `team_id` = Franchise-Slot 1–10, Spieler-Schlüssel die ESPN-ID, NFL-Teams per ESPN-`proTeamId` mit Kürzel.
 
@@ -24,7 +24,7 @@ Die App lädt `data/manifest.json?t=<jetzt>` und danach jede Datei mit `?v=<v>`.
 
 ## `teams.json` (Erstaufruf)
 - **`meta`:**
-  - `weeks` (gerechnete Wochen), `sigma`, `ligafaktor`
+  - `weeks` (gerechnete Wochen), `sigma`, `ligafaktor`, `effizienz_liga` (Σ PF / Σ Optimal der Liga in %)
   - `kader_quelle` (`"potenzial"` oder `"projektion"`), `metrics` (Liste `{key, label}` in der Reihenfolge PF · All-Play · Win · Coaching · Kader · Floor · Form)
   - `profiles` (Name → Gewichte), `profil_standard`, `norm_standard`
   - `divisions` (id → Name), `kuerzel` (team_id → Kürzel)
@@ -40,11 +40,11 @@ Die App lädt `data/manifest.json?t=<jetzt>` und danach jede Datei mit `?v=<v>`.
   - Power Ranking `pr`: `{mu, se, p, p_quelle, e, rang, rang_vorwoche, trend, kernsatz}`
   - Simulation `sim`: `{liga: {playoff, division, bye, restsiege, seeds: [6]}, espn: {…}}` – `liga` = Regel 2026 (Top 3 je Division), `espn` = Top 6 gesamt; dazu `espn_sim` (ESPN-Vergleich oder `null`)
   - `positionen`: `{nach_position: {"QB": {pts, anteil, rang}, …}, nach_slot: {"QB", "RB", "WR", "TE", "FLEX", "OP", "D/ST", "K"}}`
-  - `wochen`: Arrays in der Reihenfolge von `meta.weeks`: `gegner, heim, pf, pa, ergebnis, wochenrang, allplay_w, median_win, optimal, verschenkt, bank, projektion, mu, pr_rang`
+  - `wochen`: Arrays in der Reihenfolge von `meta.weeks` (Einzelwoche, nicht kumuliert): `gegner, heim, pf, pa, ergebnis, wochenrang, allplay_w, allplay_l, allplay_t, allplay_pct` (All-Play-Anteil pₜ der Woche in %), `luck` (Beitrag der Woche = Ergebnis W 1 · T 0,5 · L 0 − pₜ; ungerundet Σ = `luck` des Teams und je Woche Nullsumme über alle Teams – die einzeln auf 2 Stellen gerundeten Beiträge können in Summe um 0,01 abweichen, verbindlich ist `luck_kum`), `luck_kum` (laufende Summe, letzter Wert = `luck`), `median_win, optimal, verschenkt, efficiency` (PF / Optimal der Woche in %), `bank, projektion, projektions_delta, mu, pr_rang`
 
 ## `schedule.json` (Erstaufruf)
 - **`weeks`:** Liste je Woche 1–17 mit `week`, `start` (Dienstag, ISO-Datum), `status` (`final`, `laeuft`, `offen`) und `playoff` (bool). Für finale Wochen zusätzlich:
-  - `ligaschnitt, median`
+  - `ligaschnitt, median, effizienz_liga` (Σ PF / Σ Optimal der Woche in %)
   - `high {team_id, pf}`, `low {team_id, pf}`, `top_team_id`
   - `bank_suende {team_id, verschenkt}`
   - `top_scorer` (10 × `{player_id, name, pos, nfl, team_id, slot, pts, proj}`)

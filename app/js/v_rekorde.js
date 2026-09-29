@@ -74,7 +74,7 @@ function positionen(box, r, svg) {
     const keys = key === 'nach_slot' ? SLOTS : POS, P = t => t.positionen?.[key] || {};
     const cell = (t, k) => { const o = P(t)[k]; if (!o) return '–'; return wert === 'pts' ? U.num(o.pts) : wert === 'anteil' ? U.pct(share(P(t), k)) : U.val(o.rang, v => v + '.'); };
     wrap.replaceChildren(U.table({cap: `PF nach ${key === 'nach_slot' ? 'Slot' : 'Position'} (${wert === 'pts' ? 'Punkte' : wert === 'anteil' ? 'Anteil' : 'Ligarang'})`,
-      cls: 'rk kurz', rows: S.teams, sort: ['rang', 1], cols: [
+      cls: 'rk', rows: S.teams, sort: ['rang', 1], cols: [
         {k: 'rang', l: '#', v: t => t.rang, d: 1, f: t => t.rang}, {k: 'team', l: 'Team', v: t => t.name.toLowerCase(), d: 1, f: t => U.tl(t.team_id)},
         ...keys.map(k => ({k, l: k, num: 1, d: wert === 'rang' ? 1 : -1, v: t => wert === 'anteil' ? share(P(t), k) : P(t)[k]?.[wert === 'pts' ? 'pts' : 'rang'], f: t => cell(t, k)}))]}));
     const names = keys, cls = j => 'o' + (j + 1);
@@ -109,7 +109,7 @@ function h2h(box, r) {
       {k: 'b', l: 'Bilanz', v: x => x.x ? x.x.w - x.x.l : null, f: x => x.x ? txt(x.x) : '–'},
       {k: 'd', l: 'PF-Diff', num: 1, v: x => x.x?.d ?? null, f: x => x.x ? U.sgn(x.x.d) : '–'}]}));
   };
-  const mx = h('div', {class: 'tw wide', role: 'region', tabindex: '0', 'aria-label': 'H2H-Matrix'},
+  const mx = U.scrollHint(h('div', {class: 'tw', role: 'region', tabindex: '0', 'aria-label': 'H2H-Matrix'},
     h('table', {class: 'mx'}, h('caption', null, 'H2H-Matrix 2026 (Zeile gegen Spalte, W-L)'),
       h('thead', null, h('tr', null, h('td', null, ''), S.teams.map(t => h('th', {scope: 'col'}, h('a', {href: '#team/' + t.team_id, 'aria-label': t.name}, t.kuerzel))))),
       h('tbody', null, S.teams.map(a => h('tr', null, h('th', {scope: 'row'}, h('a', {href: '#team/' + a.team_id, 'aria-label': a.name}, a.kuerzel)),
@@ -117,12 +117,12 @@ function h2h(box, r) {
           if (a === b) return h('td', {class: 'hx'}, '–');
           const x = rec(a.team_id, b.team_id);
           return h('td', {class: !x ? 'hx' : x.w > x.l ? 'hw' : x.w < x.l ? 'hl' : 'he', title: x ? `PF-Diff ${U.sgn(x.d)}` : null}, x ? txt(x) : '');
-        }))))));
+        })))))));
   U.ap(box, h('div', {class: 'row'}, h('label', null, 'Team ', h('select', {onchange: e => {
     sel = +e.target.value; U.setQ('rekorde/h2h', {team: sel}); draw();
   }}, S.teams.map(t => h('option', {value: t.team_id, selected: t.team_id === sel}, t.name))))),
-  list, U.legend(['h2h']), h('h2', {class: 'wide', style: 'margin-top:16px'}, 'Alle Duelle'), mx,
-  h('p', {class: 'note wide'}, 'Blau = Bilanz positiv, orange = negativ, grau = ausgeglichen; die Bilanz steht immer in der Zelle.'));
+  list, U.legend(['h2h']), h('h2', {style: 'margin-top:16px'}, 'Alle Duelle'), mx,
+  h('p', {class: 'note'}, 'Blau = Bilanz positiv, orange = negativ, grau = ausgeglichen; die Bilanz steht immer in der Zelle.'));
   draw();
 }
 

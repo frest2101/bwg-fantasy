@@ -32,12 +32,14 @@ export async function render(box, ctx, r) {
   {heads: ['Woche', 'PF', 'Erg.', 'Optimal', 'Ligaschnitt'], rows: W.map((w, i) => ['W' + w, U.num(wk.pf[i]), wk.ergebnis[i], U.num(wk.optimal[i]), U.num(avg[i])])},
   h('p', {class: 'note'}, 'Säule = PF mit Ergebnis W/L/T, orange Strich = Optimal, gestrichelt = Ligaschnitt.'))),
   h('div', {class: 'm1'}, weekList(t))));
-  U.ap(box, h('h2', null, 'Verläufe'), ...svg.verlauf(t.team_id, false));
-  U.ap(box, h('div', {class: 'two'}, positions(t), h2h(t)));
-
+  // Kader direkt nach der Wochenliste; Verläufe und Franchise-Historie eingeklappt, auf dem Handy ist die Seite sonst
+  // acht Bildschirme lang (ab 900 px offen)
+  const wide = matchMedia('(min-width:900px)').matches;
+  const sec = (title, ...kids) => h('details', {class: 'sec', open: wide}, h('summary', null, title), kids);
   const kader = U.card('Kader');
-  const fr = U.card('Franchise-Historie');
-  U.ap(box, h('div', {class: 'two'}, kader, fr),
+  const fr = U.card(null);
+  U.ap(box, h('div', {class: 'two'}, kader, h('div', null, positions(t), h2h(t))));
+  U.ap(box, sec('Verläufe', ...svg.verlauf(t.team_id, false)), sec('Franchise-Historie', fr),
     h('p', null, h('a', {href: '#moves?team=' + t.team_id}, 'Moves dieses Teams'), ' · ', h('a', {href: '#rekorde/h2h?team=' + t.team_id}, 'H2H'), ' · ',
       h('a', {href: '#spieler?team=' + t.team_id + '&status=kader'}, 'Spielerliste des Teams')));
   ctx.lazy('players.json', 'Spielerdaten', kader).then(P => r.alive() && roster(kader, t, P)).catch(() => {});
@@ -52,17 +54,20 @@ function weekList(t) {
       p: U.ok(g.p_home) ? (home ? U.sp(g.p_home) : 100 - U.sp(g.p_home)) : null};
   }).sort((a, b) => a.week - b.week);
   const played = x => x.i >= 0;
+  const anyT = wk.allplay_t.some(v => v > 0);
   return h('div', null, U.table({cap: 'Wochenliste', cls: 'nr', rows, sortable: false, rh: 0, cols: [
-    {k: 'w', l: 'W', f: x => h('a', {href: '#spielplan/w' + x.week, class: 'tl2'}, 'W' + x.week)},
-    {k: 'o', l: 'Gegner', f: x => h('a', {href: '#team/' + x.opp, class: 'tl2', 'aria-label': U.team(x.opp)?.name}, U.kz(x.opp))},
-    {k: 'ha', l: 'H/A', f: x => x.home ? 'H' : 'A'},
+    {k: 'w', l: 'W', f: x => h('a', {href: played(x) ? '#tabelle/allplay/w' + x.week : '#spielplan/w' + x.week, class: 'tl2'}, 'W' + x.week)},
+    {k: 'o', l: 'Gegner', f: x => [x.home ? '' : '@', h('a', {href: '#team/' + x.opp, class: 'tl2', 'aria-label': `${x.home ? 'gegen' : 'bei'} ${U.team(x.opp)?.name}`}, U.kz(x.opp))]},
     {k: 'pf', l: 'PF : PA', num: 1, f: x => played(x) ? `${U.num(wk.pf[x.i])} : ${U.num(wk.pa[x.i])}` : (x.st === 'laeuft' ? 'läuft' : 'offen')},
     {k: 'e', l: 'Erg.', f: x => played(x) ? U.res(wk.ergebnis[x.i]) : x.p != null && x.st !== 'laeuft' ? U.po(x.p) : ''},
     {k: 'wr', l: 'W-Rang', num: 1, f: x => played(x) ? wk.wochenrang[x.i] + '.' : ''},
-    {k: 'ap', l: 'AP-W', num: 1, f: x => played(x) ? U.nn(wk.allplay_w[x.i]) : ''},
+    {k: 'ap', l: 'AP', num: 1, f: x => played(x) ? U.apwl(wk.allplay_w[x.i], wk.allplay_l[x.i], wk.allplay_t[x.i], anyT) : ''},
+    {k: 'lk', l: 'Luck', num: 1, f: x => played(x) ? U.sgn(wk.luck[x.i]) : ''},
+    {k: 'ef', l: 'Eff. %', num: 1, f: x => played(x) ? U.pct(wk.efficiency[x.i]) : ''},
     {k: 'vs', l: 'Verschenkt', num: 1, f: x => played(x) ? U.num(wk.verschenkt[x.i]) : ''},
     {k: 'bk', l: 'Bank', num: 1, f: x => played(x) ? U.num(wk.bank[x.i]) : ''}],
-  note: 'Bei offenen Spielen steht unter „Erg.“ die Siegchance.'}));
+  note: '@ = auswärts. Luck = Beitrag der Woche (Ergebnis − All-Play-Anteil), Summe = Luck-Kachel. Bei offenen Spielen steht unter „Erg.“ die Siegchance.'}),
+  U.legend(['wochenrang', 'ap-wl', 'luck-beitrag', 'eff-woche', 'verschenkt', 'bank']));
 }
 
 // Anteile: Vertrag ohne Einheit – Summe ≈ 1 heißt Anteil 0–1, sonst Prozent

@@ -75,7 +75,13 @@ def test_teams_vertrag(data):
             assert key in t, key
         assert all(isinstance(v, int) for v in t["norm"]["rank"].values())
         assert set(t["sim"]) == {"liga", "espn"} and len(t["sim"]["liga"]["seeds"]) == 6
+        assert set(t["wochen"]) == {"gegner", "heim", "pf", "pa", "ergebnis", "wochenrang", "allplay_w", "allplay_l",
+                                    "allplay_t", "allplay_pct", "luck", "luck_kum", "median_win", "optimal",
+                                    "verschenkt", "efficiency", "bank", "projektion", "projektions_delta", "mu", "pr_rang"}
         assert all(len(v) == len(meta["weeks"]) for v in t["wochen"].values())
+        assert t["wochen"]["luck_kum"][-1] == t["luck"]  # dieselbe Decimal-Summe, gleich gerundet
+        assert abs(sum(t["wochen"]["luck"]) - t["luck"]) <= 0.01 * len(meta["weeks"])  # Beiträge einzeln gerundet
+    assert 0 < meta["effizienz_liga"] <= 100
 
 
 def test_browserformel_gleich_python(data):
@@ -94,6 +100,7 @@ def test_schedule_vertrag(data):
     s = data["schedule.json"]
     assert [w["week"] for w in s["weeks"]] == list(range(1, ef.MAX_WEEK + 1))
     assert [w["status"] for w in s["weeks"][:2]] == ["final", "final"]
+    assert all(0 < w["effizienz_liga"] <= 100 for w in s["weeks"][:2]) and "effizienz_liga" not in s["weeks"][2]
     assert s["weeks"][0]["start"] == "2026-09-08" and s["weeks"][14]["playoff"]
     assert len(s["games"]) == 70 and len(s["h2h"]) == 45
     finals = [g for g in s["games"] if g["winner"] is not None]

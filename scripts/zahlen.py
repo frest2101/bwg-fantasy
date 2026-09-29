@@ -26,7 +26,7 @@ def rounded(value, places: int = 2, precision: dict[str, int] | None = None):
     z. B. {"z": 3} für die z-Normwerte.
     """
     if isinstance(value, Decimal):
-        number = float(round_to(value, places))
+        number = float(round_to(value, places)) or 0.0  # kein „-0.0“ aus Rest-Rundung (z. B. Σ Luck-Beiträge = −1E-27)
         return int(number) if places == 0 else number
     if isinstance(value, dict):
         precision = precision or {}
