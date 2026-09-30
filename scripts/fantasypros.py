@@ -8,8 +8,9 @@ sind deshalb die Positions-Sitemaps; robots.txt verweist auf den Sitemap-Index, 
 - Abruf (Wochenabruf, espn_fetch.py --due bei den Saisondateien): sechs Anfragen mit 5 s Abstand (Crawl-delay),
   abgelegt wird nur die Liste der Spieler-Adressen je Position unter fantasypros/sitemap.json – keine Seiteninhalte.
 - Zuordnung (compute.py → app_export.py): slug_for() sucht den ESPN-Namen in einigen Schreibweisen in der Sitemap
-  seiner Position; es zählt nur ein eindeutiger Treffer. Sonst None – die App verlinkt dann die DuckDuckGo-Suche
-  statt einer geratenen Adresse. D/ST verlinkt die App über ihre eigene Tabelle (FP_DST in v_spieler.js).
+  seiner Position, vorher die Handtabelle HAND für Spitznamen (nur wenn deren Adresse in der Sitemap steht); es zählt nur
+  ein eindeutiger Treffer. Sonst None – die App verlinkt dann die DuckDuckGo-Suche statt einer geratenen Adresse.
+  D/ST verlinkt die App über ihre eigene Tabelle (FP_DST in v_spieler.js).
   Die Sitemap ist kein vollständiges Verzeichnis: Wer darin fehlt, bekommt ebenfalls die Suche.
 """
 
@@ -39,7 +40,7 @@ INITIAL = re.compile(r"^([A-Z])\.\s+")  # „J. Michael Sturdivant“ ebenso (jm
 HAND = {4366031: "nathaniel-dell",      # Tank Dell, WR HOU
         4371733: "kenneth-gainwell",    # Kenny Gainwell, RB TB
         4685555: "nick-singleton",      # Nicholas Singleton, RB TEN
-        4870653: "kevin-concepcion"}    # KC Concepcion, WR CLE
+        4870653: "kevin-concepcion"}    # KC Concepcion, WR CLE (FantasyPros: „KC Concepcion Jr.“)
 
 
 def path(season: int) -> Path:
@@ -119,8 +120,9 @@ def index(data: dict | None) -> dict[str, set[str]]:
 def slug_for(name: str | None, pos: str | None, known: dict[str, set[str]], pid: int | None = None) -> str | None:
     """FantasyPros-Adresse eines Spielers oder None, wenn sie nicht eindeutig ist.
 
-    Zuerst die Handtabelle HAND (ESPN-ID pid), sofern ihre Adresse in der Sitemap der Position steht. Sonst gesucht wird in der Sitemap seiner Position, je Schreibweise auch mit angehängter Position (josh-allen-qb).
-    Zuerst der volle Name mit Zusatz (kenneth-walker-iii schlägt kenneth-walker), dann ohne Zusatz (deebo-samuel für
+    Zuerst die Handtabelle HAND (ESPN-ID pid), sofern ihre Adresse in der Sitemap der Position steht.
+    Sonst wird in der Sitemap seiner Position gesucht, je Schreibweise auch mit angehängter Position (josh-allen-qb),
+    dabei der volle Name mit Zusatz vor dem ohne (kenneth-walker-iii schlägt kenneth-walker; deebo-samuel für
     Deebo Samuel Sr.). Mehr als ein Treffer (isaiah-williams und isaiah-williams-wr) ist mehrdeutig: None.
     Liefert die eigene Position gar nichts, zählt eine Adresse ohne Positionsanhang, die in genau einer anderen Position
     steht (ESPN führt Connor Heyward als RB, FantasyPros als TE) – nicht aber, wenn es Namensvettern mit Anhang gibt.
