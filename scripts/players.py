@@ -214,13 +214,10 @@ def replacement_levels(pool: list[rawdata.PoolRow], per_game: dict[int, Decimal 
     Verfügbar = Status WAIVERS oder FREEAGENT und Verletzung weder OUT noch INJURY_RESERVE (Stand des Pools N).
     Weniger als drei Kandidaten → Ø der vorhandenen; keiner → None.
     """
-    levels = {}
-    for pos in POSITION_CV:
-        best = sorted((per_game[r.player_id] for r in pool
-                       if r.pos == pos and r.status in REPLACEMENT_STATUS and r.injury not in INJURED
-                       and per_game.get(r.player_id) is not None), reverse=True)[:REPLACEMENT_COUNT]
-        levels[pos] = statistics.mean(best) if best else None
-    return levels
+    return {pos: top_mean([per_game[r.player_id] for r in pool
+                           if r.pos == pos and r.status in REPLACEMENT_STATUS and r.injury not in INJURED
+                           and per_game.get(r.player_id) is not None])
+            for pos in POSITION_CV}
 
 
 def add_ros(players: dict[int, dict], ssn: rawdata.Season, ros: dict,
@@ -276,6 +273,107 @@ def team_needs(rosters: dict[int, list[tuple[int, int]]], per_game: dict[int, De
                            and per_game[pid] > levels[pos]) if levels.get(pos) is not None else None)
                  for pos in POSITION_CV}
         needs[tid] = {"luecken": gaps, "ueber_ersatz": above}
+    return needs
+
+
+# ---------------------------------------------------------------- Teil 3b: Wochensicht (Waiver-Tab, Beschluss 30.09.2026)
+
+WEEK_OUT = INJURED + ("SUSPENSION",)    # zählen in der Woche N+1 als 0 (gesperrt spielt nicht)
+DOUBTFUL = ("QUESTIONABLE", "DOUBTFUL", "DAY_TO_DAY")   # zählen mit ESPN-Projektion, die App markiert sie
+HORIZON = 3                             # Summe der Wochen N+1 … N+3
+CANDIDATES = 3                          # beste freie Spieler je Lücke der Wochensicht
+SLOT_POSITIONS = {"QB": (QB,), "RB": (RB,), "WR": (WR,), "TE": (TE,), "D/ST": (DST,), "K": (K,),
+                  "FLEX": (RB, WR, TE), "OP": (QB, RB, WR, TE)}
+
+
+def week_value(projection, injury: str | None, game: bool) -> tuple[Decimal, str | None]:
+    """Wert eines Spielers in der Woche N+1 und der Grund, wenn er sicher ausfällt.
+
+    Ohne Spiel seines NFL-Teams 0 mit Grund "BYE"; OUT, INJURY_RESERVE und gesperrt 0 mit dem Status als Grund;
+    sonst die ESPN-Wochenprojektion (ohne Projektion 0), auch bei fraglichen Spielern (QUESTIONABLE, DOUBTFUL).
+    """
+    if not game:
+        return ZERO, "BYE"
+    if injury in WEEK_OUT:
+        return ZERO, injury
+    return (dec(projection) if projection is not None else ZERO), None
+
+
+def horizon_weeks(week: int, horizon: int = HORIZON) -> list[int]:
+    """Wochen N+1 … N+horizon der Wochensicht, höchstens bis W17 (W18 zählt nicht)."""
+    return list(range(week, min(week + horizon, LAST_PLAYOFF_WEEK + 1)))
+
+
+def horizon_sum(first: Decimal, projections: dict | None, pro_team: int, nfl: dict[int, rawdata.NflTeam],
+                weeks: list[int]) -> Decimal | None:
+    """Σ der Wochenwerte über weeks: erste Woche = week_value (Tagesstand), die folgenden aus dem ROS-Auszug
+    ({"5": x, …}), Wochen ohne Spiel 0. None ohne Eintrag im ROS-Auszug (keine ESPN-Projektion)."""
+    if projections is None:
+        return None
+    return first + sum((dec(projections.get(str(w), 0)) for w in weeks[1:] if has_game(nfl, pro_team, w)), ZERO)
+
+
+def top_mean(values: list[Decimal], n: int = REPLACEMENT_COUNT) -> Decimal | None:
+    """Ø der n größten Werte (weniger → Ø der vorhandenen, keiner → None)."""
+    best = sorted(values, reverse=True)[:n]
+    return statistics.mean(best) if best else None
+
+
+def week_replacement_levels(free: list[tuple[int, Decimal]]) -> dict[int, Decimal | None]:
+    """Wochen-Ersatzniveau je Position: Ø der drei besten Werte unter den verfügbaren Spielern.
+
+    free: (Position, Wert) der Spieler mit Status WAIVERS oder FREEAGENT, die nicht sicher ausfallen (WEEK_OUT);
+    dieselbe Regel wie beim ROS-Ersatzniveau, nur mit dem Wert der Woche N+1 bzw. der Summe N+1 … N+3.
+    """
+    return {pos: top_mean([v for p, v in free if p == pos]) for pos in POSITION_CV}
+
+
+def team_week_needs(rosters: dict[int, list[tuple[int, int]]], value: dict[int, tuple[Decimal, str | None]],
+                    injury: dict[int, str | None], levels: dict[int, Decimal | None],
+                    free: list[tuple[int, Decimal, int]], per_game: dict[int, Decimal | None] | None,
+                    byes_ahead: dict[int, list[int]]) -> dict[int, dict]:
+    """Wochenbedarf je Team für die Woche N+1 (Tagesstand).
+
+    Aufstellung = lineup.optimal_lineup des Kaders mit dem Wochenwert (week_value). Lücken = unbesetzte Slots,
+    Starter, die sicher ausfallen (Grund BYE, OUT, INJURY_RESERVE, SUSPENSION), und Starter unter dem
+    Wochen-Ersatzniveau ihrer Position; je Lücke die drei besten freien Spieler (free, absteigend sortiert), die
+    in den Slot passen und mehr bringen als die Besetzung.
+    Ausfälle und Byes beziehen sich auf die ROS-optimale Aufstellung (per_game wie team_needs): Starter, die in N+1
+    ausfallen oder fraglich sind (Grund = Status bzw. BYE), und Starter mit Bye in N+2 … N+3 (byes_ahead: Spieler →
+    Wochen). Ohne per_game (kein Regular-Season-ROS) bleiben beide leer.
+    Rückgabe team_id → {"luecken": [{"slot", "id", "pos", "proj", "grund", "kandidaten"}],
+    "ausfaelle": [{"slot", "id", "pos", "grund"}], "byes": [{"woche", "slot", "id", "pos"}]}.
+    """
+    def candidates(slot: str, floor: Decimal) -> list[int]:
+        fits = SLOT_POSITIONS[slot]
+        return [pid for pos, v, pid in free if pos in fits and v > floor][:CANDIDATES]
+
+    needs = {}
+    for tid, roster in sorted(rosters.items()):
+        gaps = []
+        for slot, entry in optimal_lineup([(pos, value[pid][0], pid) for pid, pos in roster]):
+            if entry is None:
+                gaps.append({"slot": slot, "id": None, "pos": None, "proj": None, "grund": None,
+                             "kandidaten": candidates(slot, ZERO)})
+                continue
+            pos, v, pid = entry
+            grund, level = value[pid][1], levels.get(pos)
+            if grund is None and (level is None or v >= level):
+                continue
+            gaps.append({"slot": slot, "id": pid, "pos": pos, "proj": v, "grund": grund,
+                         "kandidaten": candidates(slot, v)})
+        out, byes = [], []
+        if per_game is not None:
+            for slot, entry in optimal_lineup([(pos, per_game.get(pid) or ZERO, pid) for pid, pos in roster]):
+                if entry is None:
+                    continue
+                pos, _, pid = entry
+                grund = value[pid][1] or (injury.get(pid) if injury.get(pid) in DOUBTFUL else None)
+                if grund:
+                    out.append({"slot": slot, "id": pid, "pos": pos, "grund": grund})
+                byes += [{"woche": w, "slot": slot, "id": pid, "pos": pos} for w in byes_ahead.get(pid, [])]
+        byes.sort(key=lambda b: b["woche"])   # stabil: innerhalb der Woche in Slot-Reihenfolge
+        needs[tid] = {"luecken": gaps, "ausfaelle": out, "byes": byes}
     return needs
 
 

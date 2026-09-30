@@ -2,6 +2,7 @@
 // Ersatz (Tagesstand), Bedarf je Team, Waiver-Reihenfolge, Claims der letzten 7 Tage. Zahlen kommen aus Python; hier nur
 // Anzeige, Filter und die Zusammenführung von Tagesstand (waiver.json) und Wochenstand (players.json) je Spieler-ID.
 // Positions-Matchup je Spieler (Feld mu) aus dem Wochenstand; Wetter-Fähnchen aus wetter.json (Prognose der laufenden Woche).
+// Horizont (Beschluss 30.09.2026): Woche N+1 (Standard), Σ N+1…N+3 oder ROS – für die Liste und den Bedarf je Team.
 let U, S, h;
 const POS = ['QB', 'RB', 'WR', 'TE', 'K', 'D/ST'];
 const FREE = ['WAIVERS', 'FREEAGENT'];
@@ -9,6 +10,12 @@ const ART = {WAIVER: 'Waiver', FREEAGENT: 'Free Agent'};
 const DAYS7 = 7 * 864e5;
 const KEY = 'bwg-team';                  // eigenes Team (Kürzel-Auswahl), nur Komfort im Browser
 const fz = v => 'fz' + (U.ok(v) ? ' ' + U.fcls(v) : '');   // Farbzelle um F = 1,00; ohne Wert ohne Farbe
+const HOR = ['woche', 'drei', 'ros'];
+const GRUND = {BYE: 'Bye', OUT: 'fällt aus', INJURY_RESERVE: 'IR', SUSPENSION: 'gesperrt', QUESTIONABLE: 'fraglich',
+  DOUBTFUL: 'zweifelhaft', DAY_TO_DAY: 'Day-to-Day'};
+// Spiel der Woche N+1 schon angepfiffen: Der Spieler bringt in dieser Woche nichts mehr (Anstoß aus waiver.json)
+const played = (W, x) => U.ok(W.anstoss?.[x.nfl]) && W.anstoss[x.nfl] <= Date.now();
+const span = W => W.horizont?.length ? `W${W.horizont[0]}` + (W.horizont.length > 1 ? `–${W.horizont.at(-1)}` : '') : 'nächste 3';
 
 export async function render(box, ctx, r) {
   U = ctx.ui; S = U.S; h = U.h;
@@ -31,7 +38,8 @@ export async function render(box, ctx, r) {
     const p = byId.get(d.id) || {};
     return {...p, ...d, name: p.name ?? d.name ?? `Spieler ${d.id}`, pos: p.pos ?? d.pos ?? null, nfl: p.nfl ?? d.nfl ?? null};
   });
-  const name = id => byId.get(id)?.name ?? rows.find(x => x.id === id)?.name ?? T?.spieler?.[String(id)] ?? `Spieler ${id}`;
+  const rowById = new Map(rows.map(x => [x.id, x]));
+  const name = id => byId.get(id)?.name ?? rowById.get(id)?.name ?? T?.spieler?.[String(id)] ?? `Spieler ${id}`;
   let mine = +U.store.get(KEY) || 0;
   const mineSel = h('select', {'aria-label': 'Mein Team', onchange: e => { mine = +e.target.value; U.store.set(KEY, mine); draw(); }},
     h('option', {value: 0}, 'Mein Team wählen'), S.teams.map(t => h('option', {value: t.team_id, selected: t.team_id === mine}, `${t.kuerzel} · ${t.name}`)));
@@ -40,7 +48,12 @@ export async function render(box, ctx, r) {
   available(box, W, P, rows, r, wx && (nfl => wx.flagLink(wx.gameOf(WX, nfl))));
   const grid = h('div', {class: 'two'});
   U.ap(box, grid);
-  const draw = () => { grid.replaceChildren(needs(W, P, name, mine), order(W, mine)); };
+  let bsicht = W.bedarf_woche ? 'woche' : 'ros';
+  // Wochensicht mit fünf Spalten: Bedarf und Reihenfolge untereinander in voller Breite, ROS-Sicht nebeneinander
+  const draw = () => {
+    grid.className = bsicht === 'woche' ? 'stack' : 'two';
+    grid.replaceChildren(needs(W, P, name, mine, bsicht, v => { bsicht = v; draw(); }, rowById), order(W, mine));
+  };
   draw();
   claims(box, T, name);
 }
@@ -49,7 +62,9 @@ export async function render(box, ctx, r) {
 function available(box, W, P, rows, r, wflag) {
   const q = r.q;
   const narrow = matchMedia('(max-width:599px)').matches;
+  const hasWeek = !!W.ersatz_woche;
   const st = {pos: POS.includes(q.get('pos')) ? q.get('pos') : '', text: '',
+    hor: HOR.includes(q.get('h')) && (hasWeek || q.get('h') === 'ros') ? q.get('h') : (hasWeek ? 'woche' : 'ros'),
     sicht: ['alle', 'ros', 'besitz'].includes(q.get('sicht')) ? q.get('sicht') : (narrow ? 'ros' : 'alle')};
   const free = rows.filter(x => FREE.includes(x.status));
   const rowsNow = () => free.filter(x => (!st.pos || x.pos === st.pos) && (!st.text || x.name.toLowerCase().includes(st.text)));
@@ -58,7 +73,8 @@ function available(box, W, P, rows, r, wflag) {
   // Wetter-Fähnchen als eigener Link nach #wetter neben dem Spielerlink (kein Link im Link)
   const spieler = {k: 'name', l: 'Spieler', v: x => x.name.toLowerCase(), d: 1, flt: false, f: x => {
     const a = h('a', {href: '#spieler/' + x.id, class: 'pl'},
-      h('span', null, x.name, U.inj(x.inj)), h('span', {class: 'sub'}, `${x.pos ?? '–'} · ${x.nfl ?? '–'} · ${x.status === 'FREEAGENT' ? 'FA' : 'Waivers'}`));
+      h('span', null, x.name, U.inj(x.inj)), h('span', {class: 'sub'}, `${x.pos ?? '–'} · ${x.nfl ?? '–'} · ${x.status === 'FREEAGENT' ? 'FA' : 'Waivers'}`
+        + (played(W, x) ? ` · W${W.woche} gespielt` : '')));
     const fl = wflag?.(x.nfl);
     return fl ? h('span', {class: 'plw'}, a, fl) : a;
   }};
@@ -80,7 +96,19 @@ function available(box, W, P, rows, r, wflag) {
   const verl = {k: 'inj', l: 'Verletzung', v: x => U.INJ[x.inj] ? x.inj : null, d: 1, f: x => U.INJ[x.inj]?.[1] || (x.inj === 'ACTIVE' ? 'aktiv' : '–')};
   const frist = {k: 'frist', l: 'Frist', v: x => x.status === 'WAIVERS' ? x.waiver_bis : null, d: 1,
     f: x => x.status === 'WAIVERS' ? U.val(x.waiver_bis, U.stamp, 'keine Frist gemeldet') : U.na('Free Agent, sofort')};
-  const base = [spieler, num('ros_ue', 'ROS ü. Ersatz', U.sgn, rosWhy), num('proj', `Proj. W${W.woche}`, U.num, 'noch keine ESPN-Projektion')];
+  // Woche N+1: wer schon gespielt hat, bringt in dieser Woche nichts mehr – ohne Sortierwert ans Ende
+  const weekWhy = x => x.pos === 'D/ST' || !U.ok(x.pos) ? 'kein freier Spieler der Position' : 'noch keine ESPN-Projektion';
+  const projUe = {k: 'proj_ue', l: `W${W.woche} ü. Ersatz`, num: 1, v: x => played(W, x) ? null : x.proj_ue,
+    f: x => played(W, x) ? U.na('Spiel der Woche schon angepfiffen') : U.val(x.proj_ue, U.sgn, weekWhy(x))};
+  const proj = num('proj', `Proj. W${W.woche}`, U.num, 'noch keine ESPN-Projektion');
+  const base = {
+    woche: [spieler, projUe, proj],
+    drei: [spieler, num('proj3_ue', `Σ ${span(W)} ü. Ersatz`, U.sgn, 'keine ROS-Projektion'),
+      num('proj3', `Σ ${span(W)}`, U.num, 'keine ROS-Projektion'), proj],
+    ros: [spieler, num('ros_ue', 'ROS ü. Ersatz', U.sgn, rosWhy), proj]};
+  const SORT = {woche: 'proj_ue', drei: 'proj3_ue', ros: 'ros_ue'};
+  const CAP = {woche: `Verfügbare Spieler nach Projektion W${W.woche} über Ersatz`, drei: `Verfügbare Spieler nach Σ ${span(W)} über Ersatz`,
+    ros: 'Verfügbare Spieler nach ROS über Ersatz'};
   const ros = [mu, mu3, bye, verl, num('ros_g', 'ROS/Sp.', U.num, rosWhy)];
   const besitz = [num('own', 'Besitz %', v => U.pct(v)), num('own_d', 'Δ Tag', v => U.sgn(v, 2)), num('started', 'gestartet %', v => U.pct(v))];
   const extra = {alle: [...ros, ...besitz, frist], ros: [...ros, frist], besitz: [...besitz, frist]};
@@ -90,46 +118,80 @@ function available(box, W, P, rows, r, wflag) {
     {k: 'status', l: 'Status', v: x => x.status, d: 1, cat: 1, f: x => U.STAT[x.status] || x.status}];
   let tbl;
   const build = () => {
-    tbl = U.table({cap: 'Verfügbare Spieler nach ROS über Ersatz', cls: 'nr', rh: 0, rows: rowsNow(), sort: ['ros_ue', -1], limit: 50, filter: true,
-      filters, fstate: fst, cols: [...base, ...extra[st.sicht]],
+    tbl = U.table({cap: CAP[st.hor], cls: 'nr', rh: 0, rows: rowsNow(), sort: [SORT[st.hor], -1], limit: 50, filter: true,
+      filters, fstate: fst, cols: [...base[st.hor], ...extra[st.sicht]], rc: x => st.hor !== 'ros' && played(W, x) ? 'gsp' : null,
       note: 'Verfügbar = Waivers oder Free Agent laut Tagesstand.'});
     slot.replaceChildren(tbl);
   };
   const refresh = rebuild => {
     if (rebuild) build(); else tbl.upd(rowsNow());
     count.textContent = `${rowsNow().length} verfügbare Spieler`;
-    U.setQ('waiver', {pos: st.pos || null, sicht: st.sicht !== (narrow ? 'ros' : 'alle') ? st.sicht : null});
+    U.setQ('waiver', {pos: st.pos || null, h: st.hor !== (hasWeek ? 'woche' : 'ros') ? st.hor : null,
+      sicht: st.sicht !== (narrow ? 'ros' : 'alle') ? st.sicht : null});
+    ersNote.replaceChildren(); U.ap(ersNote, ersText());
   };
   let timer;
-  const ers = P.ersatz || {};
+  // Ersatzniveau passend zum Horizont: Projektion W(N+1), Σ N+1…N+3 oder ROS/Spiel
+  const ersText = () => {
+    const [lbl, ers, gid] = {woche: [`Projektion W${W.woche}`, W.ersatz_woche, 'proj-ue'], drei: [`Σ ${span(W)}`, W.ersatz_3, 'proj3'],
+      ros: ['ROS/Spiel', P.ersatz, 'ersatz']}[st.hor];
+    return [`Ersatzniveau (${lbl}): `, POS.map((p, i) => [i ? ' · ' : '', `${p} ${U.ok(ers?.[p]) ? U.num(ers[p]) : '–'}`]),
+      ' ', U.ib(gid, '')];
+  };
+  const ersNote = h('p', {class: 'note'});
+  const horSeg = hasWeek ? U.seg('Horizont', [['woche', `W${W.woche}`], ['drei', `Σ ${span(W)}`], ['ros', 'ROS']], st.hor,
+    v => { st.hor = v; refresh(true); }) : null;
   U.ap(box, h('h2', null, 'Beste verfügbare Spieler'),
-    h('p', {class: 'note'}, 'Ersatzniveau (ROS/Spiel): ', POS.map((p, i) => [i ? ' · ' : '', `${p} ${U.num(ers[p])}`]), ' ', U.ib('ersatz', '')),
+    horSeg && h('div', {class: 'row'}, horSeg, U.ib('horizont', '')),
+    ersNote,
     h('div', {class: 'row'}, U.seg('Position', [['', 'Alle'], ...POS.map(p => [p, p])], st.pos, v => { st.pos = v; refresh(); })),
     h('div', {class: 'row'}, h('label', null, h('span', {class: 'vh'}, 'Spieler suchen'),
       h('input', {type: 'search', placeholder: 'Name suchen', oninput: e => {
         clearTimeout(timer);
         timer = setTimeout(() => { st.text = e.target.value.trim().toLowerCase(); refresh(); }, 150);
       }})),
-    U.seg('Spalten', [['alle', 'Alle'], ['ros', 'ROS'], ['besitz', 'Besitz']], st.sicht, v => { st.sicht = v; refresh(true); })),
+    U.seg('Spalten', [['alle', 'Alle'], ['ros', 'Ausblick'], ['besitz', 'Besitz']], st.sicht, v => { st.sicht = v; refresh(true); })),
     count, slot,
-    U.legend(['verfuegbar', 'ros-ue', 'ersatz', 'ros-spiel', 'proj-naechste', 'mu-n1', 'mu-naechste3', 'bye-hinweis', 'besitz-trend', 'frist',
+    U.legend(['verfuegbar', 'horizont', 'proj-ue', 'proj3', 'gespielt', 'ros-ue', 'ersatz', 'ros-spiel', 'proj-naechste', 'mu-n1', 'mu-naechste3', 'bye-hinweis', 'besitz-trend', 'frist',
       'wetter-markierung', 'filter', 'projektionen']));
   refresh(true);
 }
 
 // ---------------------------------------------------------------- Bedarf je Team
-function needs(W, P, name, mine) {
+// sicht 'woche': Lücken der Woche N+1 mit Grund und freien Kandidaten, Ausfälle der ROS-Aufstellung, Byes N+2…N+3;
+// 'ros': Lücken der ROS-optimalen Aufstellung (Regular Season)
+function needs(W, P, name, mine, sicht, onSicht, rowById) {
   const card = U.card('Bedarf je Team');
+  if (W.bedarf_woche) U.ap(card, h('div', {class: 'row'}, U.seg('Bedarf', [['woche', `W${W.woche}`], ['ros', 'ROS']], sicht, onSicht)));
+  const teams = key => [...S.teams].sort((a, b) => (b.team_id === mine) - (a.team_id === mine) || a.rang - b.rang)
+    .map(t => ({t, b: W[key]?.[String(t.team_id)]}));
+  const rc = x => x.t.team_id === mine ? 'me' : null;
+  const link = id => h('a', {href: '#spieler/' + id}, name(id));
+  if (sicht === 'woche' && W.bedarf_woche) {
+    const byId = rowById;
+    const cand = all => { const ids = all.filter(id => !played(W, byId.get(id) || {})); return ids.length ? [' → ', ids.map((id, i) => [i ? ', ' : '', link(id), ` ${U.num(byId.get(id)?.proj)}`])] : ' → kein freier Spieler mit mehr'; };
+    const gap = g => [`${g.slot}: `, g.id == null ? 'unbesetzt' : [link(g.id), U.inj(byId.get(g.id)?.inj),
+      ` ${U.num(g.proj)}` + (g.grund ? ` (${GRUND[g.grund] || g.grund})` : '')], cand(g.kandidaten)];
+    const miss = a => [link(a.id), ` ${a.slot}: ${GRUND[a.grund] || a.grund}`];
+    const bye = b => [`W${b.woche} `, link(b.id), ` (${b.slot})`];
+    const list = (arr, f, none) => arr.length ? arr.map((x, i) => [i ? h('br') : '', f(x)]) : h('span', {class: 'note'}, none);
+    U.ap(card, U.table({cap: `Lücken der besten Aufstellung für W${W.woche}`, cls: 'nr', rh: 0, rows: teams('bedarf_woche'), sortable: false, rc, cols: [
+      {k: 't', l: 'Team', f: x => U.tl(x.t.team_id)},
+      {k: 'n', l: 'Lücken', num: 1, f: x => x.b ? (x.b.luecken.length || h('span', {class: 'note'}, 'keine')) : '–'},
+      {k: 'l', l: `Lücken W${W.woche} → beste freie Spieler`, cls: 'wrap', f: x => x.b ? list(x.b.luecken, gap, '–') : '–'},
+      {k: 'a', l: 'Ausfälle und fraglich', cls: 'wrap', f: x => x.b ? list(x.b.ausfaelle, miss, '–') : '–'},
+      {k: 'y', l: `Byes ${W.horizont?.length > 1 ? `W${W.horizont[1]}–${W.horizont.at(-1)}` : ''}`, cls: 'wrap', f: x => x.b ? list(x.b.byes, bye, '–') : '–'}]}),
+    U.legend(['bedarf-woche', 'proj-ue', 'gespielt']));
+    return card;
+  }
   if (!W.bedarf) {
     U.ap(card, h('p', {class: 'note'}, P.ros_nach_woche == null ? `Bedarf ab dem ersten ROS-Auszug (Wochenabruf W${S.tw + 1}).` : 'Nach W14 gibt es keinen Regular-Season-Bedarf mehr.'));
     return card;
   }
   const ers = P.ersatz || {};
-  const teams = [...S.teams].sort((a, b) => (b.team_id === mine) - (a.team_id === mine) || a.rang - b.rang)
-    .map(t => ({t, b: W.bedarf[String(t.team_id)]}));
   const gap = g => g.id == null ? `${g.slot}: unbesetzt`
-    : [`${g.slot}: `, h('a', {href: '#spieler/' + g.id}, name(g.id)), ` ${U.num(g.ros_g)}` + (U.ok(ers[g.pos]) ? ` (Ersatz ${U.num(ers[g.pos])})` : '')];
-  U.ap(card, U.table({cap: 'Lücken der ROS-optimalen Aufstellung', cls: 'nr', rh: 0, rows: teams, sortable: false, rc: x => x.t.team_id === mine ? 'me' : null, cols: [
+    : [`${g.slot}: `, link(g.id), ` ${U.num(g.ros_g)}` + (U.ok(ers[g.pos]) ? ` (Ersatz ${U.num(ers[g.pos])})` : '')];
+  U.ap(card, U.table({cap: 'Lücken der ROS-optimalen Aufstellung', cls: 'nr', rh: 0, rows: teams('bedarf'), sortable: false, rc, cols: [
     {k: 't', l: 'Team', f: x => U.tl(x.t.team_id)},
     {k: 'n', l: 'Lücken', num: 1, f: x => x.b ? (x.b.luecken.length || h('span', {class: 'note'}, 'keine')) : '–'},
     {k: 'l', l: 'Starter unter Ersatzniveau', cls: 'wrap', f: x => x.b ? x.b.luecken.map((g, i) => [i ? h('br') : '', gap(g)]) : '–'},
