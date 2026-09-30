@@ -396,3 +396,57 @@ def test_team_needs_von_hand():
     assert needs[1]["ueber_ersatz"] == {QB: 1, RB: 1, WR: 1, TE: 0, K: 0, DST: None}
     assert needs[2]["luecken"] == [] and needs[2]["ueber_ersatz"] == {QB: 2, RB: 3, WR: 4, TE: 2, K: 1, DST: None}
     assert players.team_needs({}, per_game, levels) == {}
+
+
+# ---------------------------------------------------------------- Wochensicht (Waiver-Tab, Beschluss 30.09.2026)
+
+def test_week_value_und_horizont():
+    """Wochenwert N+1: Bye und OUT/IR/gesperrt 0 mit Grund, fraglich mit Projektion; Σ N+1…N+3 mit Bye = 0."""
+    assert players.week_value(12.5, "ACTIVE", True) == (D("12.5"), None)
+    assert players.week_value(12.5, "QUESTIONABLE", True) == (D("12.5"), None)   # fraglich zählt mit Projektion
+    assert players.week_value(12.5, "DOUBTFUL", True) == (D("12.5"), None)
+    assert players.week_value(12.5, "OUT", True) == (D(0), "OUT")
+    assert players.week_value(12.5, "INJURY_RESERVE", True) == (D(0), "INJURY_RESERVE")
+    assert players.week_value(12.5, "SUSPENSION", True) == (D(0), "SUSPENSION")
+    assert players.week_value(12.5, "OUT", False) == (D(0), "BYE")               # Bye vor Verletzung
+    assert players.week_value(None, None, True) == (D(0), None)                  # ohne Projektion 0
+    assert players.horizon_weeks(4) == [4, 5, 6] and players.horizon_weeks(16) == [16, 17]   # W18 zählt nicht
+    nfl = {1: NflTeam(1, "AAA", 5, {4: 2, 6: 2}), 2: NflTeam(2, "BBB", 5, {4: 1, 6: 1})}
+    proj = {"4": 9, "5": 11, "6": 7.5}
+    assert players.horizon_sum(D(10), proj, 1, nfl, [4, 5, 6]) == D("17.5")      # W5 Bye (ESPN projiziert trotzdem)
+    assert players.horizon_sum(D(10), None, 1, nfl, [4, 5, 6]) is None
+    assert players.week_replacement_levels([(QB, D(24)), (QB, D(20)), (QB, D(1)), (QB, D(0)), (RB, D(9))]) \
+        == {QB: D(15), RB: D(9), WR: None, TE: None, players.K: None, DST: None}
+
+
+def test_team_week_needs_von_hand():
+    """Team 1: QB 20 und QB2 OUT, RB 9 (fraglich) und RB auf Bye, WR 12/8/7, TE 6, D/ST 5/4, K 8.
+    Wochenaufstellung: RB2 = Bye → Lücke; WR 7 = Ersatz 7 keine Lücke; D/ST ohne Ersatzniveau keine Lücke; FLEX
+    zweimal und OP leer (QB2 mit 0 verliert gegen leere Reste). Kandidaten je Slot nur mit mehr Wert als die Besetzung.
+    Ausfälle aus der ROS-Aufstellung (OP = QB2 mit ROS 18): RB fraglich, RB Bye, OP OUT; Byes N+2…N+3 nach Woche."""
+    from lineup import K
+    rosters = {1: [(10, QB), (20, QB), (15, RB), (16, RB), (30, WR), (41, WR), (42, WR), (50, TE), (-1, DST), (-2, DST),
+                   (60, K)]}
+    value = {10: (D(20), None), 20: (D(0), "OUT"), 15: (D(9), None), 16: (D(0), "BYE"), 30: (D(12), None),
+             41: (D(7), None), 42: (D(8), None), 50: (D(6), None), -1: (D(5), None), -2: (D(4), None), 60: (D(8), None)}
+    injury = {15: "QUESTIONABLE", 20: "OUT"}
+    levels = {QB: D(16), RB: D(8), WR: D(7), TE: D(5), K: D(7), DST: None}
+    free = [(QB, D(18), 102), (RB, D(11), 100), (WR, D(10), 101), (TE, D(7), 104), (RB, D(5), 103)]
+    per_game = {10: D(20), 20: D(18), 15: D(10), 16: D(9), 30: D(12), 41: D(6), 42: D(7), 50: D(5), -1: D(6), -2: D(5),
+                60: D(8)}
+    needs = players.team_week_needs(rosters, value, injury, levels, free, per_game, {30: [6], 10: [5]})
+    assert needs[1]["luecken"] == [
+        {"slot": "RB", "id": 16, "pos": RB, "proj": D(0), "grund": "BYE", "kandidaten": [100, 103]},
+        {"slot": "FLEX", "id": None, "pos": None, "proj": None, "grund": None, "kandidaten": [100, 101, 104]},
+        {"slot": "FLEX", "id": None, "pos": None, "proj": None, "grund": None, "kandidaten": [100, 101, 104]},
+        {"slot": "OP", "id": None, "pos": None, "proj": None, "grund": None, "kandidaten": [102, 100, 101]}]
+    assert needs[1]["ausfaelle"] == [{"slot": "RB", "id": 15, "pos": RB, "grund": "QUESTIONABLE"},
+                                     {"slot": "RB", "id": 16, "pos": RB, "grund": "BYE"},
+                                     {"slot": "OP", "id": 20, "pos": QB, "grund": "OUT"}]
+    assert needs[1]["byes"] == [{"woche": 5, "slot": "QB", "id": 10, "pos": QB},
+                                {"woche": 6, "slot": "WR", "id": 30, "pos": WR}]
+    # schwacher Starter: K 6 unter Ersatz 7 → Lücke mit Kandidaten nur über 6; ohne ROS keine Ausfälle und Byes
+    weak = players.team_week_needs(rosters, value | {60: (D(6), None)}, injury, levels, free + [(K, D(9), 105), (K, D(6), 106)],
+                                   None, {30: [6]})
+    assert {"slot": "K", "id": 60, "pos": K, "proj": D(6), "grund": None, "kandidaten": [105]} in weak[1]["luecken"]
+    assert weak[1]["ausfaelle"] == [] and weak[1]["byes"] == []

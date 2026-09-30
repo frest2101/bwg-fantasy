@@ -72,7 +72,9 @@ def test_waiver_vertrag(result):
                         dict(row, id=ignored, onTeamId=0)]}
     out = app_export.round_file("waiver.json", app_export.build_waiver(dict(result, pool_latest=pool)))
     assert (out["stand"], out["woche"]) == ("2026-09-29T0645Z", 3)
-    assert set(out) == {"stand", "woche", "reihenfolge", "reihenfolge_quelle", "reihenfolge_stand", "bedarf", "spieler"}
+    assert set(out) == {"stand", "woche", "reihenfolge", "reihenfolge_quelle", "reihenfolge_stand", "bedarf", "spieler",
+                        "horizont", "ersatz_woche", "ersatz_3", "anstoss", "bedarf_woche"}
+    assert out["horizont"] == [3, 4, 5] and len(out["anstoss"]) == 32   # W3: alle 32 Teams spielen
     # ohne Reihenfolge im Pool-Auszug: Wochenstand (waiver_prio aus mTeam des Wochenabrufs); ohne ROS kein Bedarf
     weekly = sorted(result["teams"], key=lambda t: t["waiver_prio"])
     assert out["reihenfolge"] == [t["team_id"] for t in weekly] and out["reihenfolge_quelle"] == "wochenabruf"
@@ -85,7 +87,8 @@ def test_waiver_vertrag(result):
     assert app_export.build_waiver(dict(result, pool_latest=dict(daily, waiver_reihenfolge_stand=None)))["reihenfolge_stand"] == "2026-09-29T0645Z"
     assert [p["id"] for p in out["spieler"]] == [inside, outside]
     first = out["spieler"][0]
-    assert set(first) == {"id", "team", "status", "inj", "own", "own_d", "started", "waiver_bis", "proj", "news"}
+    assert set(first) == {"id", "team", "status", "inj", "own", "own_d", "started", "waiver_bis", "proj", "news",
+                          "proj_ue", "proj3", "proj3_ue"}
     assert (first["team"], first["status"], first["inj"], first["own"], first["own_d"], first["started"],
             first["waiver_bis"], first["proj"], first["news"]) \
         == (0, "WAIVERS", "QUESTIONABLE", 64.66, -0.07, 58.81, 1790751600000, 8.72, 1790569213000)
@@ -339,3 +342,42 @@ def test_committete_app_daten_sind_aktuell():
     fresh = app_export.render(app_export.build(latest), latest)
     stale = [n for n, raw in fresh.items() if (app_export.APP_DATA / n).read_bytes() != raw]
     assert not stale, f"app/data veraltet ({', '.join(stale)}) – python scripts/compute.py ausführen"
+
+
+def test_wochensicht_vertrag():
+    """week_view aus erfundenen Wochen- und Tagesdaten (Woche 4, Horizont 4–6): Team AAA hat in W5 Bye, BBB spielt immer.
+    Freie QBs 24,5 / 20 / OUT; Wochen-Ersatz QB = Ø(24,5; 20) (der OUT-Spieler zählt nicht); Kader Team 1: QB 30 fällt
+    aus (OUT), QB 31 mit 10 unter Ersatz."""
+    from datetime import datetime, timezone
+    from lineup import QB
+    nfl = {1: rawdata.NflTeam(1, "AAA", 5, {4: 2, 6: 2}), 2: rawdata.NflTeam(2, "BBB", 13, {4: 1, 5: 1, 6: 1})}
+    kick = datetime(2026, 10, 2, 0, 15, tzinfo=timezone.utc)
+    games = [{"id": 1, "woche": 4, "heim": 1, "gast": 2, "kickoff": kick, "tbd": False},
+             {"id": 2, "woche": 6, "heim": 2, "gast": 1, "kickoff": kick, "tbd": False}]
+    weekly = {pid: {"pos": QB, "pro_team": team, "ros_pro_spiel": Decimal(ros)}
+              for pid, team, ros in ((10, 1, 5), (11, 2, 4), (12, 2, 9), (30, 1, 22), (31, 2, 10))}
+    ros = {"10": {"4": 24.5, "5": 3, "6": 1}, "11": {"4": 20, "5": 18, "6": 17}, "30": {"4": 21, "5": 22, "6": 22}}
+    row = lambda pid, status, team, proj, inj="ACTIVE": {"id": pid, "status": status, "onTeamId": team,  # noqa: E731
+                                                         "injuryStatus": inj, "proj_naechste_woche": proj}
+    pool = {"woche": 4, "players": [row(10, "FREEAGENT", 0, 24.5), row(11, "WAIVERS", 0, 20),
+                                    row(12, "FREEAGENT", 0, 30, "OUT"), row(30, "ONTEAM", 1, 21, "OUT"),
+                                    row(31, "ONTEAM", 1, 10), row(99, "FREEAGENT", 0, 50)]}   # 99 ohne Wochenpool: entfällt
+    result = {"nfl": nfl, "nfl_spiele": games, "ros_projektion": ros,
+              "players": {"players": weekly, "ros_after_week": 3}}
+    view = app_export.round_file("waiver.json", app_export.week_view(pool, result))
+    assert view["horizont"] == [4, 5, 6] and view["anstoss"] == dict.fromkeys(("AAA", "BBB"), int(kick.timestamp() * 1000))
+    assert view["ersatz_woche"]["QB"] == 22.25 and view["ersatz_woche"]["RB"] is None
+    assert view["ersatz_3"]["QB"] == 40.25                      # Σ: 10 = 24,5 + Bye + 1 = 25,5; 11 = 20 + 18 + 17 = 55
+    assert view["spieler"][10] == {"proj_ue": 2.25, "proj3": 25.5, "proj3_ue": -14.75}
+    assert view["spieler"][12] == {"proj_ue": -22.25, "proj3": None, "proj3_ue": None}   # OUT: 0, ohne ROS-Eintrag
+    assert 99 not in view["spieler"]
+    need = view["bedarf_woche"][1]
+    assert [(g["slot"], g["id"], g["pos"], g["proj"], g["grund"], g["kandidaten"]) for g in need["luecken"]][:2] == [
+        ("QB", 31, "QB", 10.0, None, [10, 11]), ("RB", None, None, None, None, [])]
+    assert need["ausfaelle"][0] == {"slot": "QB", "id": 30, "pos": "QB", "grund": "OUT"}
+    assert need["byes"] == [{"woche": 5, "slot": "QB", "id": 30, "pos": "QB"}]
+    # ohne Regular-Season-ROS keine Ausfälle und Byes, ohne Spielplan oder nach W17 keine Wochensicht
+    late = app_export.week_view(pool, dict(result, players={"players": weekly, "ros_after_week": 14}))
+    assert late["bedarf_woche"][1]["ausfaelle"] == [] and late["bedarf_woche"][1]["byes"] == []
+    assert app_export.week_view(pool, dict(result, nfl=None)) is None
+    assert app_export.week_view(dict(pool, woche=18), result) is None
