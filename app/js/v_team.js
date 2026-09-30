@@ -55,15 +55,19 @@ export async function render(box, ctx, r) {
   U.ap(box, sec('Verläufe', ...svg.verlauf(t.team_id, false)), sec('Franchise-Historie', fr),
     U.chips('Weiter zu', [['#moves?team=' + t.team_id, 'Moves dieses Teams', 'm'], ['#rekorde/h2h?team=' + t.team_id, 'H2H-Bilanz', 'h'],
       ['#spieler?team=' + t.team_id + '&status=kader', 'Spielerliste des Teams', 's'],
+      ['#keeper/kader?team=' + t.team_id, 'Keeper und Kader', 'k'],
       ['#waiver?team=' + t.team_id, `Waiver aus Sicht von ${t.kuerzel}`, 'w']], null));
   // Kader mit dem Tagesstand (waiver.json) wie im Spieler-Tab: aktuelle Zu- und Abgänge und Verletzungen; dieselbe
   // Ladung liefert das Profil (Kurzzeile und Umschalter „Profil“)
   ctx.lazy('players.json', 'Spielerdaten', kader).then(async P => {
     const W = S.man.files?.['waiver.json'] ? await ctx.load('waiver.json').catch(() => null) : null;
+    // Herkunft je Kaderspieler (keeper.json) ist Zugabe: ohne die Datei fehlt nur die Spalte
+    const K = S.man.files?.['keeper.json'] ? await ctx.load('keeper.json').catch(() => null) : null;
+    const kp = K ? await ctx.mod('v_keeper').catch(() => null) : null;
     const sp = await ctx.mod('v_spieler');
     if (!r.alive()) return;
     const all = sp.merge(P, W);
-    roster(kader, t, P, all, W, sp.nflTxt);
+    roster(kader, t, P, all, W, sp.nflTxt, kp && K, kp);
     const name = new Map(all.map(p => [p.id, p.name]));
     const prof = W?.profil?.[String(t.team_id)];
     if (prof) { kurz.replaceChildren(...short(prof, W)); positions(pos, t, W, name); }
@@ -171,17 +175,23 @@ function h2h(t) {
     {k: 'd', l: 'PF-Diff', num: 1, v: x => x.d, f: x => U.sgn(x.d)}]}), U.legend(['h2h']));
 }
 
-function roster(box, t, P, all, W, nflTxt) {
+function roster(box, t, P, all, W, nflTxt, K, kp) {
   const last = (P.weeks || []).length - 1;
   const rows = all.filter(p => p.team === t.team_id)
     .sort((a, b) => POS.indexOf(a.pos) - POS.indexOf(b.pos) || (b.avg ?? -1) - (a.avg ?? -1));
   const ros = 'ab Wochenabruf W' + (S.tw + 1);
+  // Herkunft (keeper.json, Kader heute): nur Zeilen dieses Teams, sonst wäre ein eben gewechselter Spieler falsch beschriftet
+  const org = K ? kp.byPlayer(K) : null, ARTEN = ['keeper', 'draft', 'waiver', 'free_agent', 'trade'];
+  const mine = p => { const o = org.get(p.id); return o && o.team === t.team_id ? o : null; };
   U.ap(box, U.table({cap: `Kader (${rows.length} Spieler)`, cls: 'nr', rows, sort: null, rh: 0, cols: [
     {k: 'n', l: 'Spieler', v: p => p.name, d: 1, f: p => h('a', {href: '#spieler/' + p.id, class: 'pl'}, h('span', null, p.name, U.inj(p.inj)), h('span', {class: 'sub'}, `${p.pos ?? '–'} · ${nflTxt(p)}`))},
     {k: 's', l: `Slot W${P.weeks?.[last] ?? ''}`, v: p => { const i = ORD.indexOf(U.slot(p.wk?.[last]?.[4])); return i < 0 ? null : i; }, d: 1, f: p => U.slot(p.wk?.[last]?.[4])},
+    org ? {k: 'h', l: 'Herkunft', v: p => { const i = ARTEN.indexOf(mine(p)?.art); return i < 0 ? null : i; }, d: 1,
+      f: p => kp.herkunft(mine(p), K) ?? U.na('noch nicht zugeordnet')} : null,
     {k: 'a', l: 'Ø', num: 1, v: p => p.avg, f: p => U.val(p.avg, U.num, 'ohne Spiel')},
     {k: 'f', l: 'Form', num: 1, v: p => p.form, f: p => [U.val(p.form, U.num, 'ohne Spiel'), p.trend ? ' ' + p.trend : '']},
-    {k: 'r', l: 'ROS/Sp.', num: 1, v: p => p.ros_g, f: p => U.val(p.ros_g, U.num, ros)}]}),
+    {k: 'r', l: 'ROS/Sp.', num: 1, v: p => p.ros_g, f: p => U.val(p.ros_g, U.num, ros)}].filter(Boolean)}),
+  org ? U.legend(['herkunft']) : null,
   h('p', {class: 'note'}, W?.stand ? `Kader und Verletzung: Tagesstand ${U.stamp(W.stand)}. ` : `Verletzung: Stand nach W${S.man.datenstand?.pool_woche ?? S.tw}. `,
     'Q fraglich · D zweifelhaft · O fällt aus · IR Injured Reserve · DTD Day-to-Day.'));
 }

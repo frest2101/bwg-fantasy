@@ -1017,7 +1017,7 @@ def test_update_pool_mit_waiver_reihenfolge(raw, capsys):
     assert saved["waiver_reihenfolge"]["6"] == 1 and "Testteam" not in text and "Testmanager" not in text
     assert saved["waiver_reihenfolge_stand"] == "2026-09-29T0645Z"
     assert list(saved) == ["season", "woche", "stand", "quelle", "waiver_reihenfolge", "waiver_reihenfolge_stand",
-                           "ir_slot", "ir_slot_stand", "players"]
+                           "ir_slot", "ir_slot_stand", "trades", "players"]
     # unverändert (auch die Reihenfolge): keine neue Datei, kein neuer Stand der Reihenfolge
     errors, current = ef.update_pool(session, 2026, now + timedelta(minutes=30), "2026-09-29T0715Z")
     assert errors == 0 and current["stand"] == "2026-09-29T0645Z" and current["waiver_reihenfolge_stand"] == "2026-09-29T0645Z"
@@ -1087,3 +1087,34 @@ def test_update_pool_mit_ir_slots(raw, capsys):
     errors, current = ef.update_pool(session, 2026, now, "2026-09-29T0845Z")
     assert errors == 0 and current["ir_slot"]["7"] == [] and current["ir_slot_stand"] == "2026-09-29T0745Z"
     assert "IR-Slots" in capsys.readouterr().out
+
+
+def test_fetch_roster_state_trades():
+    """Per Trade gekommene Spieler aus mRoster (acquisitionType TRADE): Spieler-ID als Text → [team_id, Datum], nach
+    ID sortiert; Draft und Zugänge bleiben draußen, ein fehlendes Datum wird None. Die IR-Slots kommen aus demselben
+    Aufruf. Erfundene Spieler."""
+    data = fake_mroster()
+    data["teams"][6]["roster"]["entries"] += [
+        {"playerId": 9002, "lineupSlotId": 20, "acquisitionType": "TRADE", "acquisitionDate": 1788287280000},
+        {"playerId": 9001, "lineupSlotId": 2, "acquisitionType": "TRADE"},
+        {"playerId": 9003, "lineupSlotId": 20, "acquisitionType": "ADD", "acquisitionDate": 1788287280001},
+        {"playerId": 9004, "lineupSlotId": 20, "acquisitionType": "DRAFT", "acquisitionDate": 1788110942930}]
+    ir, trades = ef.fetch_roster_state(StubSession(data), 2026)
+    assert ir == ef.fetch_ir_slots(StubSession(data), 2026) and ir["7"] == [701]
+    assert trades == {"9001": [7, None], "9002": [7, 1788287280000]} and list(trades) == ["9001", "9002"]
+    assert ef.fetch_roster_state(StubSession(fake_mroster()), 2026)[1] == {}
+
+
+def test_update_pool_mit_trades(raw):
+    """Trades im Kopf des Pool-Auszugs; scheitert mRoster, bleiben die Trades des letzten Laufs, beim ersten Lauf None."""
+    session = FakePoolSession()
+    now = datetime(2026, 9, 29, 6, 45, tzinfo=timezone.utc)
+    path = ef.pool_dir(2026) / ef.POOL_FILE
+    errors, current = ef.update_pool(session, 2026, now, "2026-09-29T0645Z")
+    assert errors == 0 and current["trades"] == {} and json.loads(path.read_bytes())["trades"] == {}
+    session.roster_broken, session.owned = True, 12.0       # mRoster fällt aus, der Pool ändert sich trotzdem
+    errors, current = ef.update_pool(session, 2026, now, "2026-09-29T0745Z")
+    assert errors == 0 and current["trades"] == {}
+    path.unlink()
+    errors, current = ef.update_pool(session, 2026, now, "2026-09-29T0845Z")
+    assert errors == 0 and current["trades"] is None and current["ir_slot"] is None
