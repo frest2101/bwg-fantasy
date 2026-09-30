@@ -399,16 +399,17 @@ def team_view(pool: dict, result: dict, view: dict | None, keep: set[int]) -> tu
     Profil (players.team_profiles) nach need_basis, dazu je Gruppe ist_rang (Ist-Punkte der Starter-Slots W1–N aus
     records.positions, QB-Gruppe = QB + OP), absicherung je Position (players.cover_loss mit dem besten
     verfügbaren Spieler ohne OUT/IR) samt Rang (1 = geringster Verlust), byes = Kosten der Byes N+1 … W14 bzw.
-    W17 in den Playoffs (players.bye_costs), kader = {spieler, voll, limit} (players.must_drop).
+    W17 in den Playoffs (players.bye_costs), kader = {spieler, ir, voll, limit} (players.must_drop mit dem IR-Slot laut
+    Tagesstand ir_slot; ohne ihn steht niemand auf IR).
     Zugewinn (players.team_gains) je Spieler der Auswahl keep mit Status WAIVERS/FREEAGENT und Horizont:
     woche = Wochenwert N+1, drei = Wochenwerte N+1 … N+3 (je Woche eigene Aufstellung), ros = need_basis.
     Rückgabe (profil oder None ohne Grundlage, {Spieler-ID: {Horizont: {team_id: {"b", "n"}}}}).
     """
     weekly = result["players"]["players"]
     rosters = pool_rosters(pool, weekly)
-    injury = {p["id"]: p.get("injuryStatus") for p in pool["players"]}
+    on_ir = {pid for ids in (pool.get("ir_slot") or {}).values() for pid in ids}   # tatsächlicher IR-Slot (mRoster)
     rules = result.get("kader_regeln")
-    drop_rule = {tid: players_module.must_drop(r, injury, rules) for tid, r in rosters.items()} if rules else {}
+    drop_rule = {tid: players_module.must_drop(r, on_ir, rules) for tid, r in rosters.items()} if rules else {}
     free = [p for p in pool["players"] if p["id"] in keep and p["id"] in weekly
             and p.get("status") in players_module.REPLACEMENT_STATUS]
     gains: dict[int, dict] = {}
@@ -439,7 +440,7 @@ def team_view(pool: dict, result: dict, view: dict | None, keep: set[int]) -> tu
             pos = weekly[p["id"]]["pos"]
             free_best[pos] = max(free_best.get(pos, v), v)
     cover = {tid: players_module.cover_loss(r, per_game, free_best) for tid, r in rosters.items()}
-    cover_rank = {pos: ranked({tid: c[pos] for tid, c in cover.items() if c[pos] is not None})
+    cover_rank = {pos: ranked({tid: c[pos]["wert"] for tid, c in cover.items() if c[pos] is not None})
                   for pos in players_module.POSITION_CV}
     after, nfl = result["players"]["ros_after_week"], result.get("nfl") or {}
     last = players_module.LAST_REGULAR_WEEK if kind == "regular" else players_module.LAST_PLAYOFF_WEEK
@@ -456,9 +457,10 @@ def team_view(pool: dict, result: dict, view: dict | None, keep: set[int]) -> tu
         full, at_limit = drop_rule.get(tid, (None, set()))
         out[tid] = prof | {
             "gruppen": {g: grp | {"ist_rang": ist_rank[g].get(tid)} for g, grp in prof["gruppen"].items()},
-            "absicherung": {name(pos): {"wert": v, "rang": cover_rank[pos].get(tid)} for pos, v in cover[tid].items()},
+            "absicherung": {name(pos): (v and v | {"rang": cover_rank[pos].get(tid)}) for pos, v in cover[tid].items()},
             "byes": players_module.bye_costs(rosters[tid], per_game, byes, bye_weeks),
-            "kader": {"spieler": len(rosters[tid]), "voll": full, "limit": sorted(name(p) for p in at_limit)}}
+            "kader": {"spieler": len(rosters[tid]), "ir": sum(1 for pid, _ in rosters[tid] if pid in on_ir),
+                      "voll": full, "limit": sorted(name(p) for p in at_limit)}}
     return out, gains
 
 

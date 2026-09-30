@@ -850,13 +850,27 @@ def fake_mteam(ranks=RANKS) -> dict:
             "teams": [{"id": i, "name": f"Testteam {i}", "waiverRank": r} for i, r in zip(range(1, 11), ranks)]}
 
 
+IR = {1: [101], 7: [701]}   # erfundene IR-Slots: Team 1 Spieler 101, Team 7 Spieler 701
+
+
+def fake_mroster(ir=IR) -> dict:
+    """mRoster-Antwort mit zehn Teams und je zwei Einträgen (Bank und – laut ir – IR); Namen sind erfunden und dürfen
+    nie im Auszug landen."""
+    return {"id": ef.LEAGUE_ID, "seasonId": 2026,
+            "teams": [{"id": i, "roster": {"entries": [
+                {"playerId": i * 100 + 50, "lineupSlotId": 20, "playerPoolEntry": {"player": {"fullName": "Testspieler"}}}]
+                + [{"playerId": pid, "lineupSlotId": ef.SLOT_IR_ID} for pid in ir.get(i, [])]}} for i in range(1, 11)]}
+
+
 class FakePoolSession:
-    """Beantwortet den Spielerpool (kona) mit erfundenen Spielern und mTeam mit erfundenen Waiver-Rängen;
-    owned setzt den Besitz von Spieler 1, ranks die Reihenfolge, mteam_broken lässt nur mTeam scheitern."""
+    """Beantwortet den Spielerpool (kona) mit erfundenen Spielern, mTeam mit erfundenen Waiver-Rängen und mRoster
+    mit erfundenen IR-Slots; owned setzt den Besitz von Spieler 1, ranks die Reihenfolge, ir die IR-Slots,
+    mteam_broken bzw. roster_broken lassen nur mTeam bzw. mRoster scheitern."""
 
     def __init__(self):
         self.owned, self.broken, self.weeks = None, False, []
         self.ranks, self.mteam_broken, self.mteam_calls = list(RANKS), False, 0
+        self.ir, self.roster_broken = dict(IR), False
 
     def __enter__(self):
         return self
@@ -868,6 +882,8 @@ class FakePoolSession:
         if params["view"] == ef.TEAM_VIEW:
             self.mteam_calls += 1
             return FakeResponse(503, b"down") if self.mteam_broken else ok(fake_mteam(self.ranks))
+        if params["view"] == ef.ROSTER_VIEW:
+            return FakeResponse(503, b"down") if self.roster_broken else ok(fake_mroster(self.ir))
         assert params["view"] == ef.KONA_VIEW
         if self.broken:
             return FakeResponse(503, b"down")
@@ -909,7 +925,7 @@ class FakeDailySession(FakePoolSession):
         self.espn = espn
 
     def get(self, url, params=None, headers=None, timeout=None):
-        if params["view"] in (ef.KONA_VIEW, ef.TEAM_VIEW):
+        if params["view"] in (ef.KONA_VIEW, ef.TEAM_VIEW, ef.ROSTER_VIEW):
             return super().get(url, params, headers, timeout)
         content, _ = self.espn.fetch(params)
         return FakeResponse(200, content)
@@ -1000,7 +1016,8 @@ def test_update_pool_mit_waiver_reihenfolge(raw, capsys):
     saved, text = json.loads(path.read_bytes()), path.read_text(encoding="utf-8")
     assert saved["waiver_reihenfolge"]["6"] == 1 and "Testteam" not in text and "Testmanager" not in text
     assert saved["waiver_reihenfolge_stand"] == "2026-09-29T0645Z"
-    assert list(saved) == ["season", "woche", "stand", "quelle", "waiver_reihenfolge", "waiver_reihenfolge_stand", "players"]
+    assert list(saved) == ["season", "woche", "stand", "quelle", "waiver_reihenfolge", "waiver_reihenfolge_stand",
+                           "ir_slot", "ir_slot_stand", "players"]
     # unverändert (auch die Reihenfolge): keine neue Datei, kein neuer Stand der Reihenfolge
     errors, current = ef.update_pool(session, 2026, now + timedelta(minutes=30), "2026-09-29T0715Z")
     assert errors == 0 and current["stand"] == "2026-09-29T0645Z" and current["waiver_reihenfolge_stand"] == "2026-09-29T0645Z"
@@ -1033,3 +1050,40 @@ def test_pool_extract_verlangt_32_dst():
     data["players"][0]["player"]["defaultPositionId"] = 2  # nur noch 31 D/ST
     with pytest.raises(ef.FetchError, match="31 statt 32"):
         ef.pool_extract(data, 2026, 4, "x")
+
+
+def test_fetch_ir_slots():
+    """IR-Slots je Team als Text-Schlüssel, sortierte IDs, Teams ohne IR mit leerer Liste; unbrauchbare Antworten
+    sind Fehler."""
+    session = FakePoolSession()
+    ir = ef.fetch_ir_slots(session, 2026)
+    assert ir == {str(i): IR.get(i, []) for i in range(1, 11)} and list(ir) == [str(i) for i in range(1, 11)]
+    session.roster_broken = True
+    with pytest.raises(ef.FetchError, match="HTTP 503"):
+        ef.fetch_ir_slots(session, 2026)
+    with pytest.raises(ef.FetchError, match="ohne Teams"):
+        ef.fetch_ir_slots(StubSession(dict(fake_mroster(), teams=[])), 2026)
+    with pytest.raises(ef.FetchError, match="Liga und Saison"):
+        ef.fetch_ir_slots(StubSession(dict(fake_mroster(), seasonId=2025)), 2026)
+    broken = fake_mroster()
+    broken["teams"][0]["roster"]["entries"][0].pop("lineupSlotId")
+    with pytest.raises(ef.FetchError, match="ohne Slot"):
+        ef.fetch_ir_slots(StubSession(broken), 2026)
+
+
+def test_update_pool_mit_ir_slots(raw, capsys):
+    """IR-Slots im Kopf des Pool-Auszugs mit Stand ihrer letzten Änderung; scheitert mRoster, bleibt der alte Stand
+    (Warnung); keine Namen im Auszug."""
+    session = FakePoolSession()
+    now = datetime(2026, 9, 29, 6, 45, tzinfo=timezone.utc)
+    path = ef.pool_dir(2026) / ef.POOL_FILE
+    errors, current = ef.update_pool(session, 2026, now, "2026-09-29T0645Z")
+    assert errors == 0 and current["ir_slot"]["7"] == [701] and current["ir_slot_stand"] == "2026-09-29T0645Z"
+    assert "Testspieler" not in path.read_text(encoding="utf-8")
+    session.ir = {1: [101], 7: []}                          # Spieler 701 kommt vom IR zurück
+    errors, current = ef.update_pool(session, 2026, now, "2026-09-29T0745Z")
+    assert current["ir_slot"]["7"] == [] and current["ir_slot_stand"] == "2026-09-29T0745Z"
+    session.roster_broken, session.owned = True, 12.0       # mRoster fällt aus, der Pool ändert sich trotzdem
+    errors, current = ef.update_pool(session, 2026, now, "2026-09-29T0845Z")
+    assert errors == 0 and current["ir_slot"]["7"] == [] and current["ir_slot_stand"] == "2026-09-29T0745Z"
+    assert "IR-Slots" in capsys.readouterr().out

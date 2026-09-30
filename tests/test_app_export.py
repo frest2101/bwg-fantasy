@@ -492,9 +492,15 @@ def test_profil_und_zugewinn_echte_daten():
         assert list(p["gruppen"]) == ["QB", "RB", "WR", "TE", "FLEX", "D/ST", "K"]
         assert sum((g["wert"] for g in p["gruppen"].values()), Decimal(0)) == p["gesamt"]["wert"]
         assert set(p["schwach"]).isdisjoint(p["stark"]) and set(p["schwach"]) | set(p["stark"]) <= set(p["gruppen"])
-        assert all(a["wert"] is None or a["wert"] <= 0 for a in p["absicherung"].values())
+        assert all(a is None or (a["wert"] <= 0 and (not a["frei_gleichwertig"] or a["wert"] == 0))
+                   for a in p["absicherung"].values())
         assert all(b["kosten"] < 0 and b["ids"] for b in p["byes"])
-        assert p["kader"]["spieler"] >= 13 and isinstance(p["kader"]["voll"], bool)
+        assert p["kader"]["spieler"] >= 13 and isinstance(p["kader"]["voll"], bool) and 0 <= p["kader"]["ir"] <= 1
+    # IR-Slot laut Tagesstand: ein Team mit 24 Spielern und einem davon im IR-Slot hat einen Platz frei
+    small = next(t for t, p in out["profil"].items() if p["kader"]["spieler"] == 24)
+    parked = next(p["id"] for p in res["pool_latest"]["players"] if p.get("onTeamId") == small)
+    ir_out = app_export.build_waiver(dict(res, pool_latest=dict(res["pool_latest"], ir_slot={str(small): [parked]})))
+    assert ir_out["profil"][small]["kader"]["ir"] == 1 and ir_out["profil"][small]["kader"]["voll"] is False
     zug = [s for s in out["spieler"] if "zug" in s]
     assert zug and all(s["status"] in ("WAIVERS", "FREEAGENT") for s in zug)
     assert all(set(s["zug"]) <= {"woche", "drei", "ros"} and v["b"] > 0 and v["n"] <= v["b"]

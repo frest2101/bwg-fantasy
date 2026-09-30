@@ -509,11 +509,13 @@ def team_profiles(rosters: dict[int, list[tuple[int, int]]], value: dict[int, De
 
 
 def cover_loss(roster: list[tuple[int, int]], value: dict[int, Decimal | None],
-               free_best: dict[int, Decimal | None]) -> dict[int, Decimal | None]:
+               free_best: dict[int, Decimal | None]) -> dict[int, dict | None]:
     """Absicherung je Position: Was die beste Aufstellung verliert, wenn der beste Spieler der Position ausfällt und
-    der beste verfügbare Spieler der Position (free_best, ohne: niemand) nachrückt; höchstens 0 (ist der freie Spieler
-    mindestens so gut, kostet der Ausfall nichts – die Chance zeigt der Zugewinn). None ohne Spieler der Position im
-    Kader. Bester Spieler = höchster Wert, bei Gleichstand die kleinere ID (wie optimal_lineup)."""
+    der beste verfügbare Spieler der Position (free_best, ohne: niemand) nachrückt.
+
+    Rückgabe je Position {"wert": Verlust ≤ 0, "frei_gleichwertig": bool} oder None ohne Spieler der Position.
+    frei_gleichwertig = ein freier Spieler ist mindestens so gut wie der eigene Beste; dann ist wert 0 (ein Ausfall
+    kostet nichts, die Chance zeigt der Zugewinn). Bester Spieler = höchster Wert, bei Gleichstand die kleinere ID."""
     entries = [(pos, value.get(pid) or ZERO, pid) for pid, pos in roster]
     base = optimal_points(entries)
     out = {}
@@ -523,9 +525,11 @@ def cover_loss(roster: list[tuple[int, int]], value: dict[int, Decimal | None],
             out[pos] = None
             continue
         rest = [e for e in entries if e[2] != mine[0][2]]
-        if free_best.get(pos) is not None:
-            rest.append((pos, free_best[pos], PLACEHOLDER))
-        out[pos] = min(ZERO, optimal_points(rest) - base)
+        free = free_best.get(pos)
+        if free is not None:
+            rest.append((pos, free, PLACEHOLDER))
+        equal = free is not None and free >= mine[0][1]
+        out[pos] = {"wert": ZERO if equal else min(ZERO, optimal_points(rest) - base), "frei_gleichwertig": equal}
     return out
 
 
@@ -558,15 +562,16 @@ def roster_rules(settings: dict) -> dict:
             "limits": {pos: limits[pos] for pos in POSITION_CV if limits.get(pos, 0) > 0}}
 
 
-def must_drop(roster: list[tuple[int, int]], injury: dict[int, str | None], rules: dict) -> tuple[bool, set[int]]:
+def must_drop(roster: list[tuple[int, int]], on_ir: set[int], rules: dict) -> tuple[bool, set[int]]:
     """Braucht ein Zugang einen Drop? (voll, Positionen am Limit).
 
-    Voll = die Spieler ohne IR-Platz füllen alle übrigen Plätze: len(Kader) − min(IR-Slots, Spieler mit OUT oder
-    INJURY_RESERVE) ≥ Plätze − IR-Slots. Näherung: Der Fantasy-IR-Slot steht nicht im Tagesstand; wer OUT oder
-    INJURY_RESERVE ist, kann dort stehen. Am Limit = so viele Spieler der Position wie laut positionLimits erlaubt.
+    Voll = die Spieler außerhalb des IR-Slots füllen alle übrigen Plätze: len(Kader) − Spieler im IR-Slot
+    ≥ Plätze − IR-Slots. on_ir = Spieler-IDs, die laut ESPN (mRoster, Tagesstand ir_slot) im IR-Slot stehen; ohne
+    diese Angabe (leere Menge) steht niemand auf IR – es wird nicht nach Status geraten (Korrektur Stephan
+    30.09.2026). Am Limit = so viele Spieler der Position wie laut positionLimits erlaubt.
     """
-    eligible = sum(1 for pid, _ in roster if injury.get(pid) in INJURED)
-    full = len(roster) - min(rules["ir"], eligible) >= rules["plaetze"] - rules["ir"]
+    parked = min(rules["ir"], sum(1 for pid, _ in roster if pid in on_ir))
+    full = len(roster) - parked >= rules["plaetze"] - rules["ir"]
     counts = {pos: sum(1 for _, p in roster if p == pos) for pos in rules["limits"]}
     return full, {pos for pos, limit in rules["limits"].items() if counts[pos] >= limit}
 

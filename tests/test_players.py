@@ -495,26 +495,33 @@ def test_absicherung_und_byes_von_hand():
     springt ein (0, Woche fehlt); in W7 fehlt eine D/ST (−6)."""
     roster, value = base_roster(1)
     loss = players.cover_loss(roster, value, {QB: D(12)})
-    assert loss == {QB: D(-8), RB: D(-5), WR: D(-5), TE: D(-8), players.K: D(-8), DST: D(-6)}
-    assert players.cover_loss(roster, value, {})[QB] == D(-15)
+    assert {pos: v["wert"] for pos, v in loss.items()} == {QB: D(-8), RB: D(-5), WR: D(-5), TE: D(-8), players.K: D(-8),
+                                                            DST: D(-6)}
+    assert not any(v["frei_gleichwertig"] for v in loss.values())
+    assert players.cover_loss(roster, value, {})[QB]["wert"] == D(-15)
     assert players.cover_loss([(p, pos) for p, pos in roster if pos != TE], value, {})[TE] is None
-    assert players.cover_loss(roster, value, {TE: D(9)})[TE] == D(0)   # freier TE 9 besser als der eigene 8: 0, nicht +1
+    # freier TE 9 besser als der eigene 8 (bzw. gleich gut): kein Verlust, als gleichwertig gekennzeichnet
+    assert players.cover_loss(roster, value, {TE: D(9)})[TE] == {"wert": D(0), "frei_gleichwertig": True}
+    assert players.cover_loss(roster, value, {TE: D(8)})[TE] == {"wert": D(0), "frei_gleichwertig": True}
     costs = players.bye_costs(roster, value, {106: {5}, 105: {6}, 112: {7}}, [5, 6, 7])
     assert costs == [{"woche": 5, "kosten": D(-5), "ids": [106]}, {"woche": 7, "kosten": D(-6), "ids": [112]}]
 
 
 def test_kaderregeln_und_drop():
-    """roster_rules aus mSettings; must_drop: voll bei 24 Spielern ohne IR-Kandidat (24 Nicht-IR-Plätze), nicht voll,
-    wenn einer OUT ist (er kann auf IR); WR am Limit 8."""
+    """roster_rules aus mSettings; must_drop: voll bei 24 Spielern, wenn niemand im IR-Slot steht (24 Plätze außer
+    IR), nicht voll, wenn einer der 24 laut ESPN im IR-Slot steht; der Status allein zählt nicht (Korrektur Stephan:
+    OUT darf nicht auf IR); WR am Limit 8."""
     settings = {"rosterSettings": {"lineupSlotCounts": {"0": 1, "2": 2, "4": 3, "6": 1, "7": 1, "16": 2, "17": 1,
                                                         "20": 11, "21": 1, "23": 2},
                                    "positionLimits": {"0": 0, "1": 5, "2": 8, "3": 8, "4": 4, "5": 3, "16": 4, "17": -1}}}
     rules = players.roster_rules(settings)
     assert rules == {"plaetze": 25, "ir": 1, "limits": {QB: 5, RB: 8, WR: 8, TE: 4, players.K: 3, DST: 4}}
     roster = [(i, WR) for i in range(8)] + [(100 + i, RB) for i in range(16)]
-    assert players.must_drop(roster, {}, rules) == (True, {WR, RB})   # 16 RB > Limit 8
-    assert players.must_drop(roster, {100: "OUT"}, rules) == (False, {WR, RB})
-    assert players.must_drop(roster[:15], {}, rules) == (False, {WR})
+    assert players.must_drop(roster, set(), rules) == (True, {WR, RB})   # 16 RB > Limit 8
+    assert players.must_drop(roster, {100}, rules) == (False, {WR, RB})  # 100 steht im IR-Slot
+    assert players.must_drop(roster, {100, 101}, rules)[0] is False      # zwei gemeldet, ein IR-Slot: zählt einmal
+    assert players.must_drop(roster + [(999, TE)], {100, 101}, rules)[0] is True
+    assert players.must_drop(roster[:15], set(), rules) == (False, {WR})
 
 
 def test_team_gains_brutto_netto():

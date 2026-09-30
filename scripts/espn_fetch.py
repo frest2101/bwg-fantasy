@@ -58,6 +58,8 @@ KEYS = dict(VIEWS, mStandings="teams")
 TX_VIEW, COMM_VIEW = "mTransactions2", "kona_league_communication"
 KONA_VIEW = "kona_player_info"
 TEAM_VIEW = "mTeam"        # Tageslauf: nur waiverRank je Team (Waiver-Reihenfolge)
+ROSTER_VIEW = "mRoster"    # Tageslauf: nur wer im IR-Slot steht (lineupSlotId 21)
+SLOT_IR_ID = 21
 KONA_FILE, ROS_FILE, STANDINGS_FILE = f"{KONA_VIEW}.json", "ros.json", "mStandings.json"
 POOL_FILE = "latest.json"   # Pool-Auszug des Tageslaufs unter pool/ (je Lauf überschrieben, Historie in Git)
 MIN_POOL = 300              # ein vollständiger Spielerpool hat rund 1050 aktive Spieler
@@ -853,6 +855,8 @@ def pool_extract(data: dict, season: int, week: int, stamp: str) -> dict:
             "quelle": f"{KONA_VIEW} mit filterStatsForCurrentSeasonScoringPeriodId = [{week}], Auszug je Spieler; "
                       f"waiver_reihenfolge = waiverRank je Team aus {TEAM_VIEW} (1 = zuerst), "
                       f"waiver_reihenfolge_stand = Abrufzeit ihrer letzten Änderung; "
+                      f"ir_slot = Spieler-IDs im IR-Slot (lineupSlotId {SLOT_IR_ID}) je Team aus {ROSTER_VIEW}, "
+                      f"ir_slot_stand = Abrufzeit ihrer letzten Änderung; "
                       f"stand = Abrufzeit (UTC) des letzten Laufs, der etwas geändert hat",
             "players": rows}
 
@@ -897,9 +901,33 @@ def fetch_waiver_order(session: requests.Session, season: int) -> dict[str, int]
     return dict(sorted(order.items(), key=lambda kv: int(kv[0])))
 
 
+def fetch_ir_slots(session: requests.Session, season: int) -> dict[str, list[int]]:
+    """Spieler im IR-Slot je Team laut mRoster (ein Aufruf, laufende Periode): team_id als Text → sortierte
+    Spieler-IDs (leere Liste ohne IR-Spieler). Nur IDs – Namen, Stats und Texte bleiben draußen, der Pool-Auszug
+    ist öffentlich. Ohne Teams oder mit Einträgen ohne Slot gilt die Antwort als unbrauchbar (FetchError).
+    Grund: Wer auf IR stehen darf, zeigt ESPN nicht verlässlich (eligibleSlots nennt IR bei allen Spielern, am
+    30.09.2026 stand ein Spieler mit Status OUT im IR-Slot) – deshalb der tatsächliche Slot statt einer Regel."""
+    _, data = get_json(session, league_url(season), {"view": ROSTER_VIEW})
+    if (data.get("id"), data.get("seasonId")) != (LEAGUE_ID, season):
+        raise FetchError(f"{ROSTER_VIEW} passt nicht zu Liga und Saison: {(data.get('id'), data.get('seasonId'))}")
+    teams = data.get("teams")
+    if not isinstance(teams, list) or not teams:
+        raise FetchError(f"{ROSTER_VIEW} ohne Teams")
+    out = {}
+    for t in teams:
+        entries = (t.get("roster") or {}).get("entries")
+        if not isinstance(t.get("id"), int) or not isinstance(entries, list):
+            raise FetchError(f"{ROSTER_VIEW} ohne Kader (Team {t.get('id')})")
+        if any(not isinstance(e.get("lineupSlotId"), int) or not isinstance(e.get("playerId"), int) for e in entries):
+            raise FetchError(f"{ROSTER_VIEW} mit Eintrag ohne Slot oder Spieler (Team {t['id']})")
+        out[str(t["id"])] = sorted(e["playerId"] for e in entries if e["lineupSlotId"] == SLOT_IR_ID)
+    return dict(sorted(out.items(), key=lambda kv: int(kv[0])))
+
+
 def update_pool(session: requests.Session, season: int, now: datetime, stamp: str) -> tuple[int, dict | None]:
-    """Holt den Pool-Auszug samt Waiver-Reihenfolge (mTeam) und schreibt pool/latest.json, wenn sich außer dem
-    Stand etwas geändert hat.
+    """Holt den Pool-Auszug samt Waiver-Reihenfolge (mTeam) und IR-Slots (mRoster) und schreibt pool/latest.json,
+    wenn sich außer dem Stand etwas geändert hat. Die IR-Slots behandelt er wie die Reihenfolge (Ausfall: Warnung,
+    Stand des letzten Laufs bleibt).
 
     Rückgabe (Fehler, aktueller Auszug oder None bei Fehler); bei unverändertem Inhalt ist es der gespeicherte Auszug
     mit seinem alten Stand. Den aktuellen Auszug braucht --news. Scheitert nur der mTeam-Aufruf, bleibt die
@@ -928,6 +956,14 @@ def update_pool(session: requests.Session, season: int, now: datetime, stamp: st
         except FetchError as exc:
             warn(f"Waiver-Reihenfolge ({TEAM_VIEW}) nicht abrufbar, Stand des letzten Laufs bleibt: {exc}")
             extract["waiver_reihenfolge"], extract["waiver_reihenfolge_stand"] = old_order, old_stand
+        old_ir, old_ir_stand = (previous or {}).get("ir_slot"), (previous or {}).get("ir_slot_stand")
+        try:
+            ir = fetch_ir_slots(session, season)
+            extract["ir_slot"] = ir
+            extract["ir_slot_stand"] = old_ir_stand if ir == old_ir and old_ir_stand else stamp
+        except FetchError as exc:
+            warn(f"IR-Slots ({ROSTER_VIEW}) nicht abrufbar, Stand des letzten Laufs bleibt: {exc}")
+            extract["ir_slot"], extract["ir_slot_stand"] = old_ir, old_ir_stand
         if same_pool(previous, extract):
             print(f"  {POOL_FILE:<22} unverändert (W{week}, {len(extract['players'])} Spieler, Stand {previous['stand']})")
             return 0, previous

@@ -3,7 +3,7 @@
 # 07:00 UTC, sichtbar sind sie erfahrungsgemäß erst 10:30–11:00 Uhr deutscher Zeit); Abendblock 15:40–21:40 UTC für die
 # News-Zeit 18–22 Uhr, sonntags die Inactives vor dem 1-Uhr-Kickoff und die späten Kickoffs. 13 Läufe je Tag.
 # espn_fetch.py holt alle Transaktions-Perioden (0 … laufend), den Pool-Auszug (Status, Besitz, Verletzung, Waiver-Frist,
-# Projektion; dazu die Waiver-Reihenfolge der Teams aus mTeam) und das Wetter (Open-Meteo: Prognose der laufenden Woche, Ist-Wetter gespielter Spiele) und schreibt nur,
+# Projektion; dazu die Waiver-Reihenfolge der Teams aus mTeam und die IR-Slots aus mRoster) und das Wetter (Open-Meteo: Prognose der laufenden Woche, Ist-Wetter gespielter Spiele) und schreibt nur,
 # was sich geändert hat. Danach rechnet das Rechenwerk neu; die abgeleiteten Dateien (season_2026.json, app/data) kommen
 # nur bei grünem Rechenwerk und grünen Tests mit, Rohdaten immer. News je Spieler (--news, Stufe 2) ist vorbereitet,
 # bleibt aber aus (Beschluss Stephan 30.09.2026, CLAUDE.md „Gelernt“: Rotowire-Meldungen sind Volltext ohne Link).
