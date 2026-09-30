@@ -5,6 +5,7 @@ Die Archiv-Antworten sind erfundene Testdaten (IDs wie „t1“, „k1“ – ke
 Aufruf: python -m pytest
 """
 
+import importlib.util
 import itertools
 import json
 import shutil
@@ -14,6 +15,7 @@ from decimal import Decimal
 import pytest
 
 import espn_fetch as ef
+import fantasypros
 
 SOURCE_WEEK = ef.week_dir(2026, 1)  # echte, abgeschlossene Woche als Vorlage (Spielplan enthält alle Perioden 1–14)
 
@@ -202,6 +204,7 @@ class FakeLeague:
         self.schedule_teams = 33          # inkl. Team 0 (Free Agent)
         self.standings_echo = None        # abweichende Woche im mStandings-Echo
         self.pool_without_week: set[int] = set()  # Wochen, für die der Spielerpool keine Werte liefert
+        self.fantasypros_status = 200     # Antwort der FantasyPros-Sitemaps
 
     def __enter__(self):
         return self
@@ -210,6 +213,11 @@ class FakeLeague:
         return False
 
     def get(self, url, params=None, headers=None, timeout=None):
+        if url == fantasypros.SITEMAP_URL:  # erfundene Sitemap mit genau der Mindestzahl Spieler
+            self.requests.append(("fantasypros", params["position"]))
+            slugs = [f"testspieler-{params['position'].lower()}-{i}" for i in range(fantasypros.MIN_PLAYERS[params["position"]])]
+            return FakeResponse(self.fantasypros_status, "".join(
+                f"<loc>https://www.fantasypros.com/nfl/players/{s}.php</loc>" for s in slugs).encode())
         view, week = params["view"], params.get("scoringPeriodId")
         if view == ef.KONA_VIEW:
             flt = json.loads(headers["X-Fantasy-Filter"])["players"]
@@ -252,6 +260,7 @@ def espn_week3(raw, monkeypatch):
     make_week(3, final=False)
     session = FakeLeague(final_week=3)
     monkeypatch.setattr(ef.requests, "Session", lambda: session)
+    monkeypatch.setattr(fantasypros, "PAUSE", 0)
     return session
 
 
@@ -282,8 +291,8 @@ def test_neue_datei_je_woche_ueberschreibt_finale_wochen_nicht(espn_week3):
         assert not (ef.week_dir(2026, week) / ef.ROS_FILE).exists()  # … ROS/Standings nicht (nur „jetzt“ zu haben)
     assert ("kona", 1) in espn_week3.requests and ("kona", 2) in espn_week3.requests
     espn_week3.requests.clear()
-    assert ef.cmd_due(2026, date(2026, 9, 30)) == 0                 # Nachlauf: nur der Spielplan wird geprüft
-    assert espn_week3.requests == [("spielplan", 2026)]
+    assert ef.cmd_due(2026, date(2026, 9, 30)) == 0                 # Nachlauf: nur Spielplan und FantasyPros-Sitemap
+    assert espn_week3.requests == [("spielplan", 2026)] + [("fantasypros", p) for p in fantasypros.POSITIONS]
 
 
 def test_cmd_fetch_teilfehler_schreibt_nichts(espn_week3):
@@ -311,6 +320,8 @@ def test_saisondateien(espn_week3):
     assert files["schedule"].exists() and files["prior_schedule"].exists() and files["prior_dst"].exists()
     assert files["prior_positions"].exists()
     assert not files["draft"].exists()                               # vor dem Draft: nichts, kein Fehler
+    sitemap = ef.load_json(fantasypros.path(2026))["positionen"]
+    assert set(sitemap) == set(fantasypros.POSITIONS) and len(sitemap["QB"]) == fantasypros.MIN_PLAYERS["QB"]
     espn_week3.drafted = True
     espn_week3.requests.clear()
     before = files["schedule"].stat().st_mtime_ns
@@ -319,6 +330,33 @@ def test_saisondateien(espn_week3):
     assert ("dst_vorjahr",) not in espn_week3.requests               # einmalig
     assert not any(key[0] in ("positionen_vorjahr", "scoring") for key in espn_week3.requests)  # einmalig
     assert files["schedule"].stat().st_mtime_ns == before            # unverändert → nicht neu geschrieben
+    assert [r for r in espn_week3.requests if r[0] == "fantasypros"] == [("fantasypros", p) for p in fantasypros.POSITIONS]
+
+
+def test_fantasypros_ausfall_blockiert_die_woche_nicht(espn_week3, capsys):
+    """Nebenteil wie der Spielplan: FantasyPros nicht erreichbar → Warnung, keine Datei, die fällige Woche kommt trotzdem."""
+    espn_week3.fantasypros_status = 503
+    assert ef.cmd_due(2026, date(2026, 9, 29)) == 0
+    assert not fantasypros.path(2026).exists()
+    assert ef.is_final(2026, 3)
+    out = capsys.readouterr()
+    assert "FantasyPros-Sitemap QB: HTTP 503" in out.err and "Fehler bei Saisondateien" in out.out
+
+
+def test_skriptaufruf_fantasypros_ausfall_nur_warnung(espn_week3, monkeypatch, capsys):
+    """Wie in der Action (python scripts/espn_fetch.py): Das Skript ist ein zweites espn_fetch-Modul neben dem, das fantasypros
+    importiert, mit eigener FetchError-Klasse. Ein FantasyPros-Ausfall darf trotzdem nur warnen (Befund Gegenprüfung
+    30.09.2026: vorher Abbruch mit Traceback, und die fällige Woche wurde nicht geholt)."""
+    spec = importlib.util.spec_from_file_location("espn_fetch_als_skript", ef.__file__)
+    skript = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(skript)
+    monkeypatch.setattr(skript, "RAW_DIR", ef.RAW_DIR)
+    monkeypatch.setattr(skript, "REPO_DIR", ef.REPO_DIR)
+    assert skript.FetchError is not ef.FetchError
+    espn_week3.fantasypros_status = 503
+    assert skript.cmd_due(2026, date(2026, 9, 29)) == 0
+    assert skript.is_final(2026, 3) and not fantasypros.path(2026).exists()
+    assert "FantasyPros-Sitemap QB: HTTP 503" in capsys.readouterr().err
 
 
 def test_dst_vorjahr_braucht_alle_17_spiele(espn_week3, capsys):
@@ -347,8 +385,8 @@ def test_positionen_vorjahr_einmalig(espn_week3):
     assert b"Testspieler" not in path.read_bytes()
     assert path.stat().st_size < 50_000                              # Auszug (echt rund 25 KB), nicht die 4-MB-Rohantwort
     espn_week3.requests.clear()
-    assert ef.cmd_due(2026, date(2026, 9, 30)) == 0
-    assert espn_week3.requests == [("spielplan", 2026)]
+    assert ef.cmd_due(2026, date(2026, 9, 30)) == 0                 # Nachlauf: nur Spielplan und FantasyPros-Sitemap
+    assert espn_week3.requests == [("spielplan", 2026)] + [("fantasypros", p) for p in fantasypros.POSITIONS]
 
 
 def test_positionen_vorjahr_fehler_nur_warnung(espn_week3, capsys):

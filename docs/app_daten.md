@@ -66,6 +66,7 @@ Die App lädt `data/manifest.json?t=<jetzt>` und danach jede Datei mit `?v=<v>`.
   - `wk`: Liste je Woche `[pts|null, proj|null, bye 0/1, team_id|0, slot|null]` in der Reihenfolge von `weeks`
   - ROS: `ros, ros_g, rest_g, ros_po, ros_rang, ros_ue`
   - `mu` (Positions-Matchup, Wochenstand wie ROS; die App verknüpft über `id`): `{n1: {week, opp, f, rang}, naechste3, rest, sos_po}` – `n1` = Gegner in Woche `mu_woche` (`opp` NFL-Kürzel der Defense, `f` ihr F für die Position des Spielers, `rang` 1 = günstigstes Matchup; bei Bye alle drei `null`; `n1` selbst `null` ohne Woche N+1), `naechste3` = Ø F der Gegner in N+1…N+3, `rest` = N+1…14, `sos_po` = W15–17 (eine Woche ohne Spiel fällt heraus, `null` ohne Spiel), F mit 3 Stellen. QB, RB, WR, TE und K aus `matchup.json`; D/ST aus `dst.json` (F und Rang der gegnerischen Offense, gleiche Richtung: > 1 günstig). `mu` ist `null` ohne NFL-Team.
+  - `fp`: FantasyPros-Adresse ohne `.php` (Verweis `fantasypros.com/nfl/players/<fp>.php`), aus dem Abgleich des Namens mit der Positions-Sitemap (`scripts/fantasypros.py`); `null` = keine eindeutige Zuordnung oder nicht in der Sitemap (die App verlinkt dann eine Seitensuche), bei D/ST immer `null` (Tabelle der App). Fehlt, solange der Wochenabruf keinen Sitemap-Auszug `data/raw/<saison>/fantasypros/sitemap.json` geholt hat.
 
 ## `dst.json` (lazy, Unter-Tab D/ST)
 - **Kopf:** `ligaschnitt {"2025", "2026"}`, `formel`, `through_week`, `ausloeser_legende` (Schlüssel → Text).
@@ -105,7 +106,7 @@ Position gegen Defense, kein Einzelduell: wie viele Punkte jede NFL-Defense den 
   - `id, team` (team_id oder 0), `status` (`ONTEAM`, `WAIVERS`, `FREEAGENT`), `inj` (ESPN-Verletzungsstatus, Stand des Abrufs)
   - Besitz ESPN-weit in %: `own` (Anteil der Ligen), `own_d` (Änderung gegenüber dem Vortag), `started` (Anteil gestartet)
   - `waiver_bis` (Epoch-ms, Ende der Waiver-Frist; `null` bei Free Agents und Kaderspielern), `proj` (ESPN-Projektion der Woche `woche`, 2 Stellen), `news` (Epoch-ms der letzten ESPN-Meldung, `null` ohne)
-  - Kaderspieler, die `players.json` nicht führt (unter der Woche geholt, ohne Spiel, nicht unter den 20 besten Free Agents), tragen zusätzlich `name, pos, nfl` aus dem Wochenpool (`null`, wenn auch dort unbekannt).
+  - Kaderspieler, die `players.json` nicht führt (unter der Woche geholt, ohne Spiel, nicht unter den 20 besten Free Agents), tragen zusätzlich `name, pos, nfl` aus dem Wochenpool (`null`, wenn auch dort unbekannt) und – mit Sitemap-Auszug – `fp` wie in `players.json`.
 - Quelle: `data/raw/2026/pool/latest.json` (Tageslauf, stündlich vormittags und abends; Kopf `waiver_reihenfolge` = `waiverRank` je Team aus `mTeam`, `waiver_reihenfolge_stand` = Abrufzeit ihrer letzten Änderung); Besitz, Verletzung und Status sind der Stand des Abrufs, ESPN führt keine Historie.
 
 ## `wetter.json` (lazy, Wetter je Spiel – Ansicht `#wetter`, Spielerseite, Fähnchen im Waiver-Tab)

@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 import espn_fetch as ef
+import fantasypros
 import wetter
 from zahlen import ZERO, dec
 
@@ -205,6 +206,10 @@ class Season:
     def wetter_ist(self) -> dict | None:
         """Ist-Wetter aller gespielten Spiele (wetter/ist_<saison>.json); None ohne Datei."""
         return self._get("wetter_ist", lambda: self._optional(wetter.ist_path(self.season)))
+
+    def fantasypros(self) -> dict | None:
+        """FantasyPros-Adressen je Position (fantasypros/sitemap.json, Wochenabruf); None, solange er sie nicht holte."""
+        return self._get("fantasypros", lambda: self._optional(fantasypros.path(self.season)))
 
     # -------------------------------------------------------- Saisondateien
     def nfl(self) -> dict[int, NflTeam]:

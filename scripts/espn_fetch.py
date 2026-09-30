@@ -13,6 +13,7 @@ Ablage je Saison (--due):
     draft/mDraftDetail.json                                Draft und Keeper, einmalig
     basis/kona_dst_<vorjahr>.json, proTeamSchedules_wl_<vorjahr>.json   D/ST-Grundlage des Vorjahrs, einmalig
     basis/positionen_<vorjahr>.json                        Positions-Grundlage des Vorjahrs (QB, RB, WR, TE, K), einmalig
+    fantasypros/sitemap.json                               FantasyPros-Adressen je Position (scripts/fantasypros.py), wird aktualisiert
 Tageslauf (--transactions --pool --wetter, Action stündlich vormittags und abends):
     transactions/                                          Transaktions-Archiv (mTransactions2 je Periode, Aktivitäten)
     pool/latest.json                                       Pool-Auszug: Status, Besitz, Verletzung, Waiver-Frist, Projektion;
@@ -591,10 +592,12 @@ def last_past_week(season: int, today: date) -> int:
 
 
 def refresh_season_files(session: requests.Session, season: int, today: date) -> int:
-    """Saisondateien: NFL-Spielplan bei jedem Lauf (Verlegungen); Draft, D/ST- und Positions-Vorjahr einmalig.
+    """Saisondateien: NFL-Spielplan und FantasyPros-Sitemap bei jedem Lauf (Verlegungen, neue Spieler); Draft, D/ST- und
+    Positions-Vorjahr einmalig.
 
     Gibt die Zahl der Fehler zurück; eine fehlgeschlagene Datei versucht der nächste Lauf erneut.
     """
+    import fantasypros  # erst hier: das Modul importiert espn_fetch
     files = season_files(season)
     jobs = [(files["schedule"], True, lambda: fetch_schedule(session, season)),
             (files["draft"], False, lambda: fetch_draft(session, season)),
@@ -618,7 +621,7 @@ def refresh_season_files(session: requests.Session, season: int, today: date) ->
         else:
             save_atomic(path, content)
             print(f"  {path.name:<34} {len(content):>10,} Bytes -> {rel(path)}")
-    return errors
+    return errors + fantasypros.update(session, season)  # fängt seine Fehler selbst (siehe dort)
 
 
 def backfill_kona(session: requests.Session, season: int, week: int) -> int:

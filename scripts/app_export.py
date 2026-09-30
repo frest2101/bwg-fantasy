@@ -7,10 +7,12 @@ Format: eine Zeile je Datensatz, damit Diffs lesbar bleiben.
 
 import hashlib
 import json
+from collections import Counter
 from datetime import timedelta
 from pathlib import Path
 
 import espn_fetch as ef
+import fantasypros
 import matchup as matchup_module
 import players as players_module
 from lineup import POSITION_NAMES, SLOT_NAMES
@@ -171,6 +173,20 @@ def player_selection(result: dict) -> set[int]:
     return keep
 
 
+def add_fantasypros(rows: list[dict], result: dict) -> None:
+    """FantasyPros-Adresse je Spieler (fp, ohne .php) aus dem Sitemap-Auszug; None, wenn sie nicht eindeutig ist – die App
+    verlinkt dann die Suche. Bekämen zwei Spieler dieselbe Adresse, bekommen beide die Suche. Ohne Auszug fehlt das Feld,
+    und die App bleibt bei ihrer Namensregel."""
+    if not result.get("fantasypros"):
+        return
+    known = fantasypros.index(result["fantasypros"])
+    slugs = {id(row): fantasypros.slug_for(row.get("name"), row.get("pos"), known) for row in rows}
+    taken = Counter(slugs.values())
+    for row in rows:
+        slug = slugs[id(row)]
+        row["fp"] = slug if slug and taken[slug] == 1 else None
+
+
 def build_players(result: dict) -> dict | None:
     """Spieler mit mindestens einem Spiel oder im Kader, dazu die 20 besten Free Agents je Position nach ROS/Spiel.
 
@@ -198,6 +214,7 @@ def build_players(result: dict) -> dict | None:
                      "ros": p["ros"], "ros_g": p["ros_pro_spiel"], "rest_g": p["restspiele"], "ros_po": p["ros_po"],
                      "ros_rang": p["ros_rang"], "ros_ue": p["ros_ueber_ersatz"],
                      "mu": matchup_module.player_mu(m, dst, p["pos"], p["pro_team"])})
+    add_fantasypros(rows, result)
     return {"weeks": data["weeks"], "ersatz": {POSITION_NAMES.get(k, str(k)): v for k, v in data["ersatz"].items()},
             "ros_nach_woche": data["ros_after_week"], "mu_woche": (m or {}).get("wochen", {}).get("n1"),
             "cv": {POSITION_NAMES.get(k, str(k)): v for k, v in data["cv"].items()}, "players": rows}
@@ -304,7 +321,7 @@ def build_waiver(result: dict) -> dict | None:
     keep = selection | {p["id"] for p in pool["players"] if p.get("onTeamId")}
     weekly = result["players"]["players"]  # ganzer Wochenpool mit Stammdaten (Name, Position, NFL-Team)
     number = lambda v: dec(v) if v is not None else None  # noqa: E731 – ESPN-Floats erst beim Schreiben runden
-    rows = []
+    rows, extra = [], []
     for p in pool["players"]:
         if p["id"] not in keep:
             continue
@@ -318,7 +335,9 @@ def build_waiver(result: dict) -> dict | None:
             w = weekly.get(p["id"])
             row.update(name=w["name"] if w else None, pos=POSITION_NAMES.get(w["pos"], str(w["pos"])) if w else None,
                        nfl=w["nfl"] if w else None)
+            extra.append(row)
         rows.append(row)
+    add_fantasypros(extra, result)
     reihenfolge, quelle, stand = waiver_order(pool, result)
     return {"stand": pool["stand"], "woche": pool["woche"], "reihenfolge": reihenfolge, "reihenfolge_quelle": quelle,
             "reihenfolge_stand": stand, "bedarf": team_needs(pool, result), "spieler": rows}
