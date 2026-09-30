@@ -2,6 +2,9 @@
 // Der Browser rechnet nur Score = Σ w · norm[kind][m] / Σ w aus den fertigen Normwerten (teams.json), nie selbst normiert.
 let U, S, h;
 const GID = {pf: 'pfspiel', allplay: 'allplay', win: 'win', coaching: 'effizienz', floor: 'floor', form: 'form'};
+// Kurzformen wie im Rest der App (Tabellenkopf und Regler); der volle Name steht im title
+const SHORT = m => ({pf: 'PF/Spiel', allplay: 'All-Play', win: 'Win', coaching: 'Coaching', floor: 'Floor', form: 'Form',
+  kader: /pot/i.test(m.label) ? 'Kader-Pot.' : 'Kader-Proj.'})[m.key] || m.label;
 // Standard (z, Profil Stärke) steht in der Lesart; ohne „(Standard)“ passen die Chips auf dem Handy in eine Zeile
 const NORMS = [['z', 'z-Wert'], ['minmax', 'Min–Max'], ['rank', 'Rangpunkte']];
 const slug = s => s.toLowerCase().replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue');
@@ -59,8 +62,12 @@ function scoreView(box, r) {
     const w = p ? {...P[p]} : q.has('w') ? Object.fromEntries(M.map((m, i) => [m.key, list[i]])) : {...P[std]};
     return {w, norm: q.get('norm')};
   };
-  let st = fromQ(r.q) || U.store.get('bwg-score') || {w: {...P[std]}, norm: S.meta.norm_standard};
-  st = {w: clean(st.w || {}), norm: NORMS.some(n => n[0] === st.norm) ? st.norm : 'z'};
+  const saved = U.store.get('bwg-score');
+  let st = fromQ(r.q) || saved || {w: {...P[std]}, norm: S.meta.norm_standard};
+  // eigene: zuletzt selbst eingestellte Gewichte – „Eigene“ holt sie nach einem Profil-Vergleich zurück (alte Speicherstände ohne das Feld bleiben lesbar)
+  const eig = st.eigene || saved?.eigene;
+  st = {w: clean(st.w || {}), norm: NORMS.some(n => n[0] === st.norm) ? st.norm : 'z', eigene: eig ? clean(eig) : null};
+  if (!st.eigene && match(st.w) === 'eigene') st.eigene = {...st.w};
   let raw = false;
   const rawVal = {pf: 'pf_per_game', allplay: 'allplay_pct', win: 'win_pct', coaching: 'efficiency', floor: 'floor', form: 'form',
     kader: S.meta.kader_quelle === 'projektion' ? 'kader_projektion' : 'kader_potenzial'};
@@ -86,7 +93,7 @@ function scoreView(box, r) {
     {k: 'rk', l: '#', v: t => rk.get(t.team_id), d: 1, f: t => rk.get(t.team_id) ?? '–'},
     {k: 'team', l: 'Team', v: t => t.name.toLowerCase(), d: 1, f: t => U.tl(t.team_id)},
     {k: 'score', l: 'Score', num: 1, v: t => rk.has(t.team_id) ? -rk.get(t.team_id) : null, f: t => bar(sc.get(t.team_id))},
-    ...M.map(m => ({k: m.key, l: m.label, num: 1, v: t => raw ? t[rawVal[m.key]] : t.norm[st.norm][m.key],
+    ...M.map(m => ({k: m.key, l: h('span', {title: m.label}, SHORT(m)), num: 1, v: t => raw ? t[rawVal[m.key]] : t.norm[st.norm][m.key],
       f: t => raw ? U.val(t[rawVal[m.key]], v => rawTxt(m.key, v), 'ab Wochenabruf W' + (S.tw + 1)) : normTxt(t.norm[st.norm][m.key])})),
     {k: 'rg', l: 'Tabelle', num: 1, v: t => t.rang, d: 1, f: t => t.rang + '.'}];
   calc();
@@ -95,7 +102,11 @@ function scoreView(box, r) {
   // Bedienung: Profile, Normierung, Regler
   const profSeg = U.seg('Profil', [...PN.map(p => [slug(p), p]), ['eigene', 'Eigene']], slug(match(st.w)), v => {
     // „Eigene“ entsteht erst durch einen Regler: Chip auf den tatsächlichen Stand zurück, Regler aufklappen
-    if (v === 'eigene') { profSeg.set(slug(match(st.w))); panel.open = true; return; }
+    if (v === 'eigene') {
+      if (st.eigene) { st.w = {...st.eigene}; sync(true); return; }
+      // noch keine eigenen Werte: Regler aufklappen und den ersten fokussieren
+      profSeg.set(slug(match(st.w))); panel.open = true; ins[M[0].key]?.focus(); return;
+    }
     st.w = {...P[PN.find(p => slug(p) === v)]};
     sync(true);
   });
@@ -104,12 +115,12 @@ function scoreView(box, r) {
   const sliders = M.map(m => {
     const i = 'w-' + m.key;
     ins[m.key] = h('input', {type: 'range', id: i, min: 0, max: 50, step: 5, value: st.w[m.key],
-      oninput: e => { st.w[m.key] = +e.target.value; sync(false); }});
+      oninput: e => { st.w[m.key] = +e.target.value; st.eigene = {...st.w}; sync(false); }});
     outs[m.key] = h('output', {for: i});
-    return h('div', {class: 'sl'}, h('div', {class: 'row', style: 'margin:0'}, h('label', {for: i}, m.label), U.ib(gid(m.key), '')), outs[m.key], ins[m.key]);
+    return h('div', {class: 'sl'}, h('div', {class: 'row', style: 'margin:0'}, h('label', {for: i, title: m.label}, SHORT(m)), U.ib(gid(m.key), '')), outs[m.key], ins[m.key]);
   });
   const block = h('p', {class: 'note', 'aria-live': 'polite'});
-  const top3 = h('p', {class: 'note', 'aria-live': 'polite'});  // Spitze live im Regler-Feld: auf dem Handy liegt die Tabelle darunter außer Sicht
+  const top3 = h('p', {class: 'note live', 'aria-live': 'polite'});  // Spitze live im Regler-Feld: auf dem Handy liegt die Tabelle darunter außer Sicht
   const panel = h('details', {class: 'gw', open: matchMedia('(min-width:900px)').matches},
     h('summary', null, 'Gewichte anpassen'), sliders,
     h('div', {class: 'row'}, h('button', {type: 'button', class: 'btn', onclick: () => {
@@ -143,7 +154,7 @@ function scoreView(box, r) {
   }
   const kader = M.find(m => m.key === 'kader');
   // Bedienung im DOM zuerst (Handy: über der Tabelle), ab 900 px rechts daneben
-  U.ap(box, h('div', {class: 'two'},
+  U.ap(box, h('div', {class: 'two sc2'},
     h('div', {class: 'side'},
       h('div', {class: 'row'}, h('span', {class: 'note'}, 'Profil'), profSeg),
       h('div', {class: 'row'}, h('span', {class: 'note'}, 'Normierung'), normSeg),

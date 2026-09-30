@@ -52,6 +52,7 @@ async function start() {
   } catch (e) {
     console.error(e);
     main.replaceChildren(U.errBox(e, start));
+    addEventListener('hashchange', start, {once: true});   // Tab antippen = neuer Versuch
     return;
   }
   header();
@@ -110,21 +111,34 @@ function header() {
       h('dt', null, 'Projektionen ROS'), h('dd', null, ds.ros_nach_woche != null ? `Stand nach W${ds.ros_nach_woche}` : `ab Wochenabruf W${S.tw + 1}`),
       h('dt', null, ds.pool_stand ? 'Besitz, Verletzung, Projektion nächste Woche' : 'Besitz, Verletzung'), h('dd', null, tag),
       h('dt', null, 'Wetter'), h('dd', null, ds.wetter_stand ? `Tagesstand ${U.stamp(ds.wetter_stand)}` : '–'),
-      h('dt', null, 'Transaktionen'), h('dd', null, ds.transaktionen_bis ? `bis ${U.stamp(ds.transaktionen_bis)}` : '–'),
+      h('dt', null, 'Letzter Move'), h('dd', null, ds.transaktionen_bis ? U.stamp(ds.transaktionen_bis) : '–'),
       h('dt', null, 'Nächster Tageslauf'), h('dd', null, U.stamp(nextDaily())),
       h('dt', null, 'Nächster Wochenabruf'), h('dd', null, U.stamp(due))),
     h('p', {class: 'note'}, 'Wertung und Projektionen rechnen nur mit abgeschlossenen Wochen; der Tageslauf frischt Besitz, Verletzung, Transaktionen und Wetter stündlich vormittags und abends auf. ', h('a', {href: '#lesart/aktualisierung'}, 'Mehr zur Aktualisierung')),
   ]);
-  const tb = $('theme');
-  const dark = () => document.documentElement.dataset.theme === 'dark' ||
-    (!document.documentElement.dataset.theme && matchMedia('(prefers-color-scheme: dark)').matches);
-  const sync = () => tb.setAttribute('aria-pressed', String(dark()));
+  const tb = $('theme'), de = document.documentElement, mq = matchMedia('(prefers-color-scheme: dark)');
+  const dark = () => de.dataset.theme === 'dark' || (!de.dataset.theme && mq.matches);
+  const sync = () => {
+    tb.setAttribute('aria-pressed', String(dark()));
+    // Browserleiste (iPhone) passend zum gewählten Design, nicht nur zum System
+    for (const m of document.querySelectorAll('meta[name=theme-color]')) {
+      if (de.dataset.theme) m.setAttribute('content', dark() ? '#161a20' : '#ffffff');
+      else m.setAttribute('content', m.media.includes('dark') ? '#161a20' : '#ffffff');
+    }
+  };
   tb.onclick = () => {
     const t = dark() ? 'light' : 'dark';
-    document.documentElement.dataset.theme = t;
-    try { localStorage.setItem('bwg-theme', t); } catch { /* Umschalter gilt dann nur bis zum Neuladen */ }
+    // stimmt die Wahl mit dem System überein, nichts festhalten: dann folgt die App wieder dem Tag-Nacht-Wechsel
+    if ((t === 'dark') === mq.matches) {
+      delete de.dataset.theme;
+      try { localStorage.removeItem('bwg-theme'); } catch { /* ohne Speicher */ }
+    } else {
+      de.dataset.theme = t;
+      try { localStorage.setItem('bwg-theme', t); } catch { /* Umschalter gilt dann nur bis zum Neuladen */ }
+    }
     sync();
   };
+  mq.addEventListener?.('change', sync);
   sync();
 }
 

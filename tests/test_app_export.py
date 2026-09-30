@@ -224,6 +224,16 @@ def test_dst_und_transaktionen(data):
     assert set(data["transactions.json"]) == {"spieler", "items", "aufstellungswechsel", "draft"}
 
 
+def test_transaktionen_markieren_spieler_ohne_seite(data):
+    """in_app stimmt mit den Spielern überein, die der Spieler-Tab kennt (players.json plus Kader laut Tagesstand)."""
+    t = data["transactions.json"]
+    known = {p["id"] for p in data["players.json"]["players"]}
+    known |= {s["id"] for s in data.get("waiver.json", {}).get("spieler", []) if s["team"] > 0}
+    moves = [i for x in t["items"] for i in x["items"]]
+    assert moves and all(i["in_app"] == (i["player_id"] in known) for i in moves)
+    assert all(d["in_app"] == (d["player_id"] in known) for d in t["draft"])
+
+
 def test_oeffentlich(tmp_path, content):
     for name, raw in content.items():
         (tmp_path / name).write_bytes(raw)

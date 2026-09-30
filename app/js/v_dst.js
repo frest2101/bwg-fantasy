@@ -23,6 +23,7 @@ export async function render(box, ctx, r) {
   U.ap(box, h('p', {class: 'note'}, `nach W${D.through_week ?? S.tw} · Ligaschnitt D/ST 2025 ${U.num(ls['2025'])} · 2026 ${U.num(ls['2026'])} · Faktor F`, U.ib('f', '')),
     h('ul', {class: 'leg'}, [['f3', 'F ≥ 1,15 günstig'], ['f1', 'leicht günstig'], ['f0', 'um 1,00'], ['g1', 'leicht ungünstig'], ['g3', 'F ≤ 0,85 ungünstig']]
       .map(([c, t]) => h('li', null, h('span', {class: 'fz ' + c, style: 'display:inline-block;min-width:1.4rem;height:.9rem;border-radius:3px;vertical-align:-2px;margin-right:4px'}), t))));
+  if (!off) box.querySelector('ul.leg')?.append(h('li', null, h('span', {class: 'flag'}, '⚑ '), 'Auslöser bei dieser Offense – ', h('a', {href: '#dst/offense'}, 'Offenses')));
   (off ? offense : streaming)(box, D, r);
 }
 
@@ -52,7 +53,7 @@ function streaming(box, D, r) {
     {k: 'sos', l: 'SoS W15–17', num: 1, v: t => t.sos_po, cls: t => 'fz ' + fcls(t.sos_po), f: t => fcell(t.sos_po)},
     {k: 'bye', l: 'Bye', num: 1, cat: 1, v: t => t.bye, d: 1, f: t => U.val(t.bye, v => 'W' + v)}];
   const rows = () => teams.filter(t => !frei || !(t.besitzer > 0));
-  const tbl = U.table({cap: 'D/ST-Streaming: Gegner der nächsten Wochen', cls: 'nr', rh: 0, rows: rows(), sort: ['n3', -1], filter: true, cols});
+  const tbl = U.table({cap: 'D/ST-Streaming: Gegner der nächsten Wochen', cls: 'nr', rh: 0, rows: rows(), sort: ['n3', -1], filter: true, stick: true, cols});
   U.ap(box, h('div', {class: 'row'}, h('label', {class: 'chk'}, h('input', {type: 'checkbox', checked: frei, onchange: e => {
     frei = e.target.checked;
     tbl.upd(rows());
