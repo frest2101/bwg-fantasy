@@ -25,8 +25,8 @@ PRIOR_GAMES = 5            # Gewicht des Vorjahrs, in Spielen
 MEAN_GAMES = 5             # Gewicht des Ligamittels 1,00, in Spielen (nur neue Formel)
 NEXT_WEEKS = 3             # „nächste 3“ nach Kalenderwochen
 LAST_GAMES = 3             # „Z letzte 3“: Ø der letzten 3 Spiele der Offense (nur beschreibend)
-# Keine Auslöser-Fähnchen mehr (Beschluss Stephan 30.09.2026): Rangsprung und ΔF markierten im Zufallsmodell so viele
-# Offenses wie in echt, z erkennt echte Veränderungen kaum – Analyse in docs/auftraege/ausloeser_analyse_2026-09-30.md
+# Keine Auslöser-Fähnchen mehr (Beschluss Stephan 30.09.2026): Rangsprung und ΔF markierten im Zufallsmodell mindestens
+# so viele Offenses wie in echt, z erkennt echte Veränderungen kaum – Analyse in docs/auftraege/ausloeser_analyse_2026-09-30.md
 
 FORMEL = "F = (n·r26 + 5·r25 + 5·1,00)/(n + 10); r = Z/Ligaschnitt; Z = Ø D/ST-Punkte der Gegner je Spiel"
 FORMEL_ALT = "F_alt = (n·r26 + 5·r25)/(n + 5) (Notion bis W2, nur zum Vergleich)"

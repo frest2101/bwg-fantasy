@@ -15,7 +15,7 @@ F > 1 heißt: Gegen diese Defense holen Spieler der Position mehr Punkte als im 
 Spieler). Position gegen Defense, kein Einzelduell. ESPNs positionalRatings dienen nur als Test (Vorwochenstand).
 D/ST bleibt im D/ST-Modul; player_mu nimmt für D/ST dessen Faktoren. Keine Zwischenstände: jeder Lauf rechnet neu.
 Schwacher Hinweis: Z je Position hält sich von Jahr zu Jahr kaum (Korrelation 2024 → 2025 zwischen −0,13 und 0,24),
-F sagt die nächsten Spiele nur wenig besser voraus als 1,00. Keine Auslöser-Fähnchen; die Formel bleibt die Saison
+F sagt die nächsten Spiele kaum besser voraus als 1,00 (K 2025 gar nicht). Keine Auslöser-Fähnchen; die Formel bleibt die Saison
 über fest, Rückschau nach W17 (Analyse und Beschluss Stephan 30.09.2026: docs/auftraege/ausloeser_analyse_2026-09-30.md).
 """
 
