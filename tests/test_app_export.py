@@ -106,6 +106,9 @@ def test_fantasypros_adressen(result):
     assert all("fp" in p for p in rows.values())
     assert rows[3139477]["fp"] == "patrick-mahomes" and rows[3918298]["fp"] == "josh-allen-qb"   # Mahomes, Josh Allen
     assert all(p["fp"] is None for p in rows.values() if p["pos"] in ("D/ST", "RB"))           # D/ST: Tabelle der App
+    twins = [{"name": "Josh Allen", "pos": "QB"}, {"name": "Josh Allen", "pos": "QB"}]           # erfundene Dopplung
+    app_export.add_fantasypros(twins, dict(result, fantasypros=sitemap))
+    assert [t["fp"] for t in twins] == [None, None]                                            # dieselbe Adresse: Suche
     # Kaderspieler, den nur der Tagesstand kennt: fp wie name, pos, nfl aus dem Wochenpool
     known = next(pid for pid in sorted(result["players"]["players"]) if pid not in app_export.player_selection(result))
     pool = {"season": 2026, "woche": 3, "stand": "2026-09-29T0645Z", "players": [{"id": known, "onTeamId": 3}]}

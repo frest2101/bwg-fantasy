@@ -5,6 +5,7 @@ Die Archiv-Antworten sind erfundene Testdaten (IDs wie „t1“, „k1“ – ke
 Aufruf: python -m pytest
 """
 
+import importlib.util
 import itertools
 import json
 import shutil
@@ -308,6 +309,22 @@ def test_fantasypros_ausfall_blockiert_die_woche_nicht(espn_week3, capsys):
     assert ef.is_final(2026, 3)
     out = capsys.readouterr()
     assert "FantasyPros-Sitemap QB: HTTP 503" in out.err and "Fehler bei Saisondateien" in out.out
+
+
+def test_skriptaufruf_fantasypros_ausfall_nur_warnung(espn_week3, monkeypatch, capsys):
+    """Wie in der Action (python scripts/espn_fetch.py): Das Skript ist ein zweites espn_fetch-Modul neben dem, das fantasypros
+    importiert, mit eigener FetchError-Klasse. Ein FantasyPros-Ausfall darf trotzdem nur warnen (Befund Gegenprüfung
+    30.09.2026: vorher Abbruch mit Traceback, und die fällige Woche wurde nicht geholt)."""
+    spec = importlib.util.spec_from_file_location("espn_fetch_als_skript", ef.__file__)
+    skript = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(skript)
+    monkeypatch.setattr(skript, "RAW_DIR", ef.RAW_DIR)
+    monkeypatch.setattr(skript, "REPO_DIR", ef.REPO_DIR)
+    assert skript.FetchError is not ef.FetchError
+    espn_week3.fantasypros_status = 503
+    assert skript.cmd_due(2026, date(2026, 9, 29)) == 0
+    assert skript.is_final(2026, 3) and not fantasypros.path(2026).exists()
+    assert "FantasyPros-Sitemap QB: HTTP 503" in capsys.readouterr().err
 
 
 def test_dst_vorjahr_braucht_alle_17_spiele(espn_week3, capsys):

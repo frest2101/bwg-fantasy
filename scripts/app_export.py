@@ -7,6 +7,7 @@ Format: eine Zeile je Datensatz, damit Diffs lesbar bleiben.
 
 import hashlib
 import json
+from collections import Counter
 from datetime import timedelta
 from pathlib import Path
 
@@ -172,12 +173,16 @@ def player_selection(result: dict) -> set[int]:
 
 def add_fantasypros(rows: list[dict], result: dict) -> None:
     """FantasyPros-Adresse je Spieler (fp, ohne .php) aus dem Sitemap-Auszug; None, wenn sie nicht eindeutig ist – die App
-    verlinkt dann die Suche. Ohne Auszug fehlt das Feld, und die App bleibt bei ihrer Namensregel."""
+    verlinkt dann die Suche. Bekämen zwei Spieler dieselbe Adresse, bekommen beide die Suche. Ohne Auszug fehlt das Feld,
+    und die App bleibt bei ihrer Namensregel."""
     if not result.get("fantasypros"):
         return
     known = fantasypros.index(result["fantasypros"])
+    slugs = {id(row): fantasypros.slug_for(row.get("name"), row.get("pos"), known) for row in rows}
+    taken = Counter(slugs.values())
     for row in rows:
-        row["fp"] = fantasypros.slug_for(row.get("name"), row.get("pos"), known)
+        slug = slugs[id(row)]
+        row["fp"] = slug if slug and taken[slug] == 1 else None
 
 
 def build_players(result: dict) -> dict | None:
@@ -291,7 +296,7 @@ def build_waiver(result: dict) -> dict | None:
     keep = selection | {p["id"] for p in pool["players"] if p.get("onTeamId")}
     weekly = result["players"]["players"]  # ganzer Wochenpool mit Stammdaten (Name, Position, NFL-Team)
     number = lambda v: dec(v) if v is not None else None  # noqa: E731 – ESPN-Floats erst beim Schreiben runden
-    rows = []
+    rows, extra = [], []
     for p in pool["players"]:
         if p["id"] not in keep:
             continue
@@ -305,8 +310,9 @@ def build_waiver(result: dict) -> dict | None:
             w = weekly.get(p["id"])
             row.update(name=w["name"] if w else None, pos=POSITION_NAMES.get(w["pos"], str(w["pos"])) if w else None,
                        nfl=w["nfl"] if w else None)
-            add_fantasypros([row], result)
+            extra.append(row)
         rows.append(row)
+    add_fantasypros(extra, result)
     reihenfolge, quelle, stand = waiver_order(pool, result)
     return {"stand": pool["stand"], "woche": pool["woche"], "reihenfolge": reihenfolge, "reihenfolge_quelle": quelle,
             "reihenfolge_stand": stand, "bedarf": team_needs(pool, result), "spieler": rows}

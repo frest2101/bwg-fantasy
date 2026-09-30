@@ -473,8 +473,7 @@ def refresh_season_files(session: requests.Session, season: int, today: date) ->
     jobs = [(files["schedule"], True, lambda: fetch_schedule(session, season)),
             (files["draft"], False, lambda: fetch_draft(session, season)),
             (files["prior_schedule"], False, lambda: fetch_schedule(session, season - 1)),
-            (files["prior_dst"], False, lambda: fetch_prior_dst(session, season, today)),
-            (fantasypros.path(season), True, lambda: fantasypros.fetch(session))]
+            (files["prior_dst"], False, lambda: fetch_prior_dst(session, season, today))]
     errors = 0
     for path, refresh, job in jobs:
         if path.exists() and not refresh:
@@ -492,7 +491,7 @@ def refresh_season_files(session: requests.Session, season: int, today: date) ->
         else:
             save_atomic(path, content)
             print(f"  {path.name:<34} {len(content):>10,} Bytes -> {rel(path)}")
-    return errors
+    return errors + fantasypros.update(session, season)  # fängt seine Fehler selbst (siehe dort)
 
 
 def backfill_kona(session: requests.Session, season: int, week: int) -> int:

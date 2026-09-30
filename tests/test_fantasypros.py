@@ -17,8 +17,8 @@ EXAMPLES = {
     "RB": ["kenneth-walker-rb", "james-cook", "jacory-croskeymerritt", "kenneth-gainwell", "theo-testmann-iii",
            "theo-testmann"],
     "WR": ["dj-moore-wr", "amonra-stbrown", "marvin-harrison-jr", "deebo-samuel", "jamarr-chase",
-           "isaiah-williams", "isaiah-williams-wr", "nathaniel-dell"],
-    "TE": ["travis-kelce"], "K": ["kaimi-fairbairn"], "DST": ["san-francisco-defense"],
+           "isaiah-williams", "isaiah-williams-wr", "nathaniel-dell", "jmichael-sturdivant", "antonio-williams-wr"],
+    "TE": ["travis-kelce", "connor-heyward"], "K": ["kaimi-fairbairn"], "DST": ["san-francisco-defense"],
 }
 
 
@@ -92,7 +92,10 @@ def test_slug_wie_fantasypros():
     ("Isaiah Williams", "WR", None),                      # isaiah-williams und isaiah-williams-wr: mehrdeutig
     ("Tank Dell", "WR", None),                            # Spitzname, FantasyPros führt nathaniel-dell: keine Raterei
     ("Kenny Gainwell", "RB", None),
-    ("Josh Allen", "RB", None),                           # falsche Position
+    ("J. Michael Sturdivant", "WR", "jmichael-sturdivant"),  # Initiale angezogen
+    ("Connor Heyward", "RB", "connor-heyward"),           # ESPN RB, FantasyPros TE: eindeutig in einer anderen Position
+    ("Josh Allen", "RB", None),                           # andere Position nur mit Anhang (josh-allen-qb): Namensvetter
+    ("Antonio Williams", "RB", None),                     # ebenso (antonio-williams-wr)
     ("49ers D/ST", "D/ST", None),                         # D/ST verlinkt die App über ihre eigene Tabelle
     (None, "QB", None),
 ])
@@ -125,6 +128,18 @@ def test_fetch_pausiert_zwischen_abrufen(monkeypatch):
     monkeypatch.setattr(fp, "PAUSE", 5)
     fp.fetch(FakeSitemaps())
     assert pauses == [5] * (len(fp.POSITIONS) - 1)        # robots.txt: Crawl-delay 5
+
+
+def test_update_schreibt_nur_bei_aenderung_und_faengt_fehler(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(ef, "RAW_DIR", tmp_path / "raw")
+    monkeypatch.setattr(ef, "REPO_DIR", tmp_path)
+    assert fp.update(FakeSitemaps(status=503), 2026) == 1 and not fp.path(2026).exists()   # Fehler: zählen, nicht werfen
+    assert "HTTP 503" in capsys.readouterr().err
+    assert fp.update(FakeSitemaps(), 2026) == 0 and fp.path(2026).exists()
+    before = fp.path(2026).stat().st_mtime_ns
+    assert fp.update(FakeSitemaps(), 2026) == 0 and fp.path(2026).stat().st_mtime_ns == before
+    assert "unverändert" in capsys.readouterr().out
+    assert fp.update(FakeSitemaps(count=3), 2026) == 1 and fp.path(2026).stat().st_mtime_ns == before  # alte Datei bleibt
 
 
 @pytest.mark.parametrize("session, message", [

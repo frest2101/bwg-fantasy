@@ -3,17 +3,19 @@
 FantasyPros führt Spieler unter /nfl/players/<adresse>.php. Die Adresse folgt nicht verlässlich aus dem Namen:
 Namensvettern tragen die Position (josh-allen-qb, dj-moore-wr), Bindestriche verschmelzen (amonra-stbrown,
 jacory-croskeymerritt), Namenszusätze stehen mal dabei, mal nicht (marvin-harrison-jr, deebo-samuel). Maßgeblich
-sind deshalb die Positions-Sitemaps, die robots.txt für Maschinen ausweist:
+sind deshalb die Positions-Sitemaps; robots.txt verweist auf den Sitemap-Index, der sie auflistet:
 
 - Abruf (Wochenabruf, espn_fetch.py --due bei den Saisondateien): sechs Anfragen mit 5 s Abstand (Crawl-delay),
   abgelegt wird nur die Liste der Spieler-Adressen je Position unter fantasypros/sitemap.json – keine Seiteninhalte.
 - Zuordnung (compute.py → app_export.py): slug_for() sucht den ESPN-Namen in einigen Schreibweisen in der Sitemap
   seiner Position; es zählt nur ein eindeutiger Treffer. Sonst None – die App verlinkt dann die DuckDuckGo-Suche
   statt einer geratenen Adresse. D/ST verlinkt die App über ihre eigene Tabelle (FP_DST in v_spieler.js).
+  Die Sitemap ist kein vollständiges Verzeichnis: Wer darin fehlt, bekommt ebenfalls die Suche.
 """
 
 import json
 import re
+import sys
 import time
 import unicodedata
 from pathlib import Path
@@ -30,6 +32,7 @@ PAUSE = 5  # Sekunden zwischen zwei Abrufen (robots.txt: Crawl-delay 5)
 PLAYER_LOC = re.compile(r"<loc>https://www\.fantasypros\.com/nfl/players/([a-z0-9-]+)\.php</loc>")
 SUFFIX = re.compile(r"\s+(jr|sr|ii|iii|iv|v)\.?$", re.I)
 SAINT = re.compile(r"\bSt\.?\s+")  # „St. Brown“ führt FantasyPros zusammengezogen (amonra-stbrown)
+INITIAL = re.compile(r"^([A-Z])\.\s+")  # „J. Michael Sturdivant“ ebenso (jmichael-sturdivant)
 
 
 def path(season: int) -> Path:
@@ -64,6 +67,27 @@ def fetch(session: requests.Session) -> bytes:
     return (json.dumps(data, ensure_ascii=False, indent=1) + "\n").encode("utf-8")
 
 
+def update(session: requests.Session, season: int) -> int:
+    """Wochenabruf: Auszug holen und nur bei Änderung schreiben; gibt die Zahl der Fehler zurück (Warnung im Lauf).
+
+    Fängt seine Fehler selbst wie wetter und news: Als Skript gestartet (Action) ist espn_fetch zweimal geladen, als
+    __main__ und als espn_fetch. Ein ef.FetchError von hier wäre für refresh_season_files eine fremde Klasse und bräche
+    den ganzen Wochenabruf ab (Befund Gegenprüfung 30.09.2026).
+    """
+    target = path(season)
+    try:
+        content = fetch(session)
+    except ef.FetchError as exc:
+        print(f"  {target.name:<34} FEHLER – {exc}", file=sys.stderr)
+        return 1
+    if target.exists() and target.read_bytes() == content:
+        print(f"  {target.name:<34} unverändert")
+    else:
+        ef.save_atomic(target, content)
+        print(f"  {target.name:<34} {len(content):>10,} Bytes -> {ef.rel(target)}")
+    return 0
+
+
 # ---------------------------------------------------------------- Zuordnung (reine Funktionen)
 
 def slug(name: str) -> str:
@@ -73,9 +97,10 @@ def slug(name: str) -> str:
 
 
 def variants(name: str) -> set[str]:
-    """Schreibweisen eines Namens: wie geschrieben, Bindestriche verschmolzen (Amon-Ra → amonra), „St. X“ → stx."""
+    """Schreibweisen eines Namens: wie geschrieben, Bindestriche verschmolzen (Amon-Ra → amonra), „St. X“ → stx,
+    führende Initiale angezogen („J. Michael“ → jmichael)."""
     joined = name.replace("-", "")
-    return {slug(form) for form in (name, joined, SAINT.sub("St", joined))} - {""}
+    return {slug(form) for form in (name, joined, SAINT.sub("St", joined), INITIAL.sub(r"\1", name))} - {""}
 
 
 def index(data: dict | None) -> dict[str, set[str]]:
@@ -90,13 +115,17 @@ def slug_for(name: str | None, pos: str | None, known: dict[str, set[str]]) -> s
     Gesucht wird in der Sitemap seiner Position, je Schreibweise auch mit angehängter Position (josh-allen-qb).
     Zuerst der volle Name mit Zusatz (kenneth-walker-iii schlägt kenneth-walker), dann ohne Zusatz (deebo-samuel für
     Deebo Samuel Sr.). Mehr als ein Treffer (isaiah-williams und isaiah-williams-wr) ist mehrdeutig: None.
+    Liefert die eigene Position gar nichts, zählt eine Adresse ohne Positionsanhang, die in genau einer anderen Position
+    steht (ESPN führt Connor Heyward als RB, FantasyPros als TE) – nicht aber, wenn es Namensvettern mit Anhang gibt.
     """
-    slugs = known.get(pos or "")
-    if not slugs or not name:
+    if not name or pos not in known:
         return None
-    suffix = f"-{pos.lower()}"
-    for form in dict.fromkeys((name, SUFFIX.sub("", name))):
-        hits = {c for v in variants(form) for c in (v, v + suffix) if c in slugs}
+    forms = list(dict.fromkeys((name, SUFFIX.sub("", name))))
+    for form in forms:
+        hits = {c for v in variants(form) for c in (v, f"{v}-{pos.lower()}") if c in known[pos]}
         if hits:
             return hits.pop() if len(hits) == 1 else None
-    return None
+    plain = {v for form in forms for v in variants(form)}
+    places = [v for p in known for v in plain if v in known[p]]
+    namesakes = any(f"{v}-{p.lower()}" in known[p] for p in known for v in plain)
+    return places[0] if len(places) == 1 and not namesakes else None
