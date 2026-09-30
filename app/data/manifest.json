@@ -2,7 +2,7 @@
 "schema":1,
 "season":2026,
 "through_week":3,
-"datenstand":{"woche_final":3,"ros_nach_woche":3,"pool_woche":3,"transaktionen_bis":1790761189281,"pool_stand":"2026-09-30T1651Z","wetter_stand":"2026-09-30T1651Z"},
+"datenstand":{"woche_final":3,"ros_nach_woche":3,"pool_woche":3,"transaktionen_bis":1790761189281,"pool_stand":"2026-09-30T1750Z","wetter_stand":"2026-09-30T1750Z"},
 "files":{
 "claude.json":{"v":"fd5f8f975217","bytes":29951,"lazy":true},
 "dst.json":{"v":"c33b2db7e87e","bytes":12966,"lazy":true},
@@ -11,8 +11,8 @@
 "players.json":{"v":"cf680cd1aafb","bytes":319919,"lazy":true},
 "schedule.json":{"v":"4a84d3142d78","bytes":17583,"lazy":false},
 "teams.json":{"v":"9666e1b31d26","bytes":31435,"lazy":false},
-"transactions.json":{"v":"5dfdaf1b93be","bytes":51904,"lazy":true},
-"waiver.json":{"v":"7debb96822d0","bytes":87919,"lazy":true},
-"wetter.json":{"v":"e5b02189dd50","bytes":17521,"lazy":true}
+"transactions.json":{"v":"eb0466633402","bytes":51904,"lazy":true},
+"waiver.json":{"v":"d49a7ad69728","bytes":87910,"lazy":true},
+"wetter.json":{"v":"b8dafe5534e8","bytes":17521,"lazy":true}
 }
 }
