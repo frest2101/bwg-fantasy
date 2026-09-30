@@ -73,12 +73,13 @@ def test_waiver_vertrag(result):
     out = app_export.round_file("waiver.json", app_export.build_waiver(dict(result, pool_latest=pool)))
     assert (out["stand"], out["woche"]) == ("2026-09-29T0645Z", 3)
     assert set(out) == {"stand", "woche", "reihenfolge", "reihenfolge_quelle", "reihenfolge_stand", "bedarf", "spieler",
-                        "horizont", "ersatz_woche", "ersatz_3", "anstoss", "bedarf_woche"}
+                        "horizont", "ersatz_woche", "ersatz_3", "anstoss", "bedarf_woche", "bedarf_basis", "bedarf_ersatz", "profil"}
     assert out["horizont"] == [3, 4, 5] and len(out["anstoss"]) == 32   # W3: alle 32 Teams spielen
     # ohne Reihenfolge im Pool-Auszug: Wochenstand (waiver_prio aus mTeam des Wochenabrufs); ohne ROS kein Bedarf
     weekly = sorted(result["teams"], key=lambda t: t["waiver_prio"])
     assert out["reihenfolge"] == [t["team_id"] for t in weekly] and out["reihenfolge_quelle"] == "wochenabruf"
     assert len(out["reihenfolge"]) == 10 and out["bedarf"] is None and out["reihenfolge_stand"] is None
+    assert out["profil"] is None and out["bedarf_basis"] is None   # ohne ROS-Auszug kein Profil
     daily = dict(pool, waiver_reihenfolge={str(i): r for i, r in zip(range(1, 11), [6, 10, 5, 7, 3, 1, 4, 8, 9, 2])},
                  waiver_reihenfolge_stand="2026-09-28T1540Z")
     out_daily = app_export.build_waiver(dict(result, pool_latest=daily))
@@ -128,8 +129,11 @@ def test_bedarf_vertrag():
     weekly = {10: {"pos": QB, "ros_pro_spiel": Decimal(20)}, 15: {"pos": RB, "ros_pro_spiel": Decimal(9)},
               30: {"pos": WR, "ros_pro_spiel": Decimal(12)}, -1: {"pos": DST, "ros_pro_spiel": Decimal(8)},
               70: {"pos": QB, "ros_pro_spiel": Decimal("15.5")}, 99: {"pos": RB, "ros_pro_spiel": None}}
+    for pid, w in weekly.items():   # Playoffs W15–17: hier nur QB 70 mit 25 über dem Playoff-Ersatz 20
+        w["ros_po_pro_spiel"] = Decimal(25) if pid == 70 else None
     result = {"players": {"players": weekly, "ros_after_week": 3,
-                          "ersatz": {QB: Decimal(18), RB: Decimal(10), WR: Decimal(7), DST: None}}}
+                          "ersatz": {QB: Decimal(18), RB: Decimal(10), WR: Decimal(7), DST: None},
+                          "ersatz_po": {QB: Decimal(20), RB: None, WR: None, DST: None}}}
     pool = {"players": [{"id": 10, "onTeamId": 1}, {"id": 15, "onTeamId": 1}, {"id": 30, "onTeamId": 1},
                         {"id": -1, "onTeamId": 1}, {"id": 70, "onTeamId": 2}, {"id": 99, "onTeamId": 0},
                         {"id": 12345, "onTeamId": 2}]}   # 12345 fehlt im Wochenpool: Position unbekannt, entfällt
@@ -142,7 +146,11 @@ def test_bedarf_vertrag():
         ("FLEX", None, None, None), ("FLEX", None, None, None), ("OP", None, None, None)]
     assert [(g["slot"], g["id"], g["ros_g"]) for g in out[2]["luecken"]][:2] == [("QB", 70, 15.5), ("RB", None, None)]
     assert app_export.team_needs(pool, {"players": dict(result["players"], ros_after_week=None)}) is None
-    assert app_export.team_needs(pool, {"players": dict(result["players"], ros_after_week=14)}) is None
+    # nach W14 zählen die Playoffs (Beschluss 30.09.2026): Team 2 hat mit QB 70 (25 > 20) keine QB-Lücke mehr
+    po = app_export.team_needs(pool, {"players": dict(result["players"], ros_after_week=14)})
+    assert po[2]["luecken"][0]["slot"] == "RB" and po[2]["ueber_ersatz"]["QB"] == 1
+    assert app_export.need_basis({"players": dict(result["players"], ros_after_week=14)})[2] == "playoffs"
+    assert app_export.team_needs(pool, {"players": dict(result["players"], ros_after_week=17)}) is None
 
 
 def test_wetter_vertrag():
@@ -363,7 +371,7 @@ def test_wochensicht_vertrag():
                                     row(12, "FREEAGENT", 0, 30, "OUT"), row(30, "ONTEAM", 1, 21, "OUT"),
                                     row(31, "ONTEAM", 1, 10), row(99, "FREEAGENT", 0, 50)]}   # 99 ohne Wochenpool: entfällt
     result = {"nfl": nfl, "nfl_spiele": games, "ros_projektion": ros,
-              "players": {"players": weekly, "ros_after_week": 3}}
+              "players": {"players": weekly, "ros_after_week": 3, "ersatz": {}}}
     view = app_export.round_file("waiver.json", app_export.week_view(pool, result))
     assert view["horizont"] == [4, 5, 6] and view["anstoss"] == dict.fromkeys(("AAA", "BBB"), int(kick.timestamp() * 1000))
     assert view["ersatz_woche"]["QB"] == 22.25 and view["ersatz_woche"]["RB"] is None
@@ -377,7 +385,29 @@ def test_wochensicht_vertrag():
     assert need["ausfaelle"][0] == {"slot": "QB", "id": 30, "pos": "QB", "grund": "OUT"}
     assert need["byes"] == [{"woche": 5, "slot": "QB", "id": 30, "pos": "QB"}]
     # ohne Regular-Season-ROS keine Ausfälle und Byes, ohne Spielplan oder nach W17 keine Wochensicht
-    late = app_export.week_view(pool, dict(result, players={"players": weekly, "ros_after_week": 14}))
+    late = app_export.week_view(pool, dict(result, players={"players": weekly, "ros_after_week": 17, "ersatz": {}}))
     assert late["bedarf_woche"][1]["ausfaelle"] == [] and late["bedarf_woche"][1]["byes"] == []
     assert app_export.week_view(pool, dict(result, nfl=None)) is None
     assert app_export.week_view(dict(pool, woche=18), result) is None
+
+
+def test_profil_und_zugewinn_echte_daten():
+    """Profil und Zugewinn auf dem echten Stand. Der Tagesstand wechselt stündlich, deshalb nur Invarianten:
+    sieben Gruppen je Team, Σ Gruppen = Gesamt, schwach und stark getrennt, Absicherung und Bye-Kosten ≤ 0,
+    Zugewinn nur für freie Spieler mit brutto > 0 und netto ≤ brutto."""
+    res = compute.compute_season(2026)
+    if not res.get("pool_latest") or res["players"]["ros_after_week"] is None:
+        pytest.skip("noch kein Tagesstand oder ROS-Auszug")
+    out = app_export.build_waiver(res)
+    assert out["bedarf_basis"] in ("regular", "playoffs") and set(out["profil"]) == set(range(1, 11))
+    for p in out["profil"].values():
+        assert list(p["gruppen"]) == ["QB", "RB", "WR", "TE", "FLEX", "D/ST", "K"]
+        assert sum((g["wert"] for g in p["gruppen"].values()), Decimal(0)) == p["gesamt"]["wert"]
+        assert set(p["schwach"]).isdisjoint(p["stark"]) and set(p["schwach"]) | set(p["stark"]) <= set(p["gruppen"])
+        assert all(a["wert"] is None or a["wert"] <= 0 for a in p["absicherung"].values())
+        assert all(b["kosten"] < 0 and b["ids"] for b in p["byes"])
+        assert p["kader"]["spieler"] >= 13 and isinstance(p["kader"]["voll"], bool)
+    zug = [s for s in out["spieler"] if "zug" in s]
+    assert zug and all(s["status"] in ("WAIVERS", "FREEAGENT") for s in zug)
+    assert all(set(s["zug"]) <= {"woche", "drei", "ros"} and v["b"] > 0 and v["n"] <= v["b"]
+               for s in zug for h in s["zug"].values() for v in h.values())

@@ -40,26 +40,29 @@ export async function render(box, ctx, r) {
   });
   const rowById = new Map(rows.map(x => [x.id, x]));
   const name = id => byId.get(id)?.name ?? rowById.get(id)?.name ?? T?.spieler?.[String(id)] ?? `Spieler ${id}`;
-  let mine = +U.store.get(KEY) || 0;
-  const mineSel = h('select', {'aria-label': 'Mein Team', onchange: e => { mine = +e.target.value; U.store.set(KEY, mine); draw(); }},
-    h('option', {value: 0}, 'Mein Team wählen'), S.teams.map(t => h('option', {value: t.team_id, selected: t.team_id === mine}, `${t.kuerzel} · ${t.name}`)));
+  // Bezugsteam: #waiver?team=N gilt nur für diesen Aufruf (Link von der Team-Seite), sonst das gespeicherte Mein Team
+  const qTeam = U.team(r.q.get('team')) ? +r.q.get('team') : 0;
+  const me = {mine: qTeam || +U.store.get(KEY) || 0, q: qTeam};
+  const mineSel = h('select', {'aria-label': 'Mein Team', onchange: e => {
+    me.mine = +e.target.value; me.q = 0; U.store.set(KEY, me.mine); av.rebuild(); draw();
+  }}, h('option', {value: 0}, 'Mein Team wählen'), S.teams.map(t => h('option', {value: t.team_id, selected: t.team_id === me.mine}, `${t.kuerzel} · ${t.name}`)));
   U.ap(box, h('p', {class: 'note'}, `Tagesstand ${U.stamp(W.stand)} · Projektion und Bye-Hinweis für W${W.woche}`, ' ', U.ib('tagesstand', '')),
-    h('div', {class: 'row'}, h('label', null, 'Mein Team ', mineSel)));
-  available(box, W, P, rows, r, wx && (nfl => wx.flagLink(wx.gameOf(WX, nfl))));
+    h('div', {class: 'row'}, h('label', null, qTeam ? 'Sicht von ' : 'Mein Team ', mineSel)));
+  const av = available(box, W, P, rows, r, wx && (nfl => wx.flagLink(wx.gameOf(WX, nfl))), me);
   const grid = h('div', {class: 'two'});
   U.ap(box, grid);
   let bsicht = W.bedarf_woche ? 'woche' : 'ros';
   // Wochensicht mit fünf Spalten: Bedarf und Reihenfolge untereinander in voller Breite, ROS-Sicht nebeneinander
   const draw = () => {
     grid.className = bsicht === 'woche' ? 'stack' : 'two';
-    grid.replaceChildren(needs(W, P, name, mine, bsicht, v => { bsicht = v; draw(); }, rowById), order(W, mine));
+    grid.replaceChildren(needs(W, P, name, me.mine, bsicht, v => { bsicht = v; draw(); }, rowById), order(W, me.mine));
   };
   draw();
   claims(box, T, name);
 }
 
 // ---------------------------------------------------------------- beste verfügbare Spieler je Position
-function available(box, W, P, rows, r, wflag) {
+function available(box, W, P, rows, r, wflag, me) {
   const q = r.q;
   const narrow = matchMedia('(max-width:599px)').matches;
   const hasWeek = !!W.ersatz_woche;
@@ -74,7 +77,7 @@ function available(box, W, P, rows, r, wflag) {
   const spieler = {k: 'name', l: 'Spieler', v: x => x.name.toLowerCase(), d: 1, flt: false, f: x => {
     const a = h('a', {href: '#spieler/' + x.id, class: 'pl'},
       h('span', null, x.name, U.inj(x.inj)), h('span', {class: 'sub'}, `${x.pos ?? '–'} · ${x.nfl ?? '–'} · ${x.status === 'FREEAGENT' ? 'FA' : 'Waivers'}`
-        + (played(W, x) ? ` · W${W.woche} gespielt` : '')));
+        + (played(W, x) ? ` · W${W.woche} gespielt` : '') + ahead(x)));
     const fl = wflag?.(x.nfl);
     return fl ? h('span', {class: 'plw'}, a, fl) : a;
   }};
@@ -96,6 +99,24 @@ function available(box, W, P, rows, r, wflag) {
   const verl = {k: 'inj', l: 'Verletzung', v: x => U.INJ[x.inj] ? x.inj : null, d: 1, f: x => U.INJ[x.inj]?.[1] || (x.inj === 'ACTIVE' ? 'aktiv' : '–')};
   const frist = {k: 'frist', l: 'Frist', v: x => x.status === 'WAIVERS' ? x.waiver_bis : null, d: 1,
     f: x => x.status === 'WAIVERS' ? U.val(x.waiver_bis, U.stamp, 'keine Frist gemeldet') : U.na('Free Agent, sofort')};
+  // Zugewinn für das Bezugsteam (waiver.json spieler[].zug, Python): brutto, netto nur, wenn ein Drop etwas kostet
+  const gain = x => x.zug?.[st.hor]?.[String(me.mine)] ?? null;
+  const lost = x => st.hor !== 'ros' && played(W, x);
+  const zugCol = () => ({k: 'zug', l: `Für ${U.kz(me.mine)}`, num: 1, v: x => lost(x) ? null : gain(x)?.b ?? null,
+    f: x => {
+      const z = gain(x);
+      if (lost(x)) return U.na('Spiel der Woche schon angepfiffen');
+      if (!z) return U.na('verbessert die beste Aufstellung nicht');
+      return z.n !== z.b ? [U.sgn(z.b), h('small', null, `netto ${U.sgn(z.n)}`)] : U.sgn(z.b);
+    }});
+  // Konkurrenz um den Claim: Teams vor dem Bezugsteam in der Waiver-Reihenfolge, bei denen der Spieler starten würde
+  const ahead = x => {
+    if (x.status !== 'WAIVERS' || !me.mine || !W.reihenfolge) return '';
+    const mineAt = W.reihenfolge.indexOf(me.mine);
+    const rivals = W.reihenfolge.slice(0, mineAt < 0 ? W.reihenfolge.length : mineAt)
+      .map((tid, i) => [tid, i + 1]).filter(([tid]) => x.zug?.[st.hor]?.[String(tid)]);
+    return rivals.length ? ' · vor dir: ' + rivals.map(([tid, i]) => `${i}. ${U.kz(tid)}`).join(', ') : '';
+  };
   // Woche N+1: wer schon gespielt hat, bringt in dieser Woche nichts mehr – ohne Sortierwert ans Ende
   const weekWhy = x => x.pos === 'D/ST' || !U.ok(x.pos) ? 'kein freier Spieler der Position' : 'noch keine ESPN-Projektion';
   const projUe = {k: 'proj_ue', l: `W${W.woche} ü. Ersatz`, num: 1, v: x => played(W, x) ? null : x.proj_ue,
@@ -119,14 +140,15 @@ function available(box, W, P, rows, r, wflag) {
   let tbl;
   const build = () => {
     tbl = U.table({cap: CAP[st.hor], cls: 'nr', rh: 0, rows: rowsNow(), sort: [SORT[st.hor], -1], limit: 50, filter: true,
-      filters, fstate: fst, cols: [...base[st.hor], ...extra[st.sicht]], rc: x => st.hor !== 'ros' && played(W, x) ? 'gsp' : null,
+      filters, fstate: fst, cols: [base[st.hor][0], ...(me.mine ? [zugCol()] : []), ...base[st.hor].slice(1), ...extra[st.sicht]],
+      rc: x => st.hor !== 'ros' && played(W, x) ? 'gsp' : null,
       note: 'Verfügbar = Waivers oder Free Agent laut Tagesstand.'});
     slot.replaceChildren(tbl);
   };
   const refresh = rebuild => {
     if (rebuild) build(); else tbl.upd(rowsNow());
     count.textContent = `${rowsNow().length} verfügbare Spieler`;
-    U.setQ('waiver', {pos: st.pos || null, h: st.hor !== (hasWeek ? 'woche' : 'ros') ? st.hor : null,
+    U.setQ('waiver', {team: me.q || null, pos: st.pos || null, h: st.hor !== (hasWeek ? 'woche' : 'ros') ? st.hor : null,
       sicht: st.sicht !== (narrow ? 'ros' : 'alle') ? st.sicht : null});
     ersNote.replaceChildren(); U.ap(ersNote, ersText());
   };
@@ -155,6 +177,7 @@ function available(box, W, P, rows, r, wflag) {
     U.legend(['verfuegbar', 'horizont', 'proj-ue', 'proj3', 'gespielt', 'ros-ue', 'ersatz', 'ros-spiel', 'proj-naechste', 'mu-n1', 'mu-naechste3', 'bye-hinweis', 'besitz-trend', 'frist',
       'wetter-markierung', 'filter', 'projektionen']));
   refresh(true);
+  return {rebuild: () => refresh(true)};
 }
 
 // ---------------------------------------------------------------- Bedarf je Team
@@ -167,6 +190,8 @@ function needs(W, P, name, mine, sicht, onSicht, rowById) {
     .map(t => ({t, b: W[key]?.[String(t.team_id)]}));
   const rc = x => x.t.team_id === mine ? 'me' : null;
   const link = id => h('a', {href: '#spieler/' + id}, name(id));
+  // Team mit Schwächen laut Profil (waiver.json profil) als Unterzeile, in beiden Sichten
+  const teamCell = x => [U.tl(x.t.team_id), weakSub(W, x.t.team_id)];
   if (sicht === 'woche' && W.bedarf_woche) {
     const byId = rowById;
     const cand = all => { const ids = all.filter(id => !played(W, byId.get(id) || {})); return ids.length ? [' → ', ids.map((id, i) => [i ? ', ' : '', link(id), ` ${U.num(byId.get(id)?.proj)}`])] : ' → kein freier Spieler mit mehr'; };
@@ -176,29 +201,36 @@ function needs(W, P, name, mine, sicht, onSicht, rowById) {
     const bye = b => [`W${b.woche} `, link(b.id), ` (${b.slot})`];
     const list = (arr, f, none) => arr.length ? arr.map((x, i) => [i ? h('br') : '', f(x)]) : h('span', {class: 'note'}, none);
     U.ap(card, U.table({cap: `Lücken der besten Aufstellung für W${W.woche}`, cls: 'nr', rh: 0, rows: teams('bedarf_woche'), sortable: false, rc, cols: [
-      {k: 't', l: 'Team', f: x => U.tl(x.t.team_id)},
+      {k: 't', l: 'Team', f: teamCell},
       {k: 'n', l: 'Lücken', num: 1, f: x => x.b ? (x.b.luecken.length || h('span', {class: 'note'}, 'keine')) : '–'},
       {k: 'l', l: `Lücken W${W.woche} → beste freie Spieler`, cls: 'wrap', f: x => x.b ? list(x.b.luecken, gap, '–') : '–'},
       {k: 'a', l: 'Ausfälle und fraglich', cls: 'wrap', f: x => x.b ? list(x.b.ausfaelle, miss, '–') : '–'},
       {k: 'y', l: `Byes ${W.horizont?.length > 1 ? `W${W.horizont[1]}–${W.horizont.at(-1)}` : ''}`, cls: 'wrap', f: x => x.b ? list(x.b.byes, bye, '–') : '–'}]}),
-    U.legend(['bedarf-woche', 'proj-ue', 'gespielt']));
+    U.legend(['bedarf-woche', 'proj-ue', 'gespielt', 'profil']));
     return card;
   }
   if (!W.bedarf) {
-    U.ap(card, h('p', {class: 'note'}, P.ros_nach_woche == null ? `Bedarf ab dem ersten ROS-Auszug (Wochenabruf W${S.tw + 1}).` : 'Nach W14 gibt es keinen Regular-Season-Bedarf mehr.'));
+    U.ap(card, h('p', {class: 'note'}, P.ros_nach_woche == null ? `Bedarf ab dem ersten ROS-Auszug (Wochenabruf W${S.tw + 1}).` : 'Nach W17 gibt es keinen Bedarf mehr.'));
     return card;
   }
-  const ers = P.ersatz || {};
+  const po = W.bedarf_basis === 'playoffs';   // nach W14: ROS Playoffs/Spiel W15–17 mit dem Ersatzniveau der Playoffs
+  const ers = W.bedarf_ersatz || P.ersatz || {};
   const gap = g => g.id == null ? `${g.slot}: unbesetzt`
     : [`${g.slot}: `, link(g.id), ` ${U.num(g.ros_g)}` + (U.ok(ers[g.pos]) ? ` (Ersatz ${U.num(ers[g.pos])})` : '')];
-  U.ap(card, U.table({cap: 'Lücken der ROS-optimalen Aufstellung', cls: 'nr', rh: 0, rows: teams('bedarf'), sortable: false, rc, cols: [
-    {k: 't', l: 'Team', f: x => U.tl(x.t.team_id)},
+  U.ap(card, U.table({cap: po ? 'Lücken der besten Aufstellung für W15–17' : 'Lücken der ROS-optimalen Aufstellung', cls: 'nr', rh: 0,
+    rows: teams('bedarf'), sortable: false, rc, cols: [
+    {k: 't', l: 'Team', f: teamCell},
     {k: 'n', l: 'Lücken', num: 1, f: x => x.b ? (x.b.luecken.length || h('span', {class: 'note'}, 'keine')) : '–'},
     {k: 'l', l: 'Starter unter Ersatzniveau', cls: 'wrap', f: x => x.b ? x.b.luecken.map((g, i) => [i ? h('br') : '', gap(g)]) : '–'},
     {k: 'u', l: 'Über Ersatz je Position', cls: 'wrap', f: x => x.b ? POS.map((p, i) => [i ? ' · ' : '', `${p} ${x.b.ueber_ersatz[p] ?? '–'}`]) : '–'}]}),
-  U.legend(['bedarf', 'ersatz']));
+  U.legend(['bedarf', 'ersatz', 'profil']));
   return card;
 }
+
+// Schwächen eines Teams laut Profil als Unterzeile („schwach: WR · RB“); leer ohne Profil oder ohne Schwäche
+const PROF_NAME = {QB: 'QB+OP'};
+const weakText = (W, tid) => (W.profil?.[String(tid)]?.schwach || []).map(g => PROF_NAME[g] || g).join(' · ');
+const weakSub = (W, tid) => weakText(W, tid) ? h('span', {class: 'sub'}, 'schwach: ' + weakText(W, tid)) : null;
 
 // ---------------------------------------------------------------- Waiver-Reihenfolge
 function order(W, mine) {
@@ -209,8 +241,9 @@ function order(W, mine) {
   U.ap(card, U.table({cap: 'Reihenfolge der Claims', cls: 'nr', rh: 1, rows: list.map((tid, i) => ({i: i + 1, tid})), sortable: false,
     rc: x => x.tid === mine ? 'me' : null, cols: [
       {k: 'p', l: 'Platz', num: 1, f: x => x.i + '.'},
-      {k: 't', l: 'Team', f: x => U.tl(x.tid)}]}),
-  h('p', {class: 'note'}, src, '. ESPN verarbeitet Waiver um 07:00 UTC; in der ESPN-App sind die Ergebnisse erfahrungsgemäß erst 10:30–11:00 Uhr sichtbar. ', U.ib('waiver-reihenfolge', '')));
+      {k: 't', l: 'Team', f: x => U.tl(x.tid)},
+      ...(W.profil ? [{k: 's', l: 'Schwächen', cls: 'wrap', f: x => weakText(W, x.tid) || '–'}] : [])]}),
+  h('p', {class: 'note'}, src, '. ESPN verarbeitet Waiver um 07:00 UTC; in der ESPN-App sind die Ergebnisse erfahrungsgemäß erst 10:30–11:00 Uhr sichtbar. Die Reihenfolge rollt: Wer erfolgreich claimt, rückt ans Ende. ', U.ib('waiver-reihenfolge', '')));
   return card;
 }
 
