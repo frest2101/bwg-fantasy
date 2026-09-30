@@ -117,7 +117,7 @@
 {"id":3054850,"team":5,"status":"ONTEAM","inj":"ACTIVE","own":54.86,"own_d":2.61,"started":10.27,"waiver_bis":null,"proj":10.8,"news":1790558394000},
 {"id":3055899,"team":4,"status":"ONTEAM","inj":"ACTIVE","own":82.91,"own_d":-1.55,"started":76.94,"waiver_bis":null,"proj":8.74,"news":1790569865000},
 {"id":3059989,"team":0,"status":"FREEAGENT","inj":"ACTIVE","own":0.02,"own_d":0.0,"started":0.0,"waiver_bis":null,"proj":0.0,"news":1790040745000},
-{"id":3068267,"team":9,"status":"ONTEAM","inj":"ACTIVE","own":1.3,"own_d":0.94,"started":0.09,"waiver_bis":null,"proj":4.09,"news":1790712784000,"name":"Austin Ekeler","pos":"RB","nfl":null},
+{"id":3068267,"team":9,"status":"ONTEAM","inj":"ACTIVE","own":1.3,"own_d":0.94,"started":0.09,"waiver_bis":null,"proj":4.09,"news":1790712784000,"name":"Austin Ekeler","pos":"RB","nfl":null,"fp":"austin-ekeler"},
 {"id":3115293,"team":0,"status":"FREEAGENT","inj":"ACTIVE","own":0.09,"own_d":0.0,"started":0.01,"waiver_bis":null,"proj":0.0,"news":1773100014000},
 {"id":3116164,"team":0,"status":"FREEAGENT","inj":"ACTIVE","own":8.94,"own_d":0.43,"started":1.52,"waiver_bis":null,"proj":7.52,"news":1790566721000},
 {"id":3116165,"team":4,"status":"ONTEAM","inj":"ACTIVE","own":65.42,"own_d":-3.99,"started":5.49,"waiver_bis":null,"proj":7.11,"news":1790710404000},
