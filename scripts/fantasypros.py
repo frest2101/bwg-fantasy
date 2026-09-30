@@ -8,8 +8,9 @@ sind deshalb die Positions-Sitemaps; robots.txt verweist auf den Sitemap-Index, 
 - Abruf (Wochenabruf, espn_fetch.py --due bei den Saisondateien): sechs Anfragen mit 5 s Abstand (Crawl-delay),
   abgelegt wird nur die Liste der Spieler-Adressen je Position unter fantasypros/sitemap.json – keine Seiteninhalte.
 - Zuordnung (compute.py → app_export.py): slug_for() sucht den ESPN-Namen in einigen Schreibweisen in der Sitemap
-  seiner Position; es zählt nur ein eindeutiger Treffer. Sonst None – die App verlinkt dann die DuckDuckGo-Suche
-  statt einer geratenen Adresse. D/ST verlinkt die App über ihre eigene Tabelle (FP_DST in v_spieler.js).
+  seiner Position, vorher die Handtabelle HAND für Spitznamen (nur wenn deren Adresse in der Sitemap steht); es zählt nur
+  ein eindeutiger Treffer. Sonst None – die App verlinkt dann die DuckDuckGo-Suche statt einer geratenen Adresse.
+  D/ST verlinkt die App über ihre eigene Tabelle (FP_DST in v_spieler.js).
   Die Sitemap ist kein vollständiges Verzeichnis: Wer darin fehlt, bekommt ebenfalls die Suche.
 """
 
@@ -33,6 +34,13 @@ PLAYER_LOC = re.compile(r"<loc>https://www\.fantasypros\.com/nfl/players/([a-z0-
 SUFFIX = re.compile(r"\s+(jr|sr|ii|iii|iv|v)\.?$", re.I)
 SAINT = re.compile(r"\bSt\.?\s+")  # „St. Brown“ führt FantasyPros zusammengezogen (amonra-stbrown)
 INITIAL = re.compile(r"^([A-Z])\.\s+")  # „J. Michael Sturdivant“ ebenso (jmichael-sturdivant)
+# Von Hand geprüft (Seitentitel mit Name und Team, 30.09.2026): Spieler, die FantasyPros unter dem vollen Vornamen führt.
+# ESPN-ID → Adresse; gilt nur, solange die Adresse in der Sitemap der Position steht. Keine Regel über Spitznamen –
+# „gleicher Nachname, gleiche Initiale“ schickte Kyle Williams zu keshawn-williams (Beschluss Stephan: Tabelle).
+HAND = {4366031: "nathaniel-dell",      # Tank Dell, WR HOU
+        4371733: "kenneth-gainwell",    # Kenny Gainwell, RB TB
+        4685555: "nick-singleton",      # Nicholas Singleton, RB TEN
+        4870653: "kevin-concepcion"}    # KC Concepcion, WR CLE (FantasyPros: „KC Concepcion Jr.“)
 
 
 def path(season: int) -> Path:
@@ -109,17 +117,20 @@ def index(data: dict | None) -> dict[str, set[str]]:
     return {pos: set(positions[pos]) for pos in ("QB", "RB", "WR", "TE", "K") if positions.get(pos)}
 
 
-def slug_for(name: str | None, pos: str | None, known: dict[str, set[str]]) -> str | None:
+def slug_for(name: str | None, pos: str | None, known: dict[str, set[str]], pid: int | None = None) -> str | None:
     """FantasyPros-Adresse eines Spielers oder None, wenn sie nicht eindeutig ist.
 
-    Gesucht wird in der Sitemap seiner Position, je Schreibweise auch mit angehängter Position (josh-allen-qb).
-    Zuerst der volle Name mit Zusatz (kenneth-walker-iii schlägt kenneth-walker), dann ohne Zusatz (deebo-samuel für
+    Zuerst die Handtabelle HAND (ESPN-ID pid), sofern ihre Adresse in der Sitemap der Position steht.
+    Sonst wird in der Sitemap seiner Position gesucht, je Schreibweise auch mit angehängter Position (josh-allen-qb),
+    dabei der volle Name mit Zusatz vor dem ohne (kenneth-walker-iii schlägt kenneth-walker; deebo-samuel für
     Deebo Samuel Sr.). Mehr als ein Treffer (isaiah-williams und isaiah-williams-wr) ist mehrdeutig: None.
     Liefert die eigene Position gar nichts, zählt eine Adresse ohne Positionsanhang, die in genau einer anderen Position
     steht (ESPN führt Connor Heyward als RB, FantasyPros als TE) – nicht aber, wenn es Namensvettern mit Anhang gibt.
     """
     if not name or pos not in known:
         return None
+    if HAND.get(pid) in known[pos]:
+        return HAND[pid]
     forms = list(dict.fromkeys((name, SUFFIX.sub("", name))))
     for form in forms:
         hits = {c for v in variants(form) for c in (v, f"{v}-{pos.lower()}") if c in known[pos]}

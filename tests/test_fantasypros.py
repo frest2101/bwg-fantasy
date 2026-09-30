@@ -103,6 +103,18 @@ def test_slug_for(known, name, pos, expected):
     assert fp.slug_for(name, pos, known) == expected
 
 
+def test_handtabelle(known):
+    """Spitznamen aus der Handtabelle (echte ESPN-IDs); ohne ID bleibt es bei der Suche, fehlt die Adresse in der Sitemap der
+    Position (veralteter Eintrag), gilt wieder die Regel."""
+    assert fp.slug_for("Tank Dell", "WR", known, 4366031) == "nathaniel-dell"
+    assert fp.slug_for("Kenny Gainwell", "RB", known, 4371733) == "kenneth-gainwell"
+    assert fp.slug_for("Tank Dell", "WR", known) is None
+    assert fp.slug_for("Nicholas Singleton", "RB", known, 4685555) is None       # nick-singleton fehlt im erfundenen Auszug
+    assert fp.slug_for("Tank Dell", "RB", known, 4366031) is None                # falsche Position: Tabelle greift nicht
+    assert fp.slug_for("Josh Allen", "QB", known, 3918298) == "josh-allen-qb"   # ohne Tabelleneintrag: Regel
+    assert all(isinstance(pid, int) and slug == fp.slug(slug) for pid, slug in fp.HAND.items())
+
+
 def test_ohne_auszug_keine_zuordnung():
     assert fp.index(None) == {}
     assert fp.slug_for("Brock Purdy", "QB", fp.index(None)) is None
