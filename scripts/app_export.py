@@ -513,6 +513,10 @@ def build_waiver(result: dict) -> dict | None:
 
 
 CLAUDE_PLAYER_COLS = ("name", "pos", "nfl", "inj", "avg", "form", "trend", "ros_g", "ros_rang", "gegner_n1", "mu_n1")
+# Free Agents zusätzlich mit Status und den Wochenwerten des Tagesstands (waiver.json: proj, proj3)
+CLAUDE_FREE_COLS = CLAUDE_PLAYER_COLS + ("status", "proj", "proj3")
+# je Spieler aus dem Tagesstand (waiver.json) überlagert
+CLAUDE_DAILY = ("team", "status", "inj", "proj", "proj3")
 
 
 def fixed(value, places: int):
@@ -520,17 +524,35 @@ def fixed(value, places: int):
     return None if value is None else float(round_to(value, places))
 
 
-def claude_player(p: dict) -> list:
-    """Spielerzeile nach CLAUDE_PLAYER_COLS; gegner_n1 und mu_n1 aus mu.n1 (Kürzel und F mit 3 Stellen, None bei Bye
+def claude_player(p: dict, cols: tuple = CLAUDE_PLAYER_COLS) -> list:
+    """Spielerzeile nach cols; gegner_n1 und mu_n1 aus mu.n1 (Kürzel und F mit 3 Stellen, None bei Bye
     oder ohne Wert)."""
     n1 = (p.get("mu") or {}).get("n1") or {}
     mu = {"gegner_n1": n1.get("opp"), "mu_n1": fixed(n1.get("f"), 3)}
-    return [mu[c] if c in mu else p.get(c) for c in CLAUDE_PLAYER_COLS]
+    return [mu[c] if c in mu else p.get(c) for c in cols]
+
+
+def claude_rows(players: dict, waiver: dict | None) -> list[dict]:
+    """Spieler für claude.json, nach ID: players.json (Wochenstand), je Spieler team, status, inj, proj und proj3 aus
+    dem Tagesstand überlagert – wie merge() in app/js/v_spieler.js. Kaderspieler, die nur der Tagesstand kennt, kommen
+    mit name, pos, nfl aus waiver.json dazu (unbekannter Name: „Spieler <id>“ wie in der App), ihre Wochenwerte
+    fehlen. Spieler ohne Eintrag im Tagesstand und alle ohne waiver bleiben beim Wochenstand."""
+    daily = {s["id"]: s for s in (waiver or {}).get("spieler", [])}
+    rows = [p | ({c: daily[p["id"]].get(c) for c in CLAUDE_DAILY} if p["id"] in daily else {})
+            for p in players["players"]]
+    known = {p["id"] for p in players["players"]}
+    rows += [{"id": d["id"], "name": d.get("name") or f"Spieler {d['id']}", "pos": d.get("pos"), "nfl": d.get("nfl")}
+             | {c: d.get(c) for c in CLAUDE_DAILY} for d in daily.values() if d["id"] not in known and d["team"]]
+    return sorted(rows, key=lambda p: p["id"])
 
 
 def build_claude(result: dict, teams: dict, schedule: dict, players: dict | None, dst: dict | None,
-                 transactions: dict | None) -> dict:
-    """Kompakte Datei für Claude-Sessions unterwegs (< 50 KB): Tabellen als Spaltenkopf plus Zeilen, Teams als Kürzel."""
+                 transactions: dict | None, waiver: dict | None = None) -> dict:
+    """Kompakte Datei für Claude-Sessions unterwegs (< 50 KB): Tabellen als Spaltenkopf plus Zeilen, Teams als Kürzel.
+
+    waiver = build_waiver (Tagesstand, noch ungerundet): Kader, freie Spieler und D/ST-Besitzer folgen ihm, sobald es
+    ihn gibt (Freigabe Stephan 30.09.2026); ohne ihn (vor dem ersten Tageslauf) gilt der Wochenstand, pool_stand None.
+    """
     k = KUERZEL.get
     tabelle = []
     for t in teams["teams"]:
@@ -544,9 +566,15 @@ def build_claude(result: dict, teams: dict, schedule: dict, players: dict | None
                       "Projektionen sind ESPN-Input. Zeilen gehören zu den *_spalten; mu_n1 = Positions-Matchup F des "
                       "Gegners in matchup_woche, > 1 günstig. Definitionen: docs/app_daten.md "
                       "und CLAUDE.md (Rechenregeln) im Repo frest2101/bwg-fantasy.",
+           "legende_stand": "Tagesstand (pool_stand): Zuordnung zu kader/free_agents, inj, status, proj (ESPN-Projektion "
+                            "pool_woche), proj3 (Σ pool_woche…+2; erste Woche Bye/OUT/IR 0, dann ROS-Auszug), "
+                            "D/ST-besitzer, transaktionen. Wochenstand (nach_woche): alles Übrige; Spieler nur aus dem "
+                            "Tagesstand ohne Wochenwerte. pool_stand null: alles Wochenstand.",
            "stand": {"saison": result["season"], "nach_woche": result["through_week"],
                      "kader_quelle": teams["meta"]["kader_quelle"], "ros_nach_woche": result.get("ros_after_week"),
-                     "matchup_woche": (result.get("matchup") or {}).get("wochen", {}).get("n1")},
+                     "matchup_woche": (result.get("matchup") or {}).get("wochen", {}).get("n1"),
+                     # Tagesstand: Abrufzeit (UTC) wie manifest datenstand.pool_stand, Woche der Projektion proj
+                     "pool_stand": waiver["stand"] if waiver else None, "pool_woche": waiver["woche"] if waiver else None},
            "teams": {k(t["team_id"]): t["name"] for t in teams["teams"]},
            "tabelle_spalten": ["rang", "team", "name", "w_l_t", "pf", "allplay_pct", "matchup_glueck", "effizienz_pct", "form",
                                "score_50_10z", "kader", "pr_rang", "mu", "e", "trend", "playoff_anteil"],
@@ -554,18 +582,25 @@ def build_claude(result: dict, teams: dict, schedule: dict, players: dict | None
            "spiele_spalten": ["woche", "heim", "gast", "pf_heim", "pf_gast", "p_heim"],
            "spiele": [[g["week"], k(g["home"]), k(g["away"]), g["home_pf"], g["away_pf"], fixed(g.get("p_home"), 4)]
                       for g in schedule["games"]]}
+    owner = {}  # D/ST laut Tagesstand: NFL-Kürzel → (team_id, Status)
     if players:
-        rows = players["players"]
+        rows = claude_rows(players, waiver)
         out["spieler_spalten"] = list(CLAUDE_PLAYER_COLS)
+        out["free_agents_spalten"] = list(CLAUDE_FREE_COLS)
         out["kader"] = {k(tid): [claude_player(p) for p in rows if p["team"] == tid] for tid in sorted(KUERZEL)}
-        free = [p for p in rows if not p["team"] and p.get("ros_g") is not None]
-        out["free_agents"] = {pos: [claude_player(p) + [p.get("status")]
+        free = [p for p in rows if p.get("status") in players_module.REPLACEMENT_STATUS and p.get("ros_g") is not None]
+        out["free_agents"] = {pos: [claude_player(p, CLAUDE_FREE_COLS)
                                     for p in sorted((p for p in free if p["pos"] == pos), key=lambda p: -p["ros_g"])[:10]]
                               for pos in POSITION_NAMES.values()}
+        daily = {s["id"] for s in (waiver or {}).get("spieler", [])}
+        owner = {p["nfl"]: (p["team"], p["status"]) for p in rows if p["pos"] == "D/ST" and p["id"] in daily}
     if dst:
         out["dst_spalten"] = ["nfl", "f", "naechste3", "rest", "sos_w15_17", "besitzer"]
-        out["dst"] = [[d["abbrev"], fixed(d["f"], 3), fixed(d["naechste3"], 3), fixed(d["rest"], 3), fixed(d["sos_po"], 3),
-                       k(d["besitzer"]) if d["besitzer"] else d["status"]] for d in dst["teams"]]
+        out["dst"] = []
+        for d in dst["teams"]:
+            team, status = owner.get(d["abbrev"], (d["besitzer"], d["status"]))
+            out["dst"].append([d["abbrev"], fixed(d["f"], 3), fixed(d["naechste3"], 3), fixed(d["rest"], 3),
+                               fixed(d["sos_po"], 3), k(team) if team else status])
     if transactions:
         out["transaktionen_spalten"] = ["datum_ms", "team", "typ", "zugang", "abgang"]
         out["transaktionen"] = [[t["datum"], k(t["team_id"]), t["type"],
@@ -579,13 +614,13 @@ def build(result: dict) -> dict[str, dict]:
     """Alle App-Dateien (ohne manifest) als Python-Objekte, noch ungerundet."""
     teams, schedule = build_teams(result), build_schedule(result)
     files = {"teams.json": teams, "schedule.json": schedule}
-    players, dst = build_players(result), build_dst(result)
+    players, dst, waiver = build_players(result), build_dst(result), build_waiver(result)
     optional = {"players.json": players, "dst.json": dst, "matchup.json": build_matchup(result),
                 "history.json": result.get("history"),
                 "transactions.json": build_transactions(result),
-                "waiver.json": build_waiver(result), "wetter.json": result.get("wetter")}
+                "waiver.json": waiver, "wetter.json": result.get("wetter")}
     files.update({name: obj for name, obj in optional.items() if obj})
-    files["claude.json"] = build_claude(result, teams, schedule, players, dst, result.get("transactions"))
+    files["claude.json"] = build_claude(result, teams, schedule, players, dst, result.get("transactions"), waiver)
     return files
 
 

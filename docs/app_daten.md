@@ -41,7 +41,7 @@ Die App lädt `data/manifest.json?t=<jetzt>` und danach jede Datei mit `?v=<v>`.
   - Score: `norm` `{z, minmax, rank}` je Kennzahl; `score_ref` je Profil und Normierung (Python-Wert, damit der Test die Browserformel prüfen kann).
   - Power Ranking `pr`: `{mu, se, p, p_quelle, e, rang, rang_vorwoche, trend, kernsatz}`
   - Simulation `sim`: `{liga: {playoff, division, bye, restsiege, seeds: [6]}, espn: {…}}` – `liga` = Regel 2026 (Top 3 je Division), `espn` = Top 6 gesamt; dazu `espn_sim` (ESPN-Vergleich oder `null`)
-  - `positionen`: `{nach_position: {"QB": {pts, anteil, rang}, …}, nach_slot: {"QB", "RB", "WR", "TE", "FLEX", "OP", "D/ST", "K"}}`
+  - `positionen`: `{summe, nach_position: {"QB": {pts, anteil, rang}, …}, nach_slot: {"QB", "RB", "WR", "TE", "FLEX", "OP", "D/ST", "K"}}` – `summe` = Σ Starter-Punkte aller Positionen (= PF, Grundlage von `anteil`)
   - `wochen`: Arrays in der Reihenfolge von `meta.weeks` (Einzelwoche, nicht kumuliert): `gegner, heim, pf, pa, ergebnis, wochenrang, allplay_w, allplay_l, allplay_t, allplay_pct` (All-Play-Anteil pₜ der Woche in %), `median_abstand` (PF − Wochenmedian), `gegner_abstand` (PA − Wochenmedian), `matchup_glueck` (Woche: Sieg unter dem Median +, Niederlage über dem Median −, Gewicht (|median_abstand| + |gegner_abstand|)/(2σ) gekappt bei 1, sonst 0), `matchup_kum` (laufende Summe, letzter Wert = `matchup_glueck` des Teams), `gegner_pkt` (Ligaschnitt − PA), `median_win, optimal, verschenkt, efficiency` (PF / Optimal der Woche in %), `bank, projektion, projektions_delta, mu, pr_rang`
 
 ## `schedule.json` (Erstaufruf)
@@ -49,8 +49,8 @@ Die App lädt `data/manifest.json?t=<jetzt>` und danach jede Datei mit `?v=<v>`.
   - `ligaschnitt, median, effizienz_liga` (Σ PF / Σ Optimal der Woche in %)
   - `high {team_id, pf}`, `low {team_id, pf}`, `top_team_id`
   - `bank_suende {team_id, verschenkt}`
-  - `top_scorer` (10 × `{player_id, name, pos, nfl, team_id, slot, pts, proj}`)
-- **`games`:** Liste aller Paarungen mit `week, home, away, home_pf, away_pf, winner` (team_id, `"T"` bei Unentschieden, `null` wenn offen) und `p_home` (Siegchance nach μ, nur offene Spiele).
+  - `top_scorer`: die 10 besten Kaderspieler der Woche über alle Teams, Bank eingeschlossen, ohne IR (bei Gleichstand auf Platz 10 mehr), absteigend nach Punkten, je `{rang, player_id, name, pos, pro_team, nfl, team_id, slot, pts, proj}` – `rang` = 1 + Zahl der Spieler mit mehr Punkten (Gleichstand teilt den Rang), `pro_team` = NFL-Team-ID zum Abruf der Woche, `nfl` das Kürzel dazu (`records.top_scorer`)
+- **`games`:** Liste aller Paarungen mit `week, home, away, home_pf, away_pf, winner` (team_id, `"T"` bei Unentschieden, `null` wenn offen), `playoff` (bool: Paarung einer Matchup-Periode nach der Regular Season laut mSettings) und `p_home` (Siegchance nach μ, nur offene Spiele).
 - **`h2h`:** Liste aller 45 Paare `{a, b, spiele, w_a, l_a, t, pf_diff}`, auch mit `spiele = 0`.
 - **`records_rs`, `records_po`:** je Rekord eine Liste von Einträgen (bei Gleichstand mehrere):
   - Team-Woche `{team_id, week, opponent_id, wert}`: `hoechster_score`, `niedrigster_score`, `hoechster_verlierer`, `niedrigster_sieger`, `hoechste_bank`, `meiste_verschenkt`
@@ -125,16 +125,18 @@ Position gegen Defense, kein Einzelduell: wie viele Punkte jede NFL-Defense den 
 - Quelle: Open-Meteo (Modellwerte, kein Stationsmesswert), Spielorte aus `data/raw/2026/nfl/stadien.json` (von Hand, gegen die ESPN-Scoreboard-API geprüft). Rohdaten: `data/raw/2026/wetter/prognose/wNN_<UTC>.json` (nur laufende Woche) und `wetter/ist_2026.json` (dauerhaft).
 
 ## `claude.json` (kompakt, < 50 KB, für Claude-Sessions unterwegs)
-- **Stand:** `legende`, `stand` (`saison, nach_woche, kader_quelle, ros_nach_woche, matchup_woche` = Woche N+1 des Positions-Matchups).
+- **Stand:**
+  - `legende` (Lesehilfe), `legende_stand` (welche Spalten Tages- und welche Wochenstand sind); jeder Text unter 400 Zeichen (Grenze von `check_public.py`)
+  - `stand`: `saison, nach_woche, kader_quelle, ros_nach_woche, matchup_woche` (Woche N+1 des Positions-Matchups), `pool_stand` (Abrufzeit des Tagesstands, UTC, wie `datenstand.pool_stand` im Manifest) und `pool_woche` (`woche` aus `waiver.json`: die Woche von `proj`, deren Spiele als Nächstes anstehen; nicht `datenstand.pool_woche` des Manifests, das den Wochen-Pool meint); beide `null` ohne Tagesstand
 - **Liga:**
   - `tabelle`: 10 Teams mit Rang, W-L-T, PF, All-Play-Quote, Matchup-Glück, Effizienz, Form, Score, Power Ranking (μ, E, Rang, Trend) und Playoff-%
   - `spiele`: alle Paarungen mit Ergebnis
-- **Spieler** (Spalten `spieler_spalten`):
-  - `kader`: alle Kaderspieler je Team mit Name, Position, NFL-Team, Verletzung, Ø, Form, Trend, ROS/Spiel, ROS-Rang, `gegner_n1` (Gegner in `matchup_woche`, NFL-Kürzel) und `mu_n1` (Positions-Matchup F dieses Gegners, 3 Stellen, > 1 günstig; beide `null` bei Bye oder ohne Wert)
-  - `free_agents`: die Top 10 je Position nach ROS/Spiel, dieselben Spalten und zusätzlich am Ende der Status
+- **Spieler** (Tagesstand seit 30.09.2026, Freigabe Stephan): Grundlage sind die Spieler aus `players.json` (Wochenstand nach `nach_woche`); je Spieler kommen `team`, `status` und `inj` aus `waiver.json` wie in der App (`merge()` in `app/js/v_spieler.js`). Spieler ohne Eintrag im Tagesstand behalten den Wochenstand; ohne `waiver.json` (vor dem ersten Tageslauf) gilt überall der Wochenstand.
+  - `kader` (Spalten `spieler_spalten`): je Team-Kürzel alle Spieler mit diesem Team laut Tagesstand, nach ESPN-ID, mit Name, Position, NFL-Team, Verletzung (Tagesstand), Ø, Form, Trend, ROS/Spiel, ROS-Rang, `gegner_n1` (Gegner in `matchup_woche`, NFL-Kürzel) und `mu_n1` (Positions-Matchup F dieses Gegners, 3 Stellen, > 1 günstig; beide `null` bei Bye oder ohne Wert); Ø bis `mu_n1` sind Wochenstand. Kaderspieler, die `players.json` nicht führt (unter der Woche geholt), stehen mit `name, pos, nfl` aus `waiver.json` darin (`name` = „Spieler <id>“, wenn auch der Wochenpool ihn nicht kennt), die übrigen Spalten `null`.
+  - `free_agents` (Spalten `free_agents_spalten` = `spieler_spalten` + `status, proj, proj3`): je Position die 10 besten Spieler mit Status `WAIVERS` oder `FREEAGENT` laut Tagesstand nach ROS/Spiel (ohne ROS/Spiel nicht dabei); `proj` = ESPN-Projektion der Woche `pool_woche` (wie `waiver.json › proj`), `proj3` = Σ der Wochenwerte `pool_woche` … +2 (wie `waiver.json › proj3`: erste Woche mit Bye, OUT, IR und Sperre 0, danach ROS-Auszug; `null` ohne Eintrag im ROS-Auszug); beide `null` ohne Tagesstand.
 - **D/ST und Bewegungen:**
-  - `dst`: 32 D/ST mit F, nächste 3, Rest, SoS und Besitzer
-  - `transaktionen` (mit `transaktionen_spalten`): die Moves der 14 Tage bis zur letzten Transaktion
+  - `dst`: 32 D/ST mit F, nächste 3, Rest, SoS (Wochenstand) und Besitzer (Team-Kürzel oder Status; laut Tagesstand, damit `dst` und `kader` übereinstimmen, sonst Wochenstand)
+  - `transaktionen` (mit `transaktionen_spalten`): die Moves der 14 Tage bis zur letzten Transaktion (Archiv, das der Tageslauf laufend ergänzt)
 - **Form:** Tabellen als Spaltenkopf (`*_spalten`) plus Zeilen, Teams als Kürzel (`teams` = Kürzel → Name).
 
 Abruf: `https://raw.githubusercontent.com/frest2101/bwg-fantasy/main/app/data/claude.json`.

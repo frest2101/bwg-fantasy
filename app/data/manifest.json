@@ -4,7 +4,7 @@
 "through_week":3,
 "datenstand":{"woche_final":3,"ros_nach_woche":3,"pool_woche":3,"transaktionen_bis":1790761189281,"pool_stand":"2026-09-30T2050Z","wetter_stand":"2026-09-30T2050Z"},
 "files":{
-"claude.json":{"v":"fd5f8f975217","bytes":29951,"lazy":true},
+"claude.json":{"v":"8cea4b610ef7","bytes":31299,"lazy":true},
 "dst.json":{"v":"fb7a76f70c6e","bytes":11625,"lazy":true},
 "history.json":{"v":"d7c4d8da8907","bytes":42016,"lazy":true},
 "matchup.json":{"v":"3877738fad55","bytes":22970,"lazy":true},
