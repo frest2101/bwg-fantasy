@@ -159,15 +159,33 @@ const FP_DST = {ARI: 'arizona', ATL: 'atlanta', BAL: 'baltimore', BUF: 'buffalo'
 export const fpUrl = (name, nfl) => FP_DST[nfl] && /D\/ST$/.test(name) ? `https://www.fantasypros.com/nfl/players/${FP_DST[nfl]}-defense.php`
   : SUFFIX.test(name) ? `https://duckduckgo.com/?q=${encodeURIComponent('site:fantasypros.com ' + name)}`
   : `https://www.fantasypros.com/nfl/players/${name.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/['’.]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}.php`;
+// ESPN-Liga: ohne Login lesbar, solange die Saison bei ESPN die laufende ist (eine vergangene Saison verlangt Login, geprüft 30.09.2026)
+const LIGA = 1166555857;
+// NBC-/Rotoworld-Spielerseiten tragen eine NBC-eigene ID, und die NBC-Suche zeigt über die Adresse keine Treffer; für D/ST (keine
+// NBC-Spielerseite) die Rotoworld-Team-News /nfl/<team>/player-news, Schlüssel = ESPN-Kürzel (alle 32 geprüft 30.09.2026)
+const NBC_TEAM = {ARI: 'arizona-cardinals', ATL: 'atlanta-falcons', BAL: 'baltimore-ravens', BUF: 'buffalo-bills', CAR: 'carolina-panthers',
+  CHI: 'chicago-bears', CIN: 'cincinnati-bengals', CLE: 'cleveland-browns', DAL: 'dallas-cowboys', DEN: 'denver-broncos', DET: 'detroit-lions',
+  GB: 'green-bay-packers', HOU: 'houston-texans', IND: 'indianapolis-colts', JAX: 'jacksonville-jaguars', KC: 'kansas-city-chiefs',
+  LAC: 'los-angeles-chargers', LAR: 'los-angeles-rams', LV: 'las-vegas-raiders', MIA: 'miami-dolphins', MIN: 'minnesota-vikings',
+  NE: 'new-england-patriots', NO: 'new-orleans-saints', NYG: 'new-york-giants', NYJ: 'new-york-jets', PHI: 'philadelphia-eagles',
+  PIT: 'pittsburgh-steelers', SEA: 'seattle-seahawks', SF: 'san-francisco-49ers', TB: 'tampa-bay-buccaneers', TEN: 'tennessee-titans',
+  WSH: 'washington-commanders'};
+// Spieler: Seitensuche wie bei FantasyPros; der volle ESPN-Name mit Zusatz trifft Namensvettern über die Adresse (marvin-harrison-jr),
+// „www.“ hält die alte Statistikseite scores.nbcsports.com fern, „news stats bio“ trifft den Titel der Spielerseiten
+export const nbcUrl = (name, nfl, dst) => dst ? (NBC_TEAM[nfl] ? `https://www.nbcsports.com/nfl/${NBC_TEAM[nfl]}/player-news` : null)
+  : `https://duckduckgo.com/?q=${encodeURIComponent(`site:www.nbcsports.com ${name} news stats bio`)}`;
 export function links(p) {
   const dst = p.pos === 'D/ST' || p.id < 0;
-  const q = encodeURIComponent(dst ? p.name.replace(/\s*D\/ST$/, '') : p.name);
+  // ESPN hat für die Fantasy-Spielerkarte keine Adresse (Pop-up, football/player gibt 404); sie öffnet sich im Kader des Fantasy-Teams
+  // per Klick auf den Namen. Deshalb nur für Kaderspieler und nur, bis die letzte Woche der Saison final ist.
+  const kader = p.team > 0 && S.weeks.at(-1)?.status !== 'final';
+  const nbc = nbcUrl(p.name, p.nfl, dst);
   return [
     dst ? [`https://www.espn.com/nfl/team/_/name/${String(p.nfl || '').toLowerCase()}`, 'ESPN-Teamseite']
       : [`https://www.espn.com/nfl/player/_/id/${p.id}`, 'ESPN-Spielerseite'],
-    [`https://fantasy.espn.com/football/player?playerId=${p.id}`, 'ESPN-Fantasy-Karte'],
+    kader ? [`https://fantasy.espn.com/football/team?leagueId=${LIGA}&teamId=${p.team}&seasonId=${S.man.season}`, `ESPN Fantasy – Kader ${U.kz(p.team)}`] : null,
     dst && !FP_DST[p.nfl] ? null : [fpUrl(p.name, p.nfl), SUFFIX.test(p.name) && !dst ? 'FantasyPros – Suche' : 'FantasyPros'],
-    [`https://www.nbcsports.com/search?q=${q}`, 'NBC Sports (Rotoworld) – Suche']].filter(Boolean);
+    nbc ? [nbc, dst ? 'NBC Rotoworld – Team-News' : 'NBC Rotoworld – Suche'] : null].filter(Boolean);
 }
 function newsBox(p, W) {
   const last = !W ? U.na('keine Tagesdaten') : U.ok(p.news) ? U.stamp(p.news) : U.na('keine Meldung');
