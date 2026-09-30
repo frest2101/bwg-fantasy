@@ -313,6 +313,62 @@ def test_cmd_fetch_falsche_woche_wird_abgelehnt(espn_week3):
     assert snapshot(3) == before
 
 
+def test_mteam_wird_als_auszug_gespeichert(espn_week3, capsys):
+    """Entscheidung 01.10.2026: tradeBlock, draftStrategy und notificationSettings kommen nicht ins öffentliche Repo;
+    Felder, die ESPN neu ergänzt, fallen weg und werden am Lauf gemeldet (nur der Feldname). Alle hier gesetzten
+    Werte sind erfunden."""
+    answer = week_views(3, final=True)["mTeam"]
+    echt = json.loads(json.dumps(answer))   # Stand vor den erfundenen Zusätzen
+    answer["erfundenOben"] = {"absicht": "erfundener Testwert"}
+    for t in answer["teams"]:
+        t["tradeBlock"] = {"players": {"erfundene-id-1": "ON_THE_BLOCK"}}
+        t["draftStrategy"] = {"keeperPlayerIds": ["erfundene-id-2"], "futureKeeperPlayerIds": ["erfundene-id-3"]}
+        t["erfundenesFeld"] = {"absicht": "erfundener Testwert"}
+    for m in answer["members"]:
+        m["notificationSettings"] = [{"enabled": True, "id": "erfundene-id-4", "type": "TRADE"}]
+        m["erfundeneAdresse"] = "erfunden@example.invalid"
+    espn_week3.week_answers[("mTeam", 3)] = ok(answer)
+    assert ef.cmd_due(2026, date(2026, 9, 29)) == 0
+    raw_bytes = (ef.week_dir(2026, 3) / "mTeam.json").read_bytes()
+    saved = json.loads(raw_bytes)
+    # Vergleiche als Liste oder Wahrheitswert, damit ein Fehlschlag keinen Dateiinhalt (Manager-Namen) ins öffentliche Log druckt
+    gefunden = [n.decode() for n in (b"tradeBlock", b"draftStrategy", b"notificationSettings", b"KeeperPlayerIds",
+                                     b"erfunden") if n in raw_bytes]
+    assert gefunden == []
+    assert set(saved) <= ef.TOP_KEEP
+    assert all(set(t) <= ef.TEAM_KEEP for t in saved["teams"])
+    assert all(set(m) == ef.MEMBER_KEEP for m in saved["members"])
+    # was Rechenwerk (rawdata.teams), Summary und Öffentlichkeits-Check lesen, bleibt wie geliefert
+    teams_gleich = saved["teams"] == [{k: v for k, v in t.items() if k in ef.TEAM_KEEP} for t in echt["teams"]]
+    members_gleich = saved["members"] == [{k: m[k] for k in ("displayName", "firstName", "id", "lastName")}
+                                          for m in echt["members"]]
+    rest_gleich = ({k: v for k, v in saved.items() if k not in ("teams", "members")}
+                   == {k: v for k, v in echt.items() if k not in ("teams", "members")})
+    assert (teams_gleich, members_gleich, rest_gleich) == (True, True, True)
+    rechenwerk = ("id", "name", "abbrev", "divisionId", "waiverRank", "transactionCounter", "playoffSeed")
+    assert all(k in t for t in saved["teams"] for k in rechenwerk)
+    out = capsys.readouterr().out
+    assert "unbekannte Felder nicht gespeichert (erfundenOben, members.erfundeneAdresse, teams.erfundenesFeld)" in out
+    assert "tradeBlock" not in out and "notificationSettings" not in out  # bekannte Felder fallen still weg
+
+
+def test_team_extract_ist_stabil_und_prueft_die_form():
+    """Ein Auszug bleibt beim erneuten Anwenden byte-gleich (nichts Unbekanntes); ohne Team-Liste gibt es einen Fehler."""
+    first, unknown = ef.team_extract(json.loads((SOURCE_WEEK / "mTeam.json").read_bytes()))
+    stabil = ef.team_extract(json.loads(first)) == (first, [])   # als Wahrheitswert: kein Dateiinhalt im Log
+    assert unknown == [] and stabil
+    assert list(json.loads(first)) == list(json.loads((SOURCE_WEEK / "mTeam.json").read_bytes()))  # Reihenfolge von ESPN
+    assert ef.team_extract({"id": 1, "teams": []}) == (b'{"id":1,"teams":[]}', [])               # members fehlt: bleibt weg
+    for broken in ({}, {"teams": {"1": {}}}, {"teams": [1]}, {"teams": [], "members": "x"}):
+        with pytest.raises(ef.FetchError, match="ohne Liste"):
+            ef.team_extract(broken)
+    with pytest.raises(ef.FetchError, match="UTF-8"):   # erfundener Name mit einzelnem Surrogat
+        ef.team_extract({"teams": [{"id": 1, "name": "\ud800"}]})
+    # die bekannten Absichts- und Einstellungsfelder stehen in keiner Positivliste
+    assert not (ef.TOP_KEEP | ef.TEAM_KEEP | ef.MEMBER_KEEP) & (ef.TEAM_DROP | ef.MEMBER_DROP)
+    assert {"tradeBlock", "draftStrategy"} <= ef.TEAM_DROP and "notificationSettings" in ef.MEMBER_DROP
+
+
 def test_saisondateien(espn_week3):
     files = ef.season_files(2026)
     espn_week3.drafted = False
