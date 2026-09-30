@@ -306,6 +306,72 @@ def team_needs(pool: dict, result: dict) -> dict | None:
             for tid, n in players_module.team_needs(rosters, per_game, data["ersatz"]).items()}
 
 
+WEEK_VIEW_HEAD = ("horizont", "ersatz_woche", "ersatz_3", "anstoss", "bedarf_woche")
+
+
+def week_view(pool: dict, result: dict) -> dict | None:
+    """Wochensicht des Waiver-Tabs (Beschluss 30.09.2026) für die Woche N+1 = pool["woche"] laut Tagesstand.
+
+    Je Spieler (Schlüssel id): proj_ue = Wochenwert (players.week_value: Bye und OUT/IR/gesperrt 0) − Wochen-
+    Ersatzniveau, proj3 = Σ N+1 … N+3 (N+1 Tagesstand, danach ROS-Auszug), proj3_ue = proj3 − Ersatzniveau der Summe.
+    Kopf: horizont (Wochen), ersatz_woche, ersatz_3, anstoss (NFL-Kürzel → Epoch-ms des Spiels in N+1, ohne offene
+    Anstöße), bedarf_woche (players.team_week_needs). None ohne NFL-Spielplan oder außerhalb W1–17.
+    """
+    week, nfl = pool.get("woche"), result.get("nfl")
+    if not nfl or not week or not 1 <= week <= players_module.LAST_PLAYOFF_WEEK:
+        return None
+    weekly, ros = result["players"]["players"], result.get("ros_projektion")
+    weeks = players_module.horizon_weeks(week)
+    rows = {}
+    for p in pool["players"]:
+        w = weekly.get(p["id"])
+        if not w:
+            continue  # Position und NFL-Team unbekannt
+        team = w["pro_team"]
+        value, grund = players_module.week_value(p.get("proj_naechste_woche"), p.get("injuryStatus"),
+                                                 players_module.has_game(nfl, team, week))
+        total = players_module.horizon_sum(value, ros.get(str(p["id"])) if ros else None, team, nfl, weeks)
+        rows[p["id"]] = {"p": p, "pos": w["pos"], "team": team, "value": value, "grund": grund, "sum": total}
+    free = {pid: r for pid, r in rows.items() if r["p"].get("status") in players_module.REPLACEMENT_STATUS
+            and r["grund"] not in players_module.WEEK_OUT}
+    level = players_module.week_replacement_levels([(r["pos"], r["value"]) for r in free.values() if r["grund"] is None])
+    level3 = players_module.week_replacement_levels([(r["pos"], r["sum"]) for r in free.values() if r["sum"] is not None])
+    per_player = {pid: {"proj_ue": r["value"] - level[r["pos"]] if level.get(r["pos"]) is not None else None,
+                        "proj3": r["sum"],
+                        "proj3_ue": r["sum"] - level3[r["pos"]]
+                        if r["sum"] is not None and level3.get(r["pos"]) is not None else None}
+                  for pid, r in rows.items()}
+    rosters: dict[int, list] = {}
+    for pid, r in rows.items():
+        if r["p"].get("onTeamId"):
+            rosters.setdefault(r["p"]["onTeamId"], []).append((pid, r["pos"]))
+    after = result["players"].get("ros_after_week")
+    regular = after is not None and after < players_module.LAST_REGULAR_WEEK
+    per_game = {pid: w["ros_pro_spiel"] for pid, w in weekly.items()} if regular else None
+    byes = {pid: [w for w in weeks[1:] if players_module.is_bye(nfl, r["team"], w)] for pid, r in rows.items()}
+    candidates = sorted(((r["pos"], r["value"], pid) for pid, r in free.items() if r["grund"] is None),
+                        key=lambda c: (-c[1], c[2]))
+    needs = players_module.team_week_needs(rosters, {pid: (r["value"], r["grund"]) for pid, r in rows.items()},
+                                           {pid: r["p"].get("injuryStatus") for pid, r in rows.items()}, level,
+                                           candidates, per_game, byes)
+    name = lambda pos: POSITION_NAMES.get(pos, str(pos)) if pos is not None else None  # noqa: E731
+    abbrev = {tid: t.abbrev for tid, t in nfl.items()}
+    anstoss = {}
+    for g in result.get("nfl_spiele") or []:
+        if g["woche"] == week and not g["tbd"]:
+            ms = int(g["kickoff"].timestamp() * 1000)
+            anstoss.update({abbrev[t]: ms for t in (g["heim"], g["gast"]) if t in abbrev})
+    return {"horizont": weeks,
+            "ersatz_woche": {name(pos): v for pos, v in level.items()},
+            "ersatz_3": {name(pos): v for pos, v in level3.items()},
+            "anstoss": dict(sorted(anstoss.items())),
+            "bedarf_woche": {tid: {"luecken": [g | {"pos": name(g["pos"])} for g in n["luecken"]],
+                                   "ausfaelle": [a | {"pos": name(a["pos"])} for a in n["ausfaelle"]],
+                                   "byes": [b | {"pos": name(b["pos"])} for b in n["byes"]]}
+                             for tid, n in needs.items()},
+            "spieler": per_player}
+
+
 def build_waiver(result: dict) -> dict | None:
     """Tagesstand je Spieler aus dem Pool-Auszug des Tageslaufs (Session 6): Status, Fantasy-Team, Verletzung,
     Besitz ESPN-weit mit Trend, Waiver-Frist, Projektion der nächsten Woche, letzte ESPN-News. Dazu (Session 7) die
@@ -339,8 +405,13 @@ def build_waiver(result: dict) -> dict | None:
         rows.append(row)
     add_fantasypros(extra, result)
     reihenfolge, quelle, stand = waiver_order(pool, result)
+    view = week_view(pool, result)
+    if view:
+        for row in rows:
+            row.update(view["spieler"].get(row["id"], dict.fromkeys(("proj_ue", "proj3", "proj3_ue"))))
+    head = {k: v for k, v in (view or dict.fromkeys(WEEK_VIEW_HEAD)).items() if k != "spieler"}
     return {"stand": pool["stand"], "woche": pool["woche"], "reihenfolge": reihenfolge, "reihenfolge_quelle": quelle,
-            "reihenfolge_stand": stand, "bedarf": team_needs(pool, result), "spieler": rows}
+            "reihenfolge_stand": stand, "bedarf": team_needs(pool, result)} | head | {"spieler": rows}
 
 
 CLAUDE_PLAYER_COLS = ("name", "pos", "nfl", "inj", "avg", "form", "trend", "ros_g", "ros_rang", "gegner_n1", "mu_n1")

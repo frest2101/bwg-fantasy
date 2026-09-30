@@ -159,6 +159,8 @@ thead th.n button{flex-direction:row-reverse;justify-content:flex-start}
 .rk tr>:nth-child(2),.nr tr>:first-child{position:sticky;left:0;z-index:1;box-shadow:1px 0 0 var(--bd)}
 .rk tr>:nth-child(2){left:2.75rem}
 tr.me>*{background:var(--ac2)}
+tr.gsp>*{color:var(--mu)}
+.stack{display:grid;gap:16px}
 .tl2{font-weight:600;text-decoration:none;color:var(--tx);display:inline-flex;min-height:44px;align-items:center}
 .tl2:hover{text-decoration:underline}
 /* Links in Tabellen, Überschriften und Absätzen: Tap-Ziel ≥ 44 px */
