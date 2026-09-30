@@ -176,14 +176,16 @@ export const nbcUrl = (name, nfl, dst) => dst ? (NBC_TEAM[nfl] ? `https://www.nb
   : `https://duckduckgo.com/?q=${encodeURIComponent(`site:www.nbcsports.com ${name} news stats bio`)}`;
 export function links(p) {
   const dst = p.pos === 'D/ST' || p.id < 0;
-  // ESPN hat für die Fantasy-Spielerkarte keine Adresse (Pop-up, football/player gibt 404); sie öffnet sich im Kader des Fantasy-Teams
-  // per Klick auf den Namen. Deshalb nur für Kaderspieler und nur, bis die letzte Woche der Saison final ist.
+  // ESPN hat für die Fantasy-Spielerkarte keine Adresse (Pop-up, football/player gibt 404); sie öffnet sich in den Liga-Kadern
+  // per Klick auf den Namen. Nicht die Teamseite football/team: Die öffnet auf dem iPhone laut apple-app-site-association die ESPN-Fantasy-App,
+  // und die zeigt so offenbar nur das eigene Team (Test Stephan 30.09.2026). seasonId ist Pflicht (sonst gilt die Saison aus ESPNs Cookie).
+  // Nur für Kaderspieler und nur, bis die letzte Woche der Saison final ist.
   const kader = p.team > 0 && S.weeks.at(-1)?.status !== 'final';
   const nbc = nbcUrl(p.name, p.nfl, dst);
   return [
     dst ? [`https://www.espn.com/nfl/team/_/name/${String(p.nfl || '').toLowerCase()}`, 'ESPN-Teamseite']
       : [`https://www.espn.com/nfl/player/_/id/${p.id}`, 'ESPN-Spielerseite'],
-    kader ? [`https://fantasy.espn.com/football/team?leagueId=${LIGA}&teamId=${p.team}&seasonId=${S.man.season}`, `ESPN Fantasy – Kader ${U.kz(p.team)}`] : null,
+    kader ? [`https://fantasy.espn.com/football/league/rosters?leagueId=${LIGA}&seasonId=${S.man.season}`, 'ESPN Fantasy – Liga-Kader'] : null,
     dst && !FP_DST[p.nfl] ? null : [fpUrl(p.name, p.nfl), SUFFIX.test(p.name) && !dst ? 'FantasyPros – Suche' : 'FantasyPros'],
     nbc ? [nbc, dst ? 'NBC Rotoworld – Team-News' : 'NBC Rotoworld – Suche'] : null].filter(Boolean);
 }
