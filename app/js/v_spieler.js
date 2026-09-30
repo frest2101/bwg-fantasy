@@ -38,7 +38,10 @@ export async function render(box, ctx, r) {
   const rows = merge(P, W);
   const wline = wx ? p => { const g = wx.gameOf(WX, p.nfl); return g ? wx.line(g) : null; } : null;
   // Herkunft nur, wenn keeper.json den Spieler beim selben Team führt wie der Tagesstand
-  const origin = kp ? p => { const o = kp.byPlayer(K).get(p.id); return o && o.team === p.team ? kp.herkunft(o, K, true) : null; } : null;
+  const origin = kp ? p => {
+    const o = kp.byPlayer(K).get(p.id);
+    return o && o.team === p.team ? [kp.herkunft(o, K, true), kp.alterTxt(o)] : null;
+  } : null;
   if (detail) one(box, h1, P, W, rows, r, svg, rosWhy, wline, origin); else list(box, W, rows, r, rosWhy, P.ersatz || {}, P.ros_nach_woche != null);
 }
 
@@ -226,7 +229,8 @@ function one(box, h1, P, W, rows, r, svg, rosWhy, wline, origin) {
     p.inj && U.INJ[p.inj] ? h('span', {class: 'badge'}, U.INJ[p.inj][1]) : null,
     U.ok(p.bye) ? ` · Bye W${p.bye}` : null,
     p.pos === 'D/ST' ? [' · ', h('a', {href: '#dst'}, 'D/ST-Faktoren')] : null), stand(W),
-  p.team > 0 && origin?.(p) ? h('p', {class: 'note'}, 'Herkunft: ', h('strong', null, origin(p)), ' · ',
+  p.team > 0 && origin?.(p) ? h('p', {class: 'note'}, 'Herkunft: ', h('strong', null, origin(p)[0]), ' · ',
+    origin(p)[1] ? [origin(p)[1], ' · '] : null,
     h('a', {href: '#keeper/kader?team=' + p.team}, 'Keeper und Kader'), ' ', U.ib('herkunft', '')) : null,
   h('div', {class: 'tiles'},
     U.tile('Pkt Saison', U.num(p.pts), spiele(p.g), 'spiele'),

@@ -267,7 +267,8 @@ def test_dst_und_transaktionen(data):
     assert set(data["transactions.json"]) == {"spieler", "items", "aufstellungswechsel"}   # Draft: keeper.json
 
 
-KEEPER_TEAM = {"keeper", "keeper_da", "picks", "picks_da", "kader", "pf", "kern"}
+KEEPER_TEAM = {"keeper", "keeper_da", "picks", "picks_da", "kader", "pf", "kern", "altersprofil"}
+KEEPER_ALTER = {"n", "kader", "ros", "bereinigt", "bereinigt_ros", "jung", "alt", "rookies", "zweites_jahr"}
 KEEPER_GRUPPEN = {"keeper", "draft", "zugang", "trade"}
 
 
@@ -275,7 +276,8 @@ def test_keeper_vertrag(data):
     """keeper.json: Kopf, liga, teams, kader und picks genau nach Positivliste; lazy; Anteile mit einer Stelle,
     Punkte mit zwei; Positionen als Kürzel; in_app wie in transactions.json."""
     k = data["keeper.json"]
-    assert set(k) == {"through_week", "stand", "draft_datum", "keeper_zahl", "kader_plaetze", "liga", "teams", "kader", "picks"}
+    assert set(k) == {"through_week", "stand", "draft_datum", "keeper_zahl", "kader_plaetze", "alter_stichtag", "alter_gewicht",
+                      "liga", "teams", "kader", "picks"}
     assert (k["through_week"], k["keeper_zahl"], k["kader_plaetze"]) == (2, 12, 24)
     assert data["manifest.json"]["files"]["keeper.json"]["lazy"]
     assert k["stand"] == data["manifest.json"]["datenstand"]["pool_stand"]
@@ -290,7 +292,7 @@ def test_keeper_vertrag(data):
     pf = {t["team_id"]: t["pf"] for t in data["teams.json"]["teams"]}
     assert all(t["pf"]["summe"] == pf[t["team_id"]] for t in k["teams"])
     assert all(set(r) == {"id", "name", "pos", "nfl", "team", "art", "pick", "runde", "von", "seit", "g", "avg", "vj_g",
-                          "vj_pts", "vj_avg", "vj_delta", "rookie", "in_app"} for r in k["kader"])
+                          "vj_pts", "vj_avg", "vj_delta", "rookie", "alter", "nfl_jahr", "in_app"} for r in k["kader"])
     assert all(set(p) == {"pick", "runde", "runden_pick", "team_id", "player_id", "name", "pos", "keeper", "da",
                           "team_jetzt", "g", "pts", "avg", "starts", "pf", "in_app"} for p in k["picks"])
     assert len(k["picks"]) == 240 and sum(p["keeper"] for p in k["picks"]) == 119
@@ -300,6 +302,42 @@ def test_keeper_vertrag(data):
     known |= {s["id"] for s in data.get("waiver.json", {}).get("spieler", []) if s["team"] > 0}
     assert all(p["in_app"] == (p["player_id"] in known) for p in k["picks"])
     assert all(r["in_app"] for r in k["kader"]) if "waiver.json" in data else True
+    # Altersprofil: ohne nflverse-Stammdaten überall null, mit ihnen je Team die Felder der Positivliste
+    if k["alter_stichtag"] is None:
+        assert k["alter_gewicht"] is None and all(t["altersprofil"] is None for t in k["teams"] + [k["liga"]])
+        assert all(r["alter"] is None and r["nfl_jahr"] is None for r in k["kader"])
+    else:
+        assert all(set(t["altersprofil"]) == KEEPER_ALTER for t in k["teams"])
+        assert set(k["liga"]["altersprofil"]) == KEEPER_ALTER | {"positionen"}
+        assert set(k["liga"]["altersprofil"]["positionen"]) <= {"QB", "RB", "WR", "TE", "K"}
+        assert all(places(r["alter"]) <= 1 for r in k["kader"] if r["alter"] is not None)
+
+
+def test_keeper_alter_export(result):
+    """Export mit erfundenen Stammdaten: Positionen der Liga als Kürzel, Alter je Spieler und das
+    Altersprofil der Teams mit einer Stelle."""
+    import keeper
+    import rawdata
+    import players
+    import records
+    from datetime import date
+    ssn = rawdata.Season(2026, 2)
+    base = keeper.compute_keeper(ssn, [1, 2], result["players"], records.player_names(ssn))
+    ssn._memo["nflverse"] = {"spieler": {str(r["id"]): {"geb": date(1992 + r["id"] % 12, 3, 1 + r["id"] % 28).isoformat(),
+                                                        "rookie": 2015 + r["id"] % 12, "draft": None}
+                                         for r in base["kader"] if r["id"] > 0}}
+    fake = dict(result, keeper=keeper.compute_keeper(ssn, [1, 2], result["players"], records.player_names(ssn)))
+    k = app_export.round_file("keeper.json", app_export.build_keeper(fake))
+    assert k["alter_stichtag"] == "2026-09-22" and k["alter_gewicht"] in ("ros", None)
+    liga = k["liga"]["altersprofil"]
+    assert set(liga) == KEEPER_ALTER | {"positionen"} and set(liga["positionen"]) == {"QB", "RB", "WR", "TE", "K"}
+    places = lambda v: len(str(v).split(".")[-1])  # noqa: E731
+    assert all(places(p["alter"]) <= 1 for p in liga["positionen"].values())
+    assert all(places(r["alter"]) <= 1 and isinstance(r["nfl_jahr"], int) for r in k["kader"] if r["alter"] is not None)
+    assert all(set(t["altersprofil"]) == KEEPER_ALTER and places(t["altersprofil"]["bereinigt"]) <= 1 for t in k["teams"])
+    findings = []
+    check_public.check_json(k, "", findings, "keeper.json")
+    assert findings == []
 
 
 MATCHUP_POS = {"z25", "z26", "n", "r25", "r26", "f", "f_vorwoche", "delta", "rang", "rang_vorwoche"}

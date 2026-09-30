@@ -15,6 +15,7 @@ from typing import NamedTuple
 
 import espn_fetch as ef
 import fantasypros
+import nflverse
 import wetter
 from zahlen import ZERO, dec
 
@@ -229,6 +230,10 @@ class Season:
     def fantasypros(self) -> dict | None:
         """FantasyPros-Adressen je Position (fantasypros/sitemap.json, Wochenabruf); None, solange er sie nicht holte."""
         return self._get("fantasypros", lambda: self._optional(fantasypros.path(self.season)))
+
+    def nflverse(self) -> dict | None:
+        """Spieler-Stammdaten von nflverse (nflverse/players.json, Wochenabruf); None, solange er sie nicht holte."""
+        return self._get("nflverse", lambda: self._optional(nflverse.path(self.season)))
 
     # -------------------------------------------------------- Saisondateien
     def nfl(self) -> dict[int, NflTeam]:

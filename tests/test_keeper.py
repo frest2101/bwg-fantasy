@@ -256,6 +256,94 @@ def test_echte_daten_kader_heute(result):
         assert r["rookie"] is None or r["rookie"] == (r["vj_pts"] is None)
 
 
+# ---------------------------------------------------------------- Altersprofil (Stufe 2)
+
+def zeile(pid, team, pos, alter, nfl_jahr):
+    return {"id": pid, "team": team, "pos": pos, "alter": None if alter is None else D(alter), "nfl_jahr": nfl_jahr}
+
+
+def test_altersprofil_konstruiert():
+    """Erfundene Kader: Team 1 mit QB (30) und WR (22), Team 2 mit QB und WR (je 26), einer D/ST ohne Alter und einem
+    Spieler ohne Position (zählt nicht, weil es für ihn keinen Positionsschnitt gibt)."""
+    rows = [zeile(1, 1, QB, "30", 8), zeile(2, 1, WR, "22", 1), zeile(3, 2, QB, "26", 4), zeile(4, 2, WR, "26", 2),
+            zeile(5, 2, DST, None, None), zeile(6, 2, None, "40", None)]
+    pos_age = keeper.position_ages(rows)
+    assert pos_age == {QB: {"n": 2, "alter": D("28")}, WR: {"n": 2, "alter": D("24")}}
+    weight = {1: D("300"), 2: D("100"), 3: D("100")}                # Spieler 4 ohne Projektion
+    t1 = keeper.age_profile(rows[:2], weight, pos_age)
+    assert t1 == {"n": 2, "kader": D("26"), "ros": D("28"), "bereinigt": D("0"), "bereinigt_ros": D("1"),
+                  "jung": 1, "alt": 1, "rookies": 1, "zweites_jahr": 0}
+    t2 = keeper.age_profile(rows[2:], weight, pos_age)
+    assert t2 == {"n": 2, "kader": D("26"), "ros": D("26"), "bereinigt": D("0"), "bereinigt_ros": D("-2"),
+                  "jung": 0, "alt": 0, "rookies": 0, "zweites_jahr": 1}
+    ohne = keeper.age_profile(rows[:2], {}, pos_age)                # ohne Gewichte (kein ROS-Auszug)
+    assert (ohne["kader"], ohne["ros"], ohne["bereinigt_ros"]) == (D("26"), None, None)
+    assert keeper.age_profile(rows[4:5], weight, pos_age) is None   # nur die D/ST: kein Profil
+
+
+def test_alter_je_kaderzeile():
+    """add_ages: Alter zum Stichtag und NFL-Jahr aus den Stammdaten; die Rookie-Saison ersetzt die Rookie-Näherung."""
+    from datetime import date
+    kader = [{"id": 1, "rookie": None}, {"id": 2, "rookie": True}, {"id": 3, "rookie": True}, {"id": 4, "rookie": False}]
+    stamm = {1: {"geb": date(2005, 1, 19), "rookie": 2026}, 2: {"geb": date(1999, 12, 27), "rookie": 2022},
+             3: {"geb": None, "rookie": None}}
+    keeper.add_ages(kader, stamm, date(2026, 9, 29), 2026)
+    assert [k["nfl_jahr"] for k in kader] == [1, 5, None, None]
+    assert [k["rookie"] for k in kader] == [True, False, True, False]   # 3 und 4: ohne Rookie-Saison bleibt die Näherung
+    assert R2(kader[0]["alter"]) == D("21.69") and R2(kader[1]["alter"]) == D("26.76")
+    assert kader[2]["alter"] is None and kader[3]["alter"] is None
+
+
+def test_ros_gewichte():
+    pool = {1: {"ros": D("100"), "ros_po": D("30")}, 2: {"ros": None, "ros_po": None}}
+    assert keeper.ros_weights({"ros_after_week": 3, "players": pool}) == ({1: D("100")}, "ros")
+    assert keeper.ros_weights({"ros_after_week": 14, "players": pool}) == ({1: D("30")}, "ros_po")
+    assert keeper.ros_weights({"ros_after_week": None, "players": pool}) == ({}, None)
+    assert keeper.ros_weights({"ros_after_week": 17, "players": pool}) == ({}, None)
+
+
+def keeper_mit_stammdaten(stammdaten):
+    import players
+    import records
+    ssn = rawdata.Season(2026, 3)
+    ssn._memo["nflverse"] = stammdaten
+    weeks = [1, 2, 3]
+    return keeper.compute_keeper(ssn, weeks, players.compute_players(ssn, weeks), records.player_names(ssn))
+
+
+def test_echte_daten_ohne_stammdaten():
+    k = keeper_mit_stammdaten(None)
+    assert (k["alter_stichtag"], k["alter_gewicht"]) == (None, None)
+    assert all(t["altersprofil"] is None for t in k["teams"]) and k["liga"]["altersprofil"] is None
+    assert all(r["alter"] is None and r["nfl_jahr"] is None for r in k["kader"])
+
+
+def test_echte_kader_mit_erfundenen_stammdaten():
+    """Die echten Kader mit erfundenen Geburtsdaten (aus der ID abgeleitet): Stichtag ist der Dienstag nach W3, jedes
+    Team hat ein Profil, die Teams summieren sich zur Liga, und positionsbereinigt liegt die Liga bei 0."""
+    from datetime import date
+    alle = keeper_mit_stammdaten(None)["kader"]
+    erfunden = {"spieler": {str(r["id"]): {"geb": date(1992 + r["id"] % 12, 1 + r["id"] % 12, 1 + r["id"] % 28).isoformat(),
+                                           "rookie": 2015 + r["id"] % 12, "draft": None}
+                            for r in alle if r["id"] > 0}}
+    k = keeper_mit_stammdaten(erfunden)
+    assert (k["alter_stichtag"], k["alter_gewicht"]) == ("2026-09-29", "ros")
+    mit = [r for r in k["kader"] if r["alter"] is not None]
+    assert len(mit) == sum(1 for r in k["kader"] if r["id"] > 0) and all(r["nfl_jahr"] >= 1 for r in mit)
+    assert all(r["alter"] is None for r in k["kader"] if r["id"] < 0)          # D/ST
+    liga = k["liga"]["altersprofil"]
+    assert liga["n"] == len(mit) == sum(t["altersprofil"]["n"] for t in k["teams"])
+    assert abs(liga["bereinigt"]) < D("1e-20") and set(liga["positionen"]) == {1, 2, 3, 4, 5}
+    assert sum(p["n"] for p in liga["positionen"].values()) == liga["n"]
+    for key in ("jung", "alt", "rookies", "zweites_jahr"):
+        assert liga[key] == sum(t["altersprofil"][key] for t in k["teams"])
+    for t in k["teams"]:
+        p = t["altersprofil"]
+        assert set(p) == {"n", "kader", "ros", "bereinigt", "bereinigt_ros", "jung", "alt", "rookies", "zweites_jahr"}
+        assert D(18) < p["kader"] < D(40) and D(18) < p["ros"] < D(40)
+    assert all(r["rookie"] == (r["nfl_jahr"] == 1) for r in mit)
+
+
 def test_vorjahr_aus_mroster():
     """Saison-Ist des Vorjahrs je Kaderzeile (rawdata.roster_rows): Punkte und Spiele, None ohne Eintrag."""
     def player(pid, stats):

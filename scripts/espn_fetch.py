@@ -15,10 +15,12 @@ Ablage je Saison (--due):
     basis/kona_dst_<vorjahr>.json, proTeamSchedules_wl_<vorjahr>.json   D/ST-Grundlage des Vorjahrs, einmalig
     basis/positionen_<vorjahr>.json                        Positions-Grundlage des Vorjahrs (QB, RB, WR, TE, K), einmalig
     fantasypros/sitemap.json                               FantasyPros-Adressen je Position (scripts/fantasypros.py), wird aktualisiert
+    nflverse/players.json                                  Geburtsdatum, Rookie-Saison und Draft je Pool-Spieler (scripts/nflverse.py), wird aktualisiert
 Tageslauf (--transactions --pool --wetter, Action stündlich vormittags und abends):
     transactions/                                          Transaktions-Archiv (mTransactions2 je Periode, Aktivitäten)
     pool/latest.json                                       Pool-Auszug: Status, Besitz, Verletzung, Waiver-Frist, Projektion;
-                                                           dazu die Waiver-Reihenfolge der Teams (mTeam.waiverRank)
+                                                           dazu die Waiver-Reihenfolge der Teams (mTeam.waiverRank) sowie
+                                                           IR-Slots und per Trade gekommene Spieler (mRoster)
     wetter/prognose/wNN_<UTC>.json, wetter/ist_<saison>.json   Wetter je Spiel (scripts/wetter.py, Open-Meteo)
     news/<UTC>.json                                        News je Spieler (scripts/news.py, --news, vorbereitet, aus)
 
@@ -650,12 +652,13 @@ def last_past_week(season: int, today: date) -> int:
 
 
 def refresh_season_files(session: requests.Session, season: int, today: date) -> int:
-    """Saisondateien: NFL-Spielplan und FantasyPros-Sitemap bei jedem Lauf (Verlegungen, neue Spieler); Draft, D/ST- und
-    Positions-Vorjahr einmalig.
+    """Saisondateien: NFL-Spielplan, FantasyPros-Sitemap und nflverse-Stammdaten bei jedem Lauf (Verlegungen, neue
+    Spieler); Draft, D/ST- und Positions-Vorjahr einmalig.
 
     Gibt die Zahl der Fehler zurück; eine fehlgeschlagene Datei versucht der nächste Lauf erneut.
     """
     import fantasypros  # erst hier: das Modul importiert espn_fetch
+    import nflverse     # ebenso
     files = season_files(season)
     jobs = [(files["schedule"], True, lambda: fetch_schedule(session, season)),
             (files["draft"], False, lambda: fetch_draft(session, season)),
@@ -679,7 +682,8 @@ def refresh_season_files(session: requests.Session, season: int, today: date) ->
         else:
             save_atomic(path, content)
             print(f"  {path.name:<34} {len(content):>10,} Bytes -> {rel(path)}")
-    return errors + fantasypros.update(session, season)  # fängt seine Fehler selbst (siehe dort)
+    # beide fangen ihre Fehler selbst (siehe dort)
+    return errors + fantasypros.update(session, season) + nflverse.update(session, season)
 
 
 def backfill_kona(session: requests.Session, season: int, week: int) -> int:
