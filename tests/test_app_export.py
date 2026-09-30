@@ -73,7 +73,7 @@ def test_waiver_vertrag(result):
     out = app_export.round_file("waiver.json", app_export.build_waiver(dict(result, pool_latest=pool)))
     assert (out["stand"], out["woche"]) == ("2026-09-29T0645Z", 3)
     assert set(out) == {"stand", "woche", "reihenfolge", "reihenfolge_quelle", "reihenfolge_stand", "bedarf", "spieler",
-                        "horizont", "ersatz_woche", "ersatz_3", "anstoss", "bedarf_woche", "bedarf_basis", "profil"}
+                        "horizont", "ersatz_woche", "ersatz_3", "anstoss", "bedarf_woche", "bedarf_basis", "bedarf_ersatz", "profil"}
     assert out["horizont"] == [3, 4, 5] and len(out["anstoss"]) == 32   # W3: alle 32 Teams spielen
     # ohne Reihenfolge im Pool-Auszug: Wochenstand (waiver_prio aus mTeam des Wochenabrufs); ohne ROS kein Bedarf
     weekly = sorted(result["teams"], key=lambda t: t["waiver_prio"])

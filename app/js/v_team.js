@@ -1,6 +1,9 @@
-// Teamseite #team/N: Kopf, Kacheln, PF je Woche, Wochenliste, Verläufe, Positionen, H2H; Kader und Franchise lazy
+// Teamseite #team/N: Kopf, Kacheln, PF je Woche, Wochenliste, Verläufe, Positionen, H2H; Kader und Franchise lazy.
+// Stärken und Schwächen (Profil) aus waiver.json: Kurzzeile unter den Kacheln, Umschalter „Profil“ in der Karte Positionen.
 let U, S, h;
 const POS = ['QB', 'RB', 'WR', 'TE', 'K', 'D/ST'];
+// Profil-Gruppen (Python: players.PROFILE_GROUPS) mit Anzeige und Position der Absicherung (FLEX hat keine)
+const GRP = {QB: ['QB+OP', 'QB'], RB: ['RB', 'RB'], WR: ['WR', 'WR'], TE: ['TE', 'TE'], FLEX: ['FLEX', null], 'D/ST': ['D/ST', 'D/ST'], K: ['K', 'K']};
 // Slots in der Reihenfolge der Aufstellung (Sortierung im Kader)
 const ORD = ['QB', 'RB', 'WR', 'TE', 'FLEX', 'OP', 'D/ST', 'K', 'Bank', 'IR'];
 
@@ -28,6 +31,8 @@ export async function render(box, ctx, r) {
       U.tile('Form Δ', t.form_band == null ? U.na('ab 4 Spielen') : [U.sgn(t.form_delta), svg.mini(t.form_delta, t.form_band)],
         t.form_band == null ? 'ab 4 Spielen' : `Band ±${U.num(t.form_band)}`, 'form-delta'),
       U.tile('Playoff-%', U.po(U.sp(sim?.playoff)), sim ? `Div ${U.po(U.sp(sim.division))} · Bye ${U.po(U.sp(sim.bye))}` : 'Simulation folgt', 'playoff')));
+  const kurz = h('p', {class: 'note', 'aria-live': 'polite'});
+  U.ap(box, kurz);
 
   const W = S.meta.weeks, wk = t.wochen, avg = W.map(w => S.weeks.find(x => x.week === w)?.ligaschnitt ?? null);
   const best = wk.pf.length ? Math.max(...wk.pf) : null;
@@ -43,16 +48,25 @@ export async function render(box, ctx, r) {
   const sec = (title, ...kids) => h('details', {class: 'sec', open: wide}, h('summary', null, title), kids);
   const kader = h('div', {class: 'tg-k'});
   const fr = U.card(null);
+  const pos = h('div');
+  positions(pos, t, null, null);
   U.ap(box, h('div', {class: 'tg'}, h('div', {class: 'tg-f'}, pfFig), h('div', {class: 'tg-w'}, weekList(t)), kader,
-    h('div', {class: 'tg-r'}, positions(t), h2h(t))));
+    h('div', {class: 'tg-r'}, pos, h2h(t))));
   U.ap(box, sec('Verläufe', ...svg.verlauf(t.team_id, false)), sec('Franchise-Historie', fr),
     U.chips('Weiter zu', [['#moves?team=' + t.team_id, 'Moves dieses Teams', 'm'], ['#rekorde/h2h?team=' + t.team_id, 'H2H-Bilanz', 'h'],
-      ['#spieler?team=' + t.team_id + '&status=kader', 'Spielerliste des Teams', 's']], null));
-  // Kader mit dem Tagesstand (waiver.json) wie im Spieler-Tab: aktuelle Zu- und Abgänge und Verletzungen
+      ['#spieler?team=' + t.team_id + '&status=kader', 'Spielerliste des Teams', 's'],
+      ['#waiver?team=' + t.team_id, `Waiver aus Sicht von ${t.kuerzel}`, 'w']], null));
+  // Kader mit dem Tagesstand (waiver.json) wie im Spieler-Tab: aktuelle Zu- und Abgänge und Verletzungen; dieselbe
+  // Ladung liefert das Profil (Kurzzeile und Umschalter „Profil“)
   ctx.lazy('players.json', 'Spielerdaten', kader).then(async P => {
     const W = S.man.files?.['waiver.json'] ? await ctx.load('waiver.json').catch(() => null) : null;
     const sp = await ctx.mod('v_spieler');
-    if (r.alive()) roster(kader, t, P, sp.merge(P, W), W, sp.nflTxt);
+    if (!r.alive()) return;
+    const all = sp.merge(P, W);
+    roster(kader, t, P, all, W, sp.nflTxt);
+    const name = new Map(all.map(p => [p.id, p.name]));
+    const prof = W?.profil?.[String(t.team_id)];
+    if (prof) { kurz.replaceChildren(...short(prof, W)); positions(pos, t, W, name); }
   }).catch(() => {});
   ctx.lazy('history.json', 'Historie', fr).then(H => r.alive() && franchise(fr, t, H, svg)).catch(() => {});
 }
@@ -84,20 +98,63 @@ function weekList(t) {
 
 // Anteile: Vertrag ohne Einheit – Summe ≈ 1 heißt Anteil 0–1, sonst Prozent
 const share = (obj, k) => { const tot = Object.values(obj).reduce((a, x) => a + (x?.anteil || 0), 0); const v = obj[k]?.anteil; return U.ok(v) ? (tot <= 1.5 ? v * 100 : v) : null; };
-function positions(t) {
-  const P = t.positionen;
-  if (!P) return h('p', {class: 'note'}, 'Positionen folgen.');
-  const box = h('div');
+// Kurzzeile unter den Kacheln: Schwächen mit Abstand und Rang, Stärken nur mit Namen
+function short(prof, W) {
+  const g = prof.gruppen;
+  const weak = prof.schwach.map((k, i) => [i ? ' · ' : '', h('b', {class: 'dn'}, GRP[k][0]), ` ${U.sgn(g[k].abstand)} (${g[k].rang}.)`]);
+  return [basisTxt(W), ': Schwach ', weak.length ? weak : '–', ' · Stark ', prof.stark.length ? prof.stark.map(k => GRP[k][0]).join(' · ') : '–',
+    ' ', U.ib('profil', '')];
+}
+const basisTxt = W => W.bedarf_basis === 'playoffs' ? 'Stärken und Schwächen (Playoffs W15–17)' : 'Stärken und Schwächen (ROS)';
+
+// Karte Positionen: Profil (Tagesstand, sobald waiver.json da ist) sowie PF nach Position und nach Slot (Ist W1–N)
+function positions(box, t, W, name) {
+  const P = t.positionen, prof = W?.profil?.[String(t.team_id)];
+  if (!P && !prof) { box.replaceChildren(h('p', {class: 'note'}, 'Positionen folgen.')); return; }
+  const out = h('div');
   const draw = key => {
-    const o = P[key] || {};
-    box.replaceChildren(U.table({cap: key === 'nach_slot' ? 'PF nach Slot' : 'PF nach Position', cls: 'nr', rows: Object.keys(o), sort: ['pts', -1], rh: 0, cols: [
+    if (key === 'profil') { out.replaceChildren(...profile(t, W, prof, name)); return; }
+    const o = P?.[key] || {};
+    out.replaceChildren(U.table({cap: key === 'nach_slot' ? 'PF nach Slot' : 'PF nach Position', cls: 'nr', rows: Object.keys(o), sort: ['pts', -1], rh: 0, cols: [
       {k: 'p', l: key === 'nach_slot' ? 'Slot' : 'Position', f: k => k},
       {k: 'pts', l: 'Pkt', num: 1, v: k => o[k].pts, f: k => U.num(o[k].pts)},
       {k: 'a', l: 'Anteil', num: 1, v: k => share(o, k), f: k => U.pct(share(o, k))},
       {k: 'r', l: 'Ligarang', num: 1, v: k => o[k].rang, d: 1, f: k => U.val(o[k].rang, v => v + '.')}]}));
   };
-  draw('nach_position');
-  return h('div', null, h('div', {class: 'row'}, U.seg('Aufteilung', [['nach_position', 'Position'], ['nach_slot', 'Slot']], 'nach_position', draw), U.ib('positionen', '')), box);
+  const opts = [...(prof ? [['profil', 'Profil']] : []), ...(P ? [['nach_position', 'PF Position'], ['nach_slot', 'PF Slot']] : [])];
+  draw(opts[0][0]);
+  box.replaceChildren(h('div', {class: 'row'}, U.seg('Aufteilung', opts, opts[0][0], draw), U.ib(prof ? 'profil' : 'positionen', '')), out);
+}
+
+// Profil: Gruppen mit ROS/Sp. der Starter, Abstand zum Ligaschnitt und Rang, Ist-Rang, Absicherung; darunter Byes und
+// freie Spieler mit Zugewinn für dieses Team. Alle Zahlen aus Python (waiver.json profil, spieler[].zug)
+function profile(t, W, prof, name) {
+  const g = prof.gruppen, abs = prof.absicherung || {};
+  const cls = k => g[k].wertung === 'schwach' ? 'dn' : g[k].wertung === 'stark' ? 'up' : null;
+  const po = W.bedarf_basis === 'playoffs';
+  const table = U.table({cap: po ? 'Profil nach Slot-Gruppen (Playoffs W15–17)' : 'Profil nach Slot-Gruppen (ROS)', cls: 'nr', rows: Object.keys(g), sortable: false, rh: 0, cols: [
+    {k: 'g', l: 'Gruppe', f: k => h('span', {class: cls(k), title: g[k].ids.map(name.get, name).join(', ')}, GRP[k][0])},
+    {k: 'w', l: po ? 'PO/Sp.' : 'ROS/Sp.', num: 1, f: k => U.num(g[k].wert)},
+    {k: 'a', l: 'zum Schnitt', num: 1, f: k => [h('span', {class: cls(k)}, U.sgn(g[k].abstand)), h('small', null, ` ${g[k].rang}.`)]},
+    {k: 'i', l: 'Ist-Rang', num: 1, f: k => U.val(g[k].ist_rang, v => v + '.', 'noch keine Woche')},
+    {k: 's', l: 'Ausfall Bester', num: 1, f: k => {
+      const a = GRP[k][1] && abs[GRP[k][1]];
+      return a && U.ok(a.wert) ? [U.sgn(a.wert), h('small', null, ` ${a.rang}.`)] : U.na(GRP[k][1] ? 'kein Spieler der Position' : 'FLEX: aus RB/WR/TE');
+    }}]});
+  const gains = W.spieler.filter(x => x.zug?.ros?.[String(t.team_id)])
+    .map(x => ({id: x.id, v: x.zug.ros[String(t.team_id)], st: x.status})).sort((a, b) => b.v.b - a.v.b).slice(0, 3);
+  const zug = gains.length ? gains.map((x, i) => [i ? ', ' : '', h('a', {href: '#spieler/' + x.id}, name.get(x.id) ?? `Spieler ${x.id}`),
+    ` ${U.sgn(x.v.b)}` + (x.v.n !== x.v.b ? ` (netto ${U.sgn(x.v.n)})` : '') + (x.st === 'WAIVERS' ? ' · Waivers' : '')])
+    : 'keiner – Verstärkung nur per Trade';
+  const byes = prof.byes.length ? prof.byes.map((b, i) => [i ? ' · ' : '', `W${b.woche} `, h('span', {class: 'dn'}, U.sgn(b.kosten)),
+    b.ids.length > 1 ? ` (${b.ids.length} Starter)` : '']) : 'keine Verluste';
+  const k = prof.kader;
+  return [table,
+    h('p', {class: 'note'}, `Freie Spieler, die hier starten würden (${po ? 'PO' : 'ROS'}/Sp.): `, zug, ' ', U.ib('zugewinn', '')),
+    h('p', {class: 'note'}, 'Byes (Verlust der besten Aufstellung): ', byes, ' ', U.ib('bye-kosten', '')),
+    h('p', {class: 'note'}, `Kader ${k.spieler} Spieler` + (k.voll ? ', voll – ein Zugang braucht einen Drop' : '')
+      + (k.limit.length ? `; am Positionslimit: ${k.limit.join(', ')}` : '') + `. Tagesstand ${U.stamp(W.stand)}.`),
+    U.legend(['profil', 'absicherung', 'zugewinn', 'bye-kosten'])];
 }
 
 function h2h(t) {

@@ -507,7 +507,9 @@ def build_waiver(result: dict) -> dict | None:
     basis = need_basis(result)
     return {"stand": pool["stand"], "woche": pool["woche"], "reihenfolge": reihenfolge, "reihenfolge_quelle": quelle,
             "reihenfolge_stand": stand, "bedarf": team_needs(pool, result),
-            "bedarf_basis": basis[2] if basis else None, "profil": profil} | head | {"spieler": rows}
+            "bedarf_basis": basis[2] if basis else None,
+            "bedarf_ersatz": {POSITION_NAMES.get(k, str(k)): v for k, v in basis[1].items()} if basis else None,
+            "profil": profil} | head | {"spieler": rows}
 
 
 CLAUDE_PLAYER_COLS = ("name", "pos", "nfl", "inj", "avg", "form", "trend", "ros_g", "ros_rang", "gegner_n1", "mu_n1")
