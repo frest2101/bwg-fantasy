@@ -77,7 +77,7 @@ function available(box, W, P, rows, r, wflag, me) {
   const spieler = {k: 'name', l: 'Spieler', v: x => x.name.toLowerCase(), d: 1, flt: false, f: x => {
     const a = h('a', {href: '#spieler/' + x.id, class: 'pl'},
       h('span', null, x.name, U.inj(x.inj)), h('span', {class: 'sub'}, `${x.pos ?? '–'} · ${x.nfl ?? '–'} · ${x.status === 'FREEAGENT' ? 'FA' : 'Waivers'}`
-        + (played(W, x) ? ` · W${W.woche} gespielt` : '') + ahead(x)));
+        + (played(W, x) ? ` · W${W.woche} gespielt` : '')));
     const fl = wflag?.(x.nfl);
     return fl ? h('span', {class: 'plw'}, a, fl) : a;
   }};
@@ -109,14 +109,6 @@ function available(box, W, P, rows, r, wflag, me) {
       if (!z) return U.na('verbessert die beste Aufstellung nicht');
       return z.n !== z.b ? [U.sgn(z.b), h('small', null, `netto ${U.sgn(z.n)}`)] : U.sgn(z.b);
     }});
-  // Konkurrenz um den Claim: Teams vor dem Bezugsteam in der Waiver-Reihenfolge, bei denen der Spieler starten würde
-  const ahead = x => {
-    if (x.status !== 'WAIVERS' || !me.mine || !W.reihenfolge) return '';
-    const mineAt = W.reihenfolge.indexOf(me.mine);
-    const rivals = W.reihenfolge.slice(0, mineAt < 0 ? W.reihenfolge.length : mineAt)
-      .map((tid, i) => [tid, i + 1]).filter(([tid]) => x.zug?.[st.hor]?.[String(tid)]);
-    return rivals.length ? ' · vor dir: ' + rivals.map(([tid, i]) => `${i}. ${U.kz(tid)}`).join(', ') : '';
-  };
   // Woche N+1: wer schon gespielt hat, bringt in dieser Woche nichts mehr – ohne Sortierwert ans Ende
   const weekWhy = x => x.pos === 'D/ST' || !U.ok(x.pos) ? 'kein freier Spieler der Position' : 'noch keine ESPN-Projektion';
   const projUe = {k: 'proj_ue', l: `W${W.woche} ü. Ersatz`, num: 1, v: x => played(W, x) ? null : x.proj_ue,

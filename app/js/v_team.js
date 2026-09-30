@@ -139,6 +139,7 @@ function profile(t, W, prof, name) {
     {k: 'i', l: 'Ist-Rang', num: 1, f: k => U.val(g[k].ist_rang, v => v + '.', 'noch keine Woche')},
     {k: 's', l: 'Ausfall Bester', num: 1, f: k => {
       const a = GRP[k][1] && abs[GRP[k][1]];
+      if (a?.frei_gleichwertig) return h('small', null, 'freier Ersatz gleichwertig');
       return a && U.ok(a.wert) ? [U.sgn(a.wert), h('small', null, ` ${a.rang}.`)] : U.na(GRP[k][1] ? 'kein Spieler der Position' : 'FLEX: aus RB/WR/TE');
     }}]});
   const gains = W.spieler.filter(x => x.zug?.ros?.[String(t.team_id)])
@@ -152,7 +153,7 @@ function profile(t, W, prof, name) {
   return [table,
     h('p', {class: 'note'}, `Freie Spieler, die hier starten würden (${po ? 'PO' : 'ROS'}/Sp.): `, zug, ' ', U.ib('zugewinn', '')),
     h('p', {class: 'note'}, 'Byes (Verlust der besten Aufstellung): ', byes, ' ', U.ib('bye-kosten', '')),
-    h('p', {class: 'note'}, `Kader ${k.spieler} Spieler` + (k.voll ? ', voll – ein Zugang braucht einen Drop' : '')
+    h('p', {class: 'note'}, `Kader ${k.spieler} Spieler` + (k.ir ? ` (${k.ir} im IR-Slot)` : '') + (k.voll ? ', voll – ein Zugang braucht einen Drop' : '')
       + (k.limit.length ? `; am Positionslimit: ${k.limit.join(', ')}` : '') + `. Tagesstand ${U.stamp(W.stand)}.`),
     U.legend(['profil', 'absicherung', 'zugewinn', 'bye-kosten'])];
 }
