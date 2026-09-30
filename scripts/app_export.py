@@ -180,7 +180,7 @@ def add_fantasypros(rows: list[dict], result: dict) -> None:
     if not result.get("fantasypros"):
         return
     known = fantasypros.index(result["fantasypros"])
-    slugs = {id(row): fantasypros.slug_for(row.get("name"), row.get("pos"), known) for row in rows}
+    slugs = {id(row): fantasypros.slug_for(row.get("name"), row.get("pos"), known, row.get("id")) for row in rows}
     taken = Counter(slugs.values())
     for row in rows:
         slug = slugs[id(row)]
