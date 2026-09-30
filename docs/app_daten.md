@@ -79,8 +79,9 @@ Die App lädt `data/manifest.json?t=<jetzt>` und danach jede Datei mit `?v=<v>`.
 
 ## `transactions.json` (lazy)
 - `spieler` (id → Name), `aufstellungswechsel` (team_id → Zahl).
-- `items`: `{id, type, team_id, datum (Epoch-ms), periode, items: [{type ADD/DROP, player_id, name, from_team_id, to_team_id}]}`. `type` ist WAIVER, FREEAGENT, ROSTER (reine Drops) oder TRADE_ACCEPT (ohne Spieler).
-- `draft`: `{pick, runde, runden_pick, team_id, player_id, name, keeper}`.
+- `items`: `{id, type, team_id, datum (Epoch-ms), periode, items: [{type ADD/DROP, player_id, name, from_team_id, to_team_id, in_app}]}`. `type` ist WAIVER, FREEAGENT, ROSTER (reine Drops) oder TRADE_ACCEPT (ohne Spieler).
+- `draft`: `{pick, runde, runden_pick, team_id, player_id, name, keeper, in_app}`.
+- `in_app` (bool): Die App hat eine Spielerseite zu diesem Spieler (players.json oder Kader laut Tagesstand); sonst zeigt sie den Namen ohne Link.
 
 ## `waiver.json` (lazy, Tagesstand je Spieler – Grundlage des Waiver-Tabs)
 - **Kopf:** `stand` (Abrufzeit des Pool-Auszugs, UTC), `woche` (die Woche der Projektion `proj`: die Kalenderwoche, deren Spiele als Nächstes anstehen).

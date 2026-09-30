@@ -9,8 +9,8 @@
 "history.json":{"v":"d7c4d8da8907","bytes":42016,"lazy":true},
 "players.json":{"v":"4ecbeec5e937","bytes":251066,"lazy":true},
 "schedule.json":{"v":"4a84d3142d78","bytes":17583,"lazy":false},
-"teams.json":{"v":"2885347abb28","bytes":31435,"lazy":false},
-"transactions.json":{"v":"37bb2db55b1b","bytes":45125,"lazy":true},
+"teams.json":{"v":"9666e1b31d26","bytes":31435,"lazy":false},
+"transactions.json":{"v":"69c8a78ebf6f","bytes":49535,"lazy":true},
 "waiver.json":{"v":"498b250919a8","bytes":89930,"lazy":true},
 "wetter.json":{"v":"57e97e4774d3","bytes":16394,"lazy":true}
 }

@@ -8,6 +8,10 @@ const DAILY = ['team', 'status', 'inj', 'own'];
 let lastOpened = null, keptFilters = {};
 // Spieler ohne NFL-Team (entlassen, vereinslos) heißen „FA“ statt „null“
 export const nflTxt = p => p.nfl || 'FA';
+// Suche ohne Groß/klein, Akzente, Punkte, Apostrophe und Bindestriche: „aj brown“ findet A.J. Brown, „amon ra“ Amon-Ra St. Brown
+export const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  .replace(/-/g, ' ').replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
+const spiele = n => `${n ?? 0} ${n === 1 ? 'Spiel' : 'Spiele'}`;
 // Rückweg-Ziele für den Link oben im Spielerdetail
 const BACK = {spieler: 'Spielerliste', team: 'Team', moves: 'Moves', spielplan: 'Spielplan', waiver: 'Waiver', dst: 'D/ST-Faktoren',
   tabelle: 'Tabelle', rekorde: 'Rekorde', ranking: 'Ranking'};
@@ -25,7 +29,7 @@ export async function render(box, ctx, r) {
   const svg = await ctx.mod('svg');
   const rosWhy = P.ros_nach_woche == null ? `ab Wochenabruf W${S.tw + 1}` : 'keine Projektion';
   const rows = merge(P, W);
-  if (detail) one(box, h1, P, W, rows, r, svg, rosWhy); else list(box, W, rows, r, rosWhy);
+  if (detail) one(box, h1, P, W, rows, r, svg, rosWhy); else list(box, W, rows, r, rosWhy, P.ersatz || {}, P.ros_nach_woche != null);
 }
 
 // Wochenwerte je Spieler mit dem Tagesstand überlagern (Schlüssel: Spieler-ID); ohne Tagesstand unverändert.
@@ -54,24 +58,27 @@ const trendTxt = t => {
     h('span', {class: 'vh'}, v === '↑' ? ' steigend' : v === '↓' ? ' fallend' : ' stabil')) : null;
 };
 function stand(W) {
-  if (W?.stand) return h('p', {class: 'note'}, `Team, Status, Besitz und Verletzung: Tagesstand ${U.stamp(W.stand)}`, ' ', U.ib('tagesstand', ''));
+  if (W?.stand) return h('p', {class: 'note'}, `Tagesstand ${U.stamp(W.stand)}`, ' ', U.ib('tagesstand', ''));
   const ds = S.man.datenstand || {}, w = S.weeks.find(x => x.week === (ds.pool_woche ?? S.tw) + 1);
   return h('p', {class: 'note'}, `Besitz und Verletzung: Stand nach W${ds.pool_woche ?? S.tw}` + (w ? ` (${U.datum(w.start)})` : ''), ' ', U.ib('besitz', ''));
 }
 
-function list(box, W, all, r, rosWhy) {
+function list(box, W, all, r, rosWhy, ersatz, hasRos) {
   const q = r.q;
   const st = {pos: POS.includes(q.get('pos')) ? q.get('pos') : '', status: ['kader', 'frei'].includes(q.get('status')) ? q.get('status') : 'alle',
     team: +q.get('team') || 0, sicht: ['ros', 'besitz'].includes(q.get('sicht')) ? q.get('sicht') : 'saison', raw: (q.get('q') || '').trim()};
-  st.text = st.raw.toLowerCase();
+  st.text = norm(st.raw);
+  for (const p of all) p._n ??= norm(p.name);
   // Spaltenfilter bleiben nur auf dem Rückweg (Zurück, „← Spielerliste“) erhalten; ein frischer Aufruf beginnt ohne
   if (!r.back) keptFilters = {};
-  const count = h('p', {class: 'note', 'aria-live': 'polite'});
-  const slotBox = h('div');
+  const count = h('span', {class: 'note cnt2', 'aria-live': 'polite'});
+  const slotBox = h('div'), legBox = h('div');
+  // „–“ bei ROS über Ersatz: ohne freien Spieler der Position gibt es kein Ersatzniveau (z. B. alle D/ST vergeben)
+  const ueWhy = p => hasRos && !U.ok(ersatz[p.pos]) ? 'kein freier Spieler der Position' : rosWhy;
   const rows = () => all.filter(p => (!st.pos || p.pos === st.pos)
     && (st.status === 'alle' || (st.status === 'kader' ? p.team > 0 : !(p.team > 0)))
     && (!st.team || p.team === st.team)
-    && (!st.text || p.name.toLowerCase().includes(st.text)));
+    && (!st.text || p._n.includes(st.text)));
   const num = (k, l, f = U.num, why) => ({k, l, num: 1, v: p => p[k], f: p => U.val(p[k], f, why)});
   const base = [
     {k: 'name', l: 'Spieler', v: p => p.name.toLowerCase(), d: 1, flt: false, f: p => h('a', {href: '#spieler/' + p.id, class: 'pl'},
@@ -81,10 +88,10 @@ function list(box, W, all, r, rosWhy) {
     num('ros_g', 'ROS/Sp.', U.num, rosWhy)];
   const extra = {
     saison: [num('pts', 'Pkt'), num('g', 'Spiele', v => v), num('floor', 'Floor', U.num, 'ohne Spiel'), num('ceil', 'Ceiling', U.num, 'ohne Spiel'),
-      num('sd', 'Konstanz', U.num, 'unter 2 Spielen'), num('starts', 'Starts', v => v), num('bench_pts', 'Bank-Pkt'),
+      {...num('sd', 'Konstanz', U.num, 'unter 2 Spielen'), d: 1}, num('starts', 'Starts', v => v), num('bench_pts', 'Bank-Pkt'),
       num('proj_d', 'Proj.-Δ', U.sgn, 'ohne Spiel'), {k: 'spark', l: 'Formkurve', f: p => h('span', {class: 'sp', 'aria-hidden': 'true'}, p.spark || '')}],
     ros: [num('ros', 'ROS', U.num, rosWhy), num('rest_g', 'Restspiele', v => v, rosWhy), num('ros_po', 'ROS PO', U.num, rosWhy),
-      {...num('ros_rang', 'ROS-Rang', v => v + '.', rosWhy), d: 1}, num('ros_ue', 'ROS ü. Ersatz', U.sgn, rosWhy),
+      {...num('ros_rang', 'ROS-Rang', v => v + '.', rosWhy), d: 1}, {k: 'ros_ue', l: 'ROS ü. Ersatz', num: 1, v: p => p.ros_ue, f: p => U.val(p.ros_ue, U.sgn, ueWhy(p))},
       {k: 'bye', l: 'Bye', num: 1, cat: 1, v: p => p.bye, d: 1, f: p => U.val(p.bye, v => 'W' + v, 'kein NFL-Team')}],
     besitz: [num('own', 'Besitz %', v => U.pct(v)),
       ...(W ? [num('own_d', 'Δ Tag', v => U.sgn(v, 2), 'keine Tagesdaten'), num('started', 'gestartet %', v => U.pct(v), 'keine Tagesdaten')] : []),
@@ -97,9 +104,15 @@ function list(box, W, all, r, rosWhy) {
     const all = [...base, ...extra[sicht]], key = sortKey[sicht];
     return [all[0], all.find(c => c.k === key), ...all.slice(1).filter(c => c.k !== key)];
   };
+  const LEG = {saison: ['spiele', 'floor-ceil', 'konstanz', 'starts', 'proj-delta-sp'], ros: ['ros', 'restspiele', 'ros-po', 'ros-rang', 'ros-ue', 'ersatz', 'projektionen'],
+    besitz: [W ? 'besitz-trend' : 'besitz']};
+  const setCount = (n, total) => { count.textContent = n < total ? `${n} von ${total} Spielern` : `${total} Spieler`; };
   let tbl, first = true;
   const build = () => {
     const cols = colsFor(st.sicht), rs = rows();
+    // Spaltenfilter ohne Spalte in dieser Sicht fallen weg (sonst greifen sie unsichtbar beim Zurückwechseln)
+    for (const k in keptFilters) if (k !== 'nfl' && !cols.some(c => c.k === k)) delete keptFilters[k];
+    legBox.replaceChildren(U.legend(['filter', 'avg', 'form-sp', 'trendpfeil', 'ros-spiel', ...LEG[st.sicht]]));
     // Rückweg: so viele 50er-Blöcke zeigen, dass der zuletzt geöffnete Spieler dabei ist
     let show = 50;
     if (first && r.back && lastOpened != null) {
@@ -108,28 +121,27 @@ function list(box, W, all, r, rosWhy) {
       if (i >= 50) show = Math.ceil((i + 1) / 50) * 50;
     }
     first = false;
-    tbl = U.table({cap: 'Spielerliste', cls: 'nr', rh: 0, rows: rs, sort: [sortKey[st.sicht], -1], limit: 50, show, filter: true, filters, fstate: keptFilters, cols});
+    tbl = U.table({cap: 'Spielerliste', cls: 'nr', rh: 0, rows: rs, sort: [sortKey[st.sicht], -1], limit: 50, show, filter: true, filters,
+      fstate: keptFilters, cols, aside: count, onCount: setCount});
     slotBox.replaceChildren(tbl);
   };
   const refresh = (rebuild) => {
     if (rebuild) build(); else tbl.upd(rows());
-    count.textContent = `${rows().length} Spieler`;
     U.setQ('spieler', {pos: st.pos || null, status: st.status !== 'alle' ? st.status : null, team: st.team || null, sicht: st.sicht !== 'saison' ? st.sicht : null, q: st.raw || null});
   };
   let timer;
   U.ap(box, stand(W),
-    h('div', {class: 'row'}, U.seg('Position', [['', 'Alle'], ...POS.map(p => [p, p])], st.pos, v => { st.pos = v; refresh(); })),
+    h('div', {class: 'row'}, U.seg('Position', [['', 'Alle'], ...POS.map(p => [p, p])], st.pos, v => { st.pos = v; refresh(); }, 'tight')),
     h('div', {class: 'row'}, U.seg('Status', [['alle', 'Alle'], ['kader', 'Kader'], ['frei', 'Frei']], st.status, v => { st.status = v; refresh(); }),
       h('label', null, h('span', {class: 'vh'}, 'Fantasy-Team '), h('select', {onchange: e => { st.team = +e.target.value; refresh(); }},
         h('option', {value: 0}, 'Alle Teams'), S.teams.map(t => h('option', {value: t.team_id, selected: t.team_id === st.team}, t.name))))),
-    h('div', {class: 'row'}, h('label', null, h('span', {class: 'vh'}, 'Spieler suchen'),
-      h('input', {type: 'search', placeholder: 'Name suchen', value: st.raw || null, oninput: e => {
+    h('div', {class: 'row srch'}, h('label', null, h('span', {class: 'vh'}, 'Spieler suchen'),
+      h('input', {type: 'search', placeholder: 'Suchen', value: st.raw || null, oninput: e => {
         clearTimeout(timer);
-        timer = setTimeout(() => { st.raw = e.target.value.trim(); st.text = st.raw.toLowerCase(); refresh(); }, 150);
+        timer = setTimeout(() => { st.raw = e.target.value.trim(); st.text = norm(st.raw); refresh(); }, 150);
       }})),
     U.seg('Spalten', [['saison', 'Saison'], ['ros', 'ROS'], ['besitz', 'Besitz']], st.sicht, v => { st.sicht = v; refresh(true); })),
-    count, slotBox,
-    U.legend(['filter', 'avg', 'form-sp', 'trendpfeil', 'ros-spiel', 'spiele', 'floor-ceil', 'konstanz', 'starts', 'proj-delta-sp', 'ros', 'restspiele', 'ros-po', 'ros-rang', 'ros-ue', 'besitz-trend', 'projektionen']));
+    slotBox, legBox);
   refresh(true);
 }
 
@@ -182,7 +194,7 @@ function one(box, h1, P, W, rows, r, svg, rosWhy) {
     U.ok(p.bye) ? ` · Bye W${p.bye}` : null,
     p.pos === 'D/ST' ? [' · ', h('a', {href: '#dst'}, 'D/ST-Faktoren')] : null), stand(W),
   h('div', {class: 'tiles'},
-    U.tile('Pkt Saison', U.num(p.pts), `${p.g ?? 0} Spiele`, 'spiele'),
+    U.tile('Pkt Saison', U.num(p.pts), spiele(p.g), 'spiele'),
     U.tile('Ø', U.val(p.avg, U.num, 'ohne Spiel'), null, 'avg'),
     U.tile('Floor / Ceiling', `${U.num(p.floor)} / ${U.num(p.ceil)}`, null, 'floor-ceil'),
     U.tile('Konstanz', U.val(p.sd, U.num, 'unter 2 Spielen'), null, 'konstanz'),
@@ -199,10 +211,12 @@ function one(box, h1, P, W, rows, r, svg, rosWhy) {
   }
   const Wk = P.weeks || [], wk = p.wk || [];
   const vals = wk.map(x => x[2] ? null : x[0]);
-  U.ap(box, svg.fig('Formkurve', svg.bars({title: `Formkurve ${p.name}`,
-    desc: `Punkte je Woche; ${p.g ?? 0} Spiele, Ø ${U.num(p.avg)}; „·“ = Bye, „–“ = nicht gespielt, Strich = Projektion.`,
+  if (!(p.g > 0)) U.ap(box, h('p', {class: 'note'}, 'Noch kein Spiel 2026 – die Formkurve erscheint mit dem ersten Einsatz.'));
+  // kleine Werte: Achse mit einer Nachkommastelle, sonst stehen dort „0 0 1 1 1“
+  else U.ap(box, svg.fig('Formkurve', svg.bars({title: `Formkurve ${p.name}`,
+    desc: `Punkte je Woche; ${spiele(p.g)}, Ø ${U.num(p.avg)}; „·“ = Bye, „–“ = nicht gespielt, Strich = Projektion.`,
     x: Wk.map(w => 'W' + w), vals, miss: i => wk[i]?.[2] ? '·' : '–', tick: wk.map(x => x[1]),
-    cls: i => wk[i]?.[4] == null || U.bench(wk[i][4]) ? 'bN' : 'bA', label: i => U.ok(wk[i]?.[0]) ? U.num(wk[i][0], 1) : null, yfmt: v => U.num(v, 0)}),
+    cls: i => wk[i]?.[4] == null || U.bench(wk[i][4]) ? 'bN' : 'bA', label: i => U.ok(wk[i]?.[0]) ? U.num(wk[i][0], 1) : null, yfmt: v => U.num(v, Number.isInteger(v) ? 0 : 1)}),
   {heads: ['Woche', 'Pkt', 'Proj.', 'Team', 'Slot'], rows: Wk.map((w, i) => ['W' + w, wk[i]?.[2] ? 'Bye' : U.num(wk[i]?.[0]), U.num(wk[i]?.[1]),
     wk[i]?.[3] ? U.kz(wk[i][3]) : 'frei', U.slot(wk[i]?.[4])])},
   h('p', {class: 'note'}, 'Blau = Starter, grau = Bank oder ohne Team, orange Strich = ESPN-Projektion. ', U.ib('formkurve', ''))));
@@ -212,7 +226,7 @@ function one(box, h1, P, W, rows, r, svg, rosWhy) {
       U.tile('ROS', U.val(p.ros, U.num, rosWhy), U.ok(p.rest_g) ? `${p.rest_g} Restspiele` : null, 'ros'),
       U.tile('ROS Playoffs', U.val(p.ros_po, U.num, rosWhy), null, 'ros-po'),
       U.tile('ROS-Rang', U.val(p.ros_rang, v => `${p.pos} ${v}`, rosWhy), null, 'ros-rang'),
-      U.tile('Ersatzniveau', U.val(ers, U.num, rosWhy), p.pos, 'ersatz'),
-      U.tile('ROS über Ersatz', U.val(p.ros_ue, U.sgn, rosWhy), null, 'ros-ue')),
+      U.tile('Ersatzniveau', U.val(ers, U.num, P.ros_nach_woche != null ? 'kein freier Spieler der Position' : rosWhy), p.pos, 'ersatz'),
+      U.tile('ROS über Ersatz', U.val(p.ros_ue, U.sgn, P.ros_nach_woche != null && !U.ok(ers) ? 'kein freier Spieler der Position' : rosWhy), null, 'ros-ue')),
     h('p', {class: 'note'}, 'Alle Projektionen sind ESPN-Schätzungen. ', U.ib('projektionen', '')));
 }

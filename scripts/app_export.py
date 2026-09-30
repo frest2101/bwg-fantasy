@@ -210,9 +210,26 @@ def build_dst(result: dict) -> dict | None:
             "ausloeser_legende": data["ausloeser_legende"], "teams": teams}
 
 
+def app_player_ids(result: dict) -> set[int]:
+    """Spieler, die der Spieler-Tab zeigen kann: die Auswahl von players.json plus die Kaderspieler laut Tagesstand
+    (waiver.json); leer ohne Spielerdaten."""
+    selection = player_selection(result)
+    pool = result.get("pool_latest")
+    if selection and pool:
+        selection |= {p["id"] for p in pool["players"] if p.get("onTeamId")}
+    return selection
+
+
 def build_transactions(result: dict) -> dict | None:
+    """Moves und Draft; je Spieler in_app (bool), ob die App eine Spielerseite dazu hat – sonst zeigt sie den Namen
+    ohne Link (gedroppte Spieler ohne Einsatz führt players.json nicht)."""
     data = result.get("transactions")
-    return {k: data[k] for k in ("spieler", "items", "aufstellungswechsel", "draft")} if data else None
+    if not data:
+        return None
+    known = app_player_ids(result)
+    items = [x | {"items": [i | {"in_app": i["player_id"] in known} for i in x["items"]]} for x in data["items"]]
+    draft = [d | {"in_app": d["player_id"] in known} for d in data["draft"]]
+    return {"spieler": data["spieler"], "items": items, "aufstellungswechsel": data["aufstellungswechsel"], "draft": draft}
 
 
 def waiver_order(pool: dict, result: dict) -> tuple[list[int] | None, str | None, str | None]:

@@ -1,16 +1,22 @@
 // Teamseite #team/N: Kopf, Kacheln, PF je Woche, Wochenliste, Verläufe, Positionen, H2H; Kader und Franchise lazy
 let U, S, h;
 const POS = ['QB', 'RB', 'WR', 'TE', 'K', 'D/ST'];
+// Slots in der Reihenfolge der Aufstellung (Sortierung im Kader)
+const ORD = ['QB', 'RB', 'WR', 'TE', 'FLEX', 'OP', 'D/ST', 'K', 'Bank', 'IR'];
 
 export async function render(box, ctx, r) {
   U = ctx.ui; S = U.S; h = U.h;
   const t = U.team(r.sub);
-  if (!t) { U.ap(box, h('h1', null, 'Team nicht gefunden'), h('p', null, h('a', {href: '#tabelle'}, 'Zur Tabelle'))); return; }
+  if (!t) {
+    U.ap(box, h('p', null, h('a', {href: '#tabelle'}, '← Tabelle')), h('h1', null, 'Team nicht gefunden'),
+      h('p', {class: 'note'}, 'Diese Team-Nummer gibt es in der Liga nicht (1–10). Der Link ist vermutlich veraltet oder vertippt.'));
+    return;
+  }
   const svg = await ctx.mod('svg');
   const div = S.meta.divisions?.[t.division] ?? 'Division ' + t.division;
   const sim = t.sim?.liga;
   U.ap(box, h('h1', null, t.name),
-    h('p', {class: 'note'}, `${t.kuerzel} · ${div} · Rang ${t.rang} (Division ${t.rang_division}) · ${U.rec(t)} · Streak ${t.streak ?? '–'}`),
+    h('p', {class: 'note'}, `${t.kuerzel} · Rang ${t.rang} gesamt · ${t.rang_division}. in ${div} · ${U.rec(t)} · Streak ${t.streak ?? '–'}`),
     t.pr ? h('p', null, h('a', {href: '#ranking'}, 'Power Ranking'), ` ${t.pr.rang}. `, U.ok(t.pr.trend) ? U.trend(t.pr.trend) : null,
       ` · μ ${U.num(t.pr.mu, 1)}`, t.pr.p_quelle === 'vorjahr' ? h('span', {class: 'badge'}, 'P aus Vorjahr') : null) : null,
     t.pr?.kernsatz ? h('blockquote', {class: 'card'}, t.pr.kernsatz) : null,
@@ -25,23 +31,23 @@ export async function render(box, ctx, r) {
 
   const W = S.meta.weeks, wk = t.wochen, avg = W.map(w => S.weeks.find(x => x.week === w)?.ligaschnitt ?? null);
   const best = wk.pf.length ? Math.max(...wk.pf) : null;
-  U.ap(box, h('div', {class: 'two'}, h('div', {class: 'side'}, svg.fig('PF je Woche', svg.bars({title: `PF je Woche – ${t.name}`,
+  const pfFig = svg.fig('PF je Woche', svg.bars({title: `PF je Woche – ${t.name}`,
     desc: `Säulen = PF mit Ergebnis (W/L/T), Strich = Optimal, gestrichelt = Ligaschnitt. Beste Woche ${U.num(best)}.`,
     x: W.map(w => 'W' + w), vals: wk.pf, cls: i => 'b' + (wk.ergebnis[i] || 'N'), letter: i => wk.ergebnis[i],
     tick: wk.optimal, avg, yfmt: v => U.num(v, 0)}),
   {heads: ['Woche', 'PF', 'Erg.', 'Optimal', 'Ligaschnitt'], rows: W.map((w, i) => ['W' + w, U.num(wk.pf[i]), wk.ergebnis[i], U.num(wk.optimal[i]), U.num(avg[i])])},
-  h('p', {class: 'note'}, 'Säule = PF mit Ergebnis W/L/T, orange Strich = Optimal, gestrichelt = Ligaschnitt.'))),
-  h('div', {class: 'm1'}, weekList(t))));
+  h('p', {class: 'note'}, 'Säule = PF mit Ergebnis W/L/T, orange Strich = Optimal, gestrichelt = Ligaschnitt.'));
   // Kader direkt nach der Wochenliste; Verläufe und Franchise-Historie eingeklappt, auf dem Handy ist die Seite sonst
   // acht Bildschirme lang (ab 900 px offen)
   const wide = matchMedia('(min-width:900px)').matches;
   const sec = (title, ...kids) => h('details', {class: 'sec', open: wide}, h('summary', null, title), kids);
-  const kader = U.card('Kader');
+  const kader = h('div', {class: 'tg-k'});
   const fr = U.card(null);
-  U.ap(box, h('div', {class: 'two'}, kader, h('div', null, positions(t), h2h(t))));
+  U.ap(box, h('div', {class: 'tg'}, h('div', {class: 'tg-f'}, pfFig), h('div', {class: 'tg-w'}, weekList(t)), kader,
+    h('div', {class: 'tg-r'}, positions(t), h2h(t))));
   U.ap(box, sec('Verläufe', ...svg.verlauf(t.team_id, false)), sec('Franchise-Historie', fr),
-    h('p', null, h('a', {href: '#moves?team=' + t.team_id}, 'Moves dieses Teams'), ' · ', h('a', {href: '#rekorde/h2h?team=' + t.team_id}, 'H2H'), ' · ',
-      h('a', {href: '#spieler?team=' + t.team_id + '&status=kader'}, 'Spielerliste des Teams')));
+    U.chips('Weiter zu', [['#moves?team=' + t.team_id, 'Moves dieses Teams', 'm'], ['#rekorde/h2h?team=' + t.team_id, 'H2H-Bilanz', 'h'],
+      ['#spieler?team=' + t.team_id + '&status=kader', 'Spielerliste des Teams', 's']], null));
   // Kader mit dem Tagesstand (waiver.json) wie im Spieler-Tab: aktuelle Zu- und Abgänge und Verletzungen
   ctx.lazy('players.json', 'Spielerdaten', kader).then(async P => {
     const W = S.man.files?.['waiver.json'] ? await ctx.load('waiver.json').catch(() => null) : null;
@@ -100,7 +106,7 @@ function h2h(t) {
     return {opp: me ? e.b : e.a, n: e.spiele, w: me ? e.w_a : e.l_a, l: me ? e.l_a : e.w_a, t: e.t, d: me ? e.pf_diff : -e.pf_diff};
   });
   if (!rows.length) return h('p', {class: 'note'}, 'Noch keine direkten Duelle.');
-  return h('div', null, U.table({cap: 'H2H 2026', cls: 'nr', rows, sort: ['d', -1], rh: 0, cols: [
+  return h('div', {class: 'blk'}, U.table({cap: 'H2H 2026', cls: 'nr kurz', rows, sort: ['d', -1], rh: 0, cols: [
     {k: 'o', l: 'Gegner', v: x => U.kz(x.opp), d: 1, f: x => U.tl(x.opp)},
     {k: 'n', l: 'Spiele', num: 1, v: x => x.n, f: x => x.n},
     {k: 'b', l: 'Bilanz', v: x => x.w - x.l, f: x => `${x.w}-${x.l}` + (x.t ? `-${x.t}` : '')},
@@ -114,7 +120,7 @@ function roster(box, t, P, all, W, nflTxt) {
   const ros = 'ab Wochenabruf W' + (S.tw + 1);
   U.ap(box, U.table({cap: `Kader (${rows.length} Spieler)`, cls: 'nr', rows, sort: null, rh: 0, cols: [
     {k: 'n', l: 'Spieler', v: p => p.name, d: 1, f: p => h('a', {href: '#spieler/' + p.id, class: 'pl'}, h('span', null, p.name, U.inj(p.inj)), h('span', {class: 'sub'}, `${p.pos ?? '–'} · ${nflTxt(p)}`))},
-    {k: 's', l: `Slot W${P.weeks?.[last] ?? ''}`, v: p => U.slot(p.wk?.[last]?.[4]), d: 1, f: p => U.slot(p.wk?.[last]?.[4])},
+    {k: 's', l: `Slot W${P.weeks?.[last] ?? ''}`, v: p => { const i = ORD.indexOf(U.slot(p.wk?.[last]?.[4])); return i < 0 ? null : i; }, d: 1, f: p => U.slot(p.wk?.[last]?.[4])},
     {k: 'a', l: 'Ø', num: 1, v: p => p.avg, f: p => U.val(p.avg, U.num, 'ohne Spiel')},
     {k: 'f', l: 'Form', num: 1, v: p => p.form, f: p => [U.val(p.form, U.num, 'ohne Spiel'), p.trend ? ' ' + p.trend : '']},
     {k: 'r', l: 'ROS/Sp.', num: 1, v: p => p.ros_g, f: p => U.val(p.ros_g, U.num, ros)}]}),
@@ -136,5 +142,8 @@ function franchise(box, t, H, svg) {
     desc: `${ts.length} Saisons, bester Endplatz ${Math.min(...ts.map(x => x.final_rank))}.`,
     x: ts.map(x => String(x.season).slice(2)), series: [{name: t.kuerzel, vals: ts.map(x => x.final_rank), hi: true}],
     invert: true, max: 10, yfmt: v => v + '.', H: 180}),
-  {heads: ['Saison', 'Name', 'W-L', 'PF+', 'Endplatz'], rows: ts.map(x => [x.season, x.team_name, `${x.w}-${x.l}`, U.num(x.pf_plus, 1), x.final_rank + '.'])}));
+  // Name nur, wenn er sich über die Saisons geändert hat, und dann hinten
+  new Set(ts.map(x => x.team_name)).size > 1
+    ? {heads: ['Saison', 'Endplatz', 'W-L', 'PF+', 'Name'], rows: ts.map(x => [x.season, x.final_rank + '.', `${x.w}-${x.l}`, U.num(x.pf_plus, 1), x.team_name])}
+    : {heads: ['Saison', 'Endplatz', 'W-L', 'PF+'], rows: ts.map(x => [x.season, x.final_rank + '.', `${x.w}-${x.l}`, U.num(x.pf_plus, 1)])}));
 }

@@ -130,8 +130,8 @@ export const apwl = (w, l, t, showT) => `${nn(w)}-${nn(l)}` + (showT || t ? `-${
 export const spGroup = cur => chips('Spieler, D/ST und Moves',
   [['#spieler', 'Spieler', 'spieler'], ['#dst', 'D/ST-Faktoren', 'dst'], ['#moves', 'Moves', 'moves']], cur);
 
-export function seg(label, opts, cur, on) {
-  const g = scrollHint(h('div', {class: 'seg', role: 'group', 'aria-label': label}));
+export function seg(label, opts, cur, on, cls) {
+  const g = scrollHint(h('div', {class: 'seg' + (cls ? ' ' + cls : ''), role: 'group', 'aria-label': label}));
   const bs = opts.map(([v, text]) => h('button', {type: 'button', 'aria-pressed': String(v === cur), 'data-v': v}, text));
   g.addEventListener('click', e => {
     const b = e.target.closest('button');
@@ -144,7 +144,7 @@ export function seg(label, opts, cur, on) {
   return g;
 }
 
-export const tile = (label, value, sub, gid) => h('div', {class: 'tile'},
+export const tile = (label, value, sub, gid) => h('div', {class: 'tile' + (gid ? ' hi' : '')},
   h('div', {class: 'tl'}, h('span', null, label), gid ? ib(gid, '') : null),
   h('div', {class: 'tv'}, value), sub ? h('div', {class: 'ts'}, sub) : null);
 
@@ -212,6 +212,7 @@ export function table(o) {
     const th = h('th', {scope: 'col', class: c.num ? 'n' : null});
     if (c.v && o.sortable !== false) th.append(h('button', {type: 'button', onclick: () => {
       if (sk === c.k) sd = -sd; else { sk = c.k; sd = c.d ?? -1; }
+      o.onSort?.(sk, sd);
       draw();
     }}, c.l, h('span', {class: 'si', 'aria-hidden': 'true'})));
     else th.append(c.l);
@@ -220,7 +221,7 @@ export function table(o) {
   const tb = h('tbody'), fn = h('p', {class: 'fn', id: id('f')}), more = h('div');
   // Filter: ein Dropdown je Spalte in einem Blatt (Handy: von unten, Desktop: Karte unter der Leiste); Auswahl als Chips über der Tabelle
   const flt = o.fstate || {};
-  const fdefs = o.filter ? [...cols.filter(c => c.v && c.flt !== false), ...(o.filters || [])] : [];
+  const fdefs = o.filter ? [...(o.filters || []), ...cols.filter(c => c.v && c.flt !== false)] : [];
   let fbar = null, fpan = null, fbtn = null, fchips = null, fback = null;
   const cellText = (c, r) => c.f ? h('td', null, c.f(r, 0)).textContent.trim() : String(c.v(r) ?? '');
   const isNum = c => c.num && !c.cat;
@@ -241,7 +242,7 @@ export function table(o) {
     fchips = h('div', {class: 'fcs', role: 'group', 'aria-label': 'Aktive Filter'});
     fbtn = h('button', {type: 'button', class: 'btn fb', 'aria-expanded': 'false', onclick: () => openPanel()},
       h('span', {'aria-hidden': 'true'}, '⚲'), 'Filter', h('span', {class: 'cnt'}));
-    fbar = h('div', {class: 'fbar'}, fbtn, fchips);
+    fbar = h('div', {class: 'fbar'}, fbtn, fchips, o.aside || null);
   }
   function openPanel() {
     if (fpan) return closePanel();
@@ -279,7 +280,7 @@ export function table(o) {
   }
   function clearAll() { for (const k in flt) delete flt[k]; draw(); }
   const tbl = h('table', {class: o.cls}, h('caption', {id: capId}, o.cap), h('thead', null, h('tr', null, heads)), tb);
-  const wrap = scrollHint(h('div', {class: 'tw', role: 'region', tabindex: '0', 'aria-labelledby': capId}, tbl));
+  const wrap = scrollHint(h('div', {class: 'tw' + (o.stick ? ' stick' : ''), role: 'region', tabindex: '0', 'aria-labelledby': capId}, tbl));
   const box = h('div', {class: 'tbox'}, fbar, wrap, fn, more);
   const rh = o.rh ?? 1;
   function draw() {
@@ -318,9 +319,14 @@ export function table(o) {
     if (o.note) fn.append(txt ? ' · ' : '', o.note);
     if (fn.hidden) tbl.removeAttribute('aria-describedby'); else tbl.setAttribute('aria-describedby', fn.id);
     more.replaceChildren(rows.length > shown.length ? h('button', {type: 'button', class: 'btn more', onclick: () => {
+      const n0 = limit;
       limit += o.limit;
       draw();
+      // Fokus auf die erste neue Zeile, sonst springt er (Tastatur, VoiceOver) an den Seitenanfang
+      const f = tb.children[n0]?.querySelector('a,button');
+      (f || tb.children[n0])?.focus?.({preventScroll: true});
     }}, `Weitere ${Math.min(o.limit, rows.length - shown.length)} anzeigen (${shown.length} von ${rows.length})`) : '');
+    o.onCount?.(rows.length, o.rows.length);
   }
   box.upd = rows => { o.rows = rows; if (o.limit) limit = o.limit; draw(); };
   draw();
@@ -333,7 +339,8 @@ export function steps(vals, asc) {
   const lo = Math.min(...vals), hi = Math.max(...vals);
   if (!(hi > lo)) return [];
   const raw = (hi - lo) / 10, p = 10 ** Math.floor(Math.log10(raw)), m = raw / p;
-  const step = (m <= 1 ? 1 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 5 ? 5 : 10) * p;
+  let step = (m <= 1 ? 1 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 5 ? 5 : 10) * p;
+  if (vals.every(Number.isInteger)) step = Math.max(1, Math.round(step));   // Spiele, Starts, Ränge: nur ganze Stufen
   const out = [];
   for (let x = Math.ceil(lo / step) * step; x <= hi + 1e-9; x += step) out.push(+x.toFixed(6));
   return out.filter(x => asc ? x < hi - 1e-9 : x > lo + 1e-9).slice(0, 12);
@@ -371,24 +378,27 @@ export const bench = v => v === 20 || v === 21 || v === 'Bank' || v === 'IR' || 
 // Paarung als Karte; full = mit Teamnamen und Wochenrängen, sonst Kürzel (Woche kompakt)
 export function game(g, full) {
   const fin = g.winner != null, st = S.weeks.find(w => w.week === g.week)?.status, wi = S.meta.weeks.indexOf(g.week);
-  const side = (tid, pts) => {
+  // offene Woche mit Siegchance: Prozent mit Balken in der Punkte-Spalte, der Favorit fett
+  const chance = !fin && st !== 'laeuft' && ok(g.p_home) ? sp(g.p_home) : null;
+  const side = (tid, pts, p) => {
     const r = fin ? (g.winner === 'T' ? 'T' : g.winner === tid ? 'W' : 'L') : null;
-    return h('div', {class: 'gl' + (r === 'W' ? ' win' : '')}, h('span', {class: 'res'}, r ? res(r) : ''),
+    return h('div', {class: 'gl' + (r === 'W' || (p != null && p > 50) ? ' win' : '')}, h('span', {class: 'res'}, r ? res(r) : ''),
       full ? tl(tid) : h('a', {href: '#team/' + tid, class: 'tl2', 'aria-label': team(tid)?.name}, kz(tid)),
-      h('span', {class: 'pts'}, fin ? num(pts) : ''));
+      h('span', {class: 'pts'}, fin ? num(pts) : p != null ? pbar(p) : ''));
   };
   let meta, info = null;
   if (fin) {
     meta = g.winner === 'T' ? 'Unentschieden' : 'Differenz ' + num(Math.abs(g.home_pf - g.away_pf));
     if (full && wi >= 0) meta += ` · Wochenrang ${team(g.home).wochen.wochenrang[wi]}. und ${team(g.away).wochen.wochenrang[wi]}.`;
   } else if (st === 'laeuft') meta = 'läuft – Ergebnis nach dem Wochenabruf';
-  else if (ok(g.p_home)) {
-    const p = sp(g.p_home);
-    meta = `Siegchance ${kz(g.home)} ${po(p)} · ${kz(g.away)} ${po(100 - p)}`;
+  else if (chance != null) {
+    meta = 'Siegchance';
     info = full ? ib('siegchance', '') : null;
   } else meta = 'offen';
-  return h('li', {class: 'game'}, side(g.home, g.home_pf), side(g.away, g.away_pf), h('div', {class: 'gm row'}, h('span', null, meta), info));
+  return h('li', {class: 'game'}, side(g.home, g.home_pf, chance), side(g.away, g.away_pf, chance == null ? null : 100 - chance),
+    h('div', {class: 'gm row'}, h('span', null, meta), info));
 }
 export const errBox = (e, retry) => h('div', {class: 'err', role: 'alert'},
-  h('p', null, 'Die Daten konnten nicht geladen werden.'), h('p', {class: 'note'}, String(e?.message || e)),
+  h('p', null, 'Die Daten konnten nicht geladen werden.'),
+  h('p', {class: 'note'}, e instanceof TypeError ? 'Keine Verbindung – bitte später erneut versuchen.' : String(e?.message || e)),
   retry ? h('button', {type: 'button', class: 'btn', onclick: retry}, 'Erneut versuchen') : null);
