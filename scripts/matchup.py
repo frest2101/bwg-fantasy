@@ -14,6 +14,9 @@ dieselbe Formel wie die D/ST-Faktoren (dst.py), nur je Defense und Position (QB,
 F > 1 heißt: Gegen diese Defense holen Spieler der Position mehr Punkte als im Schnitt (gutes Matchup für den
 Spieler). Position gegen Defense, kein Einzelduell. ESPNs positionalRatings dienen nur als Test (Vorwochenstand).
 D/ST bleibt im D/ST-Modul; player_mu nimmt für D/ST dessen Faktoren. Keine Zwischenstände: jeder Lauf rechnet neu.
+Schwacher Hinweis: Z je Position hält sich von Jahr zu Jahr kaum (Korrelation 2024 → 2025 zwischen −0,13 und 0,24),
+F sagt die nächsten Spiele nur wenig besser voraus als 1,00. Keine Auslöser-Fähnchen; die Formel bleibt die Saison
+über fest, Rückschau nach W17 (Analyse und Beschluss Stephan 30.09.2026: docs/auftraege/ausloeser_analyse_2026-09-30.md).
 """
 
 from decimal import Decimal
@@ -29,9 +32,6 @@ NAMES = POSITION_NAMES
 
 FORMEL = ("F = (n·r26 + 5·r25 + 5·1,00)/(n + 10); r = Z/Ligaschnitt der Position; Z = Ø Punkte je Spiel, die Spieler "
           "der Position gegen die Defense erzielt haben")
-# Auslöser wie D/ST ohne z: der z-Auslöser (dst.z_score mit DST_CV) kommt erst, wenn die Positions-CV gegen echte
-# Wochenwerte je Position und Defense geprüft sind (Auftrag Session 8, Punkt 2)
-AUSLOESER = {"delta": "|F − F Vorwoche| ≥ 0,10", "rang": "Rang nach F um mindestens 5 Plätze verschoben"}
 # Stellen im JSON wie dst.PRECISION: F, r und die gemittelten Spielplan-Faktoren 3, sonst 2 (Punkte, Z, Ligaschnitt)
 PRECISION = {k: 3 for k in ("f", "f_vorwoche", "delta", "r25", "r26", "naechste3", "rest", "sos_po", "f_verlauf")}
 
@@ -96,7 +96,7 @@ def scoring_points(settings: dict) -> dict[str, Decimal]:
 # ---------------------------------------------------------------- Einstieg
 
 def compute_matchup(ssn: rawdata.Season, weeks: list[int]) -> dict:
-    """Positions-Matchup nach Woche N = weeks[-1]: je NFL-Defense und Position Z, r, F, Rang und Auslöser, dazu der
+    """Positions-Matchup nach Woche N = weeks[-1]: je NFL-Defense und Position Z, r, F und Rang, dazu der
     NFL-Spielplan und F/Rang je Position für die Spielerwerte (player_mu). weeks = abgeschlossene Wochen 1…N.
 
     Vorwoche von W1 ist der Stand vor der Saison (n = 0 für alle). Zahlen als ungerundete Decimal; beim Export mit
@@ -138,23 +138,17 @@ def compute_matchup(ssn: rawdata.Season, weeks: list[int]) -> dict:
     next_weeks = [w for w in range(through + 1, through + dst.NEXT_WEEKS + 1) if w in all_weeks]
     rest_weeks = [w for w in regular if w > through]
 
-    # Rangsprung nur gegen eine Vorwoche mit Rangordnung: ohne Vorjahr teilen sich vor der Saison alle Defenses Rang 1
-    # (F = 1,00), ein „Sprung“ davon aus wäre keiner
-    ranked = {pos: len(set(states[pos][through - 1]["rang"].values())) > 1 for pos in POSITIONS}
     defenses = []
     for t in sorted(nfl):
         team = nfl[t]
         by_pos = {}
         for pos in POSITIONS:
             now, before = states[pos][through], states[pos][through - 1]
-            delta = now["f"][t] - before["f"][t]
-            rank_shift = before["rang"][t] - now["rang"][t] if ranked[pos] else None  # > 0: nach oben
             by_pos[NAMES[pos]] = {
                 "z25": z25[pos].get(t), "n25": len(games25[pos].get(t, {})) if source == "basis" else None,
                 "z26": now["z26"].get(t), "n": now["n"][t], "r25": r25[pos][t], "r26": now["r26"].get(t),
-                "f": now["f"][t], "f_vorwoche": before["f"][t], "delta": delta,
+                "f": now["f"][t], "f_vorwoche": before["f"][t], "delta": now["f"][t] - before["f"][t],
                 "rang": now["rang"][t], "rang_vorwoche": before["rang"][t],
-                "ausloeser": dst.triggers(delta, None, rank_shift),
                 "zugelassen": [games26[pos].get(t, {}).get(w) for w in weeks],
                 "f_verlauf": [states[pos][w]["f"][t] for w in weeks],
             }
@@ -165,7 +159,7 @@ def compute_matchup(ssn: rawdata.Season, weeks: list[int]) -> dict:
         "positionen": [NAMES[pos] for pos in POSITIONS],
         "ligaschnitt": {NAMES[pos]: {str(ssn.season - 1): ls25[pos], str(ssn.season): states[pos][through]["ls26"]}
                         for pos in POSITIONS},
-        "formel": FORMEL, "ausloeser_legende": AUSLOESER,
+        "formel": FORMEL,
         "wochen": {"n1": through + 1 if through + 1 in all_weeks else None, "naechste3": next_weeks,
                    "rest": rest_weeks, "sos_po": playoffs},
         "defenses": defenses,

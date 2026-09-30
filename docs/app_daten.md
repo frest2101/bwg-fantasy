@@ -69,24 +69,24 @@ Die App lädt `data/manifest.json?t=<jetzt>` und danach jede Datei mit `?v=<v>`.
   - `fp`: FantasyPros-Adresse ohne `.php` (Verweis `fantasypros.com/nfl/players/<fp>.php`), aus dem Abgleich des Namens mit der Positions-Sitemap (`scripts/fantasypros.py`, dazu die Handtabelle `HAND` für Spitznamen); `null` = keine eindeutige Zuordnung oder nicht in der Sitemap (die App verlinkt dann eine Seitensuche), bei D/ST immer `null` (Tabelle der App). Fehlt, solange der Wochenabruf keinen Sitemap-Auszug `data/raw/<saison>/fantasypros/sitemap.json` geholt hat.
 
 ## `dst.json` (lazy, Unter-Tab D/ST)
-- **Kopf:** `ligaschnitt {"2025", "2026"}`, `formel`, `through_week`, `ausloeser_legende` (Schlüssel → Text).
+- **Kopf:** `ligaschnitt {"2025", "2026"}`, `formel`, `through_week`.
 - **`teams`:** Liste je NFL-Team:
   - Offense-Werte: `id, abbrev, bye, z25, z26, n, r25, r26`
-  - Faktor und Auslöser: `f, f_vorwoche, delta, rang` (1 = höchstes F), `rang_vorwoche`, `z_last3` (Ø Z der letzten 3 Spiele in Punkten), `ausloeser` (Liste aus `delta`, `z`, `rang`), `beobachten`
+  - Faktor: `f, f_vorwoche, delta, rang` (1 = höchstes F), `rang_vorwoche`, `z_last3` (Ø Z der letzten 3 Spiele in Punkten; `null` ohne Spiel); keine Auslöser (seit 30.09.2026)
   - Sicht der D/ST: `naechste3, rest, sos_po, besitzer, status`
   - `naechste`: die Gegner der Wochen N+1…N+3 als `[{week, opp, f}]`, Bye ohne `opp`
 
 ## `matchup.json` (lazy, Positions-Matchup)
 Position gegen Defense, kein Einzelduell: wie viele Punkte jede NFL-Defense den Spielern einer Position zulässt (`scripts/matchup.py`, Formel wie D/ST).
 - **Kopf:**
-  - `through_week`, `saison`, `vorjahr`, `positionen` (`["QB", "RB", "WR", "TE", "K"]`), `formel`, `ausloeser_legende` (Schlüssel → Text: `delta`, `rang`)
+  - `through_week`, `saison`, `vorjahr`, `positionen` (`["QB", "RB", "WR", "TE", "K"]`), `formel`
   - `vorjahr_quelle`: `"basis"` (Auszug `data/raw/<saison>/basis/positionen_<vorjahr>.json`) oder `"ligamittel"` (Auszug fehlt noch: r25 = 1,00 für alle, `z25` und Ligaschnitt des Vorjahrs `null`)
   - `ligaschnitt`: je Position `{"2025": LS25|null, "2026": LS26|null}` (Ø Z über die Defenses mit Spiel)
   - `wochen`: `{n1, naechste3, rest, sos_po}` – Woche N+1 (`null` nach der letzten Woche) und die Wochen der Spielplan-Faktoren
 - **`defenses`:** Liste je NFL-Team (nach NFL-ID) mit `id, abbrev, bye` und `pos`: je Position (Schlüssel wie `positionen`):
   - `z25, z26` (Z = Ø Punkte je Spiel, die Spieler der Position mit Einsatz gegen die Defense erzielt haben; `null` ohne Spiel), `n` (Spiele 2026 mit mindestens einem Spieler der Position)
   - `r25, r26` (Z/Ligaschnitt; r25 = 1 ohne Vorjahresspiel), `f` (F = (n·r26 + 5·r25 + 5·1,00)/(n + 10)), `f_vorwoche`, `delta`
-  - `rang` (1 = höchstes F = günstigstes Matchup für Spieler der Position; Gleichstand teilt sich den besseren Rang), `rang_vorwoche`, `ausloeser` (Liste aus `delta` |ΔF| ≥ 0,10, `rang` Rangsprung ≥ 5; kein z-Auslöser)
+  - `rang` (1 = höchstes F = günstigstes Matchup für Spieler der Position; Gleichstand teilt sich den besseren Rang), `rang_vorwoche`; keine Auslöser (seit 30.09.2026)
 - Zahlen: F, r und `delta` 3 Stellen, Z und Ligaschnitt 2. Die Werte je Spieler stehen in `players.json` (`mu`).
 
 ## `history.json` (lazy, Rekorde › Historie)

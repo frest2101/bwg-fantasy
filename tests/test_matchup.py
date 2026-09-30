@@ -1,7 +1,7 @@
 """Tests Positions-Matchup (scripts/matchup.py).
 
 1. Z26 gegen ESPN positionAgainstOpponent (QB, RB, WR, TE, K; Stand W2 in der W3-Datei, siehe CLAUDE.md).
-2. Innere Stimmigkeit mit echten Daten nach W3 (Auslöser, Ränge, Summen, Stand ohne Vorjahresauszug).
+2. Innere Stimmigkeit mit echten Daten nach W3 (Vorwoche, Ränge, Summen, Stand ohne Vorjahresauszug).
 3. Randfälle mit einer Attrappe aus vier erfundenen NFL-Teams AAA–DDD und erfundenen Spielern (keine echten Ligadaten).
 Aufruf: python -m pytest -q tests/test_matchup.py
 """
@@ -22,7 +22,7 @@ from zahlen import ONE, ZERO, dec, rounded
 FILES = ef.season_files(2026)
 TOL = Decimal("0.005")
 TINY = Decimal("1e-20")
-POS_KEYS = {"z25", "n25", "z26", "n", "r25", "r26", "f", "f_vorwoche", "delta", "rang", "rang_vorwoche", "ausloeser",
+POS_KEYS = {"z25", "n25", "z26", "n", "r25", "r26", "f", "f_vorwoche", "delta", "rang", "rang_vorwoche",
             "zugelassen", "f_verlauf"}
 
 
@@ -93,32 +93,13 @@ def test_echte_daten_summen(w3):
             assert played == allowed, (week, pos)
 
 
-def test_echte_daten_ausloeser(w3):
-    """Auslöser wie D/ST ohne z: |ΔF| ≥ 0,10 und Rangsprung ≥ 5; nach W3 kommen beide vor."""
-    seen = set()
+def test_echte_daten_vorwoche_ohne_ausloeser(w3):
+    """ΔF und Rang der Vorwoche bleiben als Werte; Auslöser-Fähnchen gibt es nicht mehr (Beschluss Stephan 30.09.2026)."""
+    assert "ausloeser_legende" not in w3
     for d in w3["defenses"]:
         for p in d["pos"].values():
             assert p["delta"] == p["f"] - p["f_vorwoche"] and p["f_verlauf"][-1] == p["f"]
-            assert ("delta" in p["ausloeser"]) == (abs(p["delta"]) >= Decimal("0.10"))
-            assert ("rang" in p["ausloeser"]) == (abs(p["rang_vorwoche"] - p["rang"]) >= 5)
-            assert "z" not in p["ausloeser"]
-            seen |= set(p["ausloeser"])
-    assert seen == {"delta", "rang"}
-
-
-def test_ohne_vorjahr_kein_rangsprung_vom_gleichstand():
-    """Ohne Vorjahresauszug teilen sich vor der Saison alle 32 Defenses Rang 1 (F = 1,00): nach W1 gibt es dann keinen
-    Rang-Auslöser (ein Sprung vom Gleichstand aus ist keiner), ΔF zählt weiter."""
-    if not (ef.week_dir(2026, 1) / ef.KONA_FILE).exists():
-        pytest.skip("Spielerpool W1 fehlt noch (holt der Wochenabruf)")
-    ssn = rawdata.Season(2026, 1)
-    ssn._memo["prior_positions"] = None  # Stand vor dem ersten Abruf des Auszugs, auch wenn er im Repo liegt
-    result = matchup.compute_matchup(ssn, [1])
-    assert result["vorjahr_quelle"] == "ligamittel"
-    cells = [p for d in result["defenses"] for p in d["pos"].values()]
-    assert {p["rang_vorwoche"] for p in cells} == {1} and max(p["rang"] for p in cells) >= 6
-    assert not any("rang" in p["ausloeser"] for p in cells)
-    assert all(("delta" in p["ausloeser"]) == (abs(p["delta"]) >= Decimal("0.10")) for p in cells)
+            assert "ausloeser" not in p and 1 <= p["rang_vorwoche"] <= ef.NFL_TEAMS
 
 
 def test_echte_daten_json_stellen(w3):
@@ -288,7 +269,6 @@ def test_attrappe_reihe_und_vorwoche(fake3):
     assert all(p["f_vorwoche"] == ONE and p["rang_vorwoche"] == 1 and p["delta"] == p["f"] - 1 for p in w1.values())
     qb = pos_of(fake3, "QB")
     assert all(p["f_vorwoche"] == p["f_verlauf"][1] for p in qb.values())
-    assert all(p["ausloeser"] == [] for p in qb.values())  # |ΔF| < 0,10, Rangsprung < 5 (nur vier Teams)
 
 
 def test_attrappe_mit_vorjahr():

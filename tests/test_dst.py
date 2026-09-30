@@ -26,7 +26,7 @@ FILES = ef.season_files(2026)
 NEU_W2 = {"LV": "1.200", "ATL": "1.181", "SF": "0.812", "CAR": "0.994"}
 TOL_2, TOL_F, TOL_PLAN = Decimal("0.005"), Decimal("0.001"), Decimal("0.0015")  # Plan: Notion rundete Zwischenwerte
 TEAM_KEYS = {"id", "abbrev", "bye", "player_id", "name", "z25", "n25", "z26", "n", "r25", "r26", "f", "f_alt",
-             "f_vorwoche", "delta", "rang", "rang_vorwoche", "z_last3", "z", "ausloeser", "beobachten", "naechste3",
+             "f_vorwoche", "delta", "rang", "rang_vorwoche", "z_last3", "naechste3",
              "rest", "sos_po", "naechste3_alt", "rest_alt", "naechste", "besitzer", "status", "gegner", "punkte_dst",
              "zugelassen", "f_verlauf"}
 
@@ -164,12 +164,10 @@ def test_faktorreihe_ohne_zwischenstand(w1, w2):
         assert t["delta"] == t["f"] - t["f_vorwoche"]
 
 
-def test_ausloeser_w2(w2):
-    """Nach W2: Auslöser 1 und 3 nach Schwelle; Auslöser 2 und „beobachten“ gibt es erst ab n ≥ 4."""
-    for t in w2["teams"]:
-        assert t["z"] is None and not t["beobachten"] and "z" not in t["ausloeser"]
-        assert ("delta" in t["ausloeser"]) == (abs(t["delta"]) >= Decimal("0.10"))
-        assert ("rang" in t["ausloeser"]) == (abs(t["rang_vorwoche"] - t["rang"]) >= 5)
+def test_keine_ausloeser(w2):
+    """Keine Auslöser-Fähnchen mehr (Beschluss Stephan 30.09.2026): weder je Offense noch als Legende."""
+    assert "ausloeser_legende" not in w2
+    assert all(not {"ausloeser", "beobachten", "z"} & set(t) for t in w2["teams"])
 
 
 def test_besitzer(w2):
@@ -213,26 +211,6 @@ def test_spielplanfaktor_bye():
     assert dst.schedule_factor(f, {3: 10}, [4, 5]) is None
 
 
-def test_z_erst_ab_4_spielen():
-    games = {1: Decimal(10), 2: Decimal(10), 3: Decimal(10)}
-    assert dst.z_score(games, Decimal(10), Decimal(10)) is None
-    games[4] = Decimal(22)  # letzte 3 = 14, Z26 = 13
-    spread = Decimal("0.55") * 10 * (ONE / 3 - ONE / 4).sqrt()
-    assert dst.z_score(games, Decimal(13), Decimal(10)) == (Decimal(14) - 13) / spread
-
-
-def test_ausloeser_schwellen():
-    assert dst.triggers(Decimal("0.10"), None, None) == ["delta"]
-    assert dst.triggers(Decimal("-0.0999"), Decimal(-2), -5) == ["z", "rang"]
-    assert dst.triggers(Decimal("0.05"), Decimal("1.99"), 4) == []
-
-
-def test_beobachten_drei_groesste():
-    z = {1: Decimal("0.5"), 2: Decimal(-3), 3: None, 4: Decimal("2.5"), 5: ONE, 6: -ONE}
-    assert dst.watch_list(z) == {2, 4, 5}                                  # Gleichstand |1| nach NFL-ID
-    assert dst.watch_list({1: None, 2: None}) == set()
-
-
 def test_rang_gleichstand():
     assert dst.ranks({1: Decimal("1.1"), 2: Decimal("1.2"), 3: Decimal("1.1")}) == {1: 2, 2: 1, 3: 2}
 
@@ -254,7 +232,7 @@ def test_bye_mit_punkten_ist_fehler():
 
 # ---------------------------------------------------------------- 4. Randfälle (ganzer Lauf mit Attrappe)
 # Vier erfundene NFL-Teams; Paarungen reihum nach Woche % 3. AAA und CCC haben in W7 Bye (in den nächsten 3 nach W5).
-# Die D/ST gegen DDD spielt nie (210 fehlt): DDD hat n = 0. AAA lässt zuletzt viel zu (Auslöser 2 ab n ≥ 4).
+# Die D/ST gegen DDD spielt nie (210 fehlt): DDD hat n = 0. AAA lässt zuletzt viel zu (Z letzte 3 = 20).
 
 FAKE = {1: "AAA", 2: "BBB", 3: "CCC", 4: "DDD"}
 PAIRS = {0: ((1, 2), (3, 4)), 1: ((1, 3), (2, 4)), 2: ((1, 4), (2, 3))}
@@ -340,9 +318,9 @@ def test_attrappe_vorjahr_und_mittel(fake5):
 
 
 def test_attrappe_n0(fake5):
-    """DDD ohne Spiel: F = (5·1,6 + 5)/10 = 1,3, alt F = r25; keine Z26-, r26- und z-Werte."""
+    """DDD ohne Spiel: F = (5·1,6 + 5)/10 = 1,3, alt F = r25; keine Z26-, r26- und Z-letzte-3-Werte."""
     ddd = fake5["DDD"]
-    assert ddd["n"] == 0 and ddd["z26"] is ddd["r26"] is ddd["z_last3"] is ddd["z"] is None
+    assert ddd["n"] == 0 and ddd["z26"] is ddd["r26"] is ddd["z_last3"] is None
     assert ddd["f"] == Decimal("1.3") and ddd["f_alt"] == Decimal("1.6")
     assert ddd["zugelassen"] == [None] * 5 and ddd["f_verlauf"] == [Decimal("1.3")] * 5
 
@@ -365,13 +343,10 @@ def test_attrappe_faktor_von_hand(fake5):
     assert abs(aaa["f"] - Decimal("0.99506")) < Decimal("0.00001")
 
 
-def test_attrappe_ausloeser_2_ab_4_spielen(fake5):
-    """Nach W5: AAA z ≈ 3,32 (letzte 3 = 20 gegen Z26 12,8) löst aus; nach W3 gibt es noch kein z."""
-    assert abs(fake5["AAA"]["z"] - Decimal("3.3195")) < Decimal("0.0001") and "z" in fake5["AAA"]["ausloeser"]
-    assert fake5["BBB"]["z"] == 0 and "z" not in fake5["BBB"]["ausloeser"]
-    assert {a for a, t in fake5.items() if t["beobachten"]} == {"AAA", "BBB", "CCC"}  # DDD hat kein z
-    after3 = dst.compute_dst(FakeSeason(3), [1, 2, 3])["teams"]
-    assert all(t["z"] is None and "z" not in t["ausloeser"] and not t["beobachten"] for t in after3)
+def test_attrappe_z_letzte_3(fake5):
+    """Nach W5: Z letzte 3 = Ø der letzten drei Spiele (AAA 20 gegen Z26 12,8; CCC 9,33…), DDD ohne Spiel None."""
+    assert fake5["AAA"]["z_last3"] == 20 and fake5["BBB"]["z_last3"] == 10
+    assert abs(fake5["CCC"]["z_last3"] - Decimal(28) / 3) < Decimal("1e-20") and fake5["DDD"]["z_last3"] is None
 
 
 def test_attrappe_reihe_und_besitzer(fake5):

@@ -5,9 +5,9 @@
 "datenstand":{"woche_final":3,"ros_nach_woche":3,"pool_woche":3,"transaktionen_bis":1790761189281,"pool_stand":"2026-09-30T1750Z","wetter_stand":"2026-09-30T1750Z"},
 "files":{
 "claude.json":{"v":"fd5f8f975217","bytes":29951,"lazy":true},
-"dst.json":{"v":"c33b2db7e87e","bytes":12966,"lazy":true},
+"dst.json":{"v":"fb7a76f70c6e","bytes":11625,"lazy":true},
 "history.json":{"v":"d7c4d8da8907","bytes":42016,"lazy":true},
-"matchup.json":{"v":"6e919d0b5b6f","bytes":25770,"lazy":true},
+"matchup.json":{"v":"3877738fad55","bytes":22970,"lazy":true},
 "players.json":{"v":"cf680cd1aafb","bytes":319919,"lazy":true},
 "schedule.json":{"v":"4a84d3142d78","bytes":17583,"lazy":false},
 "teams.json":{"v":"9666e1b31d26","bytes":31435,"lazy":false},
