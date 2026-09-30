@@ -117,7 +117,7 @@ thead th.n button{flex-direction:row-reverse;justify-content:flex-start}
 .fb .cnt:not(:empty){background:var(--ac);color:var(--on);border-radius:10px;padding:0 .45rem;font-size:.8rem;margin-left:.2rem}
 .fb.on{border-color:var(--ac);color:var(--ac)}
 .fcs{display:contents}
-.fc{min-height:36px;display:inline-flex;align-items:center;gap:.2rem;padding:0 .7rem;border:1px solid var(--ac);border-radius:18px;background:var(--ac2);color:var(--tx);font-size:.85rem;font-weight:600;cursor:pointer}
+.fc{min-height:44px;display:inline-flex;align-items:center;gap:.2rem;padding:0 .7rem;border:1px solid var(--ac);border-radius:18px;background:var(--ac2);color:var(--tx);font-size:.85rem;font-weight:600;cursor:pointer}
 .fc.all{background:none;border-color:var(--bd);color:var(--mu)}
 .fp{background:var(--sf);color:var(--tx);border:1px solid var(--bd);border-radius:12px;padding:6px 12px 12px;margin:0 0 .6rem}
 .fp .ph{display:flex;align-items:center;gap:8px}
@@ -156,6 +156,7 @@ td a,th a{min-width:44px}
 .chips{scrollbar-width:none}.chips::-webkit-scrollbar{display:none}
 @media (max-width:599px){.rk .tn,.kurz .tn{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}.rk .tk,.kurz .tk{display:inline}}
 .sub{display:block;font-size:.78rem;color:var(--mu);font-weight:400;white-space:nowrap}
+@media (max-width:599px){.lab tbody tr>:first-child{white-space:normal;min-width:6.5rem;max-width:8.5rem;line-height:1.2;padding-top:4px;padding-bottom:4px}.lab .sub{white-space:normal}}
 .ks{white-space:normal;font-size:.85rem;color:var(--mu);font-weight:400;max-width:34rem;margin:0 0 6px}
 .sc thead th{white-space:normal;min-width:3.6rem;line-height:1.15}
 .ksl{margin:0;padding-left:1.4rem}.ksl li{margin:.2rem 0 .5rem}
@@ -218,7 +219,11 @@ details.dt summary,details.gw summary{min-height:44px;display:flex;align-items:c
 details.dt .tw{margin-top:4px}
 details.sec{margin:0 0 16px}
 details.sec>summary{min-height:44px;display:flex;align-items:center;cursor:pointer;font-weight:700;font-size:1.1rem}
-details.sec>summary::marker{color:var(--mu)}
+/* Aufklapper: eigener Pfeil (display:flex am summary blendet den Browser-Marker aus) */
+details.dt>summary,details.gw>summary,details.sec>summary{list-style:none}
+details>summary::-webkit-details-marker{display:none}
+details.dt>summary::before,details.gw>summary::before,details.sec>summary::before{content:"▸";display:inline-block;width:1.1em;flex:none;color:var(--mu);font-size:.9em}
+details[open].dt>summary::before,details[open].gw>summary::before,details[open].sec>summary::before{content:"▾"}
 /* Regler */
 .gw{background:var(--sf);border:1px solid var(--bd);border-radius:12px;padding:0 12px;margin:8px 0 16px}
 .sl{display:grid;grid-template-columns:1fr auto;align-items:center;gap:0 8px;padding:4px 0;border-top:1px solid var(--bd)}
@@ -229,6 +234,9 @@ details.sec>summary::marker{color:var(--mu)}
 /* H2H-Matrix */
 .mx td{text-align:center;min-width:3.2rem}
 @media (max-width:599px){.mx td{min-width:2.4rem;padding:0 .2rem;font-size:.85rem}.mx th{padding:0 .3rem}}
+.mx tr>:first-child{position:sticky;left:0;z-index:1;background:var(--sf);box-shadow:1px 0 0 var(--bd)}
+.mx thead tr>:first-child{background:var(--sf2)}
+.tw.sc-scrolled .mx tr>:first-child{box-shadow:2px 0 0 var(--bd),8px 0 8px -6px rgba(0,0,0,.2)}
 .mx .hw{background:var(--f2)}.mx .hl{background:var(--g2)}.mx .he{background:var(--f0)}.mx .hx{background:var(--sf2);color:var(--mu)}
 .wide{display:none}
 @media (min-width:640px){.wide{display:block}}
@@ -258,6 +266,8 @@ main{padding:16px 24px 32px}
 .two .strip .game{min-width:0}
 .two2{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
 h1{font-size:1.7rem}
+#glossar>div{scroll-margin-top:112px}
+#glossar dt{scroll-margin-top:118px}
 }
 @media (min-width:900px) and (max-width:1199px){.two.g{display:block}}
 @media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}

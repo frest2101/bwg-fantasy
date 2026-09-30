@@ -2,7 +2,8 @@
 // Der Browser rechnet nur Score = Σ w · norm[kind][m] / Σ w aus den fertigen Normwerten (teams.json), nie selbst normiert.
 let U, S, h;
 const GID = {pf: 'pfspiel', allplay: 'allplay', win: 'win', coaching: 'effizienz', floor: 'floor', form: 'form'};
-const NORMS = [['z', 'z (Standard)'], ['minmax', 'Min–Max'], ['rank', 'Rangpunkte']];
+// Standard (z, Profil Stärke) steht in der Lesart; ohne „(Standard)“ passen die Chips auf dem Handy in eine Zeile
+const NORMS = [['z', 'z-Wert'], ['minmax', 'Min–Max'], ['rank', 'Rangpunkte']];
 const slug = s => s.toLowerCase().replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue');
 
 export async function render(box, ctx, r) {
@@ -92,7 +93,7 @@ function scoreView(box, r) {
   const tbl = U.table({cap: 'Score je Team', cls: 'rk sc', rows: S.teams, sort: ['score', -1], cols});
 
   // Bedienung: Profile, Normierung, Regler
-  const profSeg = U.seg('Profil', [...PN.map(p => [slug(p), p + (p === std ? ' (Standard)' : '')]), ['eigene', 'Eigene']], slug(match(st.w)), v => {
+  const profSeg = U.seg('Profil', [...PN.map(p => [slug(p), p]), ['eigene', 'Eigene']], slug(match(st.w)), v => {
     // „Eigene“ entsteht erst durch einen Regler: Chip auf den tatsächlichen Stand zurück, Regler aufklappen
     if (v === 'eigene') { profSeg.set(slug(match(st.w))); panel.open = true; return; }
     st.w = {...P[PN.find(p => slug(p) === v)]};
@@ -146,10 +147,10 @@ function scoreView(box, r) {
     h('div', {class: 'side'},
       h('div', {class: 'row'}, h('span', {class: 'note'}, 'Profil'), profSeg),
       h('div', {class: 'row'}, h('span', {class: 'note'}, 'Normierung'), normSeg),
-      panel,
-      h('p', {class: 'note'}, `Kennzahl Kader: ${kader?.label || '–'}`, U.ib(gid('kader'), ''),
-        ' Anzeige bei z: 50 + 10 · Score; 50 = Ligaschnitt.')),
+      panel),
     h('div', {class: 'm1'}, tbl, h('div', {class: 'row'}, rawSeg),
+      h('p', {class: 'note'}, `Kennzahl Kader: ${kader?.label || '–'}`, U.ib(gid('kader'), ''),
+        ` Anzeige bei z: 50 + 10 · Score; 50 = Ligaschnitt. Standard: Profil ${std}, z-Wert.`),
       U.legend(['score', 'kennzahlen', 'z', 'minmax', 'rangpunkte', 'profile']))));
   sync(false);
 }

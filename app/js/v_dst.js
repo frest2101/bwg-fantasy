@@ -19,7 +19,8 @@ export async function render(box, ctx, r) {
   const D = await ctx.lazy('dst.json', 'D/ST-Faktoren', box);
   if (!r.alive()) return;
   const ls = D.ligaschnitt || {};
-  U.ap(box, h('p', {class: 'note'}, `nach W${D.through_week ?? S.tw} · Ligaschnitt D/ST 2025 ${U.num(ls['2025'])} · 2026 ${U.num(ls['2026'])} · ${D.formel || ''}`, U.ib('f', '')),
+  // Formel steht im i-Fenster „Faktor F“; hier nur Stand und Ligaschnitt, damit die Tabelle auf dem Handy früher beginnt
+  U.ap(box, h('p', {class: 'note'}, `nach W${D.through_week ?? S.tw} · Ligaschnitt D/ST 2025 ${U.num(ls['2025'])} · 2026 ${U.num(ls['2026'])} · Faktor F`, U.ib('f', '')),
     h('ul', {class: 'leg'}, [['f3', 'F ≥ 1,15 günstig'], ['f1', 'leicht günstig'], ['f0', 'um 1,00'], ['g1', 'leicht ungünstig'], ['g3', 'F ≤ 0,85 ungünstig']]
       .map(([c, t]) => h('li', null, h('span', {class: 'fz ' + c, style: 'display:inline-block;min-width:1.4rem;height:.9rem;border-radius:3px;vertical-align:-2px;margin-right:4px'}), t))));
   (off ? offense : streaming)(box, D, r);
@@ -38,18 +39,18 @@ function streaming(box, D, r) {
     const txt = `Auslöser der Offense ${ab}: ${a.join(', ')}`;
     return h('span', {class: 'flag', title: txt}, h('span', {'aria-hidden': 'true'}, ' ⚑'), h('span', {class: 'vh'}, ' ' + txt));
   };
-  const next = i => ({k: 'n' + i, l: nw[i] ? 'W' + nw[i] : '–', v: t => t.naechste?.[i]?.f ?? null,
+  const next = i => ({k: 'n' + i, l: nw[i] ? 'W' + nw[i] : '–', num: 1, v: t => t.naechste?.[i]?.f ?? null,
     cls: t => 'fz ' + (t.naechste?.[i]?.opp ? fcls(t.naechste[i].f) : 'bye'),
     f: t => { const x = t.naechste?.[i]; if (!x) return '–'; return x.opp ? [x.opp, oflag(x.opp), h('small', null, U.num(x.f, 2))] : ['Bye', h('small', null, '·')]; }});
   const cols = [
     {k: 'd', l: 'D/ST', v: t => t.abbrev, d: 1, flt: false, f: t => h('a', {href: '#spieler/' + -(16000 + t.id), class: 'tl2', 'aria-label': t.abbrev + ' D/ST'}, t.abbrev)},
+    {k: 'n3', l: 'Ø nächste 3', num: 1, v: t => t.naechste3, cls: t => 'fz ' + fcls(t.naechste3), f: t => fcell(t.naechste3)},
     {k: 'b', l: 'Besitzer', v: t => t.besitzer > 0 ? U.kz(t.besitzer) : 'zz' + (OWN[t.status] || 'FA'), d: 1,
       f: t => t.besitzer > 0 ? h('a', {href: '#team/' + t.besitzer, class: 'tl2', 'aria-label': U.team(t.besitzer)?.name}, U.kz(t.besitzer)) : (OWN[t.status] || 'FA')},
-    {k: 'bye', l: 'Bye', num: 1, cat: 1, v: t => t.bye, d: 1, f: t => U.val(t.bye, v => 'W' + v)},
     next(0), next(1), next(2),
-    {k: 'n3', l: 'Ø nächste 3', num: 1, v: t => t.naechste3, cls: t => 'fz ' + fcls(t.naechste3), f: t => fcell(t.naechste3)},
     {k: 'rest', l: `Rest bis W14`, num: 1, v: t => t.rest, cls: t => 'fz ' + fcls(t.rest), f: t => fcell(t.rest)},
-    {k: 'sos', l: 'SoS W15–17', num: 1, v: t => t.sos_po, cls: t => 'fz ' + fcls(t.sos_po), f: t => fcell(t.sos_po)}];
+    {k: 'sos', l: 'SoS W15–17', num: 1, v: t => t.sos_po, cls: t => 'fz ' + fcls(t.sos_po), f: t => fcell(t.sos_po)},
+    {k: 'bye', l: 'Bye', num: 1, cat: 1, v: t => t.bye, d: 1, f: t => U.val(t.bye, v => 'W' + v)}];
   const rows = () => teams.filter(t => !frei || !(t.besitzer > 0));
   const tbl = U.table({cap: 'D/ST-Streaming: Gegner der nächsten Wochen', cls: 'nr', rh: 0, rows: rows(), sort: ['n3', -1], filter: true, cols});
   U.ap(box, h('div', {class: 'row'}, h('label', {class: 'chk'}, h('input', {type: 'checkbox', checked: frei, onchange: e => {

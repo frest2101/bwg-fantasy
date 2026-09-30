@@ -42,7 +42,12 @@ export async function render(box, ctx, r) {
   U.ap(box, sec('Verläufe', ...svg.verlauf(t.team_id, false)), sec('Franchise-Historie', fr),
     h('p', null, h('a', {href: '#moves?team=' + t.team_id}, 'Moves dieses Teams'), ' · ', h('a', {href: '#rekorde/h2h?team=' + t.team_id}, 'H2H'), ' · ',
       h('a', {href: '#spieler?team=' + t.team_id + '&status=kader'}, 'Spielerliste des Teams')));
-  ctx.lazy('players.json', 'Spielerdaten', kader).then(P => r.alive() && roster(kader, t, P)).catch(() => {});
+  // Kader mit dem Tagesstand (waiver.json) wie im Spieler-Tab: aktuelle Zu- und Abgänge und Verletzungen
+  ctx.lazy('players.json', 'Spielerdaten', kader).then(async P => {
+    const W = S.man.files?.['waiver.json'] ? await ctx.load('waiver.json').catch(() => null) : null;
+    const sp = await ctx.mod('v_spieler');
+    if (r.alive()) roster(kader, t, P, sp.merge(P, W), W, sp.nflTxt);
+  }).catch(() => {});
   ctx.lazy('history.json', 'Historie', fr).then(H => r.alive() && franchise(fr, t, H, svg)).catch(() => {});
 }
 
@@ -102,17 +107,19 @@ function h2h(t) {
     {k: 'd', l: 'PF-Diff', num: 1, v: x => x.d, f: x => U.sgn(x.d)}]}), U.legend(['h2h']));
 }
 
-function roster(box, t, P) {
+function roster(box, t, P, all, W, nflTxt) {
   const last = (P.weeks || []).length - 1;
-  const rows = P.players.filter(p => p.team === t.team_id)
+  const rows = all.filter(p => p.team === t.team_id)
     .sort((a, b) => POS.indexOf(a.pos) - POS.indexOf(b.pos) || (b.avg ?? -1) - (a.avg ?? -1));
   const ros = 'ab Wochenabruf W' + (S.tw + 1);
   U.ap(box, U.table({cap: `Kader (${rows.length} Spieler)`, cls: 'nr', rows, sort: null, rh: 0, cols: [
-    {k: 'n', l: 'Spieler', v: p => p.name, d: 1, f: p => h('a', {href: '#spieler/' + p.id, class: 'pl'}, h('span', null, p.name), h('span', {class: 'sub'}, `${p.pos} · ${p.nfl}`))},
+    {k: 'n', l: 'Spieler', v: p => p.name, d: 1, f: p => h('a', {href: '#spieler/' + p.id, class: 'pl'}, h('span', null, p.name, U.inj(p.inj)), h('span', {class: 'sub'}, `${p.pos ?? '–'} · ${nflTxt(p)}`))},
     {k: 's', l: `Slot W${P.weeks?.[last] ?? ''}`, v: p => U.slot(p.wk?.[last]?.[4]), d: 1, f: p => U.slot(p.wk?.[last]?.[4])},
     {k: 'a', l: 'Ø', num: 1, v: p => p.avg, f: p => U.val(p.avg, U.num, 'ohne Spiel')},
     {k: 'f', l: 'Form', num: 1, v: p => p.form, f: p => [U.val(p.form, U.num, 'ohne Spiel'), p.trend ? ' ' + p.trend : '']},
-    {k: 'r', l: 'ROS/Sp.', num: 1, v: p => p.ros_g, f: p => U.val(p.ros_g, U.num, ros)}]}));
+    {k: 'r', l: 'ROS/Sp.', num: 1, v: p => p.ros_g, f: p => U.val(p.ros_g, U.num, ros)}]}),
+  h('p', {class: 'note'}, W?.stand ? `Kader und Verletzung: Tagesstand ${U.stamp(W.stand)}. ` : `Verletzung: Stand nach W${S.man.datenstand?.pool_woche ?? S.tw}. `,
+    'Q fraglich · D zweifelhaft · O fällt aus · IR Injured Reserve · DTD Day-to-Day.'));
 }
 
 function franchise(box, t, H, svg) {

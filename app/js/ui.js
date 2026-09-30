@@ -94,7 +94,7 @@ export function setQ(path, params) {
   const q = new URLSearchParams();
   for (const k in params) if (params[k] != null && params[k] !== '') q.set(k, params[k]);
   const s = q.toString().replace(/%2C/g, ',');
-  history.replaceState(null, '', '#' + path + (s ? '?' + s : ''));
+  history.replaceState(history.state, '', '#' + path + (s ? '?' + s : ''));   // state behalten: gesicherte Scrollposition
 }
 
 // ---------------------------------------------------------------- Chips, Umschalter, Kacheln
@@ -202,11 +202,12 @@ export function infoPop(btn) {        // i-Knopf: Begriff und Erklärung aus dem
 //      rows, sort: [key, dir], cls (z. B. 'rk': Rang und Team fest, auf dem Handy Kürzel), rh (Index der Zeilenkopf-Spalte), rc (Zeile → Klasse), limit,
 //      filter (true: Knopf „Filter“ öffnet ein Blatt mit einem Dropdown je Spalte – Zahlen als Stufen „≥ 15“ bzw. „≤ 5“ bei d = 1,
 //      Texte und Spalten mit cat als Werteliste; flt: false nimmt eine Spalte heraus), filters (zusätzliche Filter ohne Spalte,
-//      z. B. {k, l, v, cat}), fstate (Objekt des Aufrufers, in dem die Auswahl über einen Neuaufbau hinweg erhalten bleibt)}
+//      z. B. {k, l, v, cat}), fstate (Objekt des Aufrufers, in dem die Auswahl über einen Neuaufbau hinweg erhalten bleibt),
+//      show (anfangs so viele Zeilen statt limit, z. B. auf dem Rückweg bis zur zuletzt geöffneten Zeile)}
 export function table(o) {
   const capId = id('c');
   const cols = o.cols;
-  let sk = o.sort?.[0], sd = o.sort?.[1] ?? -1, limit = o.limit || 1e9;
+  let sk = o.sort?.[0], sd = o.sort?.[1] ?? -1, limit = o.show || o.limit || 1e9;
   const heads = cols.map(c => {
     const th = h('th', {scope: 'col', class: c.num ? 'n' : null});
     if (c.v && o.sortable !== false) th.append(h('button', {type: 'button', onclick: () => {
