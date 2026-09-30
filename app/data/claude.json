@@ -146,11 +146,6 @@
 ],
 "transaktionen_spalten":["datum_ms","team","typ","zugang","abgang"],
 "transaktionen":[
-[1789542723480,"4DS","WAIVER",["Carson Wentz"],["Carson Beck"]],
-[1789542723481,"GLS","WAIVER",["Mike Gesicki"],["Terrance Ferguson"]],
-[1789542723481,"DYN","WAIVER",["Kalif Raymond"],["Jalen Nailor"]],
-[1789542723481,"GLS","WAIVER",["Tyler Bass"],["Cameron Dicker"]],
-[1789542723481,"ACB","WAIVER",["Antonio Williams"],["Ja'Kobi Lane"]],
 [1789552194774,"TTY","FREEAGENT",["Pat Freiermuth"],[]],
 [1789552796624,"HJS","FREEAGENT",["Dontayvion Wicks"],["Germie Bernard"]],
 [1789588827875,"HJS","FREEAGENT",["Mack Hollins"],[]],
@@ -171,6 +166,10 @@
 [1790343440735,"ACB","FREEAGENT",["Tyler Allgeier"],["Devin Singletary"]],
 [1790495703504,"RTZ","FREEAGENT",["Keon Coleman"],["Dylan Sampson"]],
 [1790526434267,"CRN","FREEAGENT",["Malik Washington"],["Cairo Santos"]],
-[1790526720083,"GLS","FREEAGENT",["Xavier Hutchinson"],["Jalen McMillan"]]
+[1790526720083,"GLS","FREEAGENT",["Xavier Hutchinson"],["Jalen McMillan"]],
+[1790752780768,"SGK","WAIVER",["Ollie Gordon II"],["Jerry Jeudy"]],
+[1790752780771,"4DS","WAIVER",["Ted Hurst III"],["Carson Wentz"]],
+[1790752780772,"DYN","WAIVER",["Austin Ekeler"],["Kaleb Johnson"]],
+[1790752780773,"SGK","WAIVER",["Ryan Flournoy"],[]]
 ]
 }
