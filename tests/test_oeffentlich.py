@@ -33,6 +33,21 @@ def test_redaktion_ohne_manager_namen():
         assert not found, f"{path.name}: enthält Manager-{', '.join(sorted(set(found)))}"
 
 
+def test_mteam_rohdaten_sind_auszuege():
+    """Jede committete wNN/mTeam.json ist genau das, was espn_fetch.team_extract schreibt: je Team nur Ligafelder
+    (kein tradeBlock, keine draftStrategy), je Manager nur Name, Anzeigename und ID (keine notificationSettings),
+    nichts Unbekanntes. Schlägt an, wenn eine Rohantwort ungefiltert ins Repo kommt (Entscheidung 01.10.2026).
+    Die Meldung nennt nur die Datei, nie den Inhalt (Action-Logs sind öffentlich)."""
+    paths = sorted(ef.RAW_DIR.glob("*/w*/mTeam.json"))
+    assert paths, "keine mTeam.json in data/raw"
+    kein_auszug = []
+    for path in paths:
+        raw = path.read_bytes()
+        if ef.team_extract(json.loads(raw)) != (raw, []):
+            kein_auszug.append(ef.rel(path))
+    assert not kein_auszug, "kein mTeam-Auszug (scripts/espn_fetch.py, team_extract)"
+
+
 def write(folder, name, content):
     path = folder / name
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -65,6 +80,8 @@ def test_voller_name_und_anzeigename_im_text(tmp_path):
     ({"players": [{"id": 1, "seasonOutlook": "x"}]}, "seasonOutlook"),
     ({"tx": [{"memberId": "x", "teamId": 2}]}, "memberId"),
     ({"topics": [{"author": "x"}]}, "author"),
+    ({"teams": [{"id": 2, "tradeBlock": {}}]}, "tradeBlock"),
+    ({"teams": [{"id": 2, "draftStrategy": {}}]}, "draftStrategy"),
 ])
 def test_verbotene_schluessel(tmp_path, obj, key):
     write(tmp_path, "data/x.json", obj)

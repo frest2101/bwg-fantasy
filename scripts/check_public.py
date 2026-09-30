@@ -30,8 +30,8 @@ FORBIDDEN_KEYS = {
     "author", "creationInfo", "lastUpdateInfo", "clientAddress", "messages", "content",
     # mTransactions2: wer ausgeführt hat (teamId genügt)
     "memberId", "isLeagueManager", "isActingAsTeamOwner",
-    # Draft-Vorbereitung einzelner Teams
-    "excludedPlayerIds",
+    # Draft-Vorbereitung und Absichten einzelner Teams (mTeam)
+    "excludedPlayerIds", "draftStrategy", "tradeBlock",
 }
 MAX_TEXT = 400
 
