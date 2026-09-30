@@ -3,7 +3,8 @@
 Nutzt nur die öffentlichen Lese-Endpoints von ESPN und speichert jede Antwort
 byte-genau unter data/raw/<saison>/wNN/<view>.json, das Transaktions-Archiv
 unter data/raw/<saison>/transactions/. Ausnahmen (Auszüge statt Rohantwort):
-kona_league_communication ohne Chat-Themen, wNN/ros.json (Projektionen der Restwochen), pool/latest.json (Pool-Auszug),
+kona_league_communication ohne Chat-Themen, wNN/mTeam.json ohne Absichten und Einstellungen der Manager (team_extract),
+wNN/ros.json (Projektionen der Restwochen), pool/latest.json (Pool-Auszug),
 basis/positionen_<vorjahr>.json (Punktsummen je NFL-Team, Position und Woche des Vorjahrs).
 
 Ablage je Saison (--due):
@@ -57,8 +58,22 @@ VIEWS = {
 KEYS = dict(VIEWS, mStandings="teams")
 TX_VIEW, COMM_VIEW = "mTransactions2", "kona_league_communication"
 KONA_VIEW = "kona_player_info"
-TEAM_VIEW = "mTeam"        # Tageslauf: nur waiverRank je Team (Waiver-Reihenfolge)
+TEAM_VIEW = "mTeam"        # Wochenabruf: Auszug je Woche (team_extract); Tageslauf: nur waiverRank je Team
 ROSTER_VIEW = "mRoster"    # Tageslauf: nur wer im IR-Slot steht (lineupSlotId 21)
+# Wochenabruf: wNN/mTeam.json ist ein Auszug (team_extract). Positivlisten für die oberste Ebene, je Team (nur diese
+# Ligafelder) und je Manager (nur Name, Anzeigename, ID); was unter einem behaltenen Feld liegt, bleibt wie geliefert.
+# Die *_DROP-Felder sind bekannt und fallen still weg; jedes andere Feld fällt auch weg, wird aber am Lauf gemeldet
+# (dann hier einordnen: *_KEEP nur für Ligadaten, sonst *_DROP).
+TOP_KEEP = frozenset({"draftDetail", "gameId", "id", "members", "scoringPeriodId", "seasonId", "segmentId", "status",
+                      "teams"})
+TEAM_KEEP = frozenset({
+    "abbrev", "currentProjectedRank", "divisionId", "draftDayProjectedRank", "eliminated", "eliminationMatchupPeriod",
+    "id", "isActive", "isTransactionLocked", "logo", "logoType", "name", "owners", "playoffSeed", "points",
+    "pointsAdjusted", "pointsDelta", "primaryOwner", "rankCalculatedFinal", "rankFinal", "record",
+    "transactionCounter", "valuesByStat", "waiverRank"})
+TEAM_DROP = frozenset({"tradeBlock", "draftStrategy"})   # Absichten der Manager (Trade-Block, Keeper-Vormerkungen)
+MEMBER_KEEP = frozenset({"displayName", "firstName", "id", "lastName"})
+MEMBER_DROP = frozenset({"notificationSettings"})        # persönliche Benachrichtigungs-Einstellungen
 SLOT_IR_ID = 21
 KONA_FILE, ROS_FILE, STANDINGS_FILE = f"{KONA_VIEW}.json", "ros.json", "mStandings.json"
 POOL_FILE = "latest.json"   # Pool-Auszug des Tageslaufs unter pool/ (je Lauf überschrieben, Historie in Git)
@@ -153,6 +168,45 @@ def fetch_view(session: requests.Session, season: int, week: int, view: str) -> 
     if not data.get(key):
         raise FetchError(f"Antwort ohne Inhalt in '{key}'")
     check_echo(data, season, week)
+    return content
+
+
+def team_extract(data: dict) -> tuple[bytes, list[str]]:
+    """mTeam ohne Absichten und Einstellungen der Manager: oberste Ebene nur TOP_KEEP, je Team nur TEAM_KEEP,
+    je Manager nur MEMBER_KEEP.
+
+    Entscheidung Stephan 01.10.2026: tradeBlock (Trade-Block-Status je Spieler), draftStrategy (Keeper-Vormerkungen)
+    und notificationSettings gehören nicht ins öffentliche Repo. Positivliste statt Streichliste, damit ein Feld, das
+    ESPN später auf einer dieser drei Ebenen ergänzt, nicht ungesehen mitkommt; die Namen solcher unbekannten Felder
+    kommen als Liste zurück (Warnung am Lauf, nur der Feldname). Tiefer wird nicht gefiltert: Was unter einem
+    behaltenen Feld liegt (record, valuesByStat, status …), bleibt wie geliefert. Diese Datei ist deshalb – wie
+    kona_league_communication – nicht byte-genau, sondern kompakt neu geschrieben; Reihenfolge der Schlüssel und
+    alle übrigen Werte bleiben die von ESPN.
+    """
+    teams, members = data.get("teams"), data.get("members", [])
+    if not isinstance(teams, list) or not all(isinstance(t, dict) for t in teams):
+        raise FetchError(f"{TEAM_VIEW} ohne Liste 'teams'")
+    if not isinstance(members, list) or not all(isinstance(m, dict) for m in members):
+        raise FetchError(f"{TEAM_VIEW} ohne Liste 'members'")
+    unknown = ({k for k in data if k not in TOP_KEEP}
+               | {f"teams.{k}" for t in teams for k in t if k not in TEAM_KEEP | TEAM_DROP}
+               | {f"members.{k}" for m in members for k in m if k not in MEMBER_KEEP | MEMBER_DROP})
+    out = {k: v for k, v in data.items() if k in TOP_KEEP}
+    out["teams"] = [{k: v for k, v in t.items() if k in TEAM_KEEP} for t in teams]
+    if "members" in data:
+        out["members"] = [{k: v for k, v in m.items() if k in MEMBER_KEEP} for m in members]
+    try:
+        return json.dumps(out, ensure_ascii=False, separators=(",", ":")).encode("utf-8"), sorted(unknown)
+    except UnicodeError as exc:  # z. B. ein einzelnes Surrogat in einem Namen
+        raise FetchError(f"{TEAM_VIEW} nicht als UTF-8 schreibbar: {exc.reason}") from None
+
+
+def fetch_team(session: requests.Session, season: int, week: int) -> bytes:
+    """mTeam der Woche als Auszug (team_extract); geprüft wird wie bei jedem View die ganze Antwort."""
+    content, unknown = team_extract(json.loads(fetch_view(session, season, week, TEAM_VIEW)))
+    if unknown:
+        warn(f"{TEAM_VIEW}: unbekannte Felder nicht gespeichert ({', '.join(unknown)}) – in scripts/espn_fetch.py "
+             f"einordnen (TOP_KEEP, TEAM_KEEP, MEMBER_KEEP nur für Ligadaten, sonst TEAM_DROP, MEMBER_DROP)")
     return content
 
 
@@ -411,6 +465,7 @@ def fetch_week(session: requests.Session, season: int, week: int, force: bool, s
     """
     print(f"Woche {week}")
     jobs = {f"{view}.json": (lambda v=view: fetch_view(session, season, week, v)) for view in VIEWS}
+    jobs[f"{TEAM_VIEW}.json"] = lambda: fetch_team(session, season, week)  # Auszug statt Rohantwort
     if snapshot:
         jobs[STANDINGS_FILE] = lambda: fetch_view(session, season, week, "mStandings")
         jobs[KONA_FILE] = lambda: fetch_kona_week(session, season, week)
