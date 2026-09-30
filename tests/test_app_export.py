@@ -57,6 +57,7 @@ def test_manifest(content, data):
 
 def test_waiver_vertrag(result):
     """waiver.json aus einem erfundenen Pool-Auszug: Auswahl = players.json-Spieler plus aktuelle Kaderspieler."""
+    result = dict(result, fantasypros=None)  # ohne Sitemap-Auszug; fp prüft test_fantasypros_adressen
     keep = app_export.player_selection(result)
     inside = sorted(keep)[0]
     outside = max(result["players"]["players"]) + 1  # nicht in players.json, aber laut Tagesstand im Kader
@@ -93,6 +94,23 @@ def test_waiver_vertrag(result):
     out = app_export.build_waiver(dict(result, pool_latest=dict(pool, players=[dict(row, id=known, onTeamId=3)])))
     assert out["spieler"][0]["name"] == result["players"]["players"][known]["name"] and out["spieler"][0]["pos"]
     assert app_export.build_waiver(dict(result, pool_latest=None)) is None
+
+
+def test_fantasypros_adressen(result):
+    """Mit Sitemap-Auszug trägt jede Spielerzeile fp (Adresse oder None = Suche); ohne Auszug fehlt das Feld (App: alte
+    Namensregel). Der Auszug ist ein erfundener Ausschnitt mit echten Adressen."""
+    assert all("fp" not in p for p in app_export.build_players(dict(result, fantasypros=None))["players"])
+    sitemap = {"positionen": {"QB": ["patrick-mahomes", "josh-allen-qb"], "RB": [], "WR": [], "TE": [], "K": [],
+                              "DST": ["kansas-city-defense"]}}
+    rows = {p["id"]: p for p in app_export.build_players(dict(result, fantasypros=sitemap))["players"]}
+    assert all("fp" in p for p in rows.values())
+    assert rows[3139477]["fp"] == "patrick-mahomes" and rows[3918298]["fp"] == "josh-allen-qb"   # Mahomes, Josh Allen
+    assert all(p["fp"] is None for p in rows.values() if p["pos"] in ("D/ST", "RB"))           # D/ST: Tabelle der App
+    # Kaderspieler, den nur der Tagesstand kennt: fp wie name, pos, nfl aus dem Wochenpool
+    known = next(pid for pid in sorted(result["players"]["players"]) if pid not in app_export.player_selection(result))
+    pool = {"season": 2026, "woche": 3, "stand": "2026-09-29T0645Z", "players": [{"id": known, "onTeamId": 3}]}
+    extra = app_export.build_waiver(dict(result, pool_latest=pool, fantasypros=sitemap))["spieler"][0]
+    assert "fp" in extra and "fp" not in app_export.build_waiver(dict(result, pool_latest=pool, fantasypros=None))["spieler"][0]
 
 
 def test_bedarf_vertrag():

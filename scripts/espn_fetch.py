@@ -11,6 +11,7 @@ Ablage je Saison (--due):
     nfl/proTeamSchedules_wl.json                           NFL-Spielplan mit Byes, wird aktualisiert
     draft/mDraftDetail.json                                Draft und Keeper, einmalig
     basis/kona_dst_<vorjahr>.json, proTeamSchedules_wl_<vorjahr>.json   D/ST-Grundlage des Vorjahrs, einmalig
+    fantasypros/sitemap.json                               FantasyPros-Adressen je Position (scripts/fantasypros.py), wird aktualisiert
 Tageslauf (--transactions --pool --wetter, Action stündlich vormittags und abends):
     transactions/                                          Transaktions-Archiv (mTransactions2 je Periode, Aktivitäten)
     pool/latest.json                                       Pool-Auszug: Status, Besitz, Verletzung, Waiver-Frist, Projektion;
@@ -465,12 +466,15 @@ def last_past_week(season: int, today: date) -> int:
 
 
 def refresh_season_files(session: requests.Session, season: int, today: date) -> int:
-    """Saisondateien: NFL-Spielplan bei jedem Lauf (Verlegungen), Draft und D/ST-Vorjahr einmalig. Gibt Fehler zurück."""
+    """Saisondateien: NFL-Spielplan und FantasyPros-Sitemap bei jedem Lauf (Verlegungen, neue Spieler), Draft und
+    D/ST-Vorjahr einmalig. Gibt Fehler zurück."""
+    import fantasypros  # erst hier: das Modul importiert espn_fetch
     files = season_files(season)
     jobs = [(files["schedule"], True, lambda: fetch_schedule(session, season)),
             (files["draft"], False, lambda: fetch_draft(session, season)),
             (files["prior_schedule"], False, lambda: fetch_schedule(session, season - 1)),
-            (files["prior_dst"], False, lambda: fetch_prior_dst(session, season, today))]
+            (files["prior_dst"], False, lambda: fetch_prior_dst(session, season, today)),
+            (fantasypros.path(season), True, lambda: fantasypros.fetch(session))]
     errors = 0
     for path, refresh, job in jobs:
         if path.exists() and not refresh:

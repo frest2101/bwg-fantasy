@@ -47,7 +47,7 @@ export function merge(P, W) {
   for (const d of daily.values()) {
     if (known.has(d.id) || !(d.team > 0)) continue;
     rows.push({id: d.id, name: d.name ?? `Spieler ${d.id}`, pos: d.pos ?? null, nfl: d.nfl ?? null, team: d.team, status: d.status, inj: d.inj,
-      own: d.own, own_d: d.own_d, started: d.started, waiver_bis: d.waiver_bis, proj_n: d.proj, news: d.news, nur_tag: true});
+      own: d.own, own_d: d.own_d, started: d.started, waiver_bis: d.waiver_bis, proj_n: d.proj, news: d.news, fp: d.fp, nur_tag: true});
   }
   return rows;
 }
@@ -153,11 +153,14 @@ const FP_DST = {ARI: 'arizona', ATL: 'atlanta', BAL: 'baltimore', BUF: 'buffalo'
   LAC: 'los-angeles-chargers', LAR: 'los-angeles-rams', LV: 'las-vegas', MIA: 'miami', MIN: 'minnesota', NE: 'new-england', NO: 'new-orleans',
   NYG: 'new-york-giants', NYJ: 'new-york-jets', PHI: 'philadelphia', PIT: 'pittsburgh', SEA: 'seattle', SF: 'san-francisco', TB: 'tampa-bay',
   TEN: 'tennessee', WSH: 'washington'};
-// FantasyPros führt Spieler ohne Namenszusatz (deebo-samuel), Namensvettern aber mit (marvin-harrison-jr); die eigene Suche der
-// Seite nimmt keinen Suchbegriff aus der Adresse – bei Zusatz deshalb eine Seitensuche (DuckDuckGo, site:fantasypros.com) statt Slug;
-// sonst der Slug aus dem Namen: Kleinbuchstaben ohne Akzente, Apostrophe und Punkte, Bindestriche zwischen den Teilen
-export const fpUrl = (name, nfl) => FP_DST[nfl] && /D\/ST$/.test(name) ? `https://www.fantasypros.com/nfl/players/${FP_DST[nfl]}-defense.php`
-  : SUFFIX.test(name) ? `https://duckduckgo.com/?q=${encodeURIComponent('site:fantasypros.com ' + name)}`
+// FantasyPros-Adresse fp aus dem Abgleich mit der Sitemap (Wochenabruf, scripts/fantasypros.py): Namensvettern tragen dort die
+// Position (josh-allen-qb). null = keine eindeutige Zuordnung → Seitensuche (DuckDuckGo, site:fantasypros.com; die Suche der Seite
+// nimmt keinen Begriff aus der Adresse). Fehlt fp (noch kein Auszug), gilt die alte Regel: bei Namenszusatz Suche, sonst der Slug
+// aus dem Namen (Kleinbuchstaben ohne Akzente, Apostrophe und Punkte, Bindestriche zwischen den Teilen)
+const FP_SUCHE = 'https://duckduckgo.com/?q=';
+export const fpUrl = (name, nfl, fp) => FP_DST[nfl] && /D\/ST$/.test(name) ? `https://www.fantasypros.com/nfl/players/${FP_DST[nfl]}-defense.php`
+  : fp ? `https://www.fantasypros.com/nfl/players/${fp}.php`
+  : fp === null || SUFFIX.test(name) ? FP_SUCHE + encodeURIComponent('site:fantasypros.com ' + name)
   : `https://www.fantasypros.com/nfl/players/${name.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/['’.]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}.php`;
 // ESPN-Liga: ohne Login lesbar, solange die Saison bei ESPN die laufende ist (eine vergangene Saison verlangt Login, geprüft 30.09.2026)
 const LIGA = 1166555857;
@@ -181,12 +184,12 @@ export function links(p) {
   // und die zeigt so offenbar nur das eigene Team (Test Stephan 30.09.2026). seasonId ist Pflicht (sonst gilt die Saison aus ESPNs Cookie).
   // Nur für Kaderspieler und nur, bis die letzte Woche der Saison final ist.
   const kader = p.team > 0 && S.weeks.at(-1)?.status !== 'final';
-  const nbc = nbcUrl(p.name, p.nfl, dst);
+  const nbc = nbcUrl(p.name, p.nfl, dst), fp = fpUrl(p.name, p.nfl, p.fp);
   return [
     dst ? [`https://www.espn.com/nfl/team/_/name/${String(p.nfl || '').toLowerCase()}`, 'ESPN-Teamseite']
       : [`https://www.espn.com/nfl/player/_/id/${p.id}`, 'ESPN-Spielerseite'],
     kader ? [`https://fantasy.espn.com/football/league/rosters?leagueId=${LIGA}&seasonId=${S.man.season}`, 'ESPN Fantasy – Liga-Kader'] : null,
-    dst && !FP_DST[p.nfl] ? null : [fpUrl(p.name, p.nfl), SUFFIX.test(p.name) && !dst ? 'FantasyPros – Suche' : 'FantasyPros'],
+    dst && !FP_DST[p.nfl] ? null : [fp, fp.startsWith(FP_SUCHE) ? 'FantasyPros – Suche' : 'FantasyPros'],
     nbc ? [nbc, dst ? 'NBC Rotoworld – Team-News' : 'NBC Rotoworld – Suche'] : null].filter(Boolean);
 }
 function newsBox(p, W) {

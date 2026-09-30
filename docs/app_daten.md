@@ -65,6 +65,7 @@ Die App lädt `data/manifest.json?t=<jetzt>` und danach jede Datei mit `?v=<v>`.
   - Saison: `g, pts, avg, floor, ceil, sd, form, form_d, trend, spark, starts, bench_pts, proj_d`
   - `wk`: Liste je Woche `[pts|null, proj|null, bye 0/1, team_id|0, slot|null]` in der Reihenfolge von `weeks`
   - ROS: `ros, ros_g, rest_g, ros_po, ros_rang, ros_ue`
+  - `fp`: FantasyPros-Adresse ohne `.php` (Verweis `fantasypros.com/nfl/players/<fp>.php`), aus dem Abgleich des Namens mit der Positions-Sitemap (`scripts/fantasypros.py`); `null` = keine eindeutige Zuordnung (die App verlinkt dann eine Seitensuche), bei D/ST immer `null` (Tabelle der App). Fehlt, solange der Wochenabruf keinen Sitemap-Auszug `data/raw/<saison>/fantasypros/sitemap.json` geholt hat.
 
 ## `dst.json` (lazy, Unter-Tab D/ST)
 - **Kopf:** `ligaschnitt {"2025", "2026"}`, `formel`, `through_week`, `ausloeser_legende` (Schlüssel → Text).
@@ -91,7 +92,7 @@ Die App lädt `data/manifest.json?t=<jetzt>` und danach jede Datei mit `?v=<v>`.
   - `id, team` (team_id oder 0), `status` (`ONTEAM`, `WAIVERS`, `FREEAGENT`), `inj` (ESPN-Verletzungsstatus, Stand des Abrufs)
   - Besitz ESPN-weit in %: `own` (Anteil der Ligen), `own_d` (Änderung gegenüber dem Vortag), `started` (Anteil gestartet)
   - `waiver_bis` (Epoch-ms, Ende der Waiver-Frist; `null` bei Free Agents und Kaderspielern), `proj` (ESPN-Projektion der Woche `woche`, 2 Stellen), `news` (Epoch-ms der letzten ESPN-Meldung, `null` ohne)
-  - Kaderspieler, die `players.json` nicht führt (unter der Woche geholt, ohne Spiel, nicht unter den 20 besten Free Agents), tragen zusätzlich `name, pos, nfl` aus dem Wochenpool (`null`, wenn auch dort unbekannt).
+  - Kaderspieler, die `players.json` nicht führt (unter der Woche geholt, ohne Spiel, nicht unter den 20 besten Free Agents), tragen zusätzlich `name, pos, nfl` aus dem Wochenpool (`null`, wenn auch dort unbekannt) und – mit Sitemap-Auszug – `fp` wie in `players.json`.
 - Quelle: `data/raw/2026/pool/latest.json` (Tageslauf, stündlich vormittags und abends; Kopf `waiver_reihenfolge` = `waiverRank` je Team aus `mTeam`, `waiver_reihenfolge_stand` = Abrufzeit ihrer letzten Änderung); Besitz, Verletzung und Status sind der Stand des Abrufs, ESPN führt keine Historie.
 
 ## `wetter.json` (lazy, Wetter je Spiel – Anzeige ab Session 8)

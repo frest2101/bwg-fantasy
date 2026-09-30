@@ -11,6 +11,7 @@ from datetime import timedelta
 from pathlib import Path
 
 import espn_fetch as ef
+import fantasypros
 import players as players_module
 from lineup import POSITION_NAMES, SLOT_NAMES
 from zahlen import dec, round_to, rounded
@@ -169,6 +170,16 @@ def player_selection(result: dict) -> set[int]:
     return keep
 
 
+def add_fantasypros(rows: list[dict], result: dict) -> None:
+    """FantasyPros-Adresse je Spieler (fp, ohne .php) aus dem Sitemap-Auszug; None, wenn sie nicht eindeutig ist – die App
+    verlinkt dann die Suche. Ohne Auszug fehlt das Feld, und die App bleibt bei ihrer Namensregel."""
+    if not result.get("fantasypros"):
+        return
+    known = fantasypros.index(result["fantasypros"])
+    for row in rows:
+        row["fp"] = fantasypros.slug_for(row.get("name"), row.get("pos"), known)
+
+
 def build_players(result: dict) -> dict | None:
     """Spieler mit mindestens einem Spiel oder im Kader, dazu die 20 besten Free Agents je Position nach ROS/Spiel."""
     data = result.get("players")
@@ -190,6 +201,7 @@ def build_players(result: dict) -> dict | None:
                              SLOT_NAMES.get(w["slot"]) if w["slot"] is not None else None] for w in p["weeks"]],
                      "ros": p["ros"], "ros_g": p["ros_pro_spiel"], "rest_g": p["restspiele"], "ros_po": p["ros_po"],
                      "ros_rang": p["ros_rang"], "ros_ue": p["ros_ueber_ersatz"]})
+    add_fantasypros(rows, result)
     return {"weeks": data["weeks"], "ersatz": {POSITION_NAMES.get(k, str(k)): v for k, v in data["ersatz"].items()},
             "ros_nach_woche": data["ros_after_week"],
             "cv": {POSITION_NAMES.get(k, str(k)): v for k, v in data["cv"].items()}, "players": rows}
@@ -293,6 +305,7 @@ def build_waiver(result: dict) -> dict | None:
             w = weekly.get(p["id"])
             row.update(name=w["name"] if w else None, pos=POSITION_NAMES.get(w["pos"], str(w["pos"])) if w else None,
                        nfl=w["nfl"] if w else None)
+            add_fantasypros([row], result)
         rows.append(row)
     reihenfolge, quelle, stand = waiver_order(pool, result)
     return {"stand": pool["stand"], "woche": pool["woche"], "reihenfolge": reihenfolge, "reihenfolge_quelle": quelle,

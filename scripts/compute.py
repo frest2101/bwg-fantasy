@@ -413,7 +413,9 @@ def compute_season(season: int = ef.DEFAULT_SEASON, through: int | None = None) 
             # Tageslauf (Session 6): Pool-Auszug und Wetter, Stand des jüngsten Laufs – None, solange er nicht lief
             "pool_latest": ssn.pool_latest(),
             "wetter": wetter.compute_wetter(ssn.wetter_prognose(), ssn.wetter_ist(),
-                                            {tid: t.abbrev for tid, t in ssn.nfl().items()})}
+                                            {tid: t.abbrev for tid, t in ssn.nfl().items()}),
+            # Wochenabruf: FantasyPros-Adressen je Position (Verweis im Spielerprofil) – None, solange er sie nicht holte
+            "fantasypros": ssn.fantasypros()}
 
 
 # ---------------------------------------------------------------- Ausgabe
