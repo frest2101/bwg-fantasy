@@ -119,6 +119,41 @@ def test_kader_herkunft_ohne_tagesstand(lines):
     assert rows[0]["art"] == "keeper"
 
 
+def test_kader_aelter_als_das_archiv(lines):
+    """Kaderstand vor dem Abgang, das Archiv kennt ihn schon (Pool-Abruf gescheitert oder Wochenstand): Es gilt der
+    jüngste geschlossene Abschnitt beim Team, nicht „trade“ – und keine Warnung, auch mit ESPN-Trades."""
+    picks = {p["overallPickNumber"]: p for p in PICKS}
+    assert keeper.last_at(lines[2], 1)["art"] == "draft" and keeper.last_at(lines[2], 2) is None
+    rows, warnings = keeper.roster_origins({2: 1, 4: 1}, lines, picks, {}, {}, DRAFT_END)
+    by_id = {r["id"]: r for r in rows}
+    assert (by_id[2]["art"], by_id[2]["pick"], by_id[2]["seit"]) == ("draft", 1, DRAFT_END)   # im Archiv schon bei Team 3
+    assert (by_id[4]["art"], by_id[4]["seit"]) == ("free_agent", 5000) and warnings == []
+
+
+def test_echte_daten_ohne_tagesstand():
+    """Ohne pool/latest.json gilt der Kader des Wochenpools W3 (Stand Dienstag); das Archiv reicht weiter. Wer
+    seitdem entlassen wurde, behält seine Herkunft – als Trade bleiben nur die zwei getauschten Spieler."""
+    import players
+    import records
+    ssn = rawdata.Season(2026, 3)
+    ssn._memo["pool_latest"] = None
+    weeks = [1, 2, 3]
+    k = keeper.compute_keeper(ssn, weeks, players.compute_players(ssn, weeks), records.player_names(ssn))
+    assert k["stand"] is None and k["warnungen"] == []
+    assert sorted(r["id"] for r in k["kader"] if r["art"] == "trade") == [4429059, 4596334]
+    assert k["liga"]["kader"]["trade"] == 2 and sum(k["liga"]["kader"].values()) == 245
+
+
+def test_ohne_abgeschlossenen_draft_keine_bilanz():
+    class OhneDraft:
+        def draft(self):
+            return []
+
+        def draft_end(self):
+            return None
+    assert keeper.compute_keeper(OhneDraft(), [1], {}, {}) is None
+
+
 def test_anteile():
     s = keeper.shares({"keeper": D("75"), "draft": D("20"), "zugang": D("5"), "trade": D("0")})
     assert s["summe"] == D("100") and s["anteil"] == {"keeper": D("75"), "draft": D("20"), "zugang": D("5"), "trade": D("0")}

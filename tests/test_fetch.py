@@ -853,13 +853,15 @@ def fake_mteam(ranks=RANKS) -> dict:
 IR = {1: [101], 7: [701]}   # erfundene IR-Slots: Team 1 Spieler 101, Team 7 Spieler 701
 
 
-def fake_mroster(ir=IR) -> dict:
-    """mRoster-Antwort mit zehn Teams und je zwei Einträgen (Bank und – laut ir – IR); Namen sind erfunden und dürfen
-    nie im Auszug landen."""
+def fake_mroster(ir=IR, trades=None) -> dict:
+    """mRoster-Antwort mit zehn Teams und je zwei Einträgen (Bank und – laut ir – IR), dazu laut trades (team_id →
+    [(Spieler, Datum)]) per Trade gekommene Spieler; Namen sind erfunden und dürfen nie im Auszug landen."""
     return {"id": ef.LEAGUE_ID, "seasonId": 2026,
             "teams": [{"id": i, "roster": {"entries": [
                 {"playerId": i * 100 + 50, "lineupSlotId": 20, "playerPoolEntry": {"player": {"fullName": "Testspieler"}}}]
-                + [{"playerId": pid, "lineupSlotId": ef.SLOT_IR_ID} for pid in ir.get(i, [])]}} for i in range(1, 11)]}
+                + [{"playerId": pid, "lineupSlotId": ef.SLOT_IR_ID} for pid in ir.get(i, [])]
+                + [{"playerId": pid, "lineupSlotId": 20, "acquisitionType": "TRADE", "acquisitionDate": date}
+                   for pid, date in (trades or {}).get(i, [])]}} for i in range(1, 11)]}
 
 
 class FakePoolSession:
@@ -870,7 +872,7 @@ class FakePoolSession:
     def __init__(self):
         self.owned, self.broken, self.weeks = None, False, []
         self.ranks, self.mteam_broken, self.mteam_calls = list(RANKS), False, 0
-        self.ir, self.roster_broken = dict(IR), False
+        self.ir, self.roster_broken, self.trades = dict(IR), False, {}
 
     def __enter__(self):
         return self
@@ -883,7 +885,7 @@ class FakePoolSession:
             self.mteam_calls += 1
             return FakeResponse(503, b"down") if self.mteam_broken else ok(fake_mteam(self.ranks))
         if params["view"] == ef.ROSTER_VIEW:
-            return FakeResponse(503, b"down") if self.roster_broken else ok(fake_mroster(self.ir))
+            return FakeResponse(503, b"down") if self.roster_broken else ok(fake_mroster(self.ir, self.trades))
         assert params["view"] == ef.KONA_VIEW
         if self.broken:
             return FakeResponse(503, b"down")
@@ -1112,9 +1114,14 @@ def test_update_pool_mit_trades(raw):
     path = ef.pool_dir(2026) / ef.POOL_FILE
     errors, current = ef.update_pool(session, 2026, now, "2026-09-29T0645Z")
     assert errors == 0 and current["trades"] == {} and json.loads(path.read_bytes())["trades"] == {}
+    session.trades = {7: [(9002, 1788287280000)]}           # erfundener Spieler 9002 kommt per Trade zu Team 7
+    errors, current = ef.update_pool(session, 2026, now, "2026-09-29T0715Z")
+    expected = {"9002": [7, 1788287280000]}
+    assert errors == 0 and current["trades"] == expected and current["stand"] == "2026-09-29T0715Z"
+    assert json.loads(path.read_bytes())["trades"] == expected
     session.roster_broken, session.owned = True, 12.0       # mRoster fällt aus, der Pool ändert sich trotzdem
     errors, current = ef.update_pool(session, 2026, now, "2026-09-29T0745Z")
-    assert errors == 0 and current["trades"] == {}
+    assert errors == 0 and current["trades"] == expected and json.loads(path.read_bytes())["trades"] == expected
     path.unlink()
     errors, current = ef.update_pool(session, 2026, now, "2026-09-29T0845Z")
     assert errors == 0 and current["trades"] is None and current["ir_slot"] is None

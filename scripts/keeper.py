@@ -82,6 +82,11 @@ def origin(line: list[dict], team: int, week: int | None = None) -> dict | None:
     return None
 
 
+def last_at(line: list[dict], team: int) -> dict | None:
+    """Jüngster Abschnitt des Spielers bei team, auch ein geschlossener; None, wenn es dort nie einen gab."""
+    return next((seg for seg in reversed(line) if seg["team"] == team), None)
+
+
 def traded_pick(line: list[dict]) -> dict | None:
     """Offener Draft-Abschnitt eines per Trade gekommenen Spielers: Er steht im Archiv noch beim abgebenden Team."""
     last = line[-1] if line else None
@@ -164,7 +169,10 @@ def roster_origins(roster: dict[int, int], lines: dict[int, list[dict]], picks: 
                    draft_end: int | None) -> tuple[list[dict], list[str]]:
     """Herkunft je Kaderspieler heute, sortiert nach (team, id), dazu Warnungen.
 
-    art = Art des offenen Abschnitts beim Team; ohne ihn trade. Nennt der Tagesstand den Spieler als Trade, gilt
+    art = Art des offenen Abschnitts beim Team. Ist der Kaderstand älter als das Archiv (der Pool-Abruf eines
+    Tageslaufs scheiterte, das Archiv kennt den Abgang schon; oder Wochenstand ohne Tagesstand), gilt der jüngste
+    geschlossene Abschnitt beim Team – sonst stünde ein eben entlassener Spieler als Trade da. trade nur, wenn das
+    Archiv den Spieler nie zu diesem Team geführt hat. Nennt der Tagesstand den Spieler als Trade, gilt
     das (auch wenn das Archiv ihn anders führt), mit dem Datum von ESPN. pick, runde und von (Team des Picks) stehen
     bei Keepern und Draft-Picks und bei getauschten Spielern, die seit dem Draft ununterbrochen in einem Kader
     stehen. seit = Beginn beim Team: Draft-Ende, Datum des Zugangs, Datum des Trades (None ohne Tagesstand);
@@ -174,7 +182,7 @@ def roster_origins(roster: dict[int, int], lines: dict[int, list[dict]], picks: 
     rows, warnings = [], []
     for pid, team in sorted(roster.items(), key=lambda kv: (kv[1], kv[0])):
         line = lines.get(pid, [])
-        seg = origin(line, team)
+        seg = origin(line, team) or last_at(line, team)
         by_espn = trades.get(pid) if trades else None
         if by_espn and by_espn[0] == team:
             art, since, source = TRADE, by_espn[1], traded_pick(line) if seg is None else None
@@ -199,22 +207,23 @@ def roster_origins(roster: dict[int, int], lines: dict[int, list[dict]], picks: 
 # ---------------------------------------------------------------- Einstieg
 
 def compute_keeper(ssn: rawdata.Season, weeks: list[int], spieler: dict, names: dict[int, str]) -> dict | None:
-    """Keeper-Bilanz der Saison; None, solange es keinen Draft gibt.
+    """Keeper-Bilanz der Saison; None, solange es keinen abgeschlossenen Draft gibt.
 
     teams (nach team_id) und liga: keeper / keeper_da (Keeper-Picks und wie viele davon noch als Keeper im Kader
     stehen), picks / picks_da (Draft-Picks der Saison genauso), kader (Spieler heute je Art), pf und kern
     ({summe, pts, anteil} je Gruppe keeper, draft, zugang, trade; kern ohne K und D/ST).
     kader: Herkunft je Kaderspieler heute (roster_origins), dazu name, pos, nfl, g und avg (Saison) aus dem Wochenpool
     und vj_delta = avg − vj_avg (Punkte je Spiel gegen das Vorjahr, None ohne einen der beiden Werte).
-    picks: alle Picks mit Ertrag – da (der Abschnitt des Picks läuft noch), team_jetzt (0 = frei), g, pts und avg
+    picks: alle Picks mit Ertrag – da (der Spieler steht heute beim Team des Picks und wird dort als dieser Keeper-
+    bzw. Draft-Pick geführt, also nicht entlassen und nicht getauscht), team_jetzt (0 = frei), g, pts und avg
     (Saison des Spielers, None ohne Eintrag im Wochenpool), starts und pf (für das Team des Picks, solange der
     Abschnitt lief).
     spieler = players.compute_players (Saisonwerte je Spieler), names = Spielernamen je ID (records.player_names).
     """
     draft = ssn.draft()
-    if not draft:
-        return None
     draft_end = ssn.draft_end()
+    if not draft or draft_end is None:   # ohne Draft-Ende zählten die Vorsaison-Moves mit
+        return None
     lines = timelines(draft, ssn.transactions(), draft_end)
     pf, kern, ertrag = points_by_origin(ssn, weeks, lines)
     roster, stand = current_roster(ssn)

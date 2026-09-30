@@ -181,12 +181,12 @@ function roster(box, t, P, all, W, nflTxt, K, kp) {
     .sort((a, b) => POS.indexOf(a.pos) - POS.indexOf(b.pos) || (b.avg ?? -1) - (a.avg ?? -1));
   const ros = 'ab Wochenabruf W' + (S.tw + 1);
   // Herkunft (keeper.json, Kader heute): nur Zeilen dieses Teams, sonst wäre ein eben gewechselter Spieler falsch beschriftet
-  const org = K ? kp.byPlayer(K) : null, ARTEN = ['keeper', 'draft', 'waiver', 'free_agent', 'trade'];
+  const org = K ? kp.byPlayer(K) : null;
   const mine = p => { const o = org.get(p.id); return o && o.team === t.team_id ? o : null; };
   U.ap(box, U.table({cap: `Kader (${rows.length} Spieler)`, cls: 'nr', rows, sort: null, rh: 0, cols: [
     {k: 'n', l: 'Spieler', v: p => p.name, d: 1, f: p => h('a', {href: '#spieler/' + p.id, class: 'pl'}, h('span', null, p.name, U.inj(p.inj)), h('span', {class: 'sub'}, `${p.pos ?? '–'} · ${nflTxt(p)}`))},
     {k: 's', l: `Slot W${P.weeks?.[last] ?? ''}`, v: p => { const i = ORD.indexOf(U.slot(p.wk?.[last]?.[4])); return i < 0 ? null : i; }, d: 1, f: p => U.slot(p.wk?.[last]?.[4])},
-    org ? {k: 'h', l: 'Herkunft', v: p => { const i = ARTEN.indexOf(mine(p)?.art); return i < 0 ? null : i; }, d: 1,
+    org ? {k: 'h', l: 'Herkunft', v: p => kp.herkunftOrd(mine(p)), d: 1,
       f: p => kp.herkunft(mine(p), K) ?? U.na('noch nicht zugeordnet')} : null,
     {k: 'a', l: 'Ø', num: 1, v: p => p.avg, f: p => U.val(p.avg, U.num, 'ohne Spiel')},
     {k: 'f', l: 'Form', num: 1, v: p => p.form, f: p => [U.val(p.form, U.num, 'ohne Spiel'), p.trend ? ' ' + p.trend : '']},

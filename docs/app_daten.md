@@ -113,7 +113,8 @@ Keeper-Bilanz (`scripts/keeper.py`): woher die Punkte eines Teams kommen. Herkun
   - `pick, runde, runden_pick, team_id, player_id, name, pos, keeper, in_app`
   - `da` (bool: der Spieler steht seit dem Draft ununterbrochen beim Team des Picks), `team_jetzt` (team_id heute, 0 = frei)
   - `g, pts, avg` (Saison des Spielers insgesamt, `null` ohne Eintrag im Wochenpool), `starts`, `pf` (Wochen im Starter-Slot und Punkte für das Team des Picks, solange der Abschnitt des Picks lief; Σ `pf` der Keeper-Picks = `liga.pf.pts.keeper`, der übrigen = `liga.pf.pts.draft`)
-- Trades: Das Archiv nennt bei einem Trade keine Spieler. `art` ist `trade`, wenn kein Zugang im Archiv den Spieler zum Team geführt hat oder der Tagesstand ihn als Trade nennt (`pool/latest.json`, Kopf `trades` = Spieler-ID → `[team_id, acquisitionDate]` aus `mRoster` `acquisitionType` TRADE; von dort kommt `seit`).
+- Fehlt die Datei (kein abgeschlossener Draft), zeigt der Keeper-Tab einen Hinweis; Team- und Spielerseite lassen die Herkunft weg.
+- Trades: Das Archiv nennt bei einem Trade keine Spieler. `art` ist `trade`, wenn das Archiv den Spieler nie zu diesem Team geführt hat (weder Pick noch Zugang) oder der Tagesstand ihn als Trade nennt (`pool/latest.json`, Kopf `trades` = Spieler-ID → `[team_id, acquisitionDate]` aus `mRoster` `acquisitionType` TRADE; von dort kommt `seit`).
 
 ## `waiver.json` (lazy, Tagesstand je Spieler – Grundlage des Waiver-Tabs)
 - **Kopf:** `stand` (Abrufzeit des Pool-Auszugs, UTC), `woche` (die Woche der Projektion `proj`: die Kalenderwoche, deren Spiele als Nächstes anstehen).
