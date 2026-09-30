@@ -19,12 +19,13 @@ export async function render(box, ctx, r) {
   const games = S.sched.games.filter(g => g.week === wk);
   const svg = await ctx.mod('svg');
   if (W.status === 'final') U.ap(box, tiles(W));
+  const poTxt = wk === 15 ? 'Die Paarungen stehen nach W14 fest (6 Teams, Seeds 1–2 mit Bye). ' : `Die Paarungen stehen nach W${wk - 1} fest. `;
   U.ap(box, h('h2', null, 'Paarungen'), games.length ? h('ul', {class: 'games'}, games.map(g => U.game(g, true)))
-    : h('p', {class: 'note'}, W.playoff ? 'Die Playoff-Paarungen stehen nach W14 fest (6 Teams, W15–17).' : 'Für diese Woche gibt es keine Paarungen.'));
+    : h('p', {class: 'note'}, W.playoff ? [poTxt, h('a', {href: '#tabelle/ausblick'}, 'Playoff-Chancen')] : 'Für diese Woche gibt es keine Paarungen.'));
   const wi = S.meta.weeks.indexOf(wk);
   if (W.status === 'final' && wi >= 0) U.ap(box, weekTable(wi, wk), h('div', {style: 'margin-top:16px'}, topScorer(W)));
   else if (W.status !== 'final') U.ap(box, h('p', {class: 'note'}, 'Wochentabelle und Top-Scorer erscheinen, sobald die Woche final ist.'));
-  U.ap(box, seasonWeeks(fin, svg));
+  U.ap(box, seasonWeeks(fin, svg, wk));
 }
 
 function tiles(W) {
@@ -32,16 +33,18 @@ function tiles(W) {
   return h('div', {class: 'tiles'},
     U.tile('Wochenbestwert', U.num(W.high?.pf), who(W.high)),
     U.tile('Ligaschnitt', U.num(W.ligaschnitt), null),
-    U.tile('Median', U.num(W.median), null, 'median'),
+    U.tile('Median', U.num(W.median), null, 'wochenmedian'),
     U.tile('Tiefstwert', U.num(W.low?.pf), who(W.low)),
-    U.tile('Größte Bank-Sünde', U.num(W.bank_suende?.verschenkt), who(W.bank_suende), 'verschenkt'));
+    U.tile('Verschenkt', U.num(W.bank_suende?.verschenkt), who(W.bank_suende), 'bank-suende'),
+    U.tile('Liga-Effizienz', U.pct(W.effizienz_liga), null, 'eff-woche'));
 }
 
 function weekTable(i, wk) {
   const w = t => t.wochen, anyT = S.teams.some(t => w(t).allplay_t[i] > 0);
   const val = (k, f) => ({v: t => w(t)[k][i], f: t => U.val(w(t)[k][i], f, 'kein Spiel')});
-  return h('div', null, U.table({cap: h('span', null, `Wochentabelle W${wk}`, h('span', {class: 'sub'}, h('a', {href: '#tabelle/allplay/w' + wk}, 'All-Play und Matchup-Glück dieser Woche'), ' · ',
-    h('a', {href: '#tabelle/coaching/w' + wk}, 'Coaching'))), cls: 'rk', rows: S.teams, sort: ['wr', 1], cols: [
+  return h('div', null, h('p', {class: 'note'}, 'Diese Woche in der Tabelle: ', h('a', {href: '#tabelle/allplay/w' + wk}, 'All-Play'), ' · ',
+    h('a', {href: '#tabelle/punkte/w' + wk}, 'Punkte'), ' · ', h('a', {href: '#tabelle/coaching/w' + wk}, 'Coaching')),
+  U.table({cap: `Wochentabelle W${wk}`, cls: 'rk', rows: S.teams, sort: ['wr', 1], cols: [
     {k: 'wr', l: '#', v: t => w(t).wochenrang[i], d: 1, f: t => w(t).wochenrang[i]},
     {k: 'team', l: 'Team', v: t => t.name.toLowerCase(), d: 1, f: t => U.tl(t.team_id)},
     {k: 'opp', l: 'Gegner', v: t => U.kz(w(t).gegner[i]), d: 1, f: t => h('a', {href: '#team/' + w(t).gegner[i], class: 'tl2', 'aria-label': U.team(w(t).gegner[i])?.name}, U.kz(w(t).gegner[i]))},
@@ -74,20 +77,21 @@ function topScorer(W) {
     {k: 'proj', l: 'Proj.', num: 1, v: p => p.proj, f: p => U.val(p.proj, U.num, 'keine Projektion')}]}));
 }
 
-function seasonWeeks(fin, svg) {
+function seasonWeeks(fin, svg, cur) {
   if (!fin.length) return h('p', {class: 'note'}, 'Noch keine abgeschlossene Woche.');
-  const who = x => x ? h('span', null, U.num(x.pf), ' ', h('a', {href: '#team/' + x.team_id, 'aria-label': U.team(x.team_id)?.name}, U.kz(x.team_id))) : '–';
-  const tbl = U.table({cap: 'Saisonwochen', cls: 'nr', rows: fin, sort: ['w', 1], cols: [
+  const who = x => x ? h('span', null, U.num(x.pf), ' ', h('a', {href: '#team/' + x.team_id, class: 'tl2', 'aria-label': U.team(x.team_id)?.name}, U.kz(x.team_id))) : '–';
+  // gewählte Woche hervorgehoben; „Top-Team“ entfällt, es ist per Definition das Team mit dem Wochenhoch
+  const tbl = U.table({cap: 'Saisonwochen', cls: 'nr', rows: fin, sort: ['w', 1], rc: w => w.week === cur ? 'me' : null, cols: [
     {k: 'w', l: 'Woche', v: w => w.week, d: 1, f: w => h('a', {href: '#spielplan/w' + w.week, class: 'tl2'}, 'W' + w.week)},
     {k: 'ls', l: 'Ligaschnitt', num: 1, v: w => w.ligaschnitt, f: w => U.num(w.ligaschnitt)},
     {k: 'hi', l: 'Hoch', num: 1, v: w => w.high?.pf, f: w => who(w.high)},
     {k: 'lo', l: 'Tief', num: 1, v: w => w.low?.pf, f: w => who(w.low)},
-    {k: 'md', l: 'Median', num: 1, v: w => w.median, f: w => U.num(w.median)},
-    {k: 'tt', l: 'Top-Team', v: w => U.kz(w.top_team_id), d: 1, f: w => U.tl(w.top_team_id)}], rh: 0});
+    {k: 'md', l: 'Median', num: 1, v: w => w.median, f: w => U.num(w.median)}], rh: 0});
   const x = fin.map(w => 'W' + w.week);
   const f = svg.fig('Wochen-Band', svg.lines({title: 'Wochen-Band: Hoch, Tief und Ligaschnitt je Woche',
     desc: `Band von Tief- bis Hochwert, gestrichelt der Ligaschnitt; zuletzt ${U.num(fin.at(-1).ligaschnitt)}.`,
     x, series: [], avg: fin.map(w => w.ligaschnitt), band: [fin.map(w => w.low?.pf), fin.map(w => w.high?.pf)], yfmt: v => U.num(v, 0), H: 200}),
-  {heads: ['Woche', 'Tief', 'Ligaschnitt', 'Hoch'], rows: fin.map(w => ['W' + w.week, U.num(w.low?.pf), U.num(w.ligaschnitt), U.num(w.high?.pf)])});
-  return h('section', {class: 'two', style: 'margin-top:8px'}, h('div', null, tbl), f);
+  {heads: ['Woche', 'Tief', 'Ligaschnitt', 'Hoch'], rows: fin.map(w => ['W' + w.week, U.num(w.low?.pf), U.num(w.ligaschnitt), U.num(w.high?.pf)])},
+  h('p', {class: 'note'}, 'Fläche: Tief- bis Hochwert der Woche · gestrichelt: Ligaschnitt'));
+  return h('section', {class: 'two sw'}, h('div', null, tbl), f);
 }
