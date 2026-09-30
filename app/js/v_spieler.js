@@ -170,7 +170,7 @@ const NBC_TEAM = {ARI: 'arizona-cardinals', ATL: 'atlanta-falcons', BAL: 'baltim
   NE: 'new-england-patriots', NO: 'new-orleans-saints', NYG: 'new-york-giants', NYJ: 'new-york-jets', PHI: 'philadelphia-eagles',
   PIT: 'pittsburgh-steelers', SEA: 'seattle-seahawks', SF: 'san-francisco-49ers', TB: 'tampa-bay-buccaneers', TEN: 'tennessee-titans',
   WSH: 'washington-commanders'};
-// Spieler: Seitensuche wie bei FantasyPros; voller ESPN-Name mit Zusatz trennt Namensvettern (NBC schreibt Namen wie ESPN),
+// Spieler: Seitensuche wie bei FantasyPros; der volle ESPN-Name mit Zusatz trifft Namensvettern über die Adresse (marvin-harrison-jr),
 // „www.“ hält die alte Statistikseite scores.nbcsports.com fern, „news stats bio“ trifft den Titel der Spielerseiten
 export const nbcUrl = (name, nfl, dst) => dst ? (NBC_TEAM[nfl] ? `https://www.nbcsports.com/nfl/${NBC_TEAM[nfl]}/player-news` : null)
   : `https://duckduckgo.com/?q=${encodeURIComponent(`site:www.nbcsports.com ${name} news stats bio`)}`;
@@ -185,7 +185,7 @@ export function links(p) {
       : [`https://www.espn.com/nfl/player/_/id/${p.id}`, 'ESPN-Spielerseite'],
     kader ? [`https://fantasy.espn.com/football/team?leagueId=${LIGA}&teamId=${p.team}&seasonId=${S.man.season}`, `ESPN Fantasy – Kader ${U.kz(p.team)}`] : null,
     dst && !FP_DST[p.nfl] ? null : [fpUrl(p.name, p.nfl), SUFFIX.test(p.name) && !dst ? 'FantasyPros – Suche' : 'FantasyPros'],
-    nbc ? [nbc, dst ? 'NBC Sports (Rotoworld) – Team-News' : 'NBC Sports (Rotoworld) – Suche'] : null].filter(Boolean);
+    nbc ? [nbc, dst ? 'NBC Rotoworld – Team-News' : 'NBC Rotoworld – Suche'] : null].filter(Boolean);
 }
 function newsBox(p, W) {
   const last = !W ? U.na('keine Tagesdaten') : U.ok(p.news) ? U.stamp(p.news) : U.na('keine Meldung');
