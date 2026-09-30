@@ -177,8 +177,8 @@ export const nbcUrl = (name, nfl, dst) => dst ? (NBC_TEAM[nfl] ? `https://www.nb
 export function links(p) {
   const dst = p.pos === 'D/ST' || p.id < 0;
   // ESPN hat für die Fantasy-Spielerkarte keine Adresse (Pop-up, football/player gibt 404); sie öffnet sich in den Liga-Kadern
-  // per Klick auf den Namen. Nicht die Teamseite football/team: Die beansprucht auf dem iPhone die ESPN-App, und die zeigt so offenbar
-  // nur das eigene Team (Test Stephan 30.09.2026). seasonId ist Pflicht (sonst gilt die Saison aus ESPNs Cookie).
+  // per Klick auf den Namen. Nicht die Teamseite football/team: Die öffnet auf dem iPhone laut apple-app-site-association die ESPN-Fantasy-App,
+  // und die zeigt so offenbar nur das eigene Team (Test Stephan 30.09.2026). seasonId ist Pflicht (sonst gilt die Saison aus ESPNs Cookie).
   // Nur für Kaderspieler und nur, bis die letzte Woche der Saison final ist.
   const kader = p.team > 0 && S.weeks.at(-1)?.status !== 'final';
   const nbc = nbcUrl(p.name, p.nfl, dst);
