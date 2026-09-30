@@ -1,13 +1,14 @@
 // Waiver (lädt waiver.json und players.json, dazu transactions.json): beste verfügbare Spieler je Position nach ROS über
 // Ersatz (Tagesstand), Bedarf je Team, Waiver-Reihenfolge, Claims der letzten 7 Tage. Zahlen kommen aus Python; hier nur
 // Anzeige, Filter und die Zusammenführung von Tagesstand (waiver.json) und Wochenstand (players.json) je Spieler-ID.
-// Positions-Matchup folgt in Session 8 (keine Platzhalter-Spalte).
+// Positions-Matchup je Spieler (Feld mu) aus dem Wochenstand; Wetter-Fähnchen aus wetter.json (Prognose der laufenden Woche).
 let U, S, h;
 const POS = ['QB', 'RB', 'WR', 'TE', 'K', 'D/ST'];
 const FREE = ['WAIVERS', 'FREEAGENT'];
 const ART = {WAIVER: 'Waiver', FREEAGENT: 'Free Agent'};
 const DAYS7 = 7 * 864e5;
 const KEY = 'bwg-team';                  // eigenes Team (Kürzel-Auswahl), nur Komfort im Browser
+const fz = v => 'fz' + (U.ok(v) ? ' ' + U.fcls(v) : '');   // Farbzelle um F = 1,00; ohne Wert ohne Farbe
 
 export async function render(box, ctx, r) {
   U = ctx.ui; S = U.S; h = U.h;
@@ -19,7 +20,10 @@ export async function render(box, ctx, r) {
   }
   const [W, P] = await Promise.all([ctx.lazy('waiver.json', 'Tagesstand', box), ctx.lazy('players.json', 'Spielerdaten', box)]);
   if (!r.alive()) return;
-  const T = await ctx.load('transactions.json').catch(() => null);   // Claims sind Zugabe: ohne sie bleibt der Tab nutzbar
+  // Claims und Wetter sind Zugabe: ohne sie bleibt der Tab nutzbar (ohne Wetter keine Fähnchen)
+  const [T, WX] = await Promise.all([ctx.load('transactions.json').catch(() => null),
+    S.man.files?.['wetter.json'] ? ctx.load('wetter.json').catch(() => null) : null]);
+  const wx = WX ? await ctx.mod('v_wetter').catch(() => null) : null;
   if (!r.alive()) return;
   const byId = new Map(P.players.map(p => [p.id, p]));
   // Tagesstand je Spieler, Stammdaten und ROS aus dem Wochenstand; wer dort fehlt, heißt wie im Tagesstand (ohne ROS)
@@ -33,7 +37,7 @@ export async function render(box, ctx, r) {
     h('option', {value: 0}, 'Mein Team wählen'), S.teams.map(t => h('option', {value: t.team_id, selected: t.team_id === mine}, `${t.kuerzel} · ${t.name}`)));
   U.ap(box, h('p', {class: 'note'}, `Tagesstand ${U.stamp(W.stand)} · Projektion und Bye-Hinweis für W${W.woche}`, ' ', U.ib('tagesstand', '')),
     h('div', {class: 'row'}, h('label', null, 'Mein Team ', mineSel)));
-  available(box, W, P, rows, r);
+  available(box, W, P, rows, r, wx && (nfl => wx.flagLink(wx.gameOf(WX, nfl))));
   const grid = h('div', {class: 'two'});
   U.ap(box, grid);
   const draw = () => { grid.replaceChildren(needs(W, P, name, mine), order(W, mine)); };
@@ -42,7 +46,7 @@ export async function render(box, ctx, r) {
 }
 
 // ---------------------------------------------------------------- beste verfügbare Spieler je Position
-function available(box, W, P, rows, r) {
+function available(box, W, P, rows, r, wflag) {
   const q = r.q;
   const narrow = matchMedia('(max-width:599px)').matches;
   const st = {pos: POS.includes(q.get('pos')) ? q.get('pos') : '', text: '',
@@ -51,15 +55,33 @@ function available(box, W, P, rows, r) {
   const rowsNow = () => free.filter(x => (!st.pos || x.pos === st.pos) && (!st.text || x.name.toLowerCase().includes(st.text)));
   const rosWhy = P.ros_nach_woche == null ? `ab Wochenabruf W${S.tw + 1}` : 'keine ROS-Projektion';
   const num = (k, l, f = U.num, why) => ({k, l, num: 1, v: x => x[k], f: x => U.val(x[k], f, why)});
-  const spieler = {k: 'name', l: 'Spieler', v: x => x.name.toLowerCase(), d: 1, flt: false, f: x => h('a', {href: '#spieler/' + x.id, class: 'pl'},
-    h('span', null, x.name, U.inj(x.inj)), h('span', {class: 'sub'}, `${x.pos ?? '–'} · ${x.nfl ?? '–'} · ${x.status === 'FREEAGENT' ? 'FA' : 'Waivers'}`))};
+  // Wetter-Fähnchen als eigener Link nach #wetter neben dem Spielerlink (kein Link im Link)
+  const spieler = {k: 'name', l: 'Spieler', v: x => x.name.toLowerCase(), d: 1, flt: false, f: x => {
+    const a = h('a', {href: '#spieler/' + x.id, class: 'pl'},
+      h('span', null, x.name, U.inj(x.inj)), h('span', {class: 'sub'}, `${x.pos ?? '–'} · ${x.nfl ?? '–'} · ${x.status === 'FREEAGENT' ? 'FA' : 'Waivers'}`));
+    const fl = wflag?.(x.nfl);
+    return fl ? h('span', {class: 'plw'}, a, fl) : a;
+  }};
+  // Positions-Matchup (players.json mu, Wochenstand): Gegner in Woche mu_woche mit F als Farbzelle wie im D/ST-Tab, Bye grau
+  const hasMu = 'mu_woche' in P, week = new Set(P.players.map(p => p.id));
+  const muWhy = x => !hasMu ? 'ab dem nächsten Wochenabruf' : x.mu ? 'keine offene Woche' : !x.nfl ? 'kein NFL-Team'
+    : week.has(x.id) ? 'kein Positions-Matchup' : 'nicht im Wochenstand';
+  const mu = {k: 'mu', l: U.ok(P.mu_woche) ? `Matchup W${P.mu_woche}` : 'Matchup', num: 1, v: x => x.mu?.n1?.opp ? x.mu.n1.f ?? null : null,
+    cls: x => x.mu?.n1 ? (x.mu.n1.opp ? fz(x.mu.n1.f) : 'fz bye') : 'fz',
+    f: x => {
+      const n = x.mu?.n1;
+      if (!n) return U.na(muWhy(x));
+      return n.opp ? [n.opp, h('small', null, U.val(n.f, v => U.num(v, 2), 'kein Faktor'))] : ['Bye', h('small', null, '·')];
+    }};
+  const mu3 = {k: 'mu3', l: 'Ø nächste 3', num: 1, v: x => x.mu?.naechste3 ?? null, cls: x => fz(x.mu?.naechste3),
+    f: x => U.val(x.mu?.naechste3, v => U.num(v, 2), x.mu ? 'kein Spiel in den nächsten 3 Wochen' : muWhy(x))};
   const bye = {k: 'bye', l: 'Bye', num: 1, cat: 1, v: x => x.bye, d: 1, f: x => !U.ok(x.bye) ? U.na('kein NFL-Team')
     : x.bye === W.woche ? h('span', {class: 'dn'}, 'W' + x.bye, h('span', {class: 'vh'}, ' – nächste Woche spielfrei')) : 'W' + x.bye};
   const verl = {k: 'inj', l: 'Verletzung', v: x => U.INJ[x.inj] ? x.inj : null, d: 1, f: x => U.INJ[x.inj]?.[1] || (x.inj === 'ACTIVE' ? 'aktiv' : '–')};
   const frist = {k: 'frist', l: 'Frist', v: x => x.status === 'WAIVERS' ? x.waiver_bis : null, d: 1,
     f: x => x.status === 'WAIVERS' ? U.val(x.waiver_bis, U.stamp, 'keine Frist gemeldet') : U.na('Free Agent, sofort')};
   const base = [spieler, num('ros_ue', 'ROS ü. Ersatz', U.sgn, rosWhy), num('proj', `Proj. W${W.woche}`, U.num, 'noch keine ESPN-Projektion')];
-  const ros = [bye, verl, num('ros_g', 'ROS/Sp.', U.num, rosWhy)];
+  const ros = [mu, mu3, bye, verl, num('ros_g', 'ROS/Sp.', U.num, rosWhy)];
   const besitz = [num('own', 'Besitz %', v => U.pct(v)), num('own_d', 'Δ Tag', v => U.sgn(v, 2)), num('started', 'gestartet %', v => U.pct(v))];
   const extra = {alle: [...ros, ...besitz, frist], ros: [...ros, frist], besitz: [...besitz, frist]};
   const count = h('p', {class: 'note', 'aria-live': 'polite'});
@@ -70,7 +92,7 @@ function available(box, W, P, rows, r) {
   const build = () => {
     tbl = U.table({cap: 'Verfügbare Spieler nach ROS über Ersatz', cls: 'nr', rh: 0, rows: rowsNow(), sort: ['ros_ue', -1], limit: 50, filter: true,
       filters, fstate: fst, cols: [...base, ...extra[st.sicht]],
-      note: 'Verfügbar = Waivers oder Free Agent laut Tagesstand. Positions-Matchup folgt in Session 8.'});
+      note: 'Verfügbar = Waivers oder Free Agent laut Tagesstand.'});
     slot.replaceChildren(tbl);
   };
   const refresh = rebuild => {
@@ -90,7 +112,8 @@ function available(box, W, P, rows, r) {
       }})),
     U.seg('Spalten', [['alle', 'Alle'], ['ros', 'ROS'], ['besitz', 'Besitz']], st.sicht, v => { st.sicht = v; refresh(true); })),
     count, slot,
-    U.legend(['verfuegbar', 'ros-ue', 'ersatz', 'ros-spiel', 'proj-naechste', 'bye-hinweis', 'besitz-trend', 'frist', 'filter', 'positions-matchup', 'projektionen']));
+    U.legend(['verfuegbar', 'ros-ue', 'ersatz', 'ros-spiel', 'proj-naechste', 'mu-n1', 'mu-naechste3', 'bye-hinweis', 'besitz-trend', 'frist',
+      'wetter-markierung', 'filter', 'projektionen']));
   refresh(true);
 }
 

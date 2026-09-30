@@ -3,7 +3,8 @@
 Nutzt nur die öffentlichen Lese-Endpoints von ESPN und speichert jede Antwort
 byte-genau unter data/raw/<saison>/wNN/<view>.json, das Transaktions-Archiv
 unter data/raw/<saison>/transactions/. Ausnahmen (Auszüge statt Rohantwort):
-kona_league_communication ohne Chat-Themen, wNN/ros.json (Projektionen der Restwochen), pool/latest.json (Pool-Auszug).
+kona_league_communication ohne Chat-Themen, wNN/ros.json (Projektionen der Restwochen), pool/latest.json (Pool-Auszug),
+basis/positionen_<vorjahr>.json (Punktsummen je NFL-Team, Position und Woche des Vorjahrs).
 
 Ablage je Saison (--due):
     wNN/  mSettings, mTeam, mMatchupScore, mRoster        Kern: bestimmen, ob die Woche final ist
@@ -11,6 +12,7 @@ Ablage je Saison (--due):
     nfl/proTeamSchedules_wl.json                           NFL-Spielplan mit Byes, wird aktualisiert
     draft/mDraftDetail.json                                Draft und Keeper, einmalig
     basis/kona_dst_<vorjahr>.json, proTeamSchedules_wl_<vorjahr>.json   D/ST-Grundlage des Vorjahrs, einmalig
+    basis/positionen_<vorjahr>.json                        Positions-Grundlage des Vorjahrs (QB, RB, WR, TE, K), einmalig
 Tageslauf (--transactions --pool --wetter, Action stündlich vormittags und abends):
     transactions/                                          Transaktions-Archiv (mTransactions2 je Periode, Aktivitäten)
     pool/latest.json                                       Pool-Auszug: Status, Besitz, Verletzung, Waiver-Frist, Projektion;
@@ -42,6 +44,7 @@ LEAGUE_ID = 1166555857
 DEFAULT_SEASON = 2026
 SEASON_URL = "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/{season}"
 BASE_URL = SEASON_URL + "/segments/0/leagues/{league}"
+LEAGUE_DEFAULTS_URL = SEASON_URL + "/segments/0/leaguedefaults/3"  # ligaunabhängig, Wochen-Ist älterer Saisons mit Rohstats
 # Kern-Views je Woche → Schlüssel, der in einer brauchbaren Antwort vorhanden und nicht leer sein muss.
 # Nur sie entscheiden, ob eine Woche final ist; weitere Dateien je Woche kommen dazu, ohne das zu ändern.
 VIEWS = {
@@ -58,6 +61,8 @@ KONA_FILE, ROS_FILE, STANDINGS_FILE = f"{KONA_VIEW}.json", "ros.json", "mStandin
 POOL_FILE = "latest.json"   # Pool-Auszug des Tageslaufs unter pool/ (je Lauf überschrieben, Historie in Git)
 MIN_POOL = 300              # ein vollständiger Spielerpool hat rund 1050 aktive Spieler
 DST_POSITION, NFL_TEAMS, NFL_GAMES = 16, 32, 17
+OFFENSE_POSITIONS = {1: "QB", 2: "RB", 3: "WR", 4: "TE", 5: "K"}  # defaultPositionId → Kürzel (Positions-Grundlage)
+POSITION_SLOTS = {1: "0", 2: "2", 3: "4", 4: "6", 5: "17", 16: "16"}  # defaultPositionId → Lineup-Slot für pointsOverrides
 STAT_ACTUAL, STAT_PROJECTION, SPLIT_WEEK, STAT_PLAYED = 0, 1, 1, "210"  # statSourceId, statSplitTypeId, „hat gespielt“
 MAX_WEEK = 17  # W1–14 Regular Season, W15–17 Playoffs
 WEEK1_START = {2026: date(2026, 9, 8)}  # Dienstag, an dem NFL-Woche 1 beginnt; jede Woche läuft Di–Mo
@@ -264,6 +269,127 @@ def fetch_prior_dst(session: requests.Session, season: int, today: date) -> byte
     return content
 
 
+# ---------------------------------------------------------------- Positions-Grundlage des Vorjahrs (Session 8)
+
+def scoring_table(settings: dict) -> dict[int, tuple[Decimal, dict[str, Decimal]]]:
+    """Liga-Scoring aus dem settings-Block von mSettings: statId → (Punkte, abweichende Punkte je Lineup-Slot).
+
+    pointsOverrides kommen nur für Slot "16" (D/ST) vor, z. B. Fumble lost dort 0 statt −2.
+    """
+    items = ((settings or {}).get("scoringSettings") or {}).get("scoringItems")
+    if not isinstance(items, list) or not items:
+        raise FetchError("mSettings ohne scoringSettings.scoringItems")
+    try:
+        return {item["statId"]: (Decimal(str(item["points"])),
+                                 {slot: Decimal(str(p)) for slot, p in (item.get("pointsOverrides") or {}).items()})
+                for item in items}
+    except (KeyError, TypeError, AttributeError, ArithmeticError) as exc:
+        raise FetchError(f"Scoring-Eintrag unbrauchbar: {exc!r}") from exc
+
+
+def league_points(stats: dict, table: dict[int, tuple[Decimal, dict[str, Decimal]]], slot: str) -> Decimal:
+    """Punkte im Liga-Scoring aus Rohstats (Schlüssel als Text, z. B. "3"), ungerundet.
+
+    Je statId der Tabelle: Wert × Punkte, für den Lineup-Slot slot die abweichenden Punkte, falls die Tabelle welche
+    führt. Stats ohne Eintrag in der Tabelle zählen nicht.
+    """
+    total = Decimal(0)
+    for stat_id, (points, overrides) in table.items():
+        value = stats.get(str(stat_id))
+        if value is not None:
+            total += Decimal(str(value)) * overrides.get(slot, points)
+    return total
+
+
+def positions_extract(data: dict, prior_season: int, table: dict[int, tuple[Decimal, dict[str, Decimal]]]) -> dict:
+    """Auszug der Positions-Grundlage aus einer leaguedefaults-Antwort des Vorjahrs (rein, deterministisch).
+
+    Spieler mit defaultPositionId QB, RB, WR, TE oder K; je Wochen-Ist der Saison prior_season mit Einsatz (210 == 1)
+    zählen die Punkte im Liga-Scoring beim NFL-Team des Spiels (proTeamId des Stat-Eintrags – nach einem Trade
+    zählt jede Woche beim damaligen Team). Je (Team, Position, Woche) Summe der Punkte und Zahl der Spieler; Woche
+    ohne Einsatz der Position: pts null, n 0. Nur Summen, keine Spieler-IDs oder Namen.
+    """
+    sums: dict[tuple[int, int, int], Decimal] = {}
+    counts: dict[tuple[int, int, int], int] = {}
+    for entry in data["players"]:
+        player = entry["player"]
+        pos = player.get("defaultPositionId")
+        if pos not in OFFENSE_POSITIONS:
+            continue
+        for s in player.get("stats", []):
+            if ((s.get("seasonId"), s.get("statSourceId"), s.get("statSplitTypeId")) != (prior_season, STAT_ACTUAL, SPLIT_WEEK)
+                    or (s.get("stats") or {}).get(STAT_PLAYED) != 1):
+                continue
+            key = (s["proTeamId"], pos, s["scoringPeriodId"])
+            sums[key] = sums.get(key, Decimal(0)) + league_points(s["stats"], table, POSITION_SLOTS[pos])
+            counts[key] = counts.get(key, 0) + 1
+    weeks = sorted({week for _, _, week in sums})
+    teams = {}
+    for team in sorted({team for team, _, _ in sums}):
+        teams[str(team)] = {
+            name: {"pts": [(float(to_points(sums[(team, pos, w)])) or 0.0) if (team, pos, w) in sums else None  # kein -0.0
+                           for w in weeks],
+                   "n": [counts.get((team, pos, w), 0) for w in weeks]}
+            for pos, name in OFFENSE_POSITIONS.items()}
+    return {"saison": prior_season,
+            "quelle": f"leaguedefaults/3 kona_player_info der Saison {prior_season} (filterStatsForSourceIds [0], "
+                      f"filterStatsForSplitTypeIds [1]); Punkte im Liga-Scoring aus mSettings {prior_season + 1}, aus den "
+                      f"Rohstats neu gerechnet (appliedTotal dort ist ESPN-Standard); nur Einsätze (Stat 210 = 1); "
+                      f"pts = Summe je NFL-Team des Spiels, Position (defaultPositionId) und Woche, n = Zahl der Spieler",
+            "positionen": {str(pos): name for pos, name in OFFENSE_POSITIONS.items()},
+            "wochen": weeks,
+            "scoring": {str(stat_id): float(table[stat_id][0]) for stat_id in sorted(table)},
+            "teams": teams}
+
+
+def positions_dumps(extract: dict) -> bytes:
+    """JSON mit einer Zeile je NFL-Team (Muster pool_dumps), UTF-8, Zeilenende "\\n"."""
+    head = ",\n".join(f"{json.dumps(k)}:{json.dumps(v, ensure_ascii=False)}" for k, v in extract.items() if k != "teams")
+    rows = ",\n".join(f"{json.dumps(team)}:{json.dumps(pos, ensure_ascii=False, separators=(',', ':'))}"
+                      for team, pos in extract["teams"].items())
+    return f'{{\n{head},\n"teams":{{\n{rows}\n}}\n}}\n'.encode("utf-8")
+
+
+def check_positions(extract: dict) -> None:
+    """Ein vollständiger Auszug: genau 32 NFL-Teams mit je 17 Wochen, in denen ein QB gespielt hat (fängt Teil-Antworten ab)."""
+    teams = extract["teams"]
+    if len(teams) != NFL_TEAMS:
+        raise FetchError(f"Positionen Vorjahr: {len(teams)} statt {NFL_TEAMS} NFL-Teams")
+    qb_weeks = {team: sum(1 for n in t["QB"]["n"] if n > 0) for team, t in teams.items()}
+    short = {team: games for team, games in qb_weeks.items() if games != NFL_GAMES}
+    if short:
+        raise FetchError("Positionen Vorjahr: QB-Einsätze in " + ", ".join(
+            f"{games} statt {NFL_GAMES} Wochen bei Team {team}" for team, games in short.items()))
+
+
+def fetch_prior_positions(session: requests.Session, season: int) -> bytes:
+    """Vorjahresgrundlage Positions-Matchup: je NFL-Team, Position (QB, RB, WR, TE, K) und Woche des Vorjahrs die
+    Punktsumme im Liga-Scoring und die Zahl der Spieler mit Einsatz – ein Auszug von rund 25 KB statt 4,4 MB Rohantwort.
+
+    Über die Liga reichen Spielerstats nur als Top-N-Spiele ins Vorjahr; leaguedefaults/3 liefert das Wochen-Ist der
+    Saison mit Rohstats und dem NFL-Team je Spiel. appliedTotal ist dort ESPN-Standard-Scoring, deshalb rechnet der
+    Auszug die Punkte mit dem Liga-Scoring der laufenden Saison (mSettings) aus den Rohstats neu (wie D/ST).
+    """
+    _, settings = get_json(session, league_url(season), {"view": "mSettings"})
+    if (settings.get("id"), settings.get("seasonId")) != (LEAGUE_ID, season):
+        raise FetchError(f"mSettings passt nicht zu Liga und Saison: {(settings.get('id'), settings.get('seasonId'))}")
+    table = scoring_table(settings.get("settings"))
+    players = {"limit": 3000, "sortPercOwned": {"sortPriority": 1, "sortAsc": False},
+               "filterStatsForSourceIds": {"value": [STAT_ACTUAL]}, "filterStatsForSplitTypeIds": {"value": [SPLIT_WEEK]}}
+    _, data = get_json(session, LEAGUE_DEFAULTS_URL.format(season=season - 1), {"view": KONA_VIEW},
+                       {"X-Fantasy-Filter": json.dumps({"players": players})})
+    entries = data.get("players")
+    if not isinstance(entries, list) or len(entries) < MIN_POOL:
+        raise FetchError(f"Positionen Vorjahr: Spielerpool unvollständig "
+                         f"({len(entries) if isinstance(entries, list) else 0} Spieler)")
+    try:
+        extract = positions_extract(data, season - 1, table)
+    except (KeyError, TypeError, AttributeError, ArithmeticError) as exc:
+        raise FetchError(f"Positionen Vorjahr: Antwort unbrauchbar ({exc!r})") from exc
+    check_positions(extract)
+    return positions_dumps(extract)
+
+
 def save_atomic(path: Path, content: bytes) -> None:
     """Schreibt erst eine .tmp-Datei und benennt sie dann um – kein halbes JSON bei Abbruch."""
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -465,12 +591,16 @@ def last_past_week(season: int, today: date) -> int:
 
 
 def refresh_season_files(session: requests.Session, season: int, today: date) -> int:
-    """Saisondateien: NFL-Spielplan bei jedem Lauf (Verlegungen), Draft und D/ST-Vorjahr einmalig. Gibt Fehler zurück."""
+    """Saisondateien: NFL-Spielplan bei jedem Lauf (Verlegungen); Draft, D/ST- und Positions-Vorjahr einmalig.
+
+    Gibt die Zahl der Fehler zurück; eine fehlgeschlagene Datei versucht der nächste Lauf erneut.
+    """
     files = season_files(season)
     jobs = [(files["schedule"], True, lambda: fetch_schedule(session, season)),
             (files["draft"], False, lambda: fetch_draft(session, season)),
             (files["prior_schedule"], False, lambda: fetch_schedule(session, season - 1)),
-            (files["prior_dst"], False, lambda: fetch_prior_dst(session, season, today))]
+            (files["prior_dst"], False, lambda: fetch_prior_dst(session, season, today)),
+            (files["prior_positions"], False, lambda: fetch_prior_positions(session, season))]
     errors = 0
     for path, refresh, job in jobs:
         if path.exists() and not refresh:
@@ -517,6 +647,8 @@ def warn(message: str) -> None:
 def cmd_due(season: int, today: date) -> int:
     """Alles Fällige: Saisondateien, nicht finale Wochen, fehlende Spielerpools finaler Wochen.
 
+    Saisondateien: NFL-Spielplan, Draft, Vorjahresgrundlagen basis/proTeamSchedules_wl_<vorjahr>.json,
+    basis/kona_dst_<vorjahr>.json und basis/positionen_<vorjahr>.json (siehe refresh_season_files).
     Finale Wochen werden nie überschrieben – auch nicht, wenn später eine Datei je Woche dazukommt.
     Stand-Dateien (ROS-Auszug, mStandings) gibt es nur für die jüngste vergangene Woche: ESPN liefert sie nur
     „jetzt“, bei nachgeholten älteren Wochen stünde sonst ein späterer Stand unter der alten Woche.

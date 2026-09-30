@@ -9,6 +9,7 @@ import itertools
 import json
 import shutil
 from datetime import date, datetime, timedelta, timezone
+from decimal import Decimal
 
 import pytest
 
@@ -165,6 +166,26 @@ def fake_pool(weeks, with_actual=False, dst_games=None) -> dict:
     return {"players": players, "positionAgainstOpponent": {}}
 
 
+def stat(week: int, team: int, stats: dict, season: int = 2025, source: int = 0) -> dict:
+    """Erfundener Wochen-Eintrag (Vorjahr 2025, Ist) mit dem NFL-Team des Spiels; appliedTotal ist bewusst Unsinn
+    (ESPN-Standard, darf nicht zählen)."""
+    return {"seasonId": season, "statSourceId": source, "statSplitTypeId": 1, "scoringPeriodId": week,
+            "proTeamId": team, "appliedTotal": 99.0, "stats": stats}
+
+
+def spieler(pid: int, pos: int, stats: list[dict]) -> dict:
+    return {"id": pid, "player": {"id": pid, "fullName": f"Testspieler {pid}", "defaultPositionId": pos, "stats": stats}}
+
+
+def fake_prior_positions(teams: int = 32, qb_games=lambda team: 17) -> dict:
+    """Erfundene leaguedefaults-Antwort 2025: je NFL-Team ein QB-„Testspieler“ mit erfundenen Rohstats
+    (200 + Team Passing Yards, 1 Passing TD je Spiel), dazu Füllspieler ohne Stats bis zur Mindestgröße des Pools."""
+    players = [spieler(100 + team, 1, [stat(w, team, {"210": 1.0, "3": 200.0 + team, "4": 1.0})
+                                       for w in range(1, qb_games(team) + 1)])
+               for team in range(1, teams + 1)]
+    return {"players": players + [spieler(1000 + i, 2, []) for i in range(ef.MIN_POOL)]}
+
+
 class FakeLeague:
     """Ersetzt requests.Session: beantwortet Liga-Views, Spielerpool, Spielplan und Draft mit erfundenen Daten.
 
@@ -172,10 +193,12 @@ class FakeLeague:
     """
 
     def __init__(self, final_week: int):
+        self.final_week = final_week
         self.week_answers = {(view, final_week): ok(data) for view, data in week_views(final_week, final=True).items()}
         self.requests: list[tuple] = []
         self.drafted = True
         self.dst_games = lambda pid: 17
+        self.prior_answer = fake_prior_positions   # leaguedefaults-Antwort des Vorjahrs (Positions-Grundlage)
         self.schedule_teams = 33          # inkl. Team 0 (Free Agent)
         self.standings_echo = None        # abweichende Woche im mStandings-Echo
         self.pool_without_week: set[int] = set()  # Wochen, für die der Spielerpool keine Werte liefert
@@ -190,6 +213,10 @@ class FakeLeague:
         view, week = params["view"], params.get("scoringPeriodId")
         if view == ef.KONA_VIEW:
             flt = json.loads(headers["X-Fantasy-Filter"])["players"]
+            if "filterStatsForSourceIds" in flt:
+                assert flt["filterStatsForSplitTypeIds"]["value"] == [1] and "sortPercOwned" in flt
+                self.requests.append(("positionen_vorjahr", url))
+                return ok(self.prior_answer())
             if "filterStatsForTopScoringPeriodIds" in flt:
                 self.requests.append(("dst_vorjahr",))
                 return ok(fake_pool([], dst_games=self.dst_games))
@@ -207,6 +234,9 @@ class FakeLeague:
             self.requests.append(("draft",))
             return ok({"id": ef.LEAGUE_ID, "seasonId": 2026,
                        "draftDetail": {"drafted": self.drafted, "picks": [{"overallPickNumber": 1}] if self.drafted else []}})
+        if view == "mSettings" and week is None:   # Liga-Scoring für die Positions-Grundlage (echtes W1-mSettings)
+            self.requests.append(("scoring",))
+            return self.week_answers[("mSettings", self.final_week)]
         self.requests.append((view, week))
         if view == "mStandings":
             return ok({"id": ef.LEAGUE_ID, "seasonId": 2026, "scoringPeriodId": self.standings_echo or week,
@@ -279,6 +309,7 @@ def test_saisondateien(espn_week3):
     espn_week3.drafted = False
     assert ef.cmd_due(2026, date(2026, 9, 29)) == 0
     assert files["schedule"].exists() and files["prior_schedule"].exists() and files["prior_dst"].exists()
+    assert files["prior_positions"].exists()
     assert not files["draft"].exists()                               # vor dem Draft: nichts, kein Fehler
     espn_week3.drafted = True
     espn_week3.requests.clear()
@@ -286,6 +317,7 @@ def test_saisondateien(espn_week3):
     assert ef.cmd_due(2026, date(2026, 9, 30)) == 0
     assert files["draft"].exists()
     assert ("dst_vorjahr",) not in espn_week3.requests               # einmalig
+    assert not any(key[0] in ("positionen_vorjahr", "scoring") for key in espn_week3.requests)  # einmalig
     assert files["schedule"].stat().st_mtime_ns == before            # unverändert → nicht neu geschrieben
 
 
@@ -296,6 +328,52 @@ def test_dst_vorjahr_braucht_alle_17_spiele(espn_week3, capsys):
     assert not ef.season_files(2026)["prior_dst"].exists()
     assert ef.is_final(2026, 3)
     assert "Fehler bei Saisondateien oder beim Nachholen" in capsys.readouterr().out  # Präfix je nach Umgebung
+
+
+def test_positionen_vorjahr_einmalig(espn_week3):
+    """basis/positionen_2025.json: Scoring aus mSettings der laufenden Saison, Antwort von leaguedefaults 2025,
+    gespeichert wird nur der Auszug; der nächste Lauf fragt nicht erneut."""
+    path = ef.season_files(2026)["prior_positions"]
+    assert ef.cmd_due(2026, date(2026, 9, 29)) == 0
+    assert ("positionen_vorjahr", ef.LEAGUE_DEFAULTS_URL.format(season=2025)) in espn_week3.requests
+    assert ("scoring",) in espn_week3.requests
+    saved = json.loads(path.read_bytes())
+    assert (saved["saison"], len(saved["teams"]), saved["wochen"]) == (2025, 32, list(range(1, 18)))
+    # erfundene Rohstats von Team 1 (201 Passing Yards, 1 Passing TD) im echten Liga-Scoring der W1-Datei
+    table = ef.scoring_table(week_views(1, final=True)["mSettings"]["settings"])
+    expected = float(ef.to_points(ef.league_points({"3": 201.0, "4": 1.0}, table, "0")))
+    assert saved["teams"]["1"]["QB"] == {"pts": [expected] * 17, "n": [1] * 17}
+    assert saved["scoring"] == {str(k): float(v[0]) for k, v in sorted(table.items())}
+    assert b"Testspieler" not in path.read_bytes()
+    assert path.stat().st_size < 50_000                              # Auszug (echt rund 25 KB), nicht die 4-MB-Rohantwort
+    espn_week3.requests.clear()
+    assert ef.cmd_due(2026, date(2026, 9, 30)) == 0
+    assert espn_week3.requests == [("spielplan", 2026)]
+
+
+def test_positionen_vorjahr_fehler_nur_warnung(espn_week3, capsys):
+    """Teil-Antwort oder unbrauchbare Antwort: nichts speichern, warnen, Woche trotzdem schreiben; der nächste
+    Lauf versucht es erneut."""
+    path = ef.season_files(2026)["prior_positions"]
+
+    def without_team():
+        data = fake_prior_positions()
+        del data["players"][0]["player"]["stats"][3]["proTeamId"]
+        return data
+
+    bad = {"31 statt 32 NFL-Teams": lambda: fake_prior_positions(teams=31),
+           "16 statt 17 Wochen bei Team 7": lambda: fake_prior_positions(qb_games=lambda team: 16 if team == 7 else 17),
+           "unvollständig (40 Spieler)": lambda: {"players": fake_prior_positions()["players"][:40]},
+           "unbrauchbar": without_team}
+    for match, answer in bad.items():
+        espn_week3.prior_answer = answer
+        assert ef.cmd_due(2026, date(2026, 9, 29)) == 0, match
+        assert not path.exists() and ef.is_final(2026, 3)
+        out, err = capsys.readouterr()
+        assert match in err and "Fehler bei Saisondateien oder beim Nachholen" in out
+    espn_week3.prior_answer = fake_prior_positions
+    assert ef.cmd_due(2026, date(2026, 9, 30)) == 0
+    assert path.exists()
 
 
 def test_spielplan_fehler_blockiert_die_woche_nicht(espn_week3):
@@ -354,6 +432,8 @@ class StubSession:
     (lambda s: ef.fetch_prior_dst(s, 2026, date(2026, 9, 29)), fake_pool([], dst_games=lambda pid: 17)
      | {"players": fake_pool([], dst_games=lambda pid: 17)["players"][:31]}, "31 statt 32"),
     (lambda s: ef.fetch_ros(s, 2026, 3), {"players": fake_pool(range(4, 18))["players"][:40]}, "unvollständig"),
+    (lambda s: ef.fetch_prior_positions(s, 2026), {"id": ef.LEAGUE_ID, "seasonId": 2025}, "Liga und Saison"),
+    (lambda s: ef.fetch_prior_positions(s, 2026), {"id": ef.LEAGUE_ID, "seasonId": 2026, "settings": {}}, "scoringItems"),
 ])
 def test_pruefungen_der_abrufe(call, data, match):
     with pytest.raises(ef.FetchError, match=match):
@@ -386,6 +466,102 @@ def test_kona_filter_mit_sortierung():
     """Ohne sortPercOwned antwortet ESPN auf limit mit HTTP 400 – das alte Beispiel in CLAUDE.md hatte den Fehler."""
     flt = json.loads(ef.kona_filter([3], rank_week=3)["X-Fantasy-Filter"])["players"]
     assert "sortPercOwned" in flt and flt["filterStatsForCurrentSeasonScoringPeriodId"]["value"] == [3]
+
+
+# ---------------------------------------------------------------- Positions-Grundlage des Vorjahrs (Session 8)
+
+SCORING = {"scoringSettings": {"scoringItems": [   # erfundenes Mini-Scoring; das echte steht in mSettings
+    {"statId": 3, "points": 0.04}, {"statId": 4, "points": 4.0}, {"statId": 53, "points": 1.0},
+    {"statId": 72, "points": -2.0, "pointsOverrides": {"16": 0.0}}]}}
+
+
+def test_scoring_table_und_league_points():
+    table = ef.scoring_table(SCORING)
+    assert table[72] == (Decimal("-2"), {"16": Decimal("0")}) and table[3] == (Decimal("0.04"), {})
+    stats = {"3": 250.0, "4": 2.0, "53": 5.0, "72": 1.0, "999": 7.0, "210": 1.0}
+    assert ef.league_points(stats, table, "0") == Decimal("21")      # 10 + 8 + 5 − 2; 999 und 210 zählen nicht
+    assert ef.league_points(stats, table, "16") == Decimal("23")     # D/ST-Slot: Override 0 statt −2
+    assert ef.league_points({}, table, "2") == 0
+    for settings in (None, {}, {"scoringSettings": {}}, {"scoringSettings": {"scoringItems": []}}):
+        with pytest.raises(ef.FetchError, match="scoringItems"):
+            ef.scoring_table(settings)
+    with pytest.raises(ef.FetchError, match="unbrauchbar"):
+        ef.scoring_table({"scoringSettings": {"scoringItems": [{"statId": 3}]}})
+
+
+def test_league_points_trifft_espn_im_liga_scoring():
+    """Echte W1: Die Rohstats jedes Ist-Eintrags ergeben im Liga-Scoring genau ESPNs appliedTotal (alle Positionen,
+    D/ST mit den Overrides für Slot 16) – Grundlage dafür, die Vorjahrespunkte aus Rohstats neu zu rechnen."""
+    table = ef.scoring_table(week_views(1, final=True)["mSettings"]["settings"])
+    pool = json.loads((SOURCE_WEEK / ef.KONA_FILE).read_bytes())
+    checked = 0
+    for entry in pool["players"]:
+        pos = entry["player"]["defaultPositionId"]
+        for s in entry["player"].get("stats", []):
+            if (s["seasonId"], s["statSourceId"], s["statSplitTypeId"]) == (2026, 0, 1) and s.get("stats") \
+                    and pos in ef.POSITION_SLOTS:
+                assert ef.to_points(ef.league_points(s["stats"], table, ef.POSITION_SLOTS[pos])) \
+                    == ef.to_points(s["appliedTotal"]), entry["player"]["fullName"]
+                checked += 1
+    assert checked > 400
+
+
+MINI = {"players": [   # erfundene Spieler und Werte: NFL-Teams 1 und 2, Wochen 1 und 2 der Saison 2025
+    spieler(1, 1, [stat(1, 1, {"210": 1.0, "3": 250.0, "4": 2.0}),        # QB Team 1: 10 + 8 = 18
+                   stat(2, 1, {"210": 1.0, "3": 100.0, "72": 1.0}),        # 4 − 2 = 2
+                   stat(4, 1, {"210": 1.0, "3": 999.0}, source=1),         # Projektion: zählt nicht
+                   stat(3, 1, {"210": 1.0, "3": 999.0}, season=2024)]),     # andere Saison: zählt nicht
+    spieler(2, 1, [stat(1, 1, {"210": 1.0, "3": 25.0}),                    # zweiter QB Team 1 in W1: 1
+                   stat(2, 1, {"3": 50.0})]),                             # ohne Stat 210: zählt nicht
+    spieler(3, 3, [stat(1, 1, {"210": 1.0, "53": 3.0}),                    # WR, Trade nach W1: W1 bei Team 1 …
+                   stat(2, 2, {"210": 1.0, "53": 4.0})]),                   # … W2 beim neuen Team 2
+    spieler(4, 2, [stat(1, 2, {"210": 0.0, "53": 9.0})]),                  # RB mit 210 = 0: zählt nicht
+    spieler(5, 16, [stat(1, 2, {"210": 1.0, "53": 5.0})]),                 # D/ST: nicht Teil der Grundlage
+    spieler(6, 9, [stat(1, 2, {"210": 1.0, "53": 1.0})]),                  # Position 9: ignoriert
+    spieler(7, 1, [stat(2, 2, {"210": 1.0, "4": 1.0})]),                   # QB Team 2 nur in W2: 4
+    spieler(8, 5, [stat(1, 1, {"210": 1.0, "72": 0.0})]),                  # K Team 1 in W1 mit 0 Punkten
+]}
+
+
+def test_positions_extract():
+    extract = ef.positions_extract(MINI, 2025, ef.scoring_table(SCORING))
+    assert list(extract) == ["saison", "quelle", "positionen", "wochen", "scoring", "teams"]
+    assert (extract["saison"], extract["wochen"]) == (2025, [1, 2])
+    assert extract["positionen"] == {"1": "QB", "2": "RB", "3": "WR", "4": "TE", "5": "K"}
+    assert extract["scoring"] == {"3": 0.04, "4": 4.0, "53": 1.0, "72": -2.0}
+    empty = {"pts": [None, None], "n": [0, 0]}
+    assert extract["teams"] == {
+        "1": {"QB": {"pts": [19.0, 2.0], "n": [2, 1]}, "RB": empty, "WR": {"pts": [3.0, None], "n": [1, 0]},
+              "TE": empty, "K": {"pts": [0.0, None], "n": [1, 0]}},
+        "2": {"QB": {"pts": [None, 4.0], "n": [0, 1]}, "RB": empty, "WR": {"pts": [None, 4.0], "n": [0, 1]},
+              "TE": empty, "K": empty}}
+
+
+def test_positions_dumps_deterministisch():
+    """Gleicher Inhalt in anderer Reihenfolge ergibt dieselben Bytes; eine Zeile je NFL-Team, keine Spielernamen."""
+    table = ef.scoring_table(SCORING)
+    raw = ef.positions_dumps(ef.positions_extract(MINI, 2025, table))
+    shuffled = {"players": [spieler(e["id"], e["player"]["defaultPositionId"], e["player"]["stats"][::-1])
+                            for e in MINI["players"][::-1]]}
+    assert ef.positions_dumps(ef.positions_extract(shuffled, 2025, table)) == raw
+    assert json.loads(raw) == ef.positions_extract(MINI, 2025, table)
+    lines = raw.decode("utf-8").split("\n")
+    assert [line[:4] for line in lines if line.startswith('"') and line[1].isdigit()] == ['"1":', '"2":']
+    assert raw.endswith(b"}\n}\n") and b"Testspieler" not in raw and b"-0.0" not in raw
+
+
+def test_check_positions():
+    table = ef.scoring_table(SCORING)
+    ef.check_positions(ef.positions_extract(fake_prior_positions(), 2025, table))
+    with pytest.raises(ef.FetchError, match="31 statt 32 NFL-Teams"):
+        ef.check_positions(ef.positions_extract(fake_prior_positions(teams=31), 2025, table))
+    with pytest.raises(ef.FetchError, match="16 statt 17 Wochen bei Team 5"):
+        ef.check_positions(ef.positions_extract(fake_prior_positions(qb_games=lambda t: 16 if t == 5 else 17), 2025, table))
+    # 32 Teams, aber eines nur mit RB-Einsätzen: QB-Wochen fehlen
+    data = fake_prior_positions()
+    data["players"][8]["player"]["defaultPositionId"] = 2
+    with pytest.raises(ef.FetchError, match="0 statt 17 Wochen bei Team 9"):
+        ef.check_positions(ef.positions_extract(data, 2025, table))
 
 
 # ---------------------------------------------------------------- Archiv-Vergleich

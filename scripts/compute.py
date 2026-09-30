@@ -19,6 +19,7 @@ import app_export
 import dst
 import espn_fetch as ef
 import history
+import matchup
 import players
 import powerranking
 import rawdata
@@ -407,7 +408,8 @@ def compute_season(season: int = ef.DEFAULT_SEASON, through: int | None = None) 
             "power_ranking": pr, "kader": kader,
             "records": records.compute_records(ssn, weeks, team_weeks),
             "transactions": transactions, "transactions_until": transactions.get("bis"),
-            "dst": dst.compute_dst(ssn, weeks), "history": history.compute_history(ssn),
+            "dst": dst.compute_dst(ssn, weeks), "matchup": matchup.compute_matchup(ssn, weeks),
+            "history": history.compute_history(ssn),
             "players": spieler, "ros_after_week": spieler["ros_after_week"],
             "pool_week": weeks[-1] if ssn.pool(weeks[-1]) is not None else None,
             # Tageslauf (Session 6): Pool-Auszug und Wetter, Stand des jüngsten Laufs – None, solange er nicht lief
@@ -470,6 +472,8 @@ def main(argv: list[str] | None = None) -> int:
         if ef.to_points(r["abweichung"]) != 0:
             print(f"Warnung: W{r['week']} Team {r['team_id']}: Starter-Summe weicht von PF ab "
                   f"({ef.to_points(r['abweichung'])})", file=sys.stderr)
+    for warning in season_data["matchup"]["warnungen"]:
+        print(f"Warnung: Positions-Matchup {warning}", file=sys.stderr)
     path = ef.REPO_DIR / "data" / f"season_{args.season}.json"
     path.write_text(json.dumps(to_json(season_data), ensure_ascii=False, indent=1) + "\n",
                     encoding="utf-8", newline="\n")

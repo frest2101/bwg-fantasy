@@ -303,3 +303,57 @@ def test_compute_wetter():
     assert wetter.compute_wetter(None, None, {}) is None
     assert wetter.compute_wetter(None, {"season": 2026, "spiele": []}, {}) is None
     assert wetter.compute_wetter(None, ist, {})["stand"] == "2026-09-29T0745Z"
+    assert out["schwellen"] == {"wind": 25, "boeen": 40, "regen_wahrsch": 60, "schnee": 0}
+    assert [s["markierung"] for s in out["prognose"] + out["ist"]] == [[], [], []]  # alles unter der Schwelle, tbd
+
+
+# ---------------------------------------------------------------- Markierung (Schwellen als Faustregel)
+
+def spiel(**values) -> dict:
+    """Verdichtetes Spiel unter freiem Himmel mit erfundenen Werten unter allen Schwellen; values überschreibt."""
+    base = {"tbd": False, "dach": "offen", "temp": Decimal(12), "wind": Decimal(10), "boeen": Decimal(20),
+            "regen_wahrsch": Decimal(10), "niederschlag": Decimal(0), "schnee": Decimal(0)}
+    number = lambda v: isinstance(v, (int, float)) and not isinstance(v, bool)  # noqa: E731
+    return base | {k: Decimal(str(v)) if number(v) else v for k, v in values.items()}
+
+
+@pytest.mark.parametrize("wind, marked", [(24.4, False), (24.44, False), (24.45, True), (24.5, True), (25, True),
+                                          (40, True)])
+def test_markierung_wind_wie_angezeigt(wind, marked):
+    """Wind ganzzahlig wie in der App (erst eine Stelle wie wetter.json, dann ganze Zahl, je round half up):
+    24,4 → 24 nicht markiert, 24,5 → 25 markiert; 24,45 steht als 24,5 in wetter.json und wird als 25 angezeigt."""
+    assert wetter.markierung(spiel(wind=wind)) == (["wind"] if marked else [])
+
+
+def test_markierung_schwellen_und_reihenfolge():
+    assert wetter.markierung(spiel(boeen=39.4)) == [] and wetter.markierung(spiel(boeen=39.5)) == ["boeen"]
+    assert wetter.markierung(spiel(regen_wahrsch=59)) == [] and wetter.markierung(spiel(regen_wahrsch=60)) == ["regen_wahrsch"]
+    assert wetter.markierung(spiel(schnee=0.0)) == [] and wetter.markierung(spiel(schnee=0.04)) == []
+    assert wetter.markierung(spiel(schnee=0.05)) == ["schnee"] and wetter.markierung(spiel(schnee=0.1)) == ["schnee"]
+    assert wetter.markierung(spiel(schnee=1, regen_wahrsch=80, boeen=55, wind=30)) == ["wind", "boeen", "regen_wahrsch", "schnee"]
+
+
+def test_markierung_dach_tbd_und_ist():
+    """Dachspiele (fest, beweglich) und Spiele mit offenem Anstoß nie; Ist ohne Regenwahrscheinlichkeit, None zählt nicht."""
+    storm = {"wind": 30, "boeen": 60, "regen_wahrsch": 90, "schnee": 2}
+    assert wetter.markierung(spiel(dach="fest", **storm)) == [] and wetter.markierung(spiel(dach="beweglich", **storm)) == []
+    assert wetter.markierung(spiel(tbd=True, **storm)) == []
+    ist = {k: v for k, v in spiel(wind=26).items() if k != "regen_wahrsch"}
+    assert wetter.markierung(ist) == ["wind"]
+    assert wetter.markierung(spiel(wind=None, boeen=None, regen_wahrsch=None, schnee=None)) == []
+
+
+def test_compute_wetter_markiert_prognose_und_ist():
+    site = {"stadion": "S", "ort": "O", "lat": 1, "lon": 2, "zeitzone": "UTC", "neutral": False}
+    windig = {"zeit": ["a"] * 4, "temp": [5] * 4, "wind": [24.4, 24.5, 24.5, 24.4], "boeen": [30, 41, 35, 30],
+              "regen_wahrsch": [50, 50, 50, 50], "niederschlag": [0, 0, 0, 0], "schnee": [0, 0.1, 0, 0]}
+    prognose = {"woche": 4, "stand": "2026-09-29T0645Z", "spiele": [
+        dict(site, dach="offen", id=1, woche=4, kickoff="2026-10-02T00:15Z", heim=KC, gast=DEN, stunden=windig),
+        dict(site, dach="fest", id=2, woche=4, kickoff="2026-10-04T17:00Z", heim=DET, gast=CHI, stunden=windig)]}
+    ist = {"spiele": [dict(site, dach="offen", id=3, woche=3, kickoff="2026-09-27T17:00Z", heim=DEN, gast=KC,
+                           abgerufen="2026-09-29T0745Z",
+                           stunden={k: v for k, v in windig.items() if k != "regen_wahrsch"})]}
+    out = wetter.compute_wetter(prognose, ist, {})
+    # Ø Wind 24,45 → angezeigt 25; Böen 41; Schnee 0,1; Dachspiel ohne Markierung
+    assert [s["markierung"] for s in out["prognose"]] == [["wind", "boeen", "schnee"], []]
+    assert out["ist"][0]["markierung"] == ["wind", "boeen", "schnee"]

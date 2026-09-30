@@ -52,9 +52,9 @@ const toDate = x => typeof x === 'number' ? new Date(x) : x instanceof Date ? x 
 const parts = d => Object.fromEntries(DF.formatToParts(toDate(d)).map(p => [p.type, p.value]));
 export function datum(x) { const p = parts(x); return `${p.weekday.replace('.', '')} ${p.day}.${p.month}.`; }
 export const zeit = x => TF.format(toDate(x));
-// Abrufzeit des Tageslaufs (manifest.datenstand.pool_stand, waiver.stand) „JJJJ-MM-TTThhmmZ“ → Date; stamp: Date, Epoch-ms
-// oder Abrufzeit → „Di 29.09. 23:51 Uhr“ (deutsche Zeit)
-export const utc = s => typeof s === 'string' && /^\d{4}-\d\d-\d\dT\d{4}Z$/.test(s) ? new Date(s.replace(/T(\d\d)(\d\d)Z$/, 'T$1:$2:00Z')) : null;
+// Abrufzeit des Tageslaufs (manifest.datenstand.pool_stand, waiver.stand) „JJJJ-MM-TTThhmmZ“ oder Anstoß (wetter.json)
+// „JJJJ-MM-TTThh:mmZ“ → Date; stamp: Date, Epoch-ms oder eine solche Zeit → „Di 29.09. 23:51 Uhr“ (deutsche Zeit)
+export const utc = s => typeof s === 'string' && /^\d{4}-\d\d-\d\dT\d\d:?\d\dZ$/.test(s) ? new Date(s.replace(/T(\d\d):?(\d\d)Z$/, 'T$1:$2:00Z')) : null;
 export const stamp = x => { const d = x instanceof Date ? x : typeof x === 'number' ? new Date(x) : utc(x); return d && !isNaN(d) ? `${datum(d)} ${zeit(d)} Uhr` : '–'; };
 export function spanne(iso) {       // Woche Di–Mo, z. B. „08.–14.09.“
   const a = parts(iso), b = parts(new Date(toDate(iso).getTime() + 6 * 864e5));
@@ -127,8 +127,17 @@ export function weekChips(path, cur) {
 // All-Play-Bilanz „6-3“, mit Gleichständen „6-2-1“ (showT erzwingt die dritte Zahl, damit eine Spalte einheitlich bleibt)
 export const apwl = (w, l, t, showT) => `${nn(w)}-${nn(l)}` + (showT || t ? `-${nn(t)}` : '');
 
-export const spGroup = cur => chips('Spieler, D/ST und Moves',
-  [['#spieler', 'Spieler', 'spieler'], ['#dst', 'D/ST-Faktoren', 'dst'], ['#moves', 'Moves', 'moves']], cur);
+export const spGroup = cur => chips('Spieler, Faktoren, Matchup, Moves und Wetter',
+  [['#spieler', 'Spieler', 'spieler'], ['#dst', 'D/ST-Faktoren', 'dst'], ['#matchup', 'Positions-Matchup', 'matchup'], ['#moves', 'Moves', 'moves'],
+    ['#wetter', 'Wetter', 'wetter']], cur);
+// Farbklasse eines Faktors F um 1,00 (D/ST-Faktoren, Positions-Matchup): f1–f3 blau = günstig, g1–g3 orange = ungünstig,
+// f0 = um 1,00; die Zahl steht immer dabei. Stufen nach F auf zwei Stellen (round half up) in ganzen Hundertsteln: gleiche
+// angezeigte Zahl = gleiche Farbe, und die Grenzen der Legende gelten genau (1,15 − 1 ergibt als Gleitkommazahl 0,1499…)
+export const fcls = f => {
+  if (!ok(f)) return 'f0';
+  const d = Math.round(Math.round((f - 1) * 1000) / 10);
+  return d >= 15 ? 'f3' : d >= 7 ? 'f2' : d >= 2 ? 'f1' : d > -2 ? 'f0' : d > -7 ? 'g1' : d > -15 ? 'g2' : 'g3';
+};
 
 export function seg(label, opts, cur, on, cls) {
   const g = scrollHint(h('div', {class: 'seg' + (cls ? ' ' + cls : ''), role: 'group', 'aria-label': label}));
@@ -230,6 +239,7 @@ export function table(o) {
     if (isNum(c)) {
       const vals = o.rows.map(c.v).filter(ok);
       const asc = c.d === 1, st = steps(vals, asc);
+      if (!st.length) return null;       // alle Werte gleich (z. B. Schnee überall 0): kein Filter statt eines leeren Dropdowns
       return st.map(x => ({key: String(x), label: (asc ? '≤ ' : '≥ ') + fmtStep(x, st), test: r => ok(c.v(r)) && (asc ? c.v(r) <= x : c.v(r) >= x)}));
     }
     const seen = new Map();

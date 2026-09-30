@@ -1,5 +1,6 @@
 // Tab Spieler (lädt players.json, dazu waiver.json als Tagesstand): Liste mit Filtern in 50er-Blöcken, Detail #spieler/<id>
-// mit Formkurve, ROS und News-Kasten (nur Datum der letzten ESPN-Meldung und Verweise, nie Text).
+// mit Formkurve, ROS, Positions-Matchup (Feld mu, Wetterzeile aus wetter.json) und News-Kasten (nur Datum der letzten
+// ESPN-Meldung und Verweise, nie Text).
 let U, S, h;
 const POS = ['QB', 'RB', 'WR', 'TE', 'K', 'D/ST'];
 // Tagesstand je Spieler (waiver.json, stündlich) überlagert diese Wochenwerte: Team, Status, Verletzung, Besitz
@@ -25,11 +26,15 @@ export async function render(box, ctx, r) {
   if (!r.alive()) return;
   // Tagesstand ist Zugabe: ohne waiver.json (vor dem ersten Tageslauf, Ladefehler) gilt der Wochenstand
   const W = S.man.files?.['waiver.json'] ? await ctx.load('waiver.json').catch(() => null) : null;
+  // Wetter ebenso (nur Spielerseite): ohne wetter.json keine Wetterzeile
+  const WX = detail && S.man.files?.['wetter.json'] ? await ctx.load('wetter.json').catch(() => null) : null;
+  const wx = WX ? await ctx.mod('v_wetter').catch(() => null) : null;
   if (!r.alive()) return;
   const svg = await ctx.mod('svg');
   const rosWhy = P.ros_nach_woche == null ? `ab Wochenabruf W${S.tw + 1}` : 'keine Projektion';
   const rows = merge(P, W);
-  if (detail) one(box, h1, P, W, rows, r, svg, rosWhy); else list(box, W, rows, r, rosWhy, P.ersatz || {}, P.ros_nach_woche != null);
+  const wline = wx ? p => { const g = wx.gameOf(WX, p.nfl); return g ? wx.line(g) : null; } : null;
+  if (detail) one(box, h1, P, W, rows, r, svg, rosWhy, wline); else list(box, W, rows, r, rosWhy, P.ersatz || {}, P.ros_nach_woche != null);
 }
 
 // Wochenwerte je Spieler mit dem Tagesstand überlagern (Schlüssel: Spieler-ID); ohne Tagesstand unverändert.
@@ -176,7 +181,7 @@ function newsBox(p, W) {
     h('p', {class: 'note'}, 'Nur Verweise: Die App übernimmt keine Texte. ', W?.stand ? `Tagesstand ${U.stamp(W.stand)}.` : ''));
 }
 
-function one(box, h1, P, W, rows, r, svg, rosWhy) {
+function one(box, h1, P, W, rows, r, svg, rosWhy, wline) {
   const pid = r.sub;
   const p = rows.find(x => String(x.id) === pid);
   // Rückweg: kam man per Link aus der App, führt „← zurück“ per Verlauf dorthin (mit Filtern und Scrollposition)
@@ -229,4 +234,28 @@ function one(box, h1, P, W, rows, r, svg, rosWhy) {
       U.tile('Ersatzniveau', U.val(ers, U.num, P.ros_nach_woche != null ? 'kein freier Spieler der Position' : rosWhy), p.pos, 'ersatz'),
       U.tile('ROS über Ersatz', U.val(p.ros_ue, U.sgn, P.ros_nach_woche != null && !U.ok(ers) ? 'kein freier Spieler der Position' : rosWhy), null, 'ros-ue')),
     h('p', {class: 'note'}, 'Alle Projektionen sind ESPN-Schätzungen. ', U.ib('projektionen', '')));
+  matchup(box, p, P, wline?.(p));
+}
+
+// Positions-Matchup der nächsten Wochen (players.json mu, Wochenstand; D/ST: F der gegnerischen Offense aus den
+// D/ST-Faktoren) und die Wetterzeile des nächsten Spiels (wetter.json, Prognose der laufenden Woche)
+function matchup(box, p, P, wl) {
+  const dst = p.pos === 'D/ST', m = p.mu, n1 = m?.n1;
+  const why = !('mu_woche' in P) ? 'ab dem nächsten Wochenabruf' : !p.nfl ? 'kein NFL-Team' : 'kein Matchup-Wert für diese Position';
+  const n1Why = !n1 ? 'keine offene Woche' : 'Bye';
+  const cell = (v, reason) => U.val(v, x => h('span', {class: 'fz ' + U.fcls(x)}, U.num(x, 2)), reason);
+  U.ap(box, h('h2', null, dst ? 'Matchup D/ST' : 'Positions-Matchup'),
+    !m ? h('p', {class: 'note'}, `Kein Matchup-Wert: ${why}.`) : h('div', {class: 'tiles'},
+      // 32 NFL-Teams: Rang 1 = höchstes F, also das günstigste Matchup
+      U.tile(n1 ? `Gegner W${n1.week}` : 'Gegner', n1 ? n1.opp || 'Bye' : U.na(n1Why), n1?.opp ? (dst ? 'Offense' : 'Defense') : null, 'mu-n1'),
+      U.tile('Faktor F', n1?.opp ? cell(n1.f, 'kein Faktor') : U.na(n1Why), null, dst ? 'f' : 'mu-f'),
+      U.tile('Rang', n1?.opp ? U.val(n1.rang, v => `${v}. von 32`, 'kein Faktor') : U.na(n1Why), '1 = günstigstes Matchup', dst ? 'f' : 'mu-rang'),
+      U.tile('Ø nächste 3', cell(m.naechste3, 'kein Spiel in den nächsten 3 Wochen'), null, dst ? 'naechste3' : 'mu-naechste3'),
+      U.tile('Rest bis W14', cell(m.rest, 'keine Regular-Season-Woche mehr'), null, dst ? 'rest' : 'mu-rest'),
+      U.tile('SoS W15–17', cell(m.sos_po, 'kein Playoff-Spiel'), null, dst ? 'sos' : 'mu-sos')),
+    !m ? null : h('p', {class: 'note'}, ...(dst
+      ? ['F der gegnerischen Offense aus den D/ST-Faktoren, über 1,00 = günstig für die D/ST. ', h('a', {href: '#dst'}, 'D/ST-Faktoren')]
+      : ['Position gegen Defense, kein Einzelduell: F über 1,00 heißt, Spieler der Position holen gegen diese Defense mehr Punkte als im Schnitt. ',
+        h('a', {href: '#matchup/' + String(p.pos).toLowerCase()}, `Alle Defenses gegen ${p.pos}`)])),
+    wl ? h('p', null, wl, ' · ', h('a', {href: '#wetter'}, 'Wetter aller Spiele')) : null);
 }

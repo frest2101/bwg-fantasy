@@ -144,8 +144,8 @@ function header() {
 
 // ---------------------------------------------------------------- Router
 const VIEWS = {tabelle: 'v_tabelle', ranking: 'v_ranking', spielplan: 'v_spielplan', team: 'v_team', spieler: 'v_spieler',
-  dst: 'v_dst', moves: 'v_moves', waiver: 'v_waiver', rekorde: 'v_rekorde', lesart: 'v_lesart'};
-const NAV = {team: 'tabelle', dst: 'spieler', moves: 'spieler'};
+  dst: 'v_dst', matchup: 'v_matchup', wetter: 'v_wetter', moves: 'v_moves', waiver: 'v_waiver', rekorde: 'v_rekorde', lesart: 'v_lesart'};
+const NAV = {team: 'tabelle', dst: 'spieler', matchup: 'spieler', wetter: 'spieler', moves: 'spieler'};
 let seq = 0, cur = null, curHash = null;
 // Scrollposition je Verlaufseintrag: beim Verlassen (Link-Klick) und nach jedem Scrollen in history.state.y sichern,
 // damit „Zurück“ die alte Stelle wiederfindet. Neue Einträge haben keinen state – daran erkennt der Router den Rückweg.

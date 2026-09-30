@@ -1,11 +1,7 @@
 // D/ST-Faktoren (lädt dst.json): Streaming aus Sicht der D/ST und Offenses mit Faktor F und Auslösern.
 // Farbzellen divergierend um 1,00: blau = günstig für die D/ST, orange = ungünstig; die Zahl steht immer dabei.
 let U, S, h;
-const fcls = f => {
-  if (!U.ok(f)) return 'f0';
-  const d = f - 1;
-  return d >= 0.15 ? 'f3' : d >= 0.07 ? 'f2' : d >= 0.02 ? 'f1' : d > -0.02 ? 'f0' : d > -0.07 ? 'g1' : d > -0.15 ? 'g2' : 'g3';
-};
+const fcls = f => U.fcls(f);          // gemeinsame Farbklasse (ui.js), auch im Positions-Matchup
 const OWN = {FREEAGENT: 'FA', WAIVERS: 'W'};
 // Auslöser kommen als Schlüssel (delta, z, rang); die Langtexte liefert dst.json in ausloeser_legende
 const AUS = {delta: 'ΔF', z: 'z', rang: 'Rang'};

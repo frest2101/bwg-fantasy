@@ -59,12 +59,13 @@ Die App lädt `data/manifest.json?t=<jetzt>` und danach jede Datei mit `?v=<v>`.
   - Spieler `{player_id, name, pos, team_id, week, slot, wert}`: `bester_spieler`
 
 ## `players.json` (lazy, Tab Spieler und Teamseite)
-- **Kopf:** `ersatz` (Position → Ersatzniveau), `ros_nach_woche`, `cv`, `weeks`.
+- **Kopf:** `ersatz` (Position → Ersatzniveau), `ros_nach_woche`, `cv`, `weeks`, `mu_woche` (Woche N+1 des Positions-Matchups, `null` nach der letzten Woche).
 - **`players`:** Liste. Aufgenommen wird, wer mindestens ein Spiel hat oder im Kader steht, dazu die 20 besten Free Agents je Position nach ROS/Spiel. Felder:
   - Stammdaten: `id, name, pos` (Kürzel) `, nfl` (Kürzel) `, bye` (Bye-Woche des NFL-Teams, `null` ohne NFL-Team) `, team` (team_id oder 0) `, status, inj, own`
   - Saison: `g, pts, avg, floor, ceil, sd, form, form_d, trend, spark, starts, bench_pts, proj_d`
   - `wk`: Liste je Woche `[pts|null, proj|null, bye 0/1, team_id|0, slot|null]` in der Reihenfolge von `weeks`
   - ROS: `ros, ros_g, rest_g, ros_po, ros_rang, ros_ue`
+  - `mu` (Positions-Matchup, Wochenstand wie ROS; die App verknüpft über `id`): `{n1: {week, opp, f, rang}, naechste3, rest, sos_po}` – `n1` = Gegner in Woche `mu_woche` (`opp` NFL-Kürzel der Defense, `f` ihr F für die Position des Spielers, `rang` 1 = günstigstes Matchup; bei Bye alle drei `null`; `n1` selbst `null` ohne Woche N+1), `naechste3` = Ø F der Gegner in N+1…N+3, `rest` = N+1…14, `sos_po` = W15–17 (eine Woche ohne Spiel fällt heraus, `null` ohne Spiel), F mit 3 Stellen. QB, RB, WR, TE und K aus `matchup.json`; D/ST aus `dst.json` (F und Rang der gegnerischen Offense, gleiche Richtung: > 1 günstig). `mu` ist `null` ohne NFL-Team.
 
 ## `dst.json` (lazy, Unter-Tab D/ST)
 - **Kopf:** `ligaschnitt {"2025", "2026"}`, `formel`, `through_week`, `ausloeser_legende` (Schlüssel → Text).
@@ -73,6 +74,19 @@ Die App lädt `data/manifest.json?t=<jetzt>` und danach jede Datei mit `?v=<v>`.
   - Faktor und Auslöser: `f, f_vorwoche, delta, rang` (1 = höchstes F), `rang_vorwoche`, `z_last3` (Ø Z der letzten 3 Spiele in Punkten), `ausloeser` (Liste aus `delta`, `z`, `rang`), `beobachten`
   - Sicht der D/ST: `naechste3, rest, sos_po, besitzer, status`
   - `naechste`: die Gegner der Wochen N+1…N+3 als `[{week, opp, f}]`, Bye ohne `opp`
+
+## `matchup.json` (lazy, Positions-Matchup)
+Position gegen Defense, kein Einzelduell: wie viele Punkte jede NFL-Defense den Spielern einer Position zulässt (`scripts/matchup.py`, Formel wie D/ST).
+- **Kopf:**
+  - `through_week`, `saison`, `vorjahr`, `positionen` (`["QB", "RB", "WR", "TE", "K"]`), `formel`, `ausloeser_legende` (Schlüssel → Text: `delta`, `rang`)
+  - `vorjahr_quelle`: `"basis"` (Auszug `data/raw/<saison>/basis/positionen_<vorjahr>.json`) oder `"ligamittel"` (Auszug fehlt noch: r25 = 1,00 für alle, `z25` und Ligaschnitt des Vorjahrs `null`)
+  - `ligaschnitt`: je Position `{"2025": LS25|null, "2026": LS26|null}` (Ø Z über die Defenses mit Spiel)
+  - `wochen`: `{n1, naechste3, rest, sos_po}` – Woche N+1 (`null` nach der letzten Woche) und die Wochen der Spielplan-Faktoren
+- **`defenses`:** Liste je NFL-Team (nach NFL-ID) mit `id, abbrev, bye` und `pos`: je Position (Schlüssel wie `positionen`):
+  - `z25, z26` (Z = Ø Punkte je Spiel, die Spieler der Position mit Einsatz gegen die Defense erzielt haben; `null` ohne Spiel), `n` (Spiele 2026 mit mindestens einem Spieler der Position)
+  - `r25, r26` (Z/Ligaschnitt; r25 = 1 ohne Vorjahresspiel), `f` (F = (n·r26 + 5·r25 + 5·1,00)/(n + 10)), `f_vorwoche`, `delta`
+  - `rang` (1 = höchstes F = günstigstes Matchup für Spieler der Position; Gleichstand teilt sich den besseren Rang), `rang_vorwoche`, `ausloeser` (Liste aus `delta` |ΔF| ≥ 0,10, `rang` Rangsprung ≥ 5; kein z-Auslöser)
+- Zahlen: F, r und `delta` 3 Stellen, Z und Ligaschnitt 2. Die Werte je Spieler stehen in `players.json` (`mu`).
 
 ## `history.json` (lazy, Rekorde › Historie)
 - `alltime`, `seasons`, `team_seasons`, `champions`, `rekorde` wie `scripts/history.py`.
@@ -94,22 +108,23 @@ Die App lädt `data/manifest.json?t=<jetzt>` und danach jede Datei mit `?v=<v>`.
   - Kaderspieler, die `players.json` nicht führt (unter der Woche geholt, ohne Spiel, nicht unter den 20 besten Free Agents), tragen zusätzlich `name, pos, nfl` aus dem Wochenpool (`null`, wenn auch dort unbekannt).
 - Quelle: `data/raw/2026/pool/latest.json` (Tageslauf, stündlich vormittags und abends; Kopf `waiver_reihenfolge` = `waiverRank` je Team aus `mTeam`, `waiver_reihenfolge_stand` = Abrufzeit ihrer letzten Änderung); Besitz, Verletzung und Status sind der Stand des Abrufs, ESPN führt keine Historie.
 
-## `wetter.json` (lazy, Wetter je Spiel – Anzeige ab Session 8)
-- **Kopf:** `stand` (jüngster Wetterabruf, UTC), `woche` (Woche der Prognose oder `null`), `einheiten` (`temp` °C, `wind` und `boeen` km/h, `regen_wahrsch` %, `niederschlag` mm, `schnee` cm).
+## `wetter.json` (lazy, Wetter je Spiel – Ansicht `#wetter`, Spielerseite, Fähnchen im Waiver-Tab)
+- **Kopf:** `stand` (jüngster Wetterabruf, UTC), `woche` (Woche der Prognose oder `null`), `einheiten` (`temp` °C, `wind` und `boeen` km/h, `regen_wahrsch` %, `niederschlag` mm, `schnee` cm), `schwellen` (Faustregel der Markierung: `{"wind": 25, "boeen": 40, "regen_wahrsch": 60, "schnee": 0}`).
 - **`prognose`:** die Spiele der laufenden NFL-Woche (W1–17: die erste Woche mit einem noch nicht beendeten Spiel; nach dem letzten Spiel der W17 leer). **`ist`:** alle gespielten Spiele der Saison (ohne `regen_wahrsch`). Felder je Spiel:
   - `id` (ESPN-Spiel-ID), `woche`, `kickoff` (UTC, `JJJJ-MM-TTThh:mmZ`; `null`, wenn ESPN den Anstoß noch offen führt), `tbd` (Anstoß offen, Flex-Spiele der späten Wochen), `heim`, `gast` (NFL-Kürzel), `stadion`, `ort`, `dach` (`offen`, `fest`, `beweglich`), `neutral` (Auslandsspiel)
   - Werte über die Kickoff-Stunde und drei Stunden danach: `temp` (Ø), `wind` (Ø), `boeen` (max), `regen_wahrsch` (max, ganzzahlig), `niederschlag` (Σ), `schnee` (Σ); eine Stelle. Alle `null`, wenn `tbd`.
+  - `markierung`: Liste der Schlüssel ab der Schwelle in der Reihenfolge `wind, boeen, regen_wahrsch, schnee` – Python rechnet (`wetter.markierung`) mit dem Wert, wie die App ihn zeigt: Wind, Böen und Regenwahrscheinlichkeit ganzzahlig (aus dem Wert mit einer Stelle, round half up) ≥ Schwelle, Schnee mit einer Stelle > 0; fehlende Werte zählen nicht. Leer bei `tbd` und bei Dachspielen.
   - Dachspiele (`fest`, `beweglich`) tragen dieselben Werte; die App zeigt sie dort nicht als Wetter an.
 - Quelle: Open-Meteo (Modellwerte, kein Stationsmesswert), Spielorte aus `data/raw/2026/nfl/stadien.json` (von Hand, gegen die ESPN-Scoreboard-API geprüft). Rohdaten: `data/raw/2026/wetter/prognose/wNN_<UTC>.json` (nur laufende Woche) und `wetter/ist_2026.json` (dauerhaft).
 
 ## `claude.json` (kompakt, < 50 KB, für Claude-Sessions unterwegs)
-- **Stand:** `legende`, `stand`.
+- **Stand:** `legende`, `stand` (`saison, nach_woche, kader_quelle, ros_nach_woche, matchup_woche` = Woche N+1 des Positions-Matchups).
 - **Liga:**
   - `tabelle`: 10 Teams mit Rang, W-L-T, PF, All-Play-Quote, Matchup-Glück, Effizienz, Form, Score, Power Ranking (μ, E, Rang, Trend) und Playoff-%
   - `spiele`: alle Paarungen mit Ergebnis
-- **Spieler:**
-  - `kader`: alle Kaderspieler mit Name, Position, NFL-Team, Team, Verletzung, Ø, Form, ROS/Spiel und ROS-Rang
-  - `free_agents`: die Top 10 je Position nach ROS/Spiel
+- **Spieler** (Spalten `spieler_spalten`):
+  - `kader`: alle Kaderspieler je Team mit Name, Position, NFL-Team, Verletzung, Ø, Form, Trend, ROS/Spiel, ROS-Rang, `gegner_n1` (Gegner in `matchup_woche`, NFL-Kürzel) und `mu_n1` (Positions-Matchup F dieses Gegners, 3 Stellen, > 1 günstig; beide `null` bei Bye oder ohne Wert)
+  - `free_agents`: die Top 10 je Position nach ROS/Spiel, dieselben Spalten und zusätzlich am Ende der Status
 - **D/ST und Bewegungen:**
   - `dst`: 32 D/ST mit F, nächste 3, Rest, SoS und Besitzer
   - `transaktionen` (mit `transaktionen_spalten`): die Moves der 14 Tage bis zur letzten Transaktion
