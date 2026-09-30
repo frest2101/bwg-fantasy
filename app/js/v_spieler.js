@@ -15,7 +15,7 @@ export const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(
 const spiele = n => `${n ?? 0} ${n === 1 ? 'Spiel' : 'Spiele'}`;
 // Rückweg-Ziele für den Link oben im Spielerdetail
 const BACK = {spieler: 'Spielerliste', team: 'Team', moves: 'Moves', spielplan: 'Spielplan', waiver: 'Waiver', dst: 'D/ST-Faktoren',
-  tabelle: 'Tabelle', rekorde: 'Rekorde', ranking: 'Ranking'};
+  tabelle: 'Tabelle', rekorde: 'Rekorde', ranking: 'Ranking', keeper: 'Keeper'};
 
 export async function render(box, ctx, r) {
   U = ctx.ui; S = U.S; h = U.h;
@@ -29,12 +29,17 @@ export async function render(box, ctx, r) {
   // Wetter ebenso (nur Spielerseite): ohne wetter.json keine Wetterzeile
   const WX = detail && S.man.files?.['wetter.json'] ? await ctx.load('wetter.json').catch(() => null) : null;
   const wx = WX ? await ctx.mod('v_wetter').catch(() => null) : null;
+  // Herkunft (nur Spielerseite): ohne keeper.json fehlt die Zeile
+  const K = detail && S.man.files?.['keeper.json'] ? await ctx.load('keeper.json').catch(() => null) : null;
+  const kp = K ? await ctx.mod('v_keeper').catch(() => null) : null;
   if (!r.alive()) return;
   const svg = await ctx.mod('svg');
   const rosWhy = P.ros_nach_woche == null ? `ab Wochenabruf W${S.tw + 1}` : 'keine Projektion';
   const rows = merge(P, W);
   const wline = wx ? p => { const g = wx.gameOf(WX, p.nfl); return g ? wx.line(g) : null; } : null;
-  if (detail) one(box, h1, P, W, rows, r, svg, rosWhy, wline); else list(box, W, rows, r, rosWhy, P.ersatz || {}, P.ros_nach_woche != null);
+  // Herkunft nur, wenn keeper.json den Spieler beim selben Team führt wie der Tagesstand
+  const origin = kp ? p => { const o = kp.byPlayer(K).get(p.id); return o && o.team === p.team ? kp.herkunft(o, K, true) : null; } : null;
+  if (detail) one(box, h1, P, W, rows, r, svg, rosWhy, wline, origin); else list(box, W, rows, r, rosWhy, P.ersatz || {}, P.ros_nach_woche != null);
 }
 
 // Wochenwerte je Spieler mit dem Tagesstand überlagern (Schlüssel: Spieler-ID); ohne Tagesstand unverändert.
@@ -204,7 +209,7 @@ function newsBox(p, W) {
     h('p', {class: 'note'}, 'Nur Verweise: Die App übernimmt keine Texte. ', W?.stand ? `Tagesstand ${U.stamp(W.stand)}.` : ''));
 }
 
-function one(box, h1, P, W, rows, r, svg, rosWhy, wline) {
+function one(box, h1, P, W, rows, r, svg, rosWhy, wline, origin) {
   const pid = r.sub;
   const p = rows.find(x => String(x.id) === pid);
   // Rückweg: kam man per Link aus der App, führt „← zurück“ per Verlauf dorthin (mit Filtern und Scrollposition)
@@ -221,6 +226,8 @@ function one(box, h1, P, W, rows, r, svg, rosWhy, wline) {
     p.inj && U.INJ[p.inj] ? h('span', {class: 'badge'}, U.INJ[p.inj][1]) : null,
     U.ok(p.bye) ? ` · Bye W${p.bye}` : null,
     p.pos === 'D/ST' ? [' · ', h('a', {href: '#dst'}, 'D/ST-Faktoren')] : null), stand(W),
+  p.team > 0 && origin?.(p) ? h('p', {class: 'note'}, 'Herkunft: ', h('strong', null, origin(p)), ' · ',
+    h('a', {href: '#keeper/kader?team=' + p.team}, 'Keeper und Kader'), ' ', U.ib('herkunft', '')) : null,
   h('div', {class: 'tiles'},
     U.tile('Pkt Saison', U.num(p.pts), spiele(p.g), 'spiele'),
     U.tile('Ø', U.val(p.avg, U.num, 'ohne Spiel'), null, 'avg'),

@@ -38,7 +38,7 @@ def data(content):
 
 def test_alle_dateien_und_gueltiges_json(data):
     immer = {"manifest.json", "teams.json", "schedule.json", "players.json", "dst.json", "matchup.json", "history.json",
-             "transactions.json", "claude.json"}
+             "transactions.json", "keeper.json", "claude.json"}
     tageslauf = {"waiver.json", "wetter.json"}  # erst, wenn der Tageslauf Pool-Auszug und Wetter geliefert hat
     assert immer <= set(data) <= immer | tageslauf
 
@@ -264,7 +264,42 @@ def test_dst_und_transaktionen(data):
     lv = next(t for t in d["teams"] if t["abbrev"] == "LV")
     assert abs(Decimal(str(lv["f"])) - Decimal("1.200")) <= Decimal("0.001")
     assert all(isinstance(n.get("opp", ""), str) for t in d["teams"] for n in t["naechste"])
-    assert set(data["transactions.json"]) == {"spieler", "items", "aufstellungswechsel", "draft"}
+    assert set(data["transactions.json"]) == {"spieler", "items", "aufstellungswechsel"}   # Draft: keeper.json
+
+
+KEEPER_TEAM = {"keeper", "keeper_da", "picks", "picks_da", "kader", "pf", "kern"}
+KEEPER_GRUPPEN = {"keeper", "draft", "zugang", "trade"}
+
+
+def test_keeper_vertrag(data):
+    """keeper.json: Kopf, liga, teams, kader und picks genau nach Positivliste; lazy; Anteile mit einer Stelle,
+    Punkte mit zwei; Positionen als Kürzel; in_app wie in transactions.json."""
+    k = data["keeper.json"]
+    assert set(k) == {"through_week", "stand", "draft_datum", "keeper_zahl", "kader_plaetze", "liga", "teams", "kader", "picks"}
+    assert (k["through_week"], k["keeper_zahl"], k["kader_plaetze"]) == (2, 12, 24)
+    assert data["manifest.json"]["files"]["keeper.json"]["lazy"]
+    assert k["stand"] == data["manifest.json"]["datenstand"]["pool_stand"]
+    assert set(k["liga"]) == KEEPER_TEAM and [t["team_id"] for t in k["teams"]] == list(range(1, 11))
+    places = lambda v: len(str(v).split(".")[-1])  # noqa: E731
+    for t in k["teams"] + [k["liga"]]:
+        assert set(t) - {"team_id"} == KEEPER_TEAM
+        assert set(t["kader"]) == {"keeper", "draft", "waiver", "free_agent", "trade"}
+        for part in (t["pf"], t["kern"]):
+            assert set(part) == {"summe", "pts", "anteil"} and set(part["pts"]) == set(part["anteil"]) == KEEPER_GRUPPEN
+            assert all(places(v) <= 1 for v in part["anteil"].values()) and all(places(v) <= 2 for v in part["pts"].values())
+    pf = {t["team_id"]: t["pf"] for t in data["teams.json"]["teams"]}
+    assert all(t["pf"]["summe"] == pf[t["team_id"]] for t in k["teams"])
+    assert all(set(r) == {"id", "name", "pos", "nfl", "team", "art", "pick", "runde", "von", "seit", "g", "avg", "vj_g",
+                          "vj_pts", "vj_avg", "vj_delta", "rookie", "in_app"} for r in k["kader"])
+    assert all(set(p) == {"pick", "runde", "runden_pick", "team_id", "player_id", "name", "pos", "keeper", "da",
+                          "team_jetzt", "g", "pts", "avg", "starts", "pf", "in_app"} for p in k["picks"])
+    assert len(k["picks"]) == 240 and sum(p["keeper"] for p in k["picks"]) == 119
+    assert {p["pos"] for p in k["picks"]} <= {"QB", "RB", "WR", "TE", "K", "D/ST"}
+    assert {r["pos"] for r in k["kader"]} <= {"QB", "RB", "WR", "TE", "K", "D/ST", None}
+    known = {p["id"] for p in data["players.json"]["players"]}
+    known |= {s["id"] for s in data.get("waiver.json", {}).get("spieler", []) if s["team"] > 0}
+    assert all(p["in_app"] == (p["player_id"] in known) for p in k["picks"])
+    assert all(r["in_app"] for r in k["kader"]) if "waiver.json" in data else True
 
 
 MATCHUP_POS = {"z25", "z26", "n", "r25", "r26", "f", "f_vorwoche", "delta", "rang", "rang_vorwoche"}
@@ -421,7 +456,6 @@ def test_transaktionen_markieren_spieler_ohne_seite(data):
     known |= {s["id"] for s in data.get("waiver.json", {}).get("spieler", []) if s["team"] > 0}
     moves = [i for x in t["items"] for i in x["items"]]
     assert moves and all(i["in_app"] == (i["player_id"] in known) for i in moves)
-    assert all(d["in_app"] == (d["player_id"] in known) for d in t["draft"])
 
 
 def test_oeffentlich(tmp_path, content):

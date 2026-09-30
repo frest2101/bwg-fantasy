@@ -258,5 +258,5 @@ function claims(box, T, name) {
     {k: 'a', l: 'Art', v: x => x.type, d: 1, f: x => ART[x.type] || x.type},
     {k: 'z', l: 'Zugang', f: x => pl(part(x, 'ADD'))},
     {k: 'b', l: 'Abgang', f: x => pl(part(x, 'DROP'))}]}),
-  h('p', {class: 'note'}, h('a', {href: '#moves'}, 'Alle Moves und der Draft'), ' ', U.ib('claims', '')));
+  h('p', {class: 'note'}, h('a', {href: '#moves'}, 'Alle Moves'), ' · ', h('a', {href: '#keeper/draft'}, 'Draft'), ' ', U.ib('claims', '')));
 }

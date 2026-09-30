@@ -19,6 +19,7 @@ import wetter
 from zahlen import ZERO, dec
 
 STAT_ACTUAL, STAT_PROJECTION, SPLIT_WEEK = 0, 1, 1   # statSourceId, statSplitTypeId
+SPLIT_SEASON = 0                                     # statSplitTypeId des Saison-Eintrags
 HISTORY_DIR = "history"                              # data/history/*.csv
 
 
@@ -34,6 +35,8 @@ class RosterRow(NamedTuple):
     projection: object        # Decimal: Wochenprojektion, 0 ohne Eintrag
     played: bool              # stats["210"] == 1 im Ist-Eintrag
     injury: str | None        # player.injuryStatus, Stand des Abrufs
+    prior_pts: object = None  # Decimal: Saison-Ist des Vorjahrs im Liga-Scoring; None ohne Eintrag (Rookie)
+    prior_games: int | None = None   # Spiele des Vorjahrs (Stat 210 des Saison-Eintrags)
 
 
 class PoolRow(NamedTuple):
@@ -73,6 +76,19 @@ def played(stat: dict | None) -> bool:
     return bool(stat) and (stat.get("stats") or {}).get(ef.STAT_PLAYED) == 1
 
 
+def season_stat(player: dict, season: int) -> dict | None:
+    """Saison-Ist eines Spielers (statSourceId 0, statSplitTypeId 0, scoringPeriodId 0), None ohne Eintrag.
+
+    mRoster trägt den Eintrag auch für das Vorjahr, appliedTotal im Liga-Scoring der laufenden Saison (geprüft
+    30.09.2026: 222/222 gegen die Rohstats). Wer im Vorjahr ausfiel, hat einen Eintrag ohne Spiele; Rookies haben keinen.
+    """
+    for s in player.get("stats", []):
+        if (s.get("seasonId"), s.get("scoringPeriodId"), s.get("statSourceId"), s.get("statSplitTypeId")) \
+                == (season, 0, STAT_ACTUAL, SPLIT_SEASON):
+            return s
+    return None
+
+
 def roster_rows(data: dict, season: int, week: int) -> list[RosterRow]:
     """Alle Kaderplätze aller Teams einer mRoster-Antwort, sortiert nach Team und Spieler."""
     rows = []
@@ -80,11 +96,14 @@ def roster_rows(data: dict, season: int, week: int) -> list[RosterRow]:
         for entry in team["roster"]["entries"]:
             player = entry["playerPoolEntry"]["player"]
             actual, projection = (week_stat(player, season, week, s) for s in (STAT_ACTUAL, STAT_PROJECTION))
+            prior = season_stat(player, season - 1)
             rows.append(RosterRow(team["id"], entry["lineupSlotId"], player.get("id", 0), player["defaultPositionId"],
                                   player.get("fullName", ""), player.get("proTeamId", 0),
                                   dec(actual.get("appliedTotal", 0)) if actual else ZERO,
                                   dec(projection.get("appliedTotal", 0)) if projection else ZERO,
-                                  played(actual), player.get("injuryStatus")))
+                                  played(actual), player.get("injuryStatus"),
+                                  dec(prior.get("appliedTotal", 0)) if prior else None,
+                                  int((prior.get("stats") or {}).get(ef.STAT_PLAYED) or 0) if prior else None))
     return sorted(rows, key=lambda r: (r.team_id, r.player_id))
 
 
@@ -236,6 +255,13 @@ class Season:
             keep = ("overallPickNumber", "roundId", "roundPickNumber", "teamId", "playerId", "keeper")
             return [{k: p.get(k) for k in keep} for p in picks]
         return self._get("draft", load)
+
+    def draft_end(self) -> int | None:
+        """Ende des Drafts (draftDetail.completeDate, Epoch-ms); None, solange die Datei fehlt oder der Draft läuft."""
+        def load():
+            data = self._optional(ef.season_files(self.season)["draft"])
+            return (data or {}).get("draftDetail", {}).get("completeDate")
+        return self._get("draft_end", load)
 
     def transactions(self) -> list[dict]:
         """Alle archivierten Transaktionen (mTransactions2_p*.json), je id die zuletzt archivierte Fassung.

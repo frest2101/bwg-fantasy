@@ -95,8 +95,26 @@ Position gegen Defense, kein Einzelduell: wie viele Punkte jede NFL-Defense den 
 ## `transactions.json` (lazy)
 - `spieler` (id → Name), `aufstellungswechsel` (team_id → Zahl).
 - `items`: `{id, type, team_id, datum (Epoch-ms), periode, items: [{type ADD/DROP, player_id, name, from_team_id, to_team_id, in_app}]}`. `type` ist WAIVER, FREEAGENT, ROSTER (reine Drops) oder TRADE_ACCEPT (ohne Spieler).
-- `draft`: `{pick, runde, runden_pick, team_id, player_id, name, keeper, in_app}`.
 - `in_app` (bool): Die App hat eine Spielerseite zu diesem Spieler (players.json oder Kader laut Tagesstand); sonst zeigt sie den Namen ohne Link.
+- Der Draft steht seit dem Keeper-Tab in `keeper.json` (`picks`).
+
+## `keeper.json` (lazy, Keeper-Tab `#keeper`, dazu Herkunft auf Team- und Spielerseite)
+Keeper-Bilanz (`scripts/keeper.py`): woher die Punkte eines Teams kommen. Herkunft = Nachspielen von Draft (`mDraftDetail`) und Transaktions-Archiv; fehlt vor dem Draft.
+- **Kopf:** `through_week` (Punkte bis zu dieser Woche), `stand` (Abrufzeit des Tagesstands, nach dem sich der Kader heute richtet; `null` = Wochenstand), `draft_datum` (Draft-Ende, Epoch-ms), `keeper_zahl` (mSettings `keeperCount`), `kader_plaetze` (Kaderplätze ohne IR-Slot).
+- **`teams`** (nach `team_id`) und **`liga`** (dieselben Felder über alle Teams):
+  - `keeper`, `keeper_da` (Keeper-Picks und wie viele davon heute noch als Keeper im Kader des Teams stehen), `picks`, `picks_da` (Draft-Picks der Saison genauso)
+  - `kader`: Zahl der Kaderspieler heute je Art `{keeper, draft, waiver, free_agent, trade}`
+  - `pf` und `kern`: `{summe, pts: {keeper, draft, zugang, trade}, anteil: {…}}` – Starter-Punkte W1 … `through_week` nach Herkunft; `zugang` = Waiver-Claims und Free Agents zusammen; `anteil` in % der Summe (eine Stelle, `null` ohne Punkte). `pf.summe` = PF des Teams; `kern` = dieselbe Aufteilung nur für QB, RB, WR, TE.
+- **`kader`:** Kaderspieler heute, sortiert nach (`team`, `id`):
+  - `id, name, pos, nfl, team, in_app` (`name`, `pos`, `nfl` aus dem Wochenpool, `null` für Spieler, die er nicht kennt)
+  - `art` (`keeper`, `draft`, `waiver`, `free_agent`, `trade`), `pick`, `runde`, `von` (Pick, Runde und Team des Picks: bei Keepern und Draft-Picks, und bei getauschten Spielern, die seit dem Draft ununterbrochen in einem Kader stehen; sonst `null`), `seit` (Epoch-ms: Draft-Ende, Zugang oder Trade; `null` bei Keepern und bei Trades ohne Datum)
+  - `g`, `avg` (Spiele und Punkte je Spiel der laufenden Saison), `vj_g`, `vj_pts`, `vj_avg` (Vorjahr im heutigen Liga-Scoring aus `mRoster`), `vj_delta` (`avg` − `vj_avg`), `rookie` (bool: kein Vorjahres-Eintrag bei ESPN; `null`, wenn der Spieler in keiner gewerteten Woche im Kader stand – dann sind auch die `vj_*` `null`)
+- **`picks`:** alle Picks des Drafts inklusive Keeper, sortiert nach `pick`:
+  - `pick, runde, runden_pick, team_id, player_id, name, pos, keeper, in_app`
+  - `da` (bool: der Spieler steht seit dem Draft ununterbrochen beim Team des Picks), `team_jetzt` (team_id heute, 0 = frei)
+  - `g, pts, avg` (Saison des Spielers insgesamt, `null` ohne Eintrag im Wochenpool), `starts`, `pf` (Wochen im Starter-Slot und Punkte für das Team des Picks, solange der Abschnitt des Picks lief; Σ `pf` der Keeper-Picks = `liga.pf.pts.keeper`, der übrigen = `liga.pf.pts.draft`)
+- Fehlt die Datei (kein abgeschlossener Draft), zeigt der Keeper-Tab einen Hinweis; Team- und Spielerseite lassen die Herkunft weg.
+- Trades: Das Archiv nennt bei einem Trade keine Spieler. `art` ist `trade`, wenn das Archiv den Spieler nie zu diesem Team geführt hat (weder Pick noch Zugang) oder der Tagesstand ihn als Trade nennt (`pool/latest.json`, Kopf `trades` = Spieler-ID → `[team_id, acquisitionDate]` aus `mRoster` `acquisitionType` TRADE; von dort kommt `seit`).
 
 ## `waiver.json` (lazy, Tagesstand je Spieler – Grundlage des Waiver-Tabs)
 - **Kopf:** `stand` (Abrufzeit des Pool-Auszugs, UTC), `woche` (die Woche der Projektion `proj`: die Kalenderwoche, deren Spiele als Nächstes anstehen).
@@ -113,7 +131,7 @@ Position gegen Defense, kein Einzelduell: wie viele Punkte jede NFL-Defense den 
   - `zug` (nur freie Spieler mit Zugewinn, sonst fehlt das Feld): je Horizont `woche`, `drei`, `ros` und `team_id` `{b, n}` – `b` = brutto, um wie viel die beste Aufstellung des Teams mit dem Spieler besser wird (`players.team_gains`; `woche` = Wochenwert N+1, `drei` = Σ der Wochen N+1 … N+3 mit eigener Aufstellung je Woche, `ros` = Grundlage `bedarf_basis`), `n` = netto mit dem günstigsten nötigen Drop (voller Kader oder Position am Limit; am Limit nur dieselbe Position), sonst = `b`; nur Teams mit `b` > 0.
   - Wochensicht: `proj_ue` (Wochenwert − `ersatz_woche` der Position), `proj3` (Σ Wochenwerte über `horizont`: N+1 aus dem Tagesstand, danach aus `wNN/ros.json`, Bye 0; `null` ohne Eintrag im ROS-Auszug), `proj3_ue` (`proj3` − `ersatz_3`); `null` ohne Ersatzniveau der Position oder ohne Wochenpool-Eintrag
   - Kaderspieler, die `players.json` nicht führt (unter der Woche geholt, ohne Spiel, nicht unter den 20 besten Free Agents), tragen zusätzlich `name, pos, nfl` aus dem Wochenpool (`null`, wenn auch dort unbekannt) und – mit Sitemap-Auszug – `fp` wie in `players.json`.
-- Quelle: `data/raw/2026/pool/latest.json` (Tageslauf, stündlich vormittags und abends; Kopf `waiver_reihenfolge` = `waiverRank` je Team aus `mTeam`, `waiver_reihenfolge_stand` = Abrufzeit ihrer letzten Änderung; Kopf `ir_slot` = Spieler-IDs im IR-Slot je Team aus `mRoster`, `ir_slot_stand` genauso); Besitz, Verletzung und Status sind der Stand des Abrufs, ESPN führt keine Historie.
+- Quelle: `data/raw/2026/pool/latest.json` (Tageslauf, stündlich vormittags und abends; Kopf `waiver_reihenfolge` = `waiverRank` je Team aus `mTeam`, `waiver_reihenfolge_stand` = Abrufzeit ihrer letzten Änderung; Kopf `ir_slot` = Spieler-IDs im IR-Slot je Team aus `mRoster`, `ir_slot_stand` genauso; Kopf `trades` = per Trade gekommene Kaderspieler aus demselben Aufruf, Grundlage von `keeper.json`); Besitz, Verletzung und Status sind der Stand des Abrufs, ESPN führt keine Historie.
 
 ## `wetter.json` (lazy, Wetter je Spiel – Ansicht `#wetter`, Spielerseite, Fähnchen im Waiver-Tab)
 - **Kopf:** `stand` (jüngster Wetterabruf, UTC), `woche` (Woche der Prognose oder `null`), `einheiten` (`temp` °C, `wind` und `boeen` km/h, `regen_wahrsch` %, `niederschlag` mm, `schnee` cm), `schwellen` (Faustregel der Markierung: `{"wind": 25, "boeen": 40, "regen_wahrsch": 60, "schnee": 0}`).
