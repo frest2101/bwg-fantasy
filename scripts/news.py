@@ -1,4 +1,4 @@
-"""News je Spieler (Session 6, Stufe 2 – vorbereitet, im Tageslauf noch aus).
+"""News je Spieler (Session 6, Stufe 2 – vorbereitet, bleibt aus: Beschluss Stephan 30.09.2026).
 
 Quelle laut Probe-Lauf 29.09.2026: ESPN-Site-API, Fantasy-News je Spieler
 (site.api.espn.com/apis/fantasy/v2/games/ffl/news/players?playerId=<id>&days=<n>): je Meldung Typ (Rotowire-Meldung
@@ -11,8 +11,8 @@ Agents der App (app/data/players.json) dran; fehlgeschlagene oder wegen MAX_PLAY
 Kandidaten, bis ihr Abruf gelingt. Ablage data/raw/<saison>/news/<UTC>.json nur mit neuen Meldungen und nur mit
 Spieler-ID, Meldungs-ID, Typ, Schlagzeile, Datum, Link – nie der Text.
 
-Ob ESPN-Schlagzeilen ins öffentliche Repo dürfen, entscheidet Stephan (docs/auftraege/session6_vorbereitung.md,
-Abschnitt 6). Bis dahin ruft der Tageslauf --news nicht auf; espn_fetch.py --pool --news schaltet es ein.
+Stufe 2 bleibt aus (Beschluss Stephan 30.09.2026, CLAUDE.md „Gelernt“): Die Rotowire-„Schlagzeile“ ist der ganze Text
+ohne Web-Link, das wäre Fremdtext im öffentlichen Repo. Der Tageslauf ruft --news nicht auf; nicht erneut vorschlagen.
 """
 
 import json
