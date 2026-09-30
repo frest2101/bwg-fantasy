@@ -138,6 +138,9 @@ def compute_matchup(ssn: rawdata.Season, weeks: list[int]) -> dict:
     next_weeks = [w for w in range(through + 1, through + dst.NEXT_WEEKS + 1) if w in all_weeks]
     rest_weeks = [w for w in regular if w > through]
 
+    # Rangsprung nur gegen eine Vorwoche mit Rangordnung: ohne Vorjahr teilen sich vor der Saison alle Defenses Rang 1
+    # (F = 1,00), ein „Sprung“ davon aus wäre keiner
+    ranked = {pos: len(set(states[pos][through - 1]["rang"].values())) > 1 for pos in POSITIONS}
     defenses = []
     for t in sorted(nfl):
         team = nfl[t]
@@ -145,7 +148,7 @@ def compute_matchup(ssn: rawdata.Season, weeks: list[int]) -> dict:
         for pos in POSITIONS:
             now, before = states[pos][through], states[pos][through - 1]
             delta = now["f"][t] - before["f"][t]
-            rank_shift = before["rang"][t] - now["rang"][t]  # > 0: nach oben
+            rank_shift = before["rang"][t] - now["rang"][t] if ranked[pos] else None  # > 0: nach oben
             by_pos[NAMES[pos]] = {
                 "z25": z25[pos].get(t), "n25": len(games25[pos].get(t, {})) if source == "basis" else None,
                 "z26": now["z26"].get(t), "n": now["n"][t], "r25": r25[pos][t], "r26": now["r26"].get(t),

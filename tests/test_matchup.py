@@ -106,6 +106,21 @@ def test_echte_daten_ausloeser(w3):
     assert seen == {"delta", "rang"}
 
 
+def test_ohne_vorjahr_kein_rangsprung_vom_gleichstand():
+    """Ohne Vorjahresauszug teilen sich vor der Saison alle 32 Defenses Rang 1 (F = 1,00): nach W1 gibt es dann keinen
+    Rang-Auslöser (ein Sprung vom Gleichstand aus ist keiner), ΔF zählt weiter."""
+    if not (ef.week_dir(2026, 1) / ef.KONA_FILE).exists():
+        pytest.skip("Spielerpool W1 fehlt noch (holt der Wochenabruf)")
+    ssn = rawdata.Season(2026, 1)
+    ssn._memo["prior_positions"] = None  # Stand vor dem ersten Abruf des Auszugs, auch wenn er im Repo liegt
+    result = matchup.compute_matchup(ssn, [1])
+    assert result["vorjahr_quelle"] == "ligamittel"
+    cells = [p for d in result["defenses"] for p in d["pos"].values()]
+    assert {p["rang_vorwoche"] for p in cells} == {1} and max(p["rang"] for p in cells) >= 6
+    assert not any("rang" in p["ausloeser"] for p in cells)
+    assert all(("delta" in p["ausloeser"]) == (abs(p["delta"]) >= Decimal("0.10")) for p in cells)
+
+
 def test_echte_daten_json_stellen(w3):
     data = rounded(w3, precision=matchup.PRECISION)
     qb = data["defenses"][0]["pos"]["QB"]

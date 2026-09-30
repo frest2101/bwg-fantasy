@@ -274,7 +274,7 @@ def fetch_prior_dst(session: requests.Session, season: int, today: date) -> byte
 def scoring_table(settings: dict) -> dict[int, tuple[Decimal, dict[str, Decimal]]]:
     """Liga-Scoring aus dem settings-Block von mSettings: statId → (Punkte, abweichende Punkte je Lineup-Slot).
 
-    pointsOverrides kommen nur für Slot "16" (D/ST) vor, z. B. Fumble lost dort 0 statt −2.
+    pointsOverrides kommen nur für Slot "16" (D/ST) vor, z. B. statId 89 (0 Punkte zugelassen) dort 10 statt 12.
     """
     items = ((settings or {}).get("scoringSettings") or {}).get("scoringItems")
     if not isinstance(items, list) or not items:

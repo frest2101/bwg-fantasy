@@ -6,7 +6,7 @@ const POS = ['QB', 'RB', 'WR', 'TE', 'K'];
 // Auslöser kommen als Schlüssel (delta, rang); die Langtexte liefert matchup.json in ausloeser_legende
 const AUS = {delta: 'ΔF', rang: 'Rang'};
 const aus = t => [].concat(t?.ausloeser || []).map(a => AUS[a] || a);
-const fz = v => 'fz' + (U.ok(v) ? ' ' + U.fcls(v) : '');
+const fz = (v, st) => 'fz' + (U.ok(v) ? ' ' + U.fcls(v, st) : '');   // st = angezeigte Stellen (Standard 2)
 
 export async function render(box, ctx, r) {
   U = ctx.ui; S = U.S; h = U.h;
@@ -59,7 +59,7 @@ function position(box, M, pos) {
   const rows = (M.defenses || []).map(d => ({...(d.pos?.[pos] || {}), id: d.id, abbrev: d.abbrev}));
   const cols = [
     {k: 'o', l: 'Defense', v: t => t.abbrev, d: 1, flt: false, f: t => h('strong', null, t.abbrev)},
-    {k: 'f', l: 'F', num: 1, v: t => t.f, cls: t => fz(t.f), f: t => U.val(t.f, v => U.num(v, 3), 'kein Faktor')},
+    {k: 'f', l: 'F', num: 1, v: t => t.f, cls: t => fz(t.f, 3), f: t => U.val(t.f, v => U.num(v, 3), 'kein Faktor')},
     {k: 'd', l: 'ΔF', num: 1, v: t => t.delta, f: t => U.val(t.delta, v => U.sgn(v, 3), 'keine Vorwoche')},
     {k: 'r', l: 'Rang', num: 1, v: t => t.rang, d: 1, f: t => [U.val(t.rang, v => v + '.', 'kein Faktor'),
       h('span', {class: 'sub'}, U.ok(t.rang_vorwoche) ? `Vorw. ${t.rang_vorwoche}.` : '')]},

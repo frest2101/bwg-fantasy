@@ -131,12 +131,15 @@ export const spGroup = cur => chips('Spieler, Faktoren, Matchup, Moves und Wette
   [['#spieler', 'Spieler', 'spieler'], ['#dst', 'D/ST-Faktoren', 'dst'], ['#matchup', 'Positions-Matchup', 'matchup'], ['#moves', 'Moves', 'moves'],
     ['#wetter', 'Wetter', 'wetter']], cur);
 // Farbklasse eines Faktors F um 1,00 (D/ST-Faktoren, Positions-Matchup): f1–f3 blau = günstig, g1–g3 orange = ungünstig,
-// f0 = um 1,00; die Zahl steht immer dabei. Stufen nach F auf zwei Stellen (round half up) in ganzen Hundertsteln: gleiche
-// angezeigte Zahl = gleiche Farbe, und die Grenzen der Legende gelten genau (1,15 − 1 ergibt als Gleitkommazahl 0,1499…)
-export const fcls = f => {
+// f0 = um 1,00; die Zahl steht immer dabei. Stufe nach F in den angezeigten Stellen st (2 oder 3), gerundet mit demselben
+// Intl-Formatierer wie num() (toFixed rundet 0,985 anders als die Anzeige), gemessen in Tausendsteln: gleiche angezeigte
+// Zahl = gleiche Farbe, und die Grenzen der Legende gelten genau (1,15 − 1 ergibt als Gleitkommazahl 0,1499…)
+const NFE = {};
+const shown = (v, d) => +(NFE[d] || (NFE[d] = new Intl.NumberFormat('en-US', {minimumFractionDigits: d, maximumFractionDigits: d, useGrouping: false}))).format(v);
+export const fcls = (f, st = 2) => {
   if (!ok(f)) return 'f0';
-  const d = Math.round(Math.round((f - 1) * 1000) / 10);
-  return d >= 15 ? 'f3' : d >= 7 ? 'f2' : d >= 2 ? 'f1' : d > -2 ? 'f0' : d > -7 ? 'g1' : d > -15 ? 'g2' : 'g3';
+  const d = Math.round((shown(+f, st) - 1) * 1000);
+  return d >= 150 ? 'f3' : d >= 70 ? 'f2' : d >= 20 ? 'f1' : d > -20 ? 'f0' : d > -70 ? 'g1' : d > -150 ? 'g2' : 'g3';
 };
 
 export function seg(label, opts, cur, on, cls) {
