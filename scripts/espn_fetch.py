@@ -89,7 +89,8 @@ def season_files(season: int) -> dict[str, Path]:
     return {"schedule": base / "nfl" / "proTeamSchedules_wl.json",
             "draft": base / "draft" / "mDraftDetail.json",
             "prior_schedule": base / "basis" / f"proTeamSchedules_wl_{season - 1}.json",
-            "prior_dst": base / "basis" / f"kona_dst_{season - 1}.json"}
+            "prior_dst": base / "basis" / f"kona_dst_{season - 1}.json",
+            "prior_positions": base / "basis" / f"positionen_{season - 1}.json"}
 
 
 def league_url(season: int) -> str:
