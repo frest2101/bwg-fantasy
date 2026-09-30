@@ -24,23 +24,15 @@ from zahlen import ONE, ZERO, dec
 PRIOR_GAMES = 5            # Gewicht des Vorjahrs, in Spielen
 MEAN_GAMES = 5             # Gewicht des Ligamittels 1,00, in Spielen (nur neue Formel)
 NEXT_WEEKS = 3             # „nächste 3“ nach Kalenderwochen
-LAST_GAMES = 3             # Auslöser 2: Ø der letzten 3 Spiele der Offense
-DST_CV = Decimal("0.55")   # Streuung eines D/ST-Spiels relativ zum Ligaschnitt (Positions-CV D/ST, Frage 11 b)
-DELTA_TRIGGER = Decimal("0.10")
-Z_TRIGGER = 2
-RANK_TRIGGER = 5
-WATCH_COUNT = 3            # „beobachten“: die drei größten |z|
+LAST_GAMES = 3             # „Z letzte 3“: Ø der letzten 3 Spiele der Offense (nur beschreibend)
+# Keine Auslöser-Fähnchen mehr (Beschluss Stephan 30.09.2026): Rangsprung und ΔF markierten im Zufallsmodell mindestens
+# so viele Offenses wie in echt, z erkennt echte Veränderungen kaum – Analyse in docs/auftraege/ausloeser_analyse_2026-09-30.md
 
 FORMEL = "F = (n·r26 + 5·r25 + 5·1,00)/(n + 10); r = Z/Ligaschnitt; Z = Ø D/ST-Punkte der Gegner je Spiel"
 FORMEL_ALT = "F_alt = (n·r26 + 5·r25)/(n + 5) (Notion bis W2, nur zum Vergleich)"
-AUSLOESER = {
-    "delta": "|F − F Vorwoche| ≥ 0,10",
-    "z": "|z| ≥ 2: die letzten 3 Spiele weichen stärker vom Saisonschnitt ab, als Zufall erklärt (ab 4 Spielen)",
-    "rang": "Rang nach F um mindestens 5 Plätze verschoben",
-}
-# Stellen im JSON (Frage 11 a): F, r und die daraus gemittelten Spielplan-Faktoren 3, z 3, Punkte und Z 2
+# Stellen im JSON (Frage 11 a): F, r und die daraus gemittelten Spielplan-Faktoren 3, Punkte und Z 2
 PRECISION = {k: 3 for k in ("f", "f_alt", "f_vorwoche", "delta", "r25", "r26", "naechste3", "rest", "sos_po",
-                            "naechste3_alt", "rest_alt", "f_verlauf", "z")}
+                            "naechste3_alt", "rest_alt", "f_verlauf")}
 
 
 # ---------------------------------------------------------------- Punkte und Off. zugelassen
@@ -130,39 +122,10 @@ def schedule_factor(f: dict[int, Decimal], opponents: dict[int, int], weeks) -> 
     return statistics.mean(values) if values else None
 
 
-# ---------------------------------------------------------------- Auslöser
-
 def last_games_mean(games: dict[int, Decimal]) -> Decimal | None:
     """Ø der letzten (höchstens) 3 Spiele nach Woche; None ohne Spiel."""
     last = [games[w] for w in sorted(games)][-LAST_GAMES:]
     return statistics.mean(last) if last else None
-
-
-def z_score(games: dict[int, Decimal], z26: Decimal | None, ls26: Decimal | None) -> Decimal | None:
-    """Auslöser 2: z = (Ø letzte 3 − Z26)/(0,55·LS26·√(1/3 − 1/n)); erst ab n ≥ 4 definiert (vorher None)."""
-    n = len(games)
-    if n <= LAST_GAMES:
-        return None
-    spread = DST_CV * ls26 * (ONE / LAST_GAMES - ONE / n).sqrt()
-    return (last_games_mean(games) - z26) / spread
-
-
-def triggers(delta: Decimal | None, z: Decimal | None, rank_shift: int | None) -> list[str]:
-    """Kürzel der Auslöser (AUSLOESER): |ΔF| ≥ 0,10 · |z| ≥ 2 · Rangsprung ≥ 5."""
-    codes = []
-    if delta is not None and abs(delta) >= DELTA_TRIGGER:
-        codes.append("delta")
-    if z is not None and abs(z) >= Z_TRIGGER:
-        codes.append("z")
-    if rank_shift is not None and abs(rank_shift) >= RANK_TRIGGER:
-        codes.append("rang")
-    return codes
-
-
-def watch_list(z: dict[int, Decimal | None]) -> set[int]:
-    """„beobachten“: die drei größten |z| (nur Offenses mit z, also n ≥ 4); Gleichstand nach NFL-ID."""
-    candidates = sorted((t for t, v in z.items() if v is not None), key=lambda t: (-abs(z[t]), t))
-    return set(candidates[:WATCH_COUNT])
 
 
 # ---------------------------------------------------------------- Einstieg
@@ -177,7 +140,7 @@ def season_weeks(settings: dict) -> tuple[list[int], list[int]]:
 
 
 def compute_dst(ssn: rawdata.Season, weeks: list[int]) -> dict:
-    """D/ST-Faktoren nach Woche N = weeks[-1]: je NFL-Team die Offense-Werte (Z, r, F, Rang, Auslöser) und die Sicht
+    """D/ST-Faktoren nach Woche N = weeks[-1]: je NFL-Team die Offense-Werte (Z, r, F, Rang) und die Sicht
     seiner D/ST (Spielplan-Faktoren, Besitzer). weeks = abgeschlossene Wochen 1…N (compute.completed_weeks).
 
     Vorwoche von W1 ist der Stand vor der Saison (n = 0 für alle). Zahlen als ungerundete Decimal; beim Export mit
@@ -209,8 +172,6 @@ def compute_dst(ssn: rawdata.Season, weeks: list[int]) -> dict:
     allowed26 = allowed(points26, nfl)
     states = {w: season_state(allowed26, w, r25) for w in range(0, through + 1)}
     now, before = states[through], states[through - 1]
-    z_now = {t: z_score(now["games"].get(t, {}), now["z26"].get(t), now["ls26"]) for t in sorted(nfl)}
-    watch = watch_list(z_now)
 
     regular, playoffs = season_weeks(ssn.settings())
     all_weeks = range(1, max(regular + playoffs) + 1)
@@ -222,8 +183,6 @@ def compute_dst(ssn: rawdata.Season, weeks: list[int]) -> dict:
     for t in sorted(nfl):
         team, own = nfl[t], owners.get(t)
         opp = team.opponents
-        delta = now["f"][t] - before["f"][t]
-        rank_shift = before["rang"][t] - now["rang"][t]  # > 0: nach oben
         games = now["games"].get(t, {})
         teams.append({
             "id": t, "abbrev": team.abbrev,
@@ -231,10 +190,10 @@ def compute_dst(ssn: rawdata.Season, weeks: list[int]) -> dict:
             "player_id": own.player_id if own else None, "name": own.name if own else None,
             "z25": z25[t], "n25": len(allowed25[t]), "z26": now["z26"].get(t), "n": now["n"][t],
             "r25": r25[t], "r26": now["r26"].get(t),
-            "f": now["f"][t], "f_alt": now["f_alt"][t], "f_vorwoche": before["f"][t], "delta": delta,
+            "f": now["f"][t], "f_alt": now["f_alt"][t], "f_vorwoche": before["f"][t],
+            "delta": now["f"][t] - before["f"][t],
             "rang": now["rang"][t], "rang_vorwoche": before["rang"][t],
-            "z_last3": last_games_mean(games), "z": z_now[t],
-            "ausloeser": triggers(delta, z_now[t], rank_shift), "beobachten": t in watch,
+            "z_last3": last_games_mean(games),
             "naechste3": schedule_factor(now["f"], opp, next_weeks),
             "rest": schedule_factor(now["f"], opp, rest_weeks),
             "sos_po": schedule_factor(now["f"], opp, playoffs),
@@ -252,7 +211,7 @@ def compute_dst(ssn: rawdata.Season, weeks: list[int]) -> dict:
         "saison": ssn.season, "vorjahr": ssn.season - 1, "through_week": through,
         "ligaschnitt": {str(ssn.season - 1): ls25, str(ssn.season): now["ls26"]},
         "ligaschnitt_verlauf": [states[w]["ls26"] for w in weeks],
-        "formel": FORMEL, "formel_alt": FORMEL_ALT, "ausloeser_legende": AUSLOESER,
+        "formel": FORMEL, "formel_alt": FORMEL_ALT,
         "wochen": {"naechste3": next_weeks, "rest": rest_weeks, "sos_po": playoffs},
         "teams": teams,
     }

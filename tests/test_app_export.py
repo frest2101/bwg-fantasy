@@ -258,7 +258,7 @@ def test_dst_und_transaktionen(data):
     assert set(data["transactions.json"]) == {"spieler", "items", "aufstellungswechsel", "draft"}
 
 
-MATCHUP_POS = {"z25", "z26", "n", "r25", "r26", "f", "f_vorwoche", "delta", "rang", "rang_vorwoche", "ausloeser"}
+MATCHUP_POS = {"z25", "z26", "n", "r25", "r26", "f", "f_vorwoche", "delta", "rang", "rang_vorwoche"}
 
 
 def test_matchup_vertrag(data, result):
@@ -266,9 +266,9 @@ def test_matchup_vertrag(data, result):
     f_verlauf); lazy im Manifest; F, r und Δ mit drei Stellen."""
     m = data["matchup.json"]
     assert set(m) == {"through_week", "saison", "vorjahr", "vorjahr_quelle", "positionen", "ligaschnitt", "formel",
-                      "ausloeser_legende", "wochen", "defenses"}
+                      "wochen", "defenses"}
     assert (m["through_week"], m["saison"], m["vorjahr"]) == (2, 2026, 2025) and m["positionen"] == ["QB", "RB", "WR", "TE", "K"]
-    assert m["vorjahr_quelle"] in ("basis", "ligamittel") and set(m["ausloeser_legende"]) == {"delta", "rang"}
+    assert m["vorjahr_quelle"] in ("basis", "ligamittel")
     assert set(m["ligaschnitt"]) == set(m["positionen"]) and all(set(v) == {"2025", "2026"} for v in m["ligaschnitt"].values())
     assert m["wochen"] == {"n1": 3, "naechste3": [3, 4, 5], "rest": list(range(3, 15)), "sos_po": [15, 16, 17]}
     assert data["manifest.json"]["files"]["matchup.json"]["lazy"]

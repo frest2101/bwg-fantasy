@@ -221,7 +221,7 @@ def build_players(result: dict) -> dict | None:
 
 
 DST_FIELDS = ("id", "abbrev", "bye", "z25", "z26", "n", "r25", "r26", "f", "f_vorwoche", "delta", "rang",
-              "rang_vorwoche", "z_last3", "ausloeser", "beobachten", "naechste3", "rest", "sos_po", "besitzer", "status")
+              "rang_vorwoche", "z_last3", "naechste3", "rest", "sos_po", "besitzer", "status")
 
 
 def build_dst(result: dict) -> dict | None:
@@ -232,13 +232,13 @@ def build_dst(result: dict) -> dict | None:
     teams = [{k: t[k] for k in DST_FIELDS} | {"naechste": [n | {"opp": abbrev.get(n["opp"])} if "opp" in n else n
                                                            for n in t["naechste"]]} for t in data["teams"]]
     return {"through_week": data["through_week"], "ligaschnitt": data["ligaschnitt"], "formel": data["formel"],
-            "ausloeser_legende": data["ausloeser_legende"], "teams": teams}
+            "teams": teams}
 
 
 # Positions-Matchup: Kopf und je Defense und Position nur diese Felder (n25, zugelassen und f_verlauf bleiben im Rechenwerk)
 MATCHUP_HEAD = ("through_week", "saison", "vorjahr", "vorjahr_quelle", "positionen", "ligaschnitt", "formel",
-                "ausloeser_legende", "wochen")
-MATCHUP_FIELDS = ("z25", "z26", "n", "r25", "r26", "f", "f_vorwoche", "delta", "rang", "rang_vorwoche", "ausloeser")
+                "wochen")
+MATCHUP_FIELDS = ("z25", "z26", "n", "r25", "r26", "f", "f_vorwoche", "delta", "rang", "rang_vorwoche")
 
 
 def build_matchup(result: dict) -> dict | None:
