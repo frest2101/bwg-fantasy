@@ -943,7 +943,7 @@ def update_pool(session: requests.Session, season: int, now: datetime, stamp: st
 
 def cmd_daily(season: int, now: datetime, transactions: bool = False, pool: bool = False, wetter: bool = False,
               news: bool = False) -> int:
-    """Tageslauf: Transaktions-Archiv, Pool-Auszug, Wetter und – vorbereitet, noch aus – News je Spieler.
+    """Tageslauf: Transaktions-Archiv, Pool-Auszug, Wetter und – vorbereitet, bleibt aber aus – News je Spieler.
 
     Jeder Teil läuft für sich, geschriebene Rohdaten bleiben auch stehen, wenn ein anderer Teil scheitert. Fehler bei
     ESPN (Transaktionen, Pool) und fehlende Grundlagen machen den Lauf rot; Ausfälle von Open-Meteo und der News-
@@ -1007,7 +1007,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--wetter", action="store_true",
                         help="Tageslauf: Wetterprognose der laufenden Woche und Ist-Wetter gespielter Spiele (Open-Meteo)")
     parser.add_argument("--news", action="store_true",
-                        help="Tageslauf: News je Spieler mit geändertem lastNewsDate (nur mit --pool; Stufe 2, noch aus)")
+                        help="Tageslauf: News je Spieler mit geändertem lastNewsDate (nur mit --pool; Stufe 2, bleibt aus)")
     args = parser.parse_args(argv)
     if args.weeks:
         bad = [w for w in args.weeks if not 1 <= w <= MAX_WEEK]

@@ -6,7 +6,7 @@
 # Projektion; dazu die Waiver-Reihenfolge der Teams aus mTeam) und das Wetter (Open-Meteo: Prognose der laufenden Woche, Ist-Wetter gespielter Spiele) und schreibt nur,
 # was sich geändert hat. Danach rechnet das Rechenwerk neu; die abgeleiteten Dateien (season_2026.json, app/data) kommen
 # nur bei grünem Rechenwerk und grünen Tests mit, Rohdaten immer. News je Spieler (--news, Stufe 2) ist vorbereitet,
-# aber aus, bis Stephan entscheidet (docs/auftraege/session6_vorbereitung.md, Abschnitt 6).
+# bleibt aber aus (Beschluss Stephan 30.09.2026, CLAUDE.md „Gelernt“: Rotowire-Meldungen sind Volltext ohne Link).
 name: Tageslauf
 
 on:
@@ -38,7 +38,7 @@ jobs:
         run: python -m pip install -r requirements.txt
 
       - name: Transaktionen, Pool-Auszug und Wetter holen
-        run: python scripts/espn_fetch.py --transactions --pool --wetter   # Stufe 2: dazu --news
+        run: python scripts/espn_fetch.py --transactions --pool --wetter   # ohne --news (News Stufe 2 bleibt aus)
 
       # Auch nach einem Teilfehler des Abrufs rechnen und sichern, was schon geholt ist (der Lauf bleibt trotzdem rot).
       - name: Rechenwerk

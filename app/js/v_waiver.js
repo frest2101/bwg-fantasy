@@ -254,7 +254,11 @@ function claims(box, T, name) {
   const since = Date.now() - DAYS7;
   const items = (T.items || []).filter(x => ART[x.type] && U.ok(x.datum) && x.datum >= since);
   const part = (x, kind) => (x.items || []).filter(i => i.type === kind);
-  const pl = list => list.length ? list.map((i, k) => [k ? ', ' : '', h('a', {href: '#spieler/' + i.player_id}, i.name || name(i.player_id))]) : '–';
+  // Spieler ohne Seite in der App (in_app false, z. B. gedroppt ohne Einsatz) nur als Name, wie unter Moves
+  const pl = list => list.length ? list.map((i, k) => {
+    const txt = i.name || name(i.player_id);
+    return [k ? ', ' : '', i.in_app === false ? h('span', null, txt) : h('a', {href: '#spieler/' + i.player_id}, txt)];
+  }) : '–';
   if (!items.length) { U.ap(box, h('p', {class: 'note'}, 'Keine ausgeführten Claims oder Free-Agent-Zugänge in den letzten 7 Tagen. ', h('a', {href: '#moves'}, 'Alle Moves'))); return; }
   U.ap(box, U.table({cap: 'Ausgeführte Waiver-Claims und Free-Agent-Zugänge (neueste zuerst)', cls: 'nr', rh: 1, limit: 50, rows: items, sort: ['d', -1], cols: [
     {k: 'd', l: 'Datum', v: x => x.datum, f: x => U.stamp(x.datum)},
