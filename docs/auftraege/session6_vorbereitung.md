@@ -112,3 +112,5 @@ Gewünscht: ein Kasten mit den neuesten Nachrichten zu einem Spieler von ESPN, F
   sofern der Probe-Lauf keinen offenen RSS-Feed findet.
 
 **Empfehlung:** Stufe 1 in Session 7 mit dem Spieler-Tab bauen, Stufe 2 nach dem Probe-Lauf entscheiden.
+
+**Beschluss Stephan (30.09.2026): Stufe 2 bleibt weg.** Stufe 1 läuft seit Session 7. Ein lesender Probeabruf (neun Spieler, 7 Tage, 46 Meldungen) zeigte: Bei Rotowire ist die „Schlagzeile“ der ganze Meldungstext ohne Web-Link, die ESPN-Stories sind Sammelartikel für viele Spieler – Stufe 2 wäre Fremdtext im öffentlichen Repo bei geringem Mehrwert der Links. `--news` bleibt vorbereitet und aus. Falls später gewünscht: Meldungen auf Abruf in einer lokalen Session nur im Chat (nichts veröffentlichen).

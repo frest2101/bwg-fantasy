@@ -48,6 +48,7 @@ class PoolRow(NamedTuple):
     actual: object            # Decimal oder None, wenn kein Ist-Eintrag der Woche
     projection: object        # Decimal oder None
     played: bool
+    game_team: int = 0        # proTeamId des Ist-Eintrags (NFL-Team im Spiel der Woche), 0 ohne Ist-Eintrag
 
 
 class NflTeam(NamedTuple):
@@ -97,7 +98,7 @@ def pool_rows(data: dict, season: int, week: int) -> list[PoolRow]:
                             player.get("injuryStatus"), (player.get("ownership") or {}).get("percentOwned"),
                             dec(actual["appliedTotal"]) if actual and "appliedTotal" in actual else None,
                             dec(projection["appliedTotal"]) if projection and "appliedTotal" in projection else None,
-                            played(actual)))
+                            played(actual), (actual or {}).get("proTeamId") or 0))
     return sorted(rows, key=lambda r: r.player_id)
 
 
@@ -216,6 +217,11 @@ class Season:
     def prior_dst(self) -> dict | None:
         """Rohantwort der 32 D/ST mit Wochenwerten des Vorjahrs (basis/kona_dst_<vorjahr>.json)."""
         return self._get("prior_dst", lambda: self._optional(ef.season_files(self.season)["prior_dst"]))
+
+    def prior_positions(self) -> dict | None:
+        """Auszug Positionen des Vorjahrs (basis/positionen_<vorjahr>.json, espn_fetch.positions_extract): je NFL-Team,
+        Position und Woche Punkte im Liga-Scoring und Zahl der Spieler mit Einsatz; None, solange er fehlt."""
+        return self._get("prior_positions", lambda: self._optional(ef.season_files(self.season)["prior_positions"]))
 
     def draft(self) -> list[dict]:
         """Draft-Picks inklusive Keeper (mDraftDetail), ohne memberId; leer, solange die Datei fehlt."""

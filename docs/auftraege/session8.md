@@ -70,7 +70,7 @@ durch Stephan unter Actions › Wochenabruf › Run workflow. Erkläre bei jedem
   Zurück mit Scrollposition, feste Spalten auf dem Handy, `in_app`-Kennung für Spieler ohne Seite). Neue Ansichten
   übernehmen diese Muster – nach `git pull` zuerst `app/js/app.js`, `ui.js`, `v_dst.js` und `v_waiver.js` lesen.
 - **Nicht in Session 8:** CB-gegen-WR (keine offenen Daten), Wetter-Auswertung nach Positionen (erst nach einer
-  Saison, Abschnitt 5), News Stufe 2 (Entscheidung Stephan, eigene halbe Session; `--news` in `tageslauf.yml`).
+  Saison, Abschnitt 5), News Stufe 2 (Beschluss Stephan 30.09.2026: bleibt aus, siehe CLAUDE.md „Gelernt“).
 - **Regeln:** Rohdaten nie von Hand committen; öffentlich nur Ligadaten; Zahlen kommen aus Python, die App rechnet nur
   Anzeige und Filter; alle Projektionen und Prognosen sind Input, keine Wahrheit.
 
