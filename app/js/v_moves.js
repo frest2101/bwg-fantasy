@@ -29,12 +29,13 @@ export async function render(box, ctx, r) {
       return;
     }
     const items = (T.items || []).filter(inTeam);
-    const tbl = U.table({cap: 'Transaktionen (neueste zuerst)', cls: 'nr', rh: 1, limit: 50, rows: items, sort: ['d', -1], cols: [
+    // Zugang und Abgang direkt nach Datum und Team (auf dem Handy als Kürzel), die Art zuletzt; bei gewähltem Team ohne Team-Spalte
+    const tbl = U.table({cap: 'Transaktionen (neueste zuerst)', cls: 'nr kurz', rh: team ? 0 : 1, limit: 50, rows: items, sort: ['d', -1], cols: [
       {k: 'd', l: 'Datum', v: x => x.datum, f: x => U.ok(x.datum) ? `${U.datum(x.datum)} ${U.zeit(x.datum)}` : '–'},
-      {k: 't', l: 'Team', v: x => U.kz(x.team_id), d: 1, f: x => U.tl(x.team_id)},
-      {k: 'a', l: 'Art', v: x => typ(x), d: 1, f: x => ART[typ(x)] || typ(x)},
+      team ? null : {k: 't', l: 'Team', v: x => U.kz(x.team_id), d: 1, f: x => U.tl(x.team_id)},
       {k: 'z', l: 'Zugang', f: x => typ(x) === 'TRADE_ACCEPT' && !part(x, 'ADD').length ? h('span', {class: 'note'}, 'Inhalt folgt') : pl(part(x, 'ADD'))},
-      {k: 'b', l: 'Abgang', f: x => pl(part(x, 'DROP'))}]});
+      {k: 'b', l: 'Abgang', f: x => pl(part(x, 'DROP'))},
+      {k: 'a', l: 'Art', v: x => typ(x), d: 1, f: x => ART[typ(x)] || typ(x)}].filter(Boolean)});
     const aw = Object.entries(T.aufstellungswechsel || {}).map(([k, v]) => ({tid: +k, n: v})).filter(x => !team || x.tid === team);
     wrap.replaceChildren(); U.ap(wrap, tbl, U.legend(['transaktionen']),
       aw.length ? h('div', {class: 'card', style: 'margin-top:16px'}, U.table({cap: 'Aufstellungswechsel je Team', cls: 'nr', rows: aw, sort: ['n', -1], cols: [

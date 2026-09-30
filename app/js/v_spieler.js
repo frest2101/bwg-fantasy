@@ -4,6 +4,13 @@ let U, S, h;
 const POS = ['QB', 'RB', 'WR', 'TE', 'K', 'D/ST'];
 // Tagesstand je Spieler (waiver.json, stündlich) überlagert diese Wochenwerte: Team, Status, Verletzung, Besitz
 const DAILY = ['team', 'status', 'inj', 'own'];
+// Rückweg zur Liste: zuletzt geöffneter Spieler und die Spaltenfilter der Liste (Modul bleibt geladen, gilt bis zum Neuladen)
+let lastOpened = null, keptFilters = {};
+// Spieler ohne NFL-Team (entlassen, vereinslos) heißen „FA“ statt „null“
+export const nflTxt = p => p.nfl || 'FA';
+// Rückweg-Ziele für den Link oben im Spielerdetail
+const BACK = {spieler: 'Spielerliste', team: 'Team', moves: 'Moves', spielplan: 'Spielplan', waiver: 'Waiver', dst: 'D/ST-Faktoren',
+  tabelle: 'Tabelle', rekorde: 'Rekorde', ranking: 'Ranking'};
 
 export async function render(box, ctx, r) {
   U = ctx.ui; S = U.S; h = U.h;
@@ -18,7 +25,7 @@ export async function render(box, ctx, r) {
   const svg = await ctx.mod('svg');
   const rosWhy = P.ros_nach_woche == null ? `ab Wochenabruf W${S.tw + 1}` : 'keine Projektion';
   const rows = merge(P, W);
-  if (detail) one(box, h1, P, W, rows, r.sub, svg, rosWhy); else list(box, W, rows, r, rosWhy);
+  if (detail) one(box, h1, P, W, rows, r, svg, rosWhy); else list(box, W, rows, r, rosWhy);
 }
 
 // Wochenwerte je Spieler mit dem Tagesstand überlagern (Schlüssel: Spieler-ID); ohne Tagesstand unverändert.
@@ -55,7 +62,10 @@ function stand(W) {
 function list(box, W, all, r, rosWhy) {
   const q = r.q;
   const st = {pos: POS.includes(q.get('pos')) ? q.get('pos') : '', status: ['kader', 'frei'].includes(q.get('status')) ? q.get('status') : 'alle',
-    team: +q.get('team') || 0, sicht: ['ros', 'besitz'].includes(q.get('sicht')) ? q.get('sicht') : 'saison', text: ''};
+    team: +q.get('team') || 0, sicht: ['ros', 'besitz'].includes(q.get('sicht')) ? q.get('sicht') : 'saison', raw: (q.get('q') || '').trim()};
+  st.text = st.raw.toLowerCase();
+  // Spaltenfilter bleiben nur auf dem Rückweg (Zurück, „← Spielerliste“) erhalten; ein frischer Aufruf beginnt ohne
+  if (!r.back) keptFilters = {};
   const count = h('p', {class: 'note', 'aria-live': 'polite'});
   const slotBox = h('div');
   const rows = () => all.filter(p => (!st.pos || p.pos === st.pos)
@@ -65,7 +75,7 @@ function list(box, W, all, r, rosWhy) {
   const num = (k, l, f = U.num, why) => ({k, l, num: 1, v: p => p[k], f: p => U.val(p[k], f, why)});
   const base = [
     {k: 'name', l: 'Spieler', v: p => p.name.toLowerCase(), d: 1, flt: false, f: p => h('a', {href: '#spieler/' + p.id, class: 'pl'},
-      h('span', null, p.name, U.inj(p.inj)), h('span', {class: 'sub'}, `${p.pos ?? '–'} · ${p.nfl ?? '–'}` + (p.team > 0 ? ' · ' + U.kz(p.team) : '')))},
+      h('span', null, p.name, U.inj(p.inj)), h('span', {class: 'sub'}, `${p.pos ?? '–'} · ${nflTxt(p)}` + (p.team > 0 ? ' · ' + U.kz(p.team) : '')))},
     num('avg', 'Ø', U.num, 'ohne Spiel'),
     {k: 'form', l: 'Form', num: 1, v: p => p.form, f: p => [U.val(p.form, U.num, 'ohne Spiel'), ' ', trendTxt(p.trend)]},
     num('ros_g', 'ROS/Sp.', U.num, rosWhy)];
@@ -78,20 +88,33 @@ function list(box, W, all, r, rosWhy) {
       {k: 'bye', l: 'Bye', num: 1, cat: 1, v: p => p.bye, d: 1, f: p => U.val(p.bye, v => 'W' + v, 'kein NFL-Team')}],
     besitz: [num('own', 'Besitz %', v => U.pct(v)),
       ...(W ? [num('own_d', 'Δ Tag', v => U.sgn(v, 2), 'keine Tagesdaten'), num('started', 'gestartet %', v => U.pct(v), 'keine Tagesdaten')] : []),
-      {k: 'status', l: 'Status', v: p => p.status, d: 1, f: p => U.STAT[p.status] || p.status || '–'},
       {k: 'inj', l: 'Verletzung', v: p => U.INJ[p.inj] ? p.inj : null, d: 1, f: p => U.INJ[p.inj]?.[1] || (p.inj === 'ACTIVE' ? 'aktiv' : '–')},
       {k: 'team', l: 'Team', v: p => U.kz(p.team), d: 1, f: p => p.team > 0 ? U.tl(p.team) : (U.STAT[p.status] || 'frei')}]};
   const sortKey = {saison: 'pts', ros: 'ros_g', besitz: 'own'};
-  const fst = {}, filters = [{k: 'nfl', l: 'NFL-Team', v: p => p.nfl, d: 1, cat: 1, f: p => p.nfl}];
-  let tbl;
+  const filters = [{k: 'nfl', l: 'NFL-Team', v: nflTxt, d: 1, cat: 1, f: nflTxt}];
+  // Sortierspalte der Sicht direkt hinter den Namen: auf dem Handy sonst erst nach Wischen sichtbar
+  const colsFor = sicht => {
+    const all = [...base, ...extra[sicht]], key = sortKey[sicht];
+    return [all[0], all.find(c => c.k === key), ...all.slice(1).filter(c => c.k !== key)];
+  };
+  let tbl, first = true;
   const build = () => {
-    tbl = U.table({cap: 'Spielerliste', cls: 'nr', rh: 0, rows: rows(), sort: [sortKey[st.sicht], -1], limit: 50, filter: true, filters, fstate: fst, cols: [...base, ...extra[st.sicht]]});
+    const cols = colsFor(st.sicht), rs = rows();
+    // Rückweg: so viele 50er-Blöcke zeigen, dass der zuletzt geöffnete Spieler dabei ist
+    let show = 50;
+    if (first && r.back && lastOpened != null) {
+      const sc = cols.find(c => c.k === sortKey[st.sicht]);
+      const i = U.sortRows(rs, sc.v, -1).findIndex(p => p.id === lastOpened);
+      if (i >= 50) show = Math.ceil((i + 1) / 50) * 50;
+    }
+    first = false;
+    tbl = U.table({cap: 'Spielerliste', cls: 'nr', rh: 0, rows: rs, sort: [sortKey[st.sicht], -1], limit: 50, show, filter: true, filters, fstate: keptFilters, cols});
     slotBox.replaceChildren(tbl);
   };
   const refresh = (rebuild) => {
     if (rebuild) build(); else tbl.upd(rows());
     count.textContent = `${rows().length} Spieler`;
-    U.setQ('spieler', {pos: st.pos || null, status: st.status !== 'alle' ? st.status : null, team: st.team || null, sicht: st.sicht !== 'saison' ? st.sicht : null});
+    U.setQ('spieler', {pos: st.pos || null, status: st.status !== 'alle' ? st.status : null, team: st.team || null, sicht: st.sicht !== 'saison' ? st.sicht : null, q: st.raw || null});
   };
   let timer;
   U.ap(box, stand(W),
@@ -100,9 +123,9 @@ function list(box, W, all, r, rosWhy) {
       h('label', null, h('span', {class: 'vh'}, 'Fantasy-Team '), h('select', {onchange: e => { st.team = +e.target.value; refresh(); }},
         h('option', {value: 0}, 'Alle Teams'), S.teams.map(t => h('option', {value: t.team_id, selected: t.team_id === st.team}, t.name))))),
     h('div', {class: 'row'}, h('label', null, h('span', {class: 'vh'}, 'Spieler suchen'),
-      h('input', {type: 'search', placeholder: 'Name suchen', oninput: e => {
+      h('input', {type: 'search', placeholder: 'Name suchen', value: st.raw || null, oninput: e => {
         clearTimeout(timer);
-        timer = setTimeout(() => { st.text = e.target.value.trim().toLowerCase(); refresh(); }, 150);
+        timer = setTimeout(() => { st.raw = e.target.value.trim(); st.text = st.raw.toLowerCase(); refresh(); }, 150);
       }})),
     U.seg('Spalten', [['saison', 'Saison'], ['ros', 'ROS'], ['besitz', 'Besitz']], st.sicht, v => { st.sicht = v; refresh(true); })),
     count, slotBox,
@@ -141,13 +164,20 @@ function newsBox(p, W) {
     h('p', {class: 'note'}, 'Nur Verweise: Die App übernimmt keine Texte. ', W?.stand ? `Tagesstand ${U.stamp(W.stand)}.` : ''));
 }
 
-function one(box, h1, P, W, rows, pid, svg, rosWhy) {
+function one(box, h1, P, W, rows, r, svg, rosWhy) {
+  const pid = r.sub;
   const p = rows.find(x => String(x.id) === pid);
-  U.ap(box, h('p', null, h('a', {href: '#spieler'}, '← Spielerliste')));
+  // Rückweg: kam man per Link aus der App, führt „← zurück“ per Verlauf dorthin (mit Filtern und Scrollposition)
+  const prev = S.prevHash?.slice(1).split(/[/?]/)[0];
+  const back = !r.back && BACK[prev] && S.prevHash !== location.hash;
+  U.ap(box, h('p', null, back
+    ? h('a', {href: S.prevHash, onclick: e => { e.preventDefault(); history.back(); }}, '← ' + (prev === 'team' ? 'zurück zum Team' : 'zurück: ' + BACK[prev]))
+    : h('a', {href: '#spieler'}, '← Spielerliste')));
+  if (p) lastOpened = p.id;
   if (!p) { h1.textContent = 'Spieler nicht gefunden'; U.ap(box, h('p', {class: 'note'}, 'Dieser Spieler steht nicht in den App-Daten (nur Kader, Spieler mit Einsatz und die besten Free Agents).')); return; }
   h1.textContent = p.name;
   const ers = P.ersatz?.[p.pos];
-  U.ap(box, h('p', null, `${p.pos ?? '–'} · ${p.nfl ?? '–'} · `, p.team > 0 ? U.tl(p.team) : U.STAT[p.status] || 'frei',
+  U.ap(box, h('p', null, `${p.pos ?? '–'} · ${nflTxt(p)} · `, p.team > 0 ? U.tl(p.team) : U.STAT[p.status] || 'frei',
     p.inj && U.INJ[p.inj] ? h('span', {class: 'badge'}, U.INJ[p.inj][1]) : null,
     U.ok(p.bye) ? ` · Bye W${p.bye}` : null,
     p.pos === 'D/ST' ? [' · ', h('a', {href: '#dst'}, 'D/ST-Faktoren')] : null), stand(W),

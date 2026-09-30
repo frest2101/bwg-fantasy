@@ -132,7 +132,29 @@ function header() {
 const VIEWS = {tabelle: 'v_tabelle', ranking: 'v_ranking', spielplan: 'v_spielplan', team: 'v_team', spieler: 'v_spieler',
   dst: 'v_dst', moves: 'v_moves', waiver: 'v_waiver', rekorde: 'v_rekorde', lesart: 'v_lesart'};
 const NAV = {team: 'tabelle', dst: 'spieler', moves: 'spieler'};
-let seq = 0, cur = null;
+let seq = 0, cur = null, curHash = null;
+// Scrollposition je Verlaufseintrag: beim Verlassen (Link-Klick) und nach jedem Scrollen in history.state.y sichern,
+// damit „Zurück“ die alte Stelle wiederfindet. Neue Einträge haben keinen state – daran erkennt der Router den Rückweg.
+try { history.scrollRestoration = 'manual'; } catch { /* ältere Browser: Standardverhalten */ }
+function saveY() {
+  try { history.replaceState({...(history.state || {}), y: Math.round(scrollY)}, ''); } catch { /* Safari begrenzt replaceState */ }
+}
+let saveT = 0;
+addEventListener('scroll', () => { clearTimeout(saveT); saveT = setTimeout(saveY, 250); }, {passive: true});
+// Nach dem Rendern zur gesicherten Stelle; nachgeladene Teile (Kader, Historie) machen die Seite erst nach und nach hoch genug
+function restore(y, my) {
+  const t0 = performance.now();
+  const step = () => {
+    if (my !== seq) return;
+    const max = document.documentElement.scrollHeight - innerHeight;
+    if (max >= y - 2 || performance.now() - t0 > 2000) { scrollTo(0, Math.max(0, Math.min(y, max))); return; }
+    requestAnimationFrame(step);
+  };
+  step();
+}
+// Seiten mit eigenem Inhalt je Unterpfad (Team, Spielerdetail) beginnen oben; Wochen- und Ansichts-Chips derselben
+// Ansicht behalten die Scrollposition
+const viewKey = r => r.sec === 'team' || (r.sec === 'spieler' && r.sub) ? r.path : r.sec;
 function parse() {
   let raw = location.hash.slice(1);
   try { raw = decodeURIComponent(raw); } catch { /* unverändert */ }
@@ -150,14 +172,21 @@ async function route() {
   U.closePop(false);
   const my = ++seq;
   r.alive = () => my === seq;
+  // Rückweg (Zurück/Vor): der Eintrag trägt eine gesicherte Position; neue Einträge nicht
+  const backY = Number.isFinite(history.state?.y) ? history.state.y : null;
+  r.back = backY != null;
+  S.prevHash = curHash;
+  curHash = location.hash;
   document.documentElement.dataset.route = r.sec;
   const navSec = NAV[r.sec] || r.sec;
   for (const a of document.querySelectorAll('.tabs a')) {
     if (a.dataset.s === navSec) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
   }
-  const same = cur === r.sec;
-  cur = r.sec;
+  const key = viewKey(r), same = cur === key;
+  cur = key;
   const box = h('div', {class: 'view'}, h('p', {class: 'loading'}, 'Lade …'));
+  // gleiche Ansicht: Höhe halten, sonst verkürzt der Ladehinweis die Seite kurz und der Browser springt nach oben
+  if (same) main.style.minHeight = main.offsetHeight + 'px';
   main.replaceChildren(box);
   main.setAttribute('aria-busy', 'true');
   if (!same) scrollTo(0, 0);
@@ -173,14 +202,16 @@ async function route() {
   }
   if (!r.alive()) return;
   main.removeAttribute('aria-busy');
+  main.style.minHeight = '';
   const h1 = box.querySelector('h1');
   document.title = (h1 ? h1.textContent + ' · ' : '') + 'BWG Fantasy 2026';
   const f = target || h1;
   if (f) {
     f.tabIndex = -1;
-    f.focus({preventScroll: same || !!target});
-    if (target) target.scrollIntoView({block: 'start'});
+    f.focus({preventScroll: same || !!target || r.back});
+    if (target && !r.back) target.scrollIntoView({block: 'start'});
   }
+  if (r.back) restore(backY, my);
 }
 
 // ---------------------------------------------------------------- globale Ereignisse
@@ -189,6 +220,7 @@ document.addEventListener('click', e => {
   const b = t.closest?.('button[data-g]');
   if (b) { U.infoPop(b); return; }
   if (t.closest?.('a.skip')) { e.preventDefault(); main.focus(); return; }
+  if (t.closest?.('a[href^="#"]')) saveY();     // Position des alten Eintrags vor dem Wechsel sichern
   const p = $('pop');
   if (!p.hidden && !p.contains(t) && !t.closest?.('#stand')) U.closePop(false);
 });

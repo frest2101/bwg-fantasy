@@ -63,13 +63,14 @@ function topScorer(W) {
   const rows = W.top_scorer || [];
   if (!rows.length) return h('p', {class: 'note'}, 'Keine Top-Scorer vorhanden.');
   return h('div', null, U.table({cap: `Top-Scorer W${W.week} (alle Kader, auch Bank)`, cls: 'rk', rows, sort: ['pts', -1], cols: [
-    {k: 'i', l: '#', f: (p, i) => i + 1},
+    // # = Punkterang der Woche (fest, auch nach dem Umsortieren); Pkt direkt hinter dem Namen, auf dem Handy sonst außer Sicht
+    {k: 'i', l: '#', v: p => p.rang, d: 1, f: (p, i) => p.rang ?? i + 1},
     {k: 'name', l: 'Spieler', v: p => p.name, d: 1, f: p => h('a', {href: '#spieler/' + p.player_id, class: 'tl2'}, p.name)},
-    {k: 'pos', l: 'Pos', v: p => p.pos, d: 1, f: p => p.pos},
-    {k: 'nfl', l: 'NFL', v: p => p.nfl, d: 1, f: p => p.nfl},
-    {k: 'tm', l: 'Team', v: p => U.kz(p.team_id), d: 1, f: p => h('a', {href: '#team/' + p.team_id, class: 'tl2', 'aria-label': U.team(p.team_id)?.name}, U.kz(p.team_id))},
-    {k: 'sl', l: 'Slot', v: p => U.slot(p.slot), d: 1, f: p => U.bench(p.slot) ? h('strong', null, U.slot(p.slot)) : U.slot(p.slot)},
     {k: 'pts', l: 'Pkt', num: 1, v: p => p.pts, f: p => U.num(p.pts)},
+    {k: 'sl', l: 'Slot', v: p => U.slot(p.slot), d: 1, f: p => U.bench(p.slot) ? h('strong', null, U.slot(p.slot)) : U.slot(p.slot)},
+    {k: 'tm', l: 'Team', v: p => U.kz(p.team_id), d: 1, f: p => h('a', {href: '#team/' + p.team_id, class: 'tl2', 'aria-label': U.team(p.team_id)?.name}, U.kz(p.team_id))},
+    {k: 'pos', l: 'Pos', v: p => p.pos, d: 1, f: p => p.pos},
+    {k: 'nfl', l: 'NFL', v: p => p.nfl, d: 1, f: p => p.nfl || 'FA'},
     {k: 'proj', l: 'Proj.', num: 1, v: p => p.proj, f: p => U.val(p.proj, U.num, 'keine Projektion')}]}));
 }
 

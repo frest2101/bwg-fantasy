@@ -35,7 +35,8 @@ function recTable(cap, rec) {
     if (serie(e)) return (e.weeks[0] !== e.weeks.at(-1) ? `W${e.weeks[0]}–W${e.weeks.at(-1)}` : `W${e.weeks[0] ?? '–'}`) + (e.laufend ? ' (läuft)' : '');
     return U.ok(e.week) ? h('a', {href: '#spielplan/w' + e.week}, 'W' + e.week) : '–';
   };
-  return U.table({cap, cls: 'nr', rows, sortable: false, rh: 0, cols: [
+  // lab: erste Spalte bricht auf dem Handy um, kurz: Teams als Kürzel – sonst frisst die feste Spalte die Tabelle
+  return U.table({cap, cls: 'nr kurz lab', rows, sortable: false, rh: 0, cols: [
     {k: 'r', l: 'Rekord', f: x => x.first ? LABEL[x.id] || x.id.replace(/_/g, ' ') : h('span', {class: 'note'}, 'ebenso')},
     {k: 'v', l: 'Wert', num: 1, f: x => serie(x.e) ? `${x.e.wert} ${x.e.wert === 1 ? 'Spiel' : 'Spiele'}` : U.num(x.e.wert)},
     {k: 't', l: 'Team', f: x => tid(x.e) != null ? U.tl(tid(x.e)) : '–'},
@@ -103,7 +104,7 @@ function h2h(box, r) {
   const list = h('div');
   const draw = () => {
     const rows = S.teams.filter(t => t.team_id !== sel).map(t => ({t, x: rec(sel, t.team_id)}));
-    list.replaceChildren(U.table({cap: `H2H 2026: ${U.team(sel)?.name}`, cls: 'nr', rh: 0, rows, sort: ['d', -1], cols: [
+    list.replaceChildren(U.table({cap: `H2H 2026: ${U.team(sel)?.name}`, cls: 'nr kurz', rh: 0, rows, sort: ['d', -1], cols: [
       {k: 'o', l: 'Gegner', v: x => x.t.name.toLowerCase(), d: 1, f: x => U.tl(x.t.team_id)},
       {k: 'n', l: 'Spiele', num: 1, v: x => x.x?.n ?? null, f: x => x.x ? x.x.n : U.na('noch kein Duell')},
       {k: 'b', l: 'Bilanz', v: x => x.x ? x.x.w - x.x.l : null, f: x => x.x ? txt(x.x) : '–'},
@@ -128,7 +129,7 @@ function h2h(box, r) {
 
 function alltime(box, H, r) {
   const A = H.alltime || [];
-  U.ap(box, U.table({cap: 'All-Time 2015–2025 (Regular Season)', cls: 'nr', rh: 0, rows: A, sort: null, cols: [
+  U.ap(box, U.table({cap: 'All-Time 2015–2025 (Regular Season)', cls: 'nr kurz lab', rh: 0, rows: A, sort: null, cols: [
     {k: 'n', l: 'Franchise', v: a => a.name_2026.toLowerCase(), d: 1, f: a => [U.team(a.slot) ? U.tl(a.slot) : a.name_2026,
       a.namenskette !== a.name_2026 ? h('span', {class: 'sub'}, a.namenskette) : null]},
     {k: 's', l: 'S', num: 1, v: a => a.saisons, f: a => a.saisons},
@@ -146,7 +147,7 @@ function alltime(box, H, r) {
   U.legend(['wpct-alltime', 'pfplus', 'pfplus-avg', 'scoring-titel', 'endplatz', 'aera']));
   const R = H.rekorde || {};
   const der = R.abgeleitet || [];
-  if (der.length) U.ap(box, U.table({cap: 'Abgeleitete All-Time-Rekorde je Ära', cls: 'nr', rh: 0, sortable: false, rows: der, cols: [
+  if (der.length) U.ap(box, U.table({cap: 'Abgeleitete All-Time-Rekorde je Ära', cls: 'nr kurz lab', rh: 0, sortable: false, rows: der, cols: [
     {k: 'r', l: 'Rekord', f: x => LABEL[x.id] || x.id},
     {k: 'a', l: 'Ära', f: x => AERA[x.aera] || x.scoring_era},
     {k: 'v', l: 'Wert', num: 1, f: x => x.kriterium === 'w_pct' ? U.pct(x.wert) : U.num(x.wert, x.kriterium === 'pf_plus' ? 1 : 2)},
@@ -165,7 +166,7 @@ function alltime(box, H, r) {
     const rows = (H.team_seasons || []).filter(t => t.season === yr);
     out.replaceChildren(h('p', {class: 'note'}, [f.platform, f.teams && `${f.teams} Teams`, f.rs_games && `${f.rs_games} RS-Spiele`, f.scoring_era, f.qb_format, f.playoff_format].filter(Boolean).join(' · ')),
       U.table({cap: `Saison ${yr}`, cls: 'rk', rows, sort: ['p', 1], cols: [
-        {k: 'p', l: 'Platz', v: t => t.final_rank, d: 1, f: t => t.final_rank + '.'},
+        {k: 'p', l: '#', v: t => t.final_rank, d: 1, f: t => t.final_rank},
         {k: 'n', l: 'Team', v: t => t.team_name.toLowerCase(), d: 1, f: t => t.team_name},
         {k: 'dv', l: 'Div', num: 1, v: t => t.division * 10 + t.div_rank, d: 1, f: t => `${t.division}/${t.div_rank}.`},
         {k: 'wl', l: 'W-L', num: 1, v: t => t.w_pct, f: t => `${t.w}-${t.l}`},
