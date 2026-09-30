@@ -14,6 +14,8 @@ import app_export
 import check_public
 import compute
 import espn_fetch as ef
+import rawdata
+from zahlen import round_to
 
 FIRST_LOAD = ("manifest.json", "teams.json", "schedule.json")
 
@@ -34,7 +36,7 @@ def data(content):
 
 
 def test_alle_dateien_und_gueltiges_json(data):
-    immer = {"manifest.json", "teams.json", "schedule.json", "players.json", "dst.json", "history.json",
+    immer = {"manifest.json", "teams.json", "schedule.json", "players.json", "dst.json", "matchup.json", "history.json",
              "transactions.json", "claude.json"}
     tageslauf = {"waiver.json", "wetter.json"}  # erst, wenn der Tageslauf Pool-Auszug und Wetter geliefert hat
     assert immer <= set(data) <= immer | tageslauf
@@ -133,7 +135,15 @@ def test_wetter_vertrag():
             game["niederschlag"], game["schnee"]) == ("KC", "DEN", 10.0, 2.5, 8.0, 55, 0.4, 0.0)
     assert isinstance(game["regen_wahrsch"], int) and out["ist"] == [] and out["stand"] == "2026-09-29T0645Z"
     assert set(game) == {"id", "woche", "kickoff", "tbd", "heim", "gast", "stadion", "ort", "dach", "neutral",
-                         "temp", "wind", "boeen", "regen_wahrsch", "niederschlag", "schnee"}
+                         "temp", "wind", "boeen", "regen_wahrsch", "niederschlag", "schnee", "markierung"}
+    assert game["markierung"] == []
+    assert set(out) == {"stand", "woche", "einheiten", "schwellen", "prognose", "ist"}
+    assert out["schwellen"] == {"wind": 25, "boeen": 40, "regen_wahrsch": 60, "schnee": 0}
+    assert all(isinstance(v, int) for v in out["schwellen"].values())
+    stunden = dict(stunden, wind=[30, 30, 30, 30], schnee=[0, 0.2, 0, 0])
+    prognose["spiele"][0]["stunden"] = stunden
+    out = app_export.round_file("wetter.json", wetter.compute_wetter(prognose, None, {12: "KC", 7: "DEN"}))
+    assert out["prognose"][0]["markierung"] == ["wind", "schnee"]
 
 
 def test_deterministisch(result, content):
@@ -222,6 +232,66 @@ def test_dst_und_transaktionen(data):
     assert abs(Decimal(str(lv["f"])) - Decimal("1.200")) <= Decimal("0.001")
     assert all(isinstance(n.get("opp", ""), str) for t in d["teams"] for n in t["naechste"])
     assert set(data["transactions.json"]) == {"spieler", "items", "aufstellungswechsel", "draft"}
+
+
+MATCHUP_POS = {"z25", "z26", "n", "r25", "r26", "f", "f_vorwoche", "delta", "rang", "rang_vorwoche", "ausloeser"}
+
+
+def test_matchup_vertrag(data, result):
+    """matchup.json: Kopf und je Defense und Position genau die Felder der Positivliste (ohne n25, zugelassen,
+    f_verlauf); lazy im Manifest; F, r und Δ mit drei Stellen."""
+    m = data["matchup.json"]
+    assert set(m) == {"through_week", "saison", "vorjahr", "vorjahr_quelle", "positionen", "ligaschnitt", "formel",
+                      "ausloeser_legende", "wochen", "defenses"}
+    assert (m["through_week"], m["saison"], m["vorjahr"]) == (2, 2026, 2025) and m["positionen"] == ["QB", "RB", "WR", "TE", "K"]
+    assert m["vorjahr_quelle"] in ("basis", "ligamittel") and set(m["ausloeser_legende"]) == {"delta", "rang"}
+    assert set(m["ligaschnitt"]) == set(m["positionen"]) and all(set(v) == {"2025", "2026"} for v in m["ligaschnitt"].values())
+    assert m["wochen"] == {"n1": 3, "naechste3": [3, 4, 5], "rest": list(range(3, 15)), "sos_po": [15, 16, 17]}
+    assert data["manifest.json"]["files"]["matchup.json"]["lazy"]
+    assert [d["id"] for d in m["defenses"]] == sorted(d["id"] for d in m["defenses"]) and len(m["defenses"]) == ef.NFL_TEAMS
+    for d in m["defenses"]:
+        assert set(d) == {"id", "abbrev", "bye", "pos"} and list(d["pos"]) == m["positionen"]
+        for p in d["pos"].values():
+            assert set(p) == MATCHUP_POS and isinstance(p["rang"], int) and isinstance(p["n"], int)
+            assert all(len(str(p[k]).split(".")[-1]) <= 3 for k in ("f", "r25", "r26", "delta") if p[k] is not None)
+    qb = {d["abbrev"]: d["pos"]["QB"] for d in m["defenses"]}
+    raw = {d["abbrev"]: d["pos"]["QB"] for d in result["matchup"]["defenses"]}
+    assert qb["KC"]["f"] == float(round_to(raw["KC"]["f"], 3)) and qb["KC"]["z26"] == float(round_to(raw["KC"]["z26"], 2))
+
+
+def test_players_mu(data, result):
+    """players.json: mu je Spieler (Wochenstand, Woche mu_woche = N+1) für QB bis K aus dem Positions-Matchup, für
+    D/ST aus den D/ST-Faktoren; ohne NFL-Team None."""
+    pj = data["players.json"]
+    assert pj["mu_woche"] == 3
+    rows = {p["id"]: p for p in pj["players"]}
+    assert all("mu" in p for p in rows.values())
+    with_mu = [p for p in rows.values() if p["mu"]]
+    assert all(p["nfl"] is not None for p in with_mu) and all(p["mu"] is None for p in rows.values() if p["nfl"] is None)
+    for p in with_mu:
+        assert set(p["mu"]) == {"n1", "naechste3", "rest", "sos_po"} and p["mu"]["n1"]["week"] == 3
+        n1 = p["mu"]["n1"]
+        assert set(n1) == {"week", "opp", "f", "rang"} and (n1["opp"] is None) == (n1["f"] is None) == (n1["rang"] is None)
+        assert n1["rang"] is None or isinstance(n1["rang"], int)
+    mahomes = rows[3139477]["mu"]  # KC-QB: Gegner W3 laut Spielplan, F und Rang der Defense für QB
+    nfl = rawdata.Season(2026, 2).nfl()
+    opp = nfl[12].opponents[3]
+    assert mahomes["n1"]["opp"] == nfl[opp].abbrev
+    assert mahomes["n1"]["f"] == float(round_to(result["matchup"]["f"]["QB"][opp], 3))
+    assert mahomes["n1"]["rang"] == result["matchup"]["rang"]["QB"][opp]
+    dst_rows = [p for p in with_mu if p["pos"] == "D/ST"]
+    by_team = {t["abbrev"]: t for t in data["dst.json"]["teams"]}
+    assert dst_rows and all(p["mu"]["naechste3"] == by_team[p["nfl"]]["naechste3"] for p in dst_rows)
+
+
+def test_claude_matchup_spalten(data):
+    c = data["claude.json"]
+    assert c["spieler_spalten"][-2:] == ["gegner_n1", "mu_n1"] and c["stand"]["matchup_woche"] == 3
+    cols = {name: i for i, name in enumerate(c["spieler_spalten"])}
+    rows = [r for team in c["kader"].values() for r in team] + [r for pos in c["free_agents"].values() for r in pos]
+    assert rows and all(len(r) in (len(cols), len(cols) + 1) for r in rows)  # Free Agents zusätzlich mit Status
+    assert all((r[cols["gegner_n1"]] is None) == (r[cols["mu_n1"]] is None) for r in rows)
+    assert any(isinstance(r[cols["mu_n1"]], float) for r in rows) and "mu_n1" in c["legende"]
 
 
 def test_transaktionen_markieren_spieler_ohne_seite(data):

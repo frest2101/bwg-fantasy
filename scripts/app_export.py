@@ -11,6 +11,7 @@ from datetime import timedelta
 from pathlib import Path
 
 import espn_fetch as ef
+import matchup as matchup_module
 import players as players_module
 from lineup import POSITION_NAMES, SLOT_NAMES
 from zahlen import dec, round_to, rounded
@@ -27,7 +28,8 @@ PRECISION = {"z": 3, "e": 3, "f": 3, "f_vorwoche": 3, "delta": 3, "r25": 3, "r26
              "sos_po": 3, "playoff": 4, "division": 4, "bye": 4, "seeds": 4, "p_home": 4, "anteil": 1,
              # Wetter (wetter.json): eine Stelle wie Open-Meteo, Regenwahrscheinlichkeit ganzzahlig
              "temp": 1, "wind": 1, "boeen": 1, "niederschlag": 1, "schnee": 1, "regen_wahrsch": 0}
-LAZY = ("players.json", "dst.json", "history.json", "transactions.json", "waiver.json", "wetter.json", "claude.json")
+LAZY = ("players.json", "dst.json", "matchup.json", "history.json", "transactions.json", "waiver.json", "wetter.json",
+        "claude.json")
 
 
 # ---------------------------------------------------------------- Hilfen
@@ -170,12 +172,17 @@ def player_selection(result: dict) -> set[int]:
 
 
 def build_players(result: dict) -> dict | None:
-    """Spieler mit mindestens einem Spiel oder im Kader, dazu die 20 besten Free Agents je Position nach ROS/Spiel."""
+    """Spieler mit mindestens einem Spiel oder im Kader, dazu die 20 besten Free Agents je Position nach ROS/Spiel.
+
+    mu = Positions-Matchup des Spielers (matchup.player_mu: Gegner und F in Woche mu_woche = N+1, nächste 3, Rest,
+    SoS; D/ST aus den D/ST-Faktoren), Wochenstand wie ROS.
+    """
     data = result.get("players")
     if not data:
         return None
     pool = data["players"]
     keep = player_selection(result)
+    m, dst = result.get("matchup"), result.get("dst")
     rows = []
     for pid in sorted(keep):
         p = pool[pid]
@@ -189,9 +196,10 @@ def build_players(result: dict) -> dict | None:
                      "wk": [[w["actual"], w["projection"], 1 if w["bye"] else 0, w["team_id"] or 0,
                              SLOT_NAMES.get(w["slot"]) if w["slot"] is not None else None] for w in p["weeks"]],
                      "ros": p["ros"], "ros_g": p["ros_pro_spiel"], "rest_g": p["restspiele"], "ros_po": p["ros_po"],
-                     "ros_rang": p["ros_rang"], "ros_ue": p["ros_ueber_ersatz"]})
+                     "ros_rang": p["ros_rang"], "ros_ue": p["ros_ueber_ersatz"],
+                     "mu": matchup_module.player_mu(m, dst, p["pos"], p["pro_team"])})
     return {"weeks": data["weeks"], "ersatz": {POSITION_NAMES.get(k, str(k)): v for k, v in data["ersatz"].items()},
-            "ros_nach_woche": data["ros_after_week"],
+            "ros_nach_woche": data["ros_after_week"], "mu_woche": (m or {}).get("wochen", {}).get("n1"),
             "cv": {POSITION_NAMES.get(k, str(k)): v for k, v in data["cv"].items()}, "players": rows}
 
 
@@ -208,6 +216,23 @@ def build_dst(result: dict) -> dict | None:
                                                            for n in t["naechste"]]} for t in data["teams"]]
     return {"through_week": data["through_week"], "ligaschnitt": data["ligaschnitt"], "formel": data["formel"],
             "ausloeser_legende": data["ausloeser_legende"], "teams": teams}
+
+
+# Positions-Matchup: Kopf und je Defense und Position nur diese Felder (n25, zugelassen und f_verlauf bleiben im Rechenwerk)
+MATCHUP_HEAD = ("through_week", "saison", "vorjahr", "vorjahr_quelle", "positionen", "ligaschnitt", "formel",
+                "ausloeser_legende", "wochen")
+MATCHUP_FIELDS = ("z25", "z26", "n", "r25", "r26", "f", "f_vorwoche", "delta", "rang", "rang_vorwoche", "ausloeser")
+
+
+def build_matchup(result: dict) -> dict | None:
+    """Positions-Matchup je NFL-Defense und Position (Positivliste MATCHUP_HEAD, MATCHUP_FIELDS); None ohne Daten."""
+    data = result.get("matchup")
+    if not data:
+        return None
+    defenses = [{"id": d["id"], "abbrev": d["abbrev"], "bye": d["bye"],
+                 "pos": {name: {k: p[k] for k in MATCHUP_FIELDS} for name, p in d["pos"].items()}}
+                for d in data["defenses"]]
+    return {k: data[k] for k in MATCHUP_HEAD} | {"defenses": defenses}
 
 
 def app_player_ids(result: dict) -> set[int]:
@@ -299,12 +324,20 @@ def build_waiver(result: dict) -> dict | None:
             "reihenfolge_stand": stand, "bedarf": team_needs(pool, result), "spieler": rows}
 
 
-CLAUDE_PLAYER_COLS = ("name", "pos", "nfl", "inj", "avg", "form", "trend", "ros_g", "ros_rang")
+CLAUDE_PLAYER_COLS = ("name", "pos", "nfl", "inj", "avg", "form", "trend", "ros_g", "ros_rang", "gegner_n1", "mu_n1")
 
 
 def fixed(value, places: int):
     """Zahl mit fester Stellenzahl für Zeilen ohne Schlüssel (claude.json); None bleibt None."""
     return None if value is None else float(round_to(value, places))
+
+
+def claude_player(p: dict) -> list:
+    """Spielerzeile nach CLAUDE_PLAYER_COLS; gegner_n1 und mu_n1 aus mu.n1 (Kürzel und F mit 3 Stellen, None bei Bye
+    oder ohne Wert)."""
+    n1 = (p.get("mu") or {}).get("n1") or {}
+    mu = {"gegner_n1": n1.get("opp"), "mu_n1": fixed(n1.get("f"), 3)}
+    return [mu[c] if c in mu else p.get(c) for c in CLAUDE_PLAYER_COLS]
 
 
 def build_claude(result: dict, teams: dict, schedule: dict, players: dict | None, dst: dict | None,
@@ -320,10 +353,12 @@ def build_claude(result: dict, teams: dict, schedule: dict, players: dict | None
                         pr.get("rang"), pr.get("mu"), fixed(pr.get("e"), 3), pr.get("trend"),
                         fixed(sim.get("playoff"), 4)])
     out = {"legende": "BWG Fantasy Liga (ESPN 1166555857), inoffizielle Auswertung. Punkte = ESPN appliedTotal; "
-                      "Projektionen sind ESPN-Input. Zeilen gehören zu den *_spalten. Definitionen: docs/app_daten.md "
+                      "Projektionen sind ESPN-Input. Zeilen gehören zu den *_spalten; mu_n1 = Positions-Matchup F des "
+                      "Gegners in matchup_woche, > 1 günstig. Definitionen: docs/app_daten.md "
                       "und CLAUDE.md (Rechenregeln) im Repo frest2101/bwg-fantasy.",
            "stand": {"saison": result["season"], "nach_woche": result["through_week"],
-                     "kader_quelle": teams["meta"]["kader_quelle"], "ros_nach_woche": result.get("ros_after_week")},
+                     "kader_quelle": teams["meta"]["kader_quelle"], "ros_nach_woche": result.get("ros_after_week"),
+                     "matchup_woche": (result.get("matchup") or {}).get("wochen", {}).get("n1")},
            "teams": {k(t["team_id"]): t["name"] for t in teams["teams"]},
            "tabelle_spalten": ["rang", "team", "name", "w_l_t", "pf", "allplay_pct", "matchup_glueck", "effizienz_pct", "form",
                                "score_50_10z", "kader", "pr_rang", "mu", "e", "trend", "playoff_anteil"],
@@ -334,10 +369,9 @@ def build_claude(result: dict, teams: dict, schedule: dict, players: dict | None
     if players:
         rows = players["players"]
         out["spieler_spalten"] = list(CLAUDE_PLAYER_COLS)
-        out["kader"] = {k(tid): [[p.get(c) for c in CLAUDE_PLAYER_COLS] for p in rows if p["team"] == tid]
-                        for tid in sorted(KUERZEL)}
+        out["kader"] = {k(tid): [claude_player(p) for p in rows if p["team"] == tid] for tid in sorted(KUERZEL)}
         free = [p for p in rows if not p["team"] and p.get("ros_g") is not None]
-        out["free_agents"] = {pos: [[p.get(c) for c in CLAUDE_PLAYER_COLS] + [p.get("status")]
+        out["free_agents"] = {pos: [claude_player(p) + [p.get("status")]
                                     for p in sorted((p for p in free if p["pos"] == pos), key=lambda p: -p["ros_g"])[:10]]
                               for pos in POSITION_NAMES.values()}
     if dst:
@@ -358,7 +392,8 @@ def build(result: dict) -> dict[str, dict]:
     teams, schedule = build_teams(result), build_schedule(result)
     files = {"teams.json": teams, "schedule.json": schedule}
     players, dst = build_players(result), build_dst(result)
-    optional = {"players.json": players, "dst.json": dst, "history.json": result.get("history"),
+    optional = {"players.json": players, "dst.json": dst, "matchup.json": build_matchup(result),
+                "history.json": result.get("history"),
                 "transactions.json": build_transactions(result),
                 "waiver.json": build_waiver(result), "wetter.json": result.get("wetter")}
     files.update({name: obj for name, obj in optional.items() if obj})
@@ -369,9 +404,11 @@ def build(result: dict) -> dict[str, dict]:
 # ---------------------------------------------------------------- Schreiben
 
 def round_file(name: str, obj: dict):
-    """Rundung je Datei: D/ST mit den Stellen aus dst.PRECISION, sonst PRECISION; Rangpunkte als ganze Zahlen."""
+    """Rundung je Datei: D/ST und Positions-Matchup mit den Stellen ihres Moduls (PRECISION dort), sonst PRECISION;
+    Rangpunkte als ganze Zahlen."""
     import dst as dst_module
-    data = rounded(obj, precision=dst_module.PRECISION if name == "dst.json" else PRECISION)
+    own = {"dst.json": dst_module.PRECISION, "matchup.json": matchup_module.PRECISION}
+    data = rounded(obj, precision=own.get(name, PRECISION))
     if name == "teams.json":
         for t in data["teams"]:
             t["norm"]["rank"] = {m: int(v) for m, v in t["norm"]["rank"].items()}

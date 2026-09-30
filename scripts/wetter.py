@@ -22,7 +22,7 @@ from pathlib import Path
 import requests
 
 import espn_fetch as ef
-from zahlen import dec
+from zahlen import dec, round_to
 
 OPEN_METEO = "https://api.open-meteo.com/v1/forecast"
 # Open-Meteo-Variable → Schlüssel in den Dateien; Regenwahrscheinlichkeit nur in der Prognose
@@ -289,6 +289,10 @@ def run(session: requests.Session, season: int, now: datetime, stamp: str) -> tu
 # ---------------------------------------------------------------- Rechenwerk (App-Daten)
 
 AGG = {"temp": "mean", "wind": "mean", "boeen": "max", "regen_wahrsch": "max", "niederschlag": "sum", "schnee": "sum"}
+# Markierung als Faustregel aus der Literatur (Auftrag Session 8, Punkt 5; session6_vorbereitung.md §5): Wind ab 25 km/h,
+# Böen ab 40 km/h, Regenwahrscheinlichkeit ab 60 %, jeder Schnee (> 0 cm)
+SCHWELLEN = {"wind": 25, "boeen": 40, "regen_wahrsch": 60, "schnee": 0}
+JSON_PLACES = 1                   # Stellen der Werte in wetter.json (app_export.PRECISION), Grundlage der Anzeige
 
 
 def aggregate(stunden: dict | None) -> dict:
@@ -308,8 +312,30 @@ def aggregate(stunden: dict | None) -> dict:
     return out
 
 
+def markierung(spiel: dict) -> list[str]:
+    """Schlüssel der Werte ab der Schwelle (SCHWELLEN), in deren Reihenfolge; leer bei offenem Anstoß (tbd) und bei
+    Dachspielen (dach nicht „offen“).
+
+    Verglichen wird der Wert so, wie die App ihn zeigt: Wind, Böen und Regenwahrscheinlichkeit mit einer Stelle wie in
+    wetter.json, dann ganzzahlig (je round half up) ≥ Schwelle; Schnee mit einer Stelle > 0. Fehlende Werte (Ist ohne
+    Regenwahrscheinlichkeit) zählen nicht.
+    """
+    if spiel.get("tbd") or spiel.get("dach") != "offen":
+        return []
+    marks = []
+    for key, limit in SCHWELLEN.items():
+        value = spiel.get(key)
+        if value is None:
+            continue
+        shown = round_to(value, JSON_PLACES)
+        if (shown > limit) if key == "schnee" else (round_to(shown, 0) >= limit):
+            marks.append(key)
+    return marks
+
+
 def compute_wetter(prognose: dict | None, ist: dict | None, abbrev: dict[int, str]) -> dict | None:
-    """App-Sicht des Wetters: jüngste Prognose der laufenden Woche und das Ist-Archiv, je Spiel verdichtet.
+    """App-Sicht des Wetters: jüngste Prognose der laufenden Woche und das Ist-Archiv, je Spiel verdichtet und mit der
+    Markierung ab den Schwellen (markierung, Kopf „schwellen“).
 
     stand = jüngster Abruf (Prognose-Stand oder letzter Ist-Abruf). None, solange es keine Wetterdaten gibt.
     """
@@ -321,13 +347,15 @@ def compute_wetter(prognose: dict | None, ist: dict | None, abbrev: dict[int, st
         if not forecast:
             values = {k: v for k, v in values.items() if k not in FORECAST_ONLY}
         tbd = bool(s.get("tbd"))  # Anstoß offen: ESPNs Platzhalterzeit nicht als Kickoff ausgeben
-        return {"id": s["id"], "woche": s["woche"], "kickoff": None if tbd else s["kickoff"], "tbd": tbd,
-                "heim": abbrev.get(s["heim"]), "gast": abbrev.get(s["gast"]),
-                "stadion": s["stadion"], "ort": s["ort"], "dach": s["dach"], "neutral": s["neutral"]} | values
+        out = {"id": s["id"], "woche": s["woche"], "kickoff": None if tbd else s["kickoff"], "tbd": tbd,
+               "heim": abbrev.get(s["heim"]), "gast": abbrev.get(s["gast"]),
+               "stadion": s["stadion"], "ort": s["ort"], "dach": s["dach"], "neutral": s["neutral"]} | values
+        return out | {"markierung": markierung(out)}
 
     stands = ([prognose["stand"]] if prognose else []) + [s["abgerufen"] for s in (ist or {}).get("spiele", [])]
     if not stands:
         return None  # Ist-Datei ohne Spiele und keine Prognose
     return {"stand": max(stands), "woche": prognose["woche"] if prognose else None, "einheiten": EINHEITEN,
+            "schwellen": SCHWELLEN,
             "prognose": [row(s, True) for s in prognose["spiele"]] if prognose else [],
             "ist": [row(s, False) for s in ist["spiele"]] if ist else []}

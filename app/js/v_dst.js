@@ -1,11 +1,7 @@
 // D/ST-Faktoren (lädt dst.json): Streaming aus Sicht der D/ST und Offenses mit Faktor F und Auslösern.
 // Farbzellen divergierend um 1,00: blau = günstig für die D/ST, orange = ungünstig; die Zahl steht immer dabei.
 let U, S, h;
-const fcls = f => {
-  if (!U.ok(f)) return 'f0';
-  const d = f - 1;
-  return d >= 0.15 ? 'f3' : d >= 0.07 ? 'f2' : d >= 0.02 ? 'f1' : d > -0.02 ? 'f0' : d > -0.07 ? 'g1' : d > -0.15 ? 'g2' : 'g3';
-};
+const fcls = (f, st) => U.fcls(f, st);          // gemeinsame Farbklasse (ui.js), auch im Positions-Matchup
 const OWN = {FREEAGENT: 'FA', WAIVERS: 'W'};
 // Auslöser kommen als Schlüssel (delta, z, rang); die Langtexte liefert dst.json in ausloeser_legende
 const AUS = {delta: 'ΔF', z: 'z', rang: 'Rang'};
@@ -65,7 +61,7 @@ function streaming(box, D, r) {
 function offense(box, D) {
   const cols = [
     {k: 'o', l: 'Offense', v: t => t.abbrev, d: 1, flt: false, f: t => h('strong', null, t.abbrev)},
-    {k: 'f', l: 'F', num: 1, v: t => t.f, cls: t => 'fz ' + fcls(t.f), f: t => U.num(t.f, 3)},
+    {k: 'f', l: 'F', num: 1, v: t => t.f, cls: t => 'fz ' + fcls(t.f, 3), f: t => U.num(t.f, 3)},
     {k: 'd', l: 'ΔF', num: 1, v: t => t.delta, f: t => U.val(t.delta, v => U.sgn(v, 3), 'keine Vorwoche')},
     {k: 'r', l: 'Rang', num: 1, v: t => t.rang, d: 1, f: t => [t.rang + '.', h('span', {class: 'sub'}, U.ok(t.rang_vorwoche) ? `Vorw. ${t.rang_vorwoche}.` : '')]},
     {k: 'z25', l: 'Z25', num: 1, v: t => t.z25, f: t => U.num(t.z25)},
