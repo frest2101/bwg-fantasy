@@ -331,7 +331,8 @@ def test_ros_aus_espn_auszug():
                                                                 "stats": stats(pid)}} for pid in range(1, 301)]}
     extract = json.loads(ef.ros_extract(data, 2026, after_week=3))
     result = players.ros_player(extract["players"]["1"], 3, NFL, extract["after_week"])
-    assert result == {"ros": D("25.0"), "restspiele": 10, "ros_pro_spiel": D("2.5"), "ros_po": D("7.5")}
+    assert result == {"ros": D("25.0"), "restspiele": 10, "ros_pro_spiel": D("2.5"), "ros_po": D("7.5"),
+                      "restspiele_po": 3, "ros_po_pro_spiel": D("2.5")}
 
 
 # ---------------------------------------------------------------- echte W3-Daten (nach dem Wochenabruf W3)
@@ -450,3 +451,82 @@ def test_team_week_needs_von_hand():
                                    None, {30: [6]})
     assert {"slot": "K", "id": 60, "pos": K, "proj": D(6), "grund": None, "kandidaten": [105]} in weak[1]["luecken"]
     assert weak[1]["ausfaelle"] == [] and weak[1]["byes"] == []
+
+
+# ---------------------------------------------------------------- Profil je Team (Beschluss 30.09.2026)
+
+def base_roster(t: int, wr=(10, 10, 10), te=8) -> tuple[list, dict]:
+    """Erfundener Kader von Team t (IDs t·100 + n): QB 20/15, RB 10/10/5, WR wr + 5/5, TE te, D/ST 6/6, K 8.
+    Beste Aufstellung: QB 20 · RB 10, 10 · WR wr · TE · D/ST 6, 6 · K 8 · FLEX 5, 5 · OP = QB2 15."""
+    ids = [t * 100 + n for n in range(1, 15)]
+    spec = [(QB, 20), (QB, 15), (RB, 10), (RB, 10), (RB, 5), (WR, wr[0]), (WR, wr[1]), (WR, wr[2]), (WR, 5), (WR, 5),
+            (TE, te), (DST, 6), (DST, 6), (players.K, 8)]
+    return [(pid, pos) for pid, (pos, _) in zip(ids, spec)], {pid: D(v) for pid, (_, v) in zip(ids, spec)}
+
+
+def test_team_profiles_von_hand():
+    """Zehn gleiche Kader, nur Team 1 mit WR 6/6/6 (−12, Ligaschnitt −1,2 → Abstand −10,8, Rang 10 → schwach) und
+    Team 2 mit TE 12 (+4, Abstand +3,6, Rang 1 → stark). Die übrigen WR sind Rang 1, aber nur +1,2 über dem Schnitt
+    (< 3 Slots × 1 Pkt) → keine Wertung; QB-Gruppe = QB + OP (Superflex)."""
+    rosters, value = {}, {}
+    for t in range(1, 11):
+        roster, vals = base_roster(t, wr=(6, 6, 6) if t == 1 else (10, 10, 10), te=12 if t == 2 else 8)
+        rosters[t], value = roster, value | vals
+    prof = players.team_profiles(rosters, value)
+    assert prof[1]["schwach"] == ["WR"] and prof[1]["stark"] == []
+    assert prof[2]["stark"] == ["TE"] and prof[2]["schwach"] == []
+    assert all(prof[t]["schwach"] == [] and prof[t]["stark"] == [] for t in range(3, 11))
+    wr = prof[1]["gruppen"]["WR"]
+    assert (wr["wert"], wr["abstand"], wr["rang"], wr["wertung"]) == (D(18), D("-10.8"), 10, "schwach")
+    assert prof[3]["gruppen"]["WR"]["rang"] == 1 and prof[3]["gruppen"]["WR"]["wertung"] is None   # geteilter Rang 1
+    qb = prof[5]["gruppen"]["QB"]
+    assert qb["wert"] == D(35) and qb["ids"] == [501, 502]            # QB-Slot und OP
+    assert prof[5]["gruppen"]["FLEX"]["wert"] == D(10) and prof[5]["gesamt"]["wert"] == D(123)
+    assert prof[1]["gesamt"]["rang"] == 10 and prof[2]["gesamt"]["rang"] == 1
+    assert sum((g["wert"] for g in prof[7]["gruppen"].values()), D(0)) == prof[7]["gesamt"]["wert"]
+    assert players.team_profiles({}, value) == {}
+
+
+def test_absicherung_und_byes_von_hand():
+    """Absicherung: fällt QB 20 aus, rückt QB2 15 auf QB, auf OP ein freier QB 12 (−8) bzw. ohne freien QB der dritte
+    Rest 5 (−15); RB/WR −5 (ein Rest 5 rückt nach); TE, K und D/ST ohne Ersatz −8, −8, −6 (Slot leer); eine
+    fehlende Position None.
+    Byes: WR 10 in W5 spielfrei → WR 5 rückt nach (−5); in W6 hat der FLEX-Spieler RB 5 Bye, der gleich gute WR 5
+    springt ein (0, Woche fehlt); in W7 fehlt eine D/ST (−6)."""
+    roster, value = base_roster(1)
+    loss = players.cover_loss(roster, value, {QB: D(12)})
+    assert loss == {QB: D(-8), RB: D(-5), WR: D(-5), TE: D(-8), players.K: D(-8), DST: D(-6)}
+    assert players.cover_loss(roster, value, {})[QB] == D(-15)
+    assert players.cover_loss([(p, pos) for p, pos in roster if pos != TE], value, {})[TE] is None
+    assert players.cover_loss(roster, value, {TE: D(9)})[TE] == D(0)   # freier TE 9 besser als der eigene 8: 0, nicht +1
+    costs = players.bye_costs(roster, value, {106: {5}, 105: {6}, 112: {7}}, [5, 6, 7])
+    assert costs == [{"woche": 5, "kosten": D(-5), "ids": [106]}, {"woche": 7, "kosten": D(-6), "ids": [112]}]
+
+
+def test_kaderregeln_und_drop():
+    """roster_rules aus mSettings; must_drop: voll bei 24 Spielern ohne IR-Kandidat (24 Nicht-IR-Plätze), nicht voll,
+    wenn einer OUT ist (er kann auf IR); WR am Limit 8."""
+    settings = {"rosterSettings": {"lineupSlotCounts": {"0": 1, "2": 2, "4": 3, "6": 1, "7": 1, "16": 2, "17": 1,
+                                                        "20": 11, "21": 1, "23": 2},
+                                   "positionLimits": {"0": 0, "1": 5, "2": 8, "3": 8, "4": 4, "5": 3, "16": 4, "17": -1}}}
+    rules = players.roster_rules(settings)
+    assert rules == {"plaetze": 25, "ir": 1, "limits": {QB: 5, RB: 8, WR: 8, TE: 4, players.K: 3, DST: 4}}
+    roster = [(i, WR) for i in range(8)] + [(100 + i, RB) for i in range(16)]
+    assert players.must_drop(roster, {}, rules) == (True, {WR, RB})   # 16 RB > Limit 8
+    assert players.must_drop(roster, {100: "OUT"}, rules) == (False, {WR, RB})
+    assert players.must_drop(roster[:15], {}, rules) == (False, {WR})
+
+
+def test_team_gains_brutto_netto():
+    """Zugewinn = Differenz der besten Aufstellungen. WR 12 für den Grundkader: WR 12/10/10 (+2), WR 10 wandert auf
+    FLEX 10/5 (+5) → +7; nicht voll → netto = brutto. K mit Limit 1 über zwei Wochen: K 8 spielt W1, hat W2 Bye;
+    der freie K 9 hat W1 Bye → brutto 0 + 9 = 9, netto muss K 8 gehen → −8 + 9 = 1. Werte ≤ 0 zählen nicht."""
+    roster, value = base_roster(1)
+    gains = players.team_gains({1: roster}, [value], [(900, WR, [D(12)]), (901, WR, [D(4)]), (902, TE, [D(0)])],
+                               {1: (False, set())})
+    assert gains == {900: {1: {"b": D(7), "n": D(7)}}}
+    full = players.team_gains({1: roster}, [value], [(900, WR, [D(12)])], {1: (True, set())})
+    assert full[900][1] == {"b": D(7), "n": D(7)}          # ein Bankspieler (WR 5) geht ohne Verlust
+    week2 = dict(value) | {114: D(0)}                      # K 8 (ID 114) in W2 spielfrei
+    k = players.team_gains({1: roster}, [value, week2], [(903, players.K, [D(0), D(9)])], {1: (False, {players.K})})
+    assert k[903][1] == {"b": D(9), "n": D(1)}

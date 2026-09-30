@@ -417,6 +417,7 @@ def compute_season(season: int = ef.DEFAULT_SEASON, through: int | None = None) 
             # Wochensicht im Waiver-Tab: NFL-Spielplan (Byes, Anstoß) und Wochenprojektionen des ROS-Auszugs
             "nfl": ssn.nfl(), "nfl_spiele": wetter.season_games(ef.load_json(ef.season_files(season)["schedule"])),
             "ros_projektion": (ssn.ros() or {}).get("players"),
+            "kader_regeln": players.roster_rules(ssn.settings()),
             "wetter": wetter.compute_wetter(ssn.wetter_prognose(), ssn.wetter_ist(),
                                             {tid: t.abbrev for tid, t in ssn.nfl().items()}),
             # Wochenabruf: FantasyPros-Adressen je Position (Verweis im Spielerprofil) – None, solange er sie nicht holte

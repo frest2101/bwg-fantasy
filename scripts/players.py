@@ -29,7 +29,8 @@ LAST_REGULAR_WEEK, LAST_PLAYOFF_WEEK = 14, ef.MAX_WEEK   # W1–14 Regular Seaso
 REPLACEMENT_STATUS = ("WAIVERS", "FREEAGENT")
 INJURED = ("OUT", "INJURY_RESERVE")     # zählen im Ersatzniveau nicht und in der Kader-Projektion in Woche N+1 als 0
 REPLACEMENT_COUNT = 3                   # Ersatzniveau = Ø der drei besten verfügbaren Spieler je Position
-ROS_KEYS = ("ros", "restspiele", "ros_pro_spiel", "ros_po", "ros_rang", "ros_ueber_ersatz")
+ROS_KEYS = ("ros", "restspiele", "ros_pro_spiel", "ros_po", "restspiele_po", "ros_po_pro_spiel", "ros_rang",
+            "ros_ueber_ersatz")
 
 
 # ---------------------------------------------------------------- Hilfen
@@ -186,16 +187,20 @@ def ros_player(projections: dict | None, pro_team: int, nfl: dict[int, rawdata.N
     """ROS eines Spielers aus seinen Wochenprojektionen ({"4": x, …}); Wochen ohne Spiel des NFL-Teams zählen 0.
 
     ROS = Σ Projektion N+1…14; Restspiele = Wochen mit Spiel; ROS/Spiel = ROS/Restspiele (None bei 0);
-    ROS Playoffs = Σ W15–17. Ohne Eintrag im Auszug (keine ESPN-Projektion) sind alle Werte None;
+    ROS Playoffs = Σ W15–17 (noch offene Playoff-Wochen); Restspiele Playoffs und ROS Playoffs/Spiel genauso
+    (Grundlage von Bedarf und Profil nach W14). Ohne Eintrag im Auszug (keine ESPN-Projektion) sind alle Werte None;
     eine einzelne fehlende Woche zählt 0.
     """
     if projections is None:
-        return {"ros": None, "restspiele": None, "ros_pro_spiel": None, "ros_po": None}
+        return {"ros": None, "restspiele": None, "ros_pro_spiel": None, "ros_po": None, "restspiele_po": None,
+                "ros_po_pro_spiel": None}
     regular, playoffs = ros_weeks(after_week, last_regular)
     rest = [w for w in regular if has_game(nfl, pro_team, w)]
     ros = sum((dec(projections.get(str(w), 0)) for w in rest), ZERO)
-    po = sum((dec(projections.get(str(w), 0)) for w in playoffs if has_game(nfl, pro_team, w)), ZERO)
-    return {"ros": ros, "restspiele": len(rest), "ros_pro_spiel": ros / len(rest) if rest else None, "ros_po": po}
+    po_weeks = [w for w in playoffs if has_game(nfl, pro_team, w)]
+    po = sum((dec(projections.get(str(w), 0)) for w in po_weeks), ZERO)
+    return {"ros": ros, "restspiele": len(rest), "ros_pro_spiel": ros / len(rest) if rest else None, "ros_po": po,
+            "restspiele_po": len(po_weeks), "ros_po_pro_spiel": po / len(po_weeks) if po_weeks else None}
 
 
 def ros_ranks(per_game: dict[int, tuple[int, Decimal | None]]) -> dict[int, int]:
@@ -221,11 +226,11 @@ def replacement_levels(pool: list[rawdata.PoolRow], per_game: dict[int, Decimal 
 
 
 def add_ros(players: dict[int, dict], ssn: rawdata.Season, ros: dict,
-            last_regular: int = LAST_REGULAR_WEEK) -> dict[int, Decimal | None]:
+            last_regular: int = LAST_REGULAR_WEEK) -> tuple[dict[int, Decimal | None], dict[int, Decimal | None]]:
     """Trägt ROS, Restspiele, ROS/Spiel, ROS Playoffs, ROS-Rang und ROS über Ersatz in players ein.
 
     NFL-Team laut Pool N (N = ros["after_week"]). ROS über Ersatz = (ROS/Spiel − Ersatzniveau) × Restspiele.
-    Rückgabe: Ersatzniveau je Position.
+    Rückgabe: Ersatzniveau je Position nach ROS/Spiel und nach ROS Playoffs/Spiel (gleiche Regel, W15–17).
     """
     after = ros["after_week"]
     pool = pool_now(ssn, after)
@@ -241,7 +246,7 @@ def add_ros(players: dict[int, dict], ssn: rawdata.Season, ros: dict,
         p["ros_rang"] = ranks.get(pid)
         p["ros_ueber_ersatz"] = ((p["ros_pro_spiel"] - level) * p["restspiele"]
                                  if p["ros_pro_spiel"] is not None and level is not None else None)
-    return levels
+    return levels, replacement_levels(pool, {pid: p["ros_po_pro_spiel"] for pid, p in players.items()})
 
 
 # ---------------------------------------------------------------- Teil 3: Bedarf je Team (Waiver-Tab, Session 7)
@@ -313,6 +318,14 @@ def horizon_sum(first: Decimal, projections: dict | None, pro_team: int, nfl: di
     return first + sum((dec(projections.get(str(w), 0)) for w in weeks[1:] if has_game(nfl, pro_team, w)), ZERO)
 
 
+def horizon_values(first: Decimal, projections: dict | None, pro_team: int, nfl: dict[int, rawdata.NflTeam],
+                   weeks: list[int]) -> list[Decimal]:
+    """Wochenwerte über weeks wie horizon_sum, aber je Woche (Zugewinn mit eigener Aufstellung je Woche); ohne
+    Eintrag im ROS-Auszug zählen die Folgewochen 0."""
+    return [first] + [dec((projections or {}).get(str(w), 0)) if has_game(nfl, pro_team, w) else ZERO
+                      for w in weeks[1:]]
+
+
 def top_mean(values: list[Decimal], n: int = REPLACEMENT_COUNT) -> Decimal | None:
     """Ø der n größten Werte (weniger → Ø der vorhandenen, keiner → None)."""
     best = sorted(values, reverse=True)[:n]
@@ -340,7 +353,7 @@ def team_week_needs(rosters: dict[int, list[tuple[int, int]]], value: dict[int, 
     in den Slot passen und mehr bringen als die Besetzung.
     Ausfälle und Byes beziehen sich auf die ROS-optimale Aufstellung (per_game wie team_needs): Starter, die in N+1
     ausfallen oder fraglich sind (Grund = Status bzw. BYE), und Starter mit Bye in N+2 … N+3 (byes_ahead: Spieler →
-    Wochen). Ohne per_game (kein Regular-Season-ROS) bleiben beide leer.
+    Wochen). Ohne per_game (keine ROS-Grundlage, app_export.need_basis) bleiben beide leer.
     Rückgabe team_id → {"luecken": [{"slot", "id", "pos", "proj", "grund", "kandidaten"}],
     "ausfaelle": [{"slot", "id", "pos", "grund"}], "byes": [{"woche", "slot", "id", "pos"}]}.
     """
@@ -382,19 +395,20 @@ def team_week_needs(rosters: dict[int, list[tuple[int, int]]], value: dict[int, 
 def compute_players(ssn: rawdata.Season, weeks: list[int]) -> dict:
     """Alle Spieler des Pools und der Kader: Wochenreihe, Kennzahlen und – sobald ros.json vorliegt – ROS.
 
-    Rückgabe: {"weeks", "players": {pid: {...}}, "ersatz": {pos: Decimal|None} (leer ohne ros),
+    Rückgabe: {"weeks", "players": {pid: {...}}, "ersatz": {pos: Decimal|None} (leer ohne ros), "ersatz_po" (dasselbe
+    nach ROS Playoffs/Spiel),
     "ros_after_week" (None ohne ros), "cv": POSITION_CV, "wochen_ohne_pool": [Wochen ohne kona]}.
     """
     players, missing = player_weeks(ssn, weeks)
     for p in players.values():
         p.update(player_stats(p["weeks"], p["pos"]))
         p.update(dict.fromkeys(ROS_KEYS))
-    ros, levels = ssn.ros(), {}
+    ros, levels, levels_po = ssn.ros(), {}, {}
     if ros is not None:
         if weeks and ros["after_week"] != max(weeks):
             raise ef.FetchError(f"ROS-Auszug nach W{ros['after_week']} passt nicht zu Woche {max(weeks)}")
-        levels = add_ros(players, ssn, ros)
-    return {"weeks": sorted(weeks), "players": players, "ersatz": levels,
+        levels, levels_po = add_ros(players, ssn, ros)
+    return {"weeks": sorted(weeks), "players": players, "ersatz": levels, "ersatz_po": levels_po,
             "ros_after_week": ros["after_week"] if ros is not None else None,
             "cv": dict(POSITION_CV), "wochen_ohne_pool": missing}
 
@@ -439,3 +453,154 @@ def kader_projection(ssn: rawdata.Season, ligafaktor, last_regular: int = LAST_R
     teams = {tid: statistics.mean(values.values()) for tid, values in wochen.items()}
     dev = {tid: {w: p - teams[tid] for w, p in values.items()} for tid, values in wochen.items()}
     return {"teams": teams, "wochen": wochen, "dev": dev}
+
+
+# ---------------------------------------------------------------- Teil 3c: Profil je Team (Beschluss 30.09.2026)
+
+# Slot-Gruppen der Aufstellung: QB und OP zählen zusammen (Superflex, sonst zählt dieselbe Schwäche doppelt)
+PROFILE_GROUPS = (("QB", ("QB", "OP"), 2), ("RB", ("RB",), 2), ("WR", ("WR",), 3), ("TE", ("TE",), 1),
+                  ("FLEX", ("FLEX",), 2), ("D/ST", ("D/ST",), 2), ("K", ("K",), 1))
+PROFILE_RANKS = 3                 # schwach nur auf den letzten drei Rängen, stark auf den ersten drei
+PROFILE_POINTS = Decimal(1)       # … und mindestens 1 Pkt/Spiel je Slot der Gruppe vom Ligaschnitt entfernt
+PLACEHOLDER = 0                   # Spieler-ID des freien Ersatzes in der Absicherung (keine echte ID ist 0)
+
+
+def team_profiles(rosters: dict[int, list[tuple[int, int]]], value: dict[int, Decimal | None]) -> dict[int, dict]:
+    """Stärken und Schwächen je Team nach Slot-Gruppen der wertoptimalen Aufstellung (lineup.optimal_lineup).
+
+    value = ROS/Spiel (Regular Season, nach W14 Playoffs) je Spieler, ohne Wert 0. Je Gruppe: wert = Σ der Starter,
+    abstand = wert − Ligaschnitt (Ø der Teams), rang (1 = höchster Wert, Gleichstand teilt den besseren Rang),
+    wertung "schwach" auf den letzten PROFILE_RANKS Rängen mit abstand ≤ −PROFILE_POINTS × Slots, "stark" auf den
+    ersten mit abstand ≥ +PROFILE_POINTS × Slots, sonst None; ids = Starter der Gruppe in Slot-Reihenfolge.
+    gesamt = Summe der Gruppen (= optimal_points) mit abstand und rang. Rückgabe team_id → {"gruppen", "gesamt",
+    "schwach", "stark"} (Gruppennamen in PROFILE_GROUPS-Reihenfolge).
+    """
+    slot_group = {slot: g for g, slots, _ in PROFILE_GROUPS for slot in slots}
+    raw = {}
+    for tid, roster in sorted(rosters.items()):
+        groups = {g: {"wert": ZERO, "ids": []} for g, _, _ in PROFILE_GROUPS}
+        for slot, entry in optimal_lineup([(pos, value.get(pid) or ZERO, pid) for pid, pos in roster]):
+            if entry is not None:
+                groups[slot_group[slot]]["wert"] += entry[1]
+                groups[slot_group[slot]]["ids"].append(entry[2])
+        raw[tid] = groups
+    if not raw:
+        return {}
+    n = len(raw)
+
+    def rate(values: dict[int, Decimal]) -> dict[int, tuple[Decimal, int]]:
+        mean = sum(values.values(), ZERO) / n
+        return {t: (v - mean, 1 + sum(1 for o in values.values() if o > v)) for t, v in values.items()}
+
+    out = {tid: {"gruppen": {}, "schwach": [], "stark": []} for tid in raw}
+    for g, _, slots in PROFILE_GROUPS:
+        for tid, (gap, rank) in rate({tid: raw[tid][g]["wert"] for tid in raw}).items():
+            limit = PROFILE_POINTS * slots
+            rating = ("schwach" if rank > n - PROFILE_RANKS and gap <= -limit
+                      else "stark" if rank <= PROFILE_RANKS and gap >= limit else None)
+            out[tid]["gruppen"][g] = {"wert": raw[tid][g]["wert"], "abstand": gap, "rang": rank, "wertung": rating,
+                                      "ids": raw[tid][g]["ids"]}
+            if rating:
+                out[tid][rating].append(g)
+    totals = {tid: sum((grp["wert"] for grp in raw[tid].values()), ZERO) for tid in raw}
+    for tid, (gap, rank) in rate(totals).items():
+        out[tid]["gesamt"] = {"wert": totals[tid], "abstand": gap, "rang": rank}
+    return out
+
+
+def cover_loss(roster: list[tuple[int, int]], value: dict[int, Decimal | None],
+               free_best: dict[int, Decimal | None]) -> dict[int, Decimal | None]:
+    """Absicherung je Position: Was die beste Aufstellung verliert, wenn der beste Spieler der Position ausfällt und
+    der beste verfügbare Spieler der Position (free_best, ohne: niemand) nachrückt; höchstens 0 (ist der freie Spieler
+    mindestens so gut, kostet der Ausfall nichts – die Chance zeigt der Zugewinn). None ohne Spieler der Position im
+    Kader. Bester Spieler = höchster Wert, bei Gleichstand die kleinere ID (wie optimal_lineup)."""
+    entries = [(pos, value.get(pid) or ZERO, pid) for pid, pos in roster]
+    base = optimal_points(entries)
+    out = {}
+    for pos in POSITION_CV:
+        mine = sorted((e for e in entries if e[0] == pos), key=lambda e: (-e[1], e[2]))
+        if not mine:
+            out[pos] = None
+            continue
+        rest = [e for e in entries if e[2] != mine[0][2]]
+        if free_best.get(pos) is not None:
+            rest.append((pos, free_best[pos], PLACEHOLDER))
+        out[pos] = min(ZERO, optimal_points(rest) - base)
+    return out
+
+
+def bye_costs(roster: list[tuple[int, int]], value: dict[int, Decimal | None], byes: dict[int, set[int]],
+              weeks: list[int]) -> list[dict]:
+    """Kosten der Byes je Restwoche: beste Aufstellung mit den spielfreien Spielern der Woche auf 0 minus die
+    beste Aufstellung ohne Bye (beides nach value, also ROS/Spiel); nur Wochen mit Verlust. ids = Starter der
+    wertoptimalen Aufstellung, die in der Woche spielfrei sind. Rückgabe [{"woche", "kosten", "ids"}]."""
+    entries = [(pos, value.get(pid) or ZERO, pid) for pid, pos in roster]
+    base = optimal_points(entries)
+    starters = [e[2] for _, e in optimal_lineup(entries) if e is not None]
+    out = []
+    for w in weeks:
+        off = {pid for pid, _ in roster if w in byes.get(pid, ())}
+        if not off:
+            continue
+        cost = optimal_points([(p, ZERO if pid in off else v, pid) for p, v, pid in entries]) - base
+        if cost < 0:
+            out.append({"woche": w, "kosten": cost, "ids": [pid for pid in starters if pid in off]})
+    return out
+
+
+def roster_rules(settings: dict) -> dict:
+    """Kaderregeln aus mSettings (rosterSettings): plaetze = Σ lineupSlotCounts (Starter, Bank, IR), ir = IR-Slots,
+    limits = Höchstzahl je Position (positionLimits; 0 oder −1 = ohne Grenze)."""
+    r = settings.get("rosterSettings") or {}
+    counts = {int(k): v for k, v in (r.get("lineupSlotCounts") or {}).items()}
+    limits = {int(k): v for k, v in (r.get("positionLimits") or {}).items()}
+    return {"plaetze": sum(counts.values()), "ir": counts.get(21, 0),
+            "limits": {pos: limits[pos] for pos in POSITION_CV if limits.get(pos, 0) > 0}}
+
+
+def must_drop(roster: list[tuple[int, int]], injury: dict[int, str | None], rules: dict) -> tuple[bool, set[int]]:
+    """Braucht ein Zugang einen Drop? (voll, Positionen am Limit).
+
+    Voll = die Spieler ohne IR-Platz füllen alle übrigen Plätze: len(Kader) − min(IR-Slots, Spieler mit OUT oder
+    INJURY_RESERVE) ≥ Plätze − IR-Slots. Näherung: Der Fantasy-IR-Slot steht nicht im Tagesstand; wer OUT oder
+    INJURY_RESERVE ist, kann dort stehen. Am Limit = so viele Spieler der Position wie laut positionLimits erlaubt.
+    """
+    eligible = sum(1 for pid, _ in roster if injury.get(pid) in INJURED)
+    full = len(roster) - min(rules["ir"], eligible) >= rules["plaetze"] - rules["ir"]
+    counts = {pos: sum(1 for _, p in roster if p == pos) for pos in rules["limits"]}
+    return full, {pos for pos, limit in rules["limits"].items() if counts[pos] >= limit}
+
+
+def team_gains(rosters: dict[int, list[tuple[int, int]]], weeks_values: list[dict[int, Decimal]],
+               candidates: list[tuple[int, int, list[Decimal]]],
+               drop_rule: dict[int, tuple[bool, set[int]]]) -> dict[int, dict[int, dict]]:
+    """Zugewinn freier Spieler je Team: um wie viel die beste Aufstellung (optimal_points) mit ihm besser wird,
+    summiert über die Wochen des Horizonts (je Woche eigene Aufstellung).
+
+    weeks_values: je Woche Wert der Kaderspieler (fehlt → 0); candidates: (id, Position, Werte je Woche).
+    brutto = Σ_w optimal(Kader + Spieler) − optimal(Kader). netto = mit dem günstigsten nötigen Drop: Ist der Kader
+    voll oder die Position am Limit (drop_rule, must_drop), das Maximum über alle erlaubten Drops (am Limit nur
+    dieselbe Position) von Σ_w optimal(Kader − Drop + Spieler) − optimal(Kader); sonst netto = brutto.
+    Nur Paare mit brutto > 0. Rückgabe Spieler-ID → team_id → {"b": brutto, "n": netto}.
+    """
+    out: dict[int, dict[int, dict]] = {}
+    for tid, roster in sorted(rosters.items()):
+        entries = [[(pos, vals.get(pid) or ZERO, pid) for pid, pos in roster] for vals in weeks_values]
+        base = [optimal_points(e) for e in entries]
+        full, at_limit = drop_rule.get(tid, (False, set()))
+        for pid, pos, cvals in candidates:
+            if all(v <= 0 for v in cvals):
+                continue
+
+            def gain(drop=None):
+                return sum((optimal_points([x for x in e if x[2] != drop] + [(pos, v, pid)]) - b
+                            for e, b, v in zip(entries, base, cvals)), ZERO)
+            brutto = gain()
+            if brutto <= 0:
+                continue
+            netto = brutto
+            if full or pos in at_limit:
+                drops = [q for q, p in roster if pos not in at_limit or p == pos]
+                netto = max((gain(q) for q in drops), default=ZERO)
+            out.setdefault(pid, {})[tid] = {"b": brutto, "n": netto}
+    return out
