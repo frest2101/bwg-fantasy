@@ -95,7 +95,7 @@ Position gegen Defense, kein Einzelduell: wie viele Punkte jede NFL-Defense den 
 ## `transactions.json` (lazy)
 - `spieler` (id → Name), `aufstellungswechsel` (team_id → Zahl).
 - `items`: `{id, type, team_id, datum (Epoch-ms), periode, items: [{type ADD/DROP, player_id, name, from_team_id, to_team_id, in_app}]}`. `type` ist WAIVER, FREEAGENT, ROSTER (reine Drops) oder TRADE_ACCEPT (ohne Spieler).
-- `in_app` (bool): Die App hat eine Spielerseite zu diesem Spieler (players.json oder Kader laut Tagesstand); sonst zeigt sie den Namen ohne Link.
+- `in_app` (bool): Die App hat eine Spielerseite zu diesem Spieler: players.json, dazu die Spieler, die nur `waiver.json` führt – Kaderspieler laut Tagesstand und Spieler mit Marktwert (`app_export.app_player_ids` = `daily_selection`, ohne Tagesstand nur players.json); sonst zeigt sie den Namen ohne Link.
 - Der Draft steht seit dem Keeper-Tab in `keeper.json` (`picks`).
 
 ## `keeper.json` (lazy, Keeper-Tab `#keeper`, dazu Herkunft auf Team- und Spielerseite)
@@ -169,7 +169,7 @@ Abruf: `https://raw.githubusercontent.com/frest2101/bwg-fantasy/main/app/data/cl
 ## `claude_marktwert.json` (für das Claude-Projekt in claude.ai, nicht von der App geladen)
 Gesamtrangliste und Grundlage für Trade-Fragen im Claude-Projekt (Beschluss Stephan 01.10.2026: keine Ranglisten-Seite und kein Trade-Rechner in der App). Eigene Datei, damit `claude.json` unter 50 KB bleibt; fehlt ohne FantasyCalc-Auszug.
 - **Kopf:** `legende`, `legende_spalten`, `quelle` (jeder Text unter 400 Zeichen; `quelle` nennt FantasyCalc mit Adresse, ESPN und nflverse), `stand` `{saison, nach_woche, marktwert (Abrufzeit des Auszugs), pool_stand (Tagesstand der Kader), alter_stichtag}`, `keeper_linie`, `keeper_zahl`, `teams` (Kürzel → Name).
-- **`spieler`** (Spalten `spalten`): alle Spieler mit Marktwert, sortiert nach `rang`: `name, pos, nfl` (ESPN-Name aus dem Wochenpool, nicht der Name bei FantasyCalc), `team` (Kürzel laut Tagesstand, sonst Status `WAIVERS`/`FREEAGENT`), `wert, rang, pos_rang, trend30, redraft` (`null` = kein Redraft-Wert), `ue_linie` (`wert` − `keeper_linie`), `alter` (eine Stelle, am `alter_stichtag`), `herkunft` (`keeper`, `draft`, `waiver`, `free_agent`, `trade`; `null` bei freien Spielern).
+- **`spieler`** (Spalten `spalten`): alle Spieler mit Marktwert im Kader oder im Wochenpool, sortiert nach `rang`: `name, pos, nfl` (ESPN-Name aus dem Wochenpool, nicht der Name bei FantasyCalc; einen unter der Woche geholten Kaderspieler, den der Wochenpool nicht kennt, benennt die Kaderzeile, sonst „Spieler <id>“ und `pos`/`nfl` `null`), `team` (Kürzel laut Tagesstand, sonst Status `WAIVERS`/`FREEAGENT`), `wert, rang, pos_rang, trend30, redraft` (`null` = kein Redraft-Wert), `ue_linie` (`wert` − `keeper_linie`), `alter` (eine Stelle, am `alter_stichtag`), `herkunft` (`keeper`, `draft`, `waiver`, `free_agent`, `trade`; `null` bei freien Spielern).
 - Keine Liste „beste zwölf je Team“ – das Projekt rechnet selbst. ROS, Form und Projektionen stehen in `claude.json`.
 
 Abruf: `https://raw.githubusercontent.com/frest2101/bwg-fantasy/main/app/data/claude_marktwert.json`.

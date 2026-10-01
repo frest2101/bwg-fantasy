@@ -332,15 +332,17 @@ def league_values(profiles: list[dict | None], rows: list[dict]) -> dict | None:
 
 def value_rows(werte: dict[int, dict], pool: dict[int, dict], kader: list[dict], stamm: dict[int, dict], day,
                line: int | None) -> dict[int, dict]:
-    """Alle Spieler mit Marktwert, die der Wochenpool kennt, je ESPN-ID (Grundlage für Waiver-Tab und die Datei für
-    das Claude-Projekt): value_fields, team (heute, 0 = frei), art (Herkunft bei Kaderspielern, sonst None) und
-    alter (am Stichtag day; Kaderspieler wie add_ages, None ohne Stammdaten)."""
+    """Alle Spieler mit Marktwert, die im Kader stehen oder die der Wochenpool kennt, je ESPN-ID (Grundlage für
+    Waiver-Tab und die Datei für das Claude-Projekt): value_fields, team (heute, 0 = frei), art (Herkunft bei
+    Kaderspielern, sonst None) und alter (am Stichtag day; Kaderspieler wie add_ages, None ohne Stammdaten).
+    Kaderspieler zählen immer – auch unter der Woche geholte, die der Wochenpool noch nicht kennt, denn sie zählen
+    auch in der Keeper-Linie (Befund Gegenprüfung 01.10.2026); freie Spieler nur mit Eintrag im Wochenpool."""
     roster = {k["id"]: k for k in kader}
     out = {}
     for pid in sorted(werte):
-        if pid not in pool:
-            continue
         k, s = roster.get(pid), stamm.get(pid)
+        if pid not in pool and not k:
+            continue
         out[pid] = value_fields(werte[pid], line) | {
             "team": k["team"] if k else 0, "art": k["art"] if k else None,
             "alter": k["alter"] if k else (nflverse.age(s["geb"], day) if s else None)}

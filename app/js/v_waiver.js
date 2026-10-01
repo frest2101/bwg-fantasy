@@ -78,8 +78,12 @@ function available(box, W, P, rows, r, wflag, me, kp) {
   // Zukunft: nur Spieler mit Marktwert (K und D/ST haben keinen)
   const rowsNow = () => free.filter(x => (!st.pos || x.pos === st.pos) && (!st.text || x.name.toLowerCase().includes(st.text))
     && (st.hor !== 'zukunft' || U.ok(x.wert)));
-  const rosWhy = P.ros_nach_woche == null ? `ab Wochenabruf W${S.tw + 1}` : 'keine ROS-Projektion';
-  const num = (k, l, f = U.num, why) => ({k, l, num: 1, v: x => x[k], f: x => U.val(x[k], f, why)});
+  // Spieler, die nur der Tagesstand kennt (unter der Woche geholt, frei mit Marktwert), haben keine Wochenwerte
+  const inWeek = new Set(P.players.map(p => p.id));
+  const rosWhyBase = P.ros_nach_woche == null ? `ab Wochenabruf W${S.tw + 1}` : 'keine ROS-Projektion';
+  const rosWhy = x => inWeek.has(x.id) ? rosWhyBase : 'nicht im Wochenstand';
+  // why: Text oder Funktion der Zeile (Grund für „–“)
+  const num = (k, l, f = U.num, why) => ({k, l, num: 1, v: x => x[k], f: x => U.val(x[k], f, typeof why === 'function' ? why(x) : why)});
   // Wetter-Fähnchen als eigener Link nach #wetter neben dem Spielerlink (kein Link im Link)
   const spieler = {k: 'name', l: 'Spieler', v: x => x.name.toLowerCase(), d: 1, flt: false, f: x => {
     const a = h('a', {href: '#spieler/' + x.id, class: 'pl'},
@@ -89,7 +93,7 @@ function available(box, W, P, rows, r, wflag, me, kp) {
     return fl ? h('span', {class: 'plw'}, a, fl) : a;
   }};
   // Positions-Matchup (players.json mu, Wochenstand): Gegner in Woche mu_woche mit F als Farbzelle wie im D/ST-Tab, Bye grau
-  const hasMu = 'mu_woche' in P, week = new Set(P.players.map(p => p.id));
+  const hasMu = 'mu_woche' in P, week = inWeek;
   const muWhy = x => !hasMu ? 'ab dem nächsten Wochenabruf' : x.mu ? 'keine offene Woche' : !x.nfl ? 'kein NFL-Team'
     : week.has(x.id) ? 'kein Positions-Matchup' : 'nicht im Wochenstand';
   const mu = {k: 'mu', l: U.ok(P.mu_woche) ? `Matchup W${P.mu_woche}` : 'Matchup', num: 1, v: x => x.mu?.n1?.opp ? x.mu.n1.f ?? null : null,
@@ -101,7 +105,7 @@ function available(box, W, P, rows, r, wflag, me, kp) {
     }};
   const mu3 = {k: 'mu3', l: 'Ø nächste 3', num: 1, v: x => x.mu?.naechste3 ?? null, cls: x => fz(x.mu?.naechste3),
     f: x => U.val(x.mu?.naechste3, v => U.num(v, 2), x.mu ? 'kein Spiel in den nächsten 3 Wochen' : muWhy(x))};
-  const bye = {k: 'bye', l: 'Bye', num: 1, cat: 1, v: x => x.bye, d: 1, f: x => !U.ok(x.bye) ? U.na('kein NFL-Team')
+  const bye = {k: 'bye', l: 'Bye', num: 1, cat: 1, v: x => x.bye, d: 1, f: x => !U.ok(x.bye) ? U.na(x.nfl && !inWeek.has(x.id) ? 'nicht im Wochenstand' : 'kein NFL-Team')
     : x.bye === W.woche ? h('span', {class: 'dn'}, 'W' + x.bye, h('span', {class: 'vh'}, ' – nächste Woche spielfrei')) : 'W' + x.bye};
   const verl = {k: 'inj', l: 'Verletzung', v: x => U.INJ[x.inj] ? x.inj : null, d: 1, f: x => U.INJ[x.inj]?.[1] || (x.inj === 'ACTIVE' ? 'aktiv' : '–')};
   const frist = {k: 'frist', l: 'Frist', v: x => x.status === 'WAIVERS' ? x.waiver_bis : null, d: 1,

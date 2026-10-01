@@ -362,6 +362,11 @@ def test_marktwert_export(result):
         pytest.skip("noch kein Tagesstand")
     ssn = rawdata.Season(2026, 2)
     names = records.player_names(ssn)
+    # erfundener Kaderspieler (Team 2), den der Wochenpool nicht kennt – unter der Woche geholt (Befund Gegenprüfung)
+    neu = 99_999_991
+    pool_latest = dict(result["pool_latest"], players=result["pool_latest"]["players"] + [{"id": neu, "onTeamId": 2,
+                                                                                          "status": "ONTEAM"}])
+    ssn._memo["pool_latest"] = pool_latest
     base = keeper.compute_keeper(ssn, [1, 2], result["players"], names)
     weekly, keep = result["players"]["players"], app_export.player_selection(result)
     offense = [r["id"] for r in base["kader"] if r["pos"] in (1, 2, 3, 4)]
@@ -370,7 +375,8 @@ def test_marktwert_export(result):
             and not daily[pid].get("onTeamId") and daily[pid].get("status") in ("WAIVERS", "FREEAGENT")][:3]
     ids = offense + free
     value = {pid: 1000 + (pid * 7919) % 9000 for pid in ids}                         # erfunden, aus der ID abgeleitet
-    order = sorted(ids, key=lambda pid: (-value[pid], pid))
+    value[neu] = 999                                                                # unter allen: Linie bleibt gleich
+    order = sorted(ids, key=lambda pid: (-value[pid], pid)) + [neu]
     ssn._memo["marktwert"] = {"stand": "2026-10-01T0826Z", "spieler": {
         str(pid): {"wert": value[pid], "rang": i, "pos_rang": i, "trend30": pid % 50 - 25, "redraft": 0 if i % 2 else 99}
         for i, pid in enumerate(order, start=1)}}
@@ -382,10 +388,11 @@ def test_marktwert_export(result):
         assert t["marktwert"]["kern"] == sum(mine[:12]) and t["marktwert"]["n"] == len(mine)
         assert t["marktwert"]["ueber_linie"] == sum(v - line for v in mine if v > line)
         assert t["marktwert"]["n_linie"] == sum(1 for v in mine if v >= line)
-    assert k["liga"]["marktwert"]["n_linie"] >= 120 and k["liga"]["marktwert"]["n"] == len(offense)
-    assert set(k["werte"]) == set(ids) and all(k["werte"][pid]["team"] == 0 for pid in free)
+    assert k["liga"]["marktwert"]["n_linie"] >= 120 and k["liga"]["marktwert"]["n"] == len(offense) + 1
+    assert set(k["werte"]) == set(ids) | {neu} and all(k["werte"][pid]["team"] == 0 for pid in free)
+    assert (k["werte"][neu]["team"], k["werte"][neu]["wert"], k["werte"][neu]["alter"]) == (2, 999, None)
     assert all(k["werte"][pid]["wert_redraft"] is None for pid in order[::2])        # Redraft 0 = keiner
-    fake = dict(result, keeper=k)
+    fake = dict(result, keeper=k, pool_latest=pool_latest)
     kj = app_export.round_file("keeper.json", app_export.build_keeper(fake))
     assert all(set(t["marktwert"]) == KEEPER_WERT and isinstance(t["marktwert"]["kern"], int) for t in kj["teams"] + [kj["liga"]])
     assert all(r["wert"] == value[r["id"]] and r["wert_ue"] == value[r["id"]] - line for r in kj["kader"] if r["id"] in value)
@@ -394,13 +401,15 @@ def test_marktwert_export(result):
     assert (w["wert_stand"], w["keeper_linie"]) == ("2026-10-01T0826Z", line)
     rows = {s["id"]: s for s in w["spieler"]}
     assert all(rows[pid]["name"] == weekly[pid]["name"] and rows[pid]["wert"] == value[pid] for pid in free)
-    assert all(set(rows[pid]) >= WERT_KEYS for pid in ids) and all("wert" not in s for s in w["spieler"] if s["id"] not in value)
+    assert all(set(rows[pid]) >= WERT_KEYS for pid in ids + [neu]) and all("wert" not in s for s in w["spieler"] if s["id"] not in value)
+    assert (rows[neu]["team"], rows[neu]["name"], rows[neu]["wert"]) == (2, None, 999)   # Wert auch ohne Wochenpool
     assert set(free) <= app_export.app_player_ids(fake) and not set(free) & {p["id"] for p in app_export.build_players(fake)["players"]}
     # claude_marktwert.json: Gesamtrangliste nach Rang, team = Kürzel oder Status, Texte unter der Grenze
     c = app_export.round_file("claude_marktwert.json", app_export.build_claude_marktwert(fake))
-    assert c["spalten"] == list(app_export.MARKTWERT_COLS) and len(c["spieler"]) == len(ids)
+    assert c["spalten"] == list(app_export.MARKTWERT_COLS) and len(c["spieler"]) == len(ids) + 1
     col = {name: i for i, name in enumerate(c["spalten"])}
-    assert [r[col["rang"]] for r in c["spieler"]] == list(range(1, len(ids) + 1))
+    assert [r[col["rang"]] for r in c["spieler"]] == list(range(1, len(ids) + 2))
+    assert c["spieler"][-1][:4] == [f"Spieler {neu}", None, None, "HJS"]             # ohne Wochenpool: kein „None“-Text
     assert {r[col["team"]] for r in c["spieler"]} <= set(app_export.KUERZEL.values()) | {"WAIVERS", "FREEAGENT"}
     assert all(r[col["herkunft"]] is None for r in c["spieler"] if r[col["team"]] in ("WAIVERS", "FREEAGENT"))
     assert (c["keeper_linie"], c["keeper_zahl"], c["stand"]["marktwert"]) == (line, 12, "2026-10-01T0826Z")

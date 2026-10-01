@@ -687,13 +687,16 @@ def build_claude_marktwert(result: dict) -> dict | None:
         return None
     weekly = result["players"]["players"]
     daily = {p["id"]: p.get("status") for p in (result.get("pool_latest") or {}).get("players", [])}
+    roster = {k["id"]: k for k in keeper.get("kader", [])}
     rows = []
     for pid, w in sorted(werte.items(), key=lambda kv: kv[1]["wert_rang"]):
-        p = weekly[pid]
-        status = daily.get(pid) or p["status"]
-        rows.append([p["name"], POSITION_NAMES.get(p["pos"], str(p["pos"])), p["nfl"],
-                     KUERZEL.get(w["team"]) if w["team"] else status, w["wert"], w["wert_rang"], w["wert_posrang"],
-                     w["wert_trend"], w["wert_redraft"], w["wert_ue"], fixed(w["alter"], 1), w["art"]])
+        # Stammdaten aus dem Wochenpool; ein unter der Woche geholter Kaderspieler, den er nicht kennt, aus der Kaderzeile
+        p = weekly.get(pid) or roster.get(pid) or {}
+        pos = p.get("pos")
+        rows.append([p.get("name") or f"Spieler {pid}", POSITION_NAMES.get(pos, str(pos)) if pos is not None else None,
+                     p.get("nfl"), KUERZEL.get(w["team"]) if w["team"] else daily.get(pid) or p.get("status"),
+                     w["wert"], w["wert_rang"], w["wert_posrang"], w["wert_trend"], w["wert_redraft"], w["wert_ue"],
+                     fixed(w["alter"], 1), w["art"]])
     return {"legende": "BWG Fantasy Liga (ESPN 1166555857): Marktwerte aller Spieler mit Wert als Gesamtrangliste. "
                        "Werte: FantasyCalc (https://fantasycalc.com), Dynasty, Superflex, 10 Teams, PPR – Tauschpreise "
                        "aus Ligen mit rund 300 gehaltenen Spielern; die BWG hält 120 (12 je Team). Oberhalb der "
