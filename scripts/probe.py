@@ -1,7 +1,9 @@
-"""Probe-Lauf (Session 6): sind Open-Meteo und die ESPN-Site-API aus der GitHub Action erreichbar, und was liefern sie?
+"""Probe-Lauf (Session 6): sind Open-Meteo, die ESPN-Site-API und FantasyCalc aus der GitHub Action erreichbar, und was
+liefern sie?
 
 Fragt jede Quelle einmal ab und schreibt die Antworten gekürzt ins Log – nichts wird gespeichert oder committet.
-Grundlage für die Entscheidung, welche Wetter- und News-Quelle der Tageslauf nutzt (docs/auftraege/session6.md, Punkt 1).
+Grundlage für die Entscheidung, welche Wetter- und News-Quelle der Tageslauf nutzt (docs/auftraege/session6.md, Punkt 1);
+FantasyCalc seit Session 9 (Marktwert im Keeper-Tab): nur Statuscode, Zahl der Einträge und Größe.
 Jede Quelle wird für sich geprüft; ein Fehler bei einer Quelle stoppt die anderen nicht, der Exit-Code bleibt 0.
 
 Aufruf: python scripts/probe.py            # lokal oder in .github/workflows/probe.yml (workflow_dispatch)
@@ -23,7 +25,10 @@ PLAYER_NEWS = "https://site.api.espn.com/apis/fantasy/v2/games/ffl/news/players"
 ATHLETE_OVERVIEW = "https://site.web.api.espn.com/apis/common/v3/sports/football/nfl/athletes/{id}/overview"
 CLEVELAND = (41.506, -81.699)          # Huntington Bank Field, offenes Stadion (TNF-Spielort in W4)
 LONDON = (51.604, -0.066)              # Tottenham Hotspur Stadium (Auslandsspiel W4)
-PROBE_PLAYER = 3139477                 # ESPN-Athleten-ID eines bekannten QB (öffentliche ID, Test der News-Abfrage)
+# FantasyCalc: der einzige dokumentierte Endpunkt (fantasycalc.com/api-docs), Parameter der Liga (Superflex, 10 Teams, PPR)
+FANTASYCALC = "https://api.fantasycalc.com/values/current"
+FANTASYCALC_PARAMS = {"isDynasty": "true", "numQbs": 2, "numTeams": 10, "ppr": 1}
+PROBE_PLAYER = 3139477                # ESPN-Athleten-ID eines bekannten QB (öffentliche ID, Test der News-Abfrage)
 
 
 def title(text: str) -> None:
@@ -118,6 +123,21 @@ def probe_news(session: requests.Session) -> None:
               f"web={bool(((item.get('links') or {}).get('web') or {}).get('href'))}")
 
 
+def probe_fantasycalc(session: requests.Session) -> None:
+    """FantasyCalc: erreichbar? Nur Statuscode, Zahl der Einträge (Spieler und Picks) und Größe – keine Werte im Log."""
+    title("FantasyCalc: values/current (Dynasty, Superflex, 10 Teams, PPR)")
+    resp = session.get(FANTASYCALC, params=FANTASYCALC_PARAMS, timeout=TIMEOUT)
+    try:
+        data = resp.json()
+    except ValueError:
+        data = None
+    rows = data if isinstance(data, list) else []
+    players = [r for r in rows if isinstance(r, dict) and (r.get("player") or {}).get("position") != "PICK"]
+    with_espn = sum(1 for r in players if (r.get("player") or {}).get("espnId"))
+    print(f"HTTP {resp.status_code}, {len(resp.content):,} Bytes, {len(rows)} Einträge "
+          f"({len(players)} Spieler, davon {with_espn} mit espnId; {len(rows) - len(players)} Picks)")
+
+
 def main() -> int:
     sys.stdout.reconfigure(errors="replace", line_buffering=True)
     now = datetime.now(timezone.utc)
@@ -127,7 +147,8 @@ def main() -> int:
     with requests.Session() as session:
         for name, job in (("Open-Meteo", lambda: probe_open_meteo(session, now)),
                           ("ESPN-Scoreboard", lambda: probe_scoreboard(session, season, week)),
-                          ("ESPN-News", lambda: probe_news(session))):
+                          ("ESPN-News", lambda: probe_news(session)),
+                          ("FantasyCalc", lambda: probe_fantasycalc(session))):
             try:
                 job()
             except Exception as exc:  # noqa: BLE001 – jede Quelle für sich melden, der Lauf geht weiter
