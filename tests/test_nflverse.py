@@ -45,6 +45,13 @@ def test_auszug():
     assert json.loads(raw) == ext and raw.count(b"\n") == 6 + 5     # Kopf und Klammern, dazu eine Zeile je Spieler
 
 
+def test_auszug_kurze_zeile_und_unsinnige_zahl():
+    """Eine Zeile mit zu wenigen Feldern oder „inf“ als Zahl ist kein Fehler: Die fehlenden Angaben bleiben leer."""
+    ext = nv.extract(csv_text(["00-9,Testspieler kurz,7", "00-8,Testspieler inf,8,2000-01-01,inf,2026,inf,1,1"]), {7, 8})
+    assert ext["spieler"] == {"7": {"geb": None, "rookie": None, "draft": None},
+                              "8": {"geb": "2000-01-01", "rookie": None, "draft": None}}
+
+
 def test_auszug_unbrauchbare_liste():
     with pytest.raises(ef.FetchError, match="Spalten fehlen .*rookie_season"):
         nv.extract(csv_text(ROWS, HEAD.replace("rookie_season", "rookie")), {1})
@@ -113,7 +120,20 @@ def test_update_schreibt_nur_bei_aenderung(raw, capsys):
     assert nv.update(session, 2026) == 0 and json.loads(nv.path(2026).read_bytes())["spieler"]["2"]["geb"] == "2005-01-20"
 
 
+class KaputtesGzip(FakeSession):
+    """Gültiger gzip-Kopf, beschädigter Datenstrom: gzip.decompress wirft zlib.error (keine OSError-Unterklasse)."""
+
+    def get(self, url, timeout=None):
+        good = gzip.compress(csv_text(self.rows * 50).encode("utf-8"))
+
+        class Response:
+            status_code = 200
+            content = good[:10] + bytes(b ^ 0xFF for b in good[10:40]) + good[40:]
+        return Response()
+
+
 @pytest.mark.parametrize("session, text", [(FakeSession(status=503), "HTTP 503"), (FakeSession(broken=True), "nicht lesbar"),
+                                           (KaputtesGzip(), "nicht lesbar"),
                                            (FakeSession(rows=ROWS[:2]), "nur 2 von 5")])
 def test_update_fehler_lassen_den_alten_auszug_stehen(raw, capsys, session, text):
     pool([1, 2, 3, 4, 5])
@@ -121,3 +141,12 @@ def test_update_fehler_lassen_den_alten_auszug_stehen(raw, capsys, session, text
     saved = nv.path(2026).read_bytes()
     assert nv.update(session, 2026) == 1 and nv.path(2026).read_bytes() == saved
     assert text in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("content", ["[]", '{"players": null}', "{kaputt"])
+def test_update_pool_auszug_in_unerwarteter_form(raw, capsys, content):
+    """Ein Tagesstand in unerwarteter Form ist ein Fehler des Nebenteils (Rückgabe 1), keine Ausnahme."""
+    path = ef.pool_dir(2026) / ef.POOL_FILE
+    path.parent.mkdir(parents=True)
+    path.write_text(content, encoding="utf-8")
+    assert nv.update(FakeSession(), 2026) == 1 and "FEHLER" in capsys.readouterr().err

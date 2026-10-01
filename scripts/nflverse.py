@@ -19,6 +19,7 @@ import gzip
 import io
 import json
 import sys
+import zlib
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
@@ -63,7 +64,7 @@ def number(text: str) -> int | None:
     """Ganze Zahl aus einem CSV-Feld („2022“, „7.0“); None bei leerem oder unlesbarem Feld."""
     try:
         return int(float(text))
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return None
 
 
@@ -86,7 +87,7 @@ def extract(text: str, ids: set[int]) -> dict:
             continue
         last = number(row["last_season"]) or 0
         if pid not in best or last > best[pid][0]:
-            birth = row["birth_date"].strip()
+            birth = (row["birth_date"] or "").strip()   # kurze Zeile: fehlende Felder sind None
             try:
                 date.fromisoformat(birth)
             except ValueError:
@@ -116,7 +117,7 @@ def fetch(session: requests.Session, ids: set[int]) -> bytes:
         raise ef.FetchError(f"nflverse players: HTTP {resp.status_code}")
     try:
         text = gzip.decompress(resp.content).decode("utf-8")
-    except (OSError, EOFError, UnicodeDecodeError) as exc:
+    except (OSError, EOFError, zlib.error, UnicodeDecodeError) as exc:
         raise ef.FetchError(f"nflverse players: Antwort nicht lesbar ({exc})") from exc
     return dumps(extract(text, ids))
 
@@ -124,7 +125,9 @@ def fetch(session: requests.Session, ids: set[int]) -> bytes:
 def update(session: requests.Session, season: int) -> int:
     """Wochenabruf: Auszug holen und nur bei Änderung schreiben; gibt die Zahl der Fehler zurück (Warnung im Lauf).
 
-    Fängt seine Fehler selbst wie fantasypros (siehe dort: als Skript gestartet ist espn_fetch zweimal geladen).
+    Fängt seine Fehler selbst wie fantasypros (siehe dort: als Skript gestartet ist espn_fetch zweimal geladen) –
+    und zwar jeden: Die Stammdaten sind ein Nebenteil und laufen vor dem Holen der fälligen Woche; eine Liste oder ein
+    Pool-Auszug in unerwarteter Form darf den Wochenabruf nicht abbrechen (Befund Gegenprüfung 01.10.2026).
     Ohne Spielerpool (vor dem ersten Abruf der Saison) gibt es nichts zu suchen: kein Abruf, kein Fehler.
     """
     target = path(season)
@@ -134,8 +137,9 @@ def update(session: requests.Session, season: int) -> int:
             print(f"  {target.name:<34} noch kein Spielerpool")
             return 0
         content = fetch(session, ids)
-    except (ef.FetchError, KeyError, OSError) as exc:
-        print(f"  {target.name:<34} FEHLER – {exc}", file=sys.stderr)
+    except Exception as exc:  # noqa: BLE001 – Nebenteil, siehe Docstring
+        reason = exc if isinstance(exc, ef.FetchError) else f"{type(exc).__name__}: {exc}"
+        print(f"  {target.name:<34} FEHLER – {reason}", file=sys.stderr)
         return 1
     if target.exists() and target.read_bytes() == content:
         print(f"  {target.name:<34} unverändert")

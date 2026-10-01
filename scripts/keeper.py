@@ -25,7 +25,7 @@ import players
 import rawdata
 import records
 from lineup import QB, RB, TE, WR, is_starter
-from zahlen import HUNDRED, ZERO
+from zahlen import HUNDRED, ZERO, round_to
 
 KEEPER, DRAFT, WAIVER, FREEAGENT, TRADE = "keeper", "draft", "waiver", "free_agent", "trade"
 ARTEN = (KEEPER, DRAFT, WAIVER, FREEAGENT, TRADE)
@@ -34,8 +34,9 @@ GRUPPE = {KEEPER: "keeper", DRAFT: "draft", WAIVER: "zugang", FREEAGENT: "zugang
 GRUPPEN = ("keeper", "draft", "zugang", "trade")
 # Kern = ohne K und D/ST: kein Kicker ist Keeper und nur wenige D/ST, ihr Anteil misst sonst vor allem das
 KERN = (QB, RB, WR, TE)
-# Altersprofil: „jung“ bis 25 vollendete Jahre, „alt“ ab 30 (Faustgrenzen, keine Positionskurve)
-JUNG, ALT = 25, 30
+# Altersprofil: „jung“ unter 26, „alt“ ab 30 (Faustgrenzen, keine Positionskurve); verglichen wie angezeigt, also
+# mit dem auf eine Stelle gerundeten Alter – sonst stünde ein Spieler mit „26,0“ in der Liste und zählte als unter 26
+JUNG_UNTER, ALT_AB, ALTER_STELLEN = 26, 30, 1
 
 
 # ---------------------------------------------------------------- Zeitleisten
@@ -244,7 +245,8 @@ def age_profile(rows: list[dict], weight: dict[int, Decimal], pos_age: dict[int,
     kader = Ø Alter; ros = mit den Gewichten weight (Restpunkte laut ESPN-Projektion) gewichtet – das Alter der
     Spieler, von denen die Punkte kommen sollen; bereinigt = Ø (Alter − Liga-Schnitt der Position, pos_age), weil
     Quarterbacks und Kicker im Schnitt älter sind; bereinigt_ros = dasselbe gewichtet. Beide ros-Werte None ohne
-    Gewichte. jung = bis JUNG vollendete Jahre, alt = ab ALT; rookies und zweites_jahr nach nfl_jahr.
+    Gewichte. jung = Alter unter JUNG_UNTER, alt = ab ALT_AB, verglichen wie angezeigt (auf eine Stelle, round half
+    up); rookies und zweites_jahr nach nfl_jahr.
     """
     aged = [r for r in rows if has_age(r)]
     if not aged:
@@ -253,10 +255,12 @@ def age_profile(rows: list[dict], weight: dict[int, Decimal], pos_age: dict[int,
     dev = {r["id"]: r["alter"] - pos_age[r["pos"]]["alter"] for r in aged}
     w = {r["id"]: weight.get(r["id"]) or ZERO for r in aged}
     total = sum(w.values(), ZERO)
+    shown = {r["id"]: round_to(r["alter"], ALTER_STELLEN) for r in aged}
     weighted = lambda value: sum((w[r["id"]] * value(r) for r in aged), ZERO) / total if total > 0 else None  # noqa: E731
     return {"n": n, "kader": sum((r["alter"] for r in aged), ZERO) / n, "ros": weighted(lambda r: r["alter"]),
             "bereinigt": sum(dev.values(), ZERO) / n, "bereinigt_ros": weighted(lambda r: dev[r["id"]]),
-            "jung": sum(1 for r in aged if r["alter"] < JUNG + 1), "alt": sum(1 for r in aged if r["alter"] >= ALT),
+            "jung": sum(1 for r in aged if shown[r["id"]] < JUNG_UNTER),
+            "alt": sum(1 for r in aged if shown[r["id"]] >= ALT_AB),
             "rookies": sum(1 for r in aged if r["nfl_jahr"] == 1),
             "zweites_jahr": sum(1 for r in aged if r["nfl_jahr"] == 2)}
 

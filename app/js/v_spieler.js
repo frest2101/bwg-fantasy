@@ -230,7 +230,7 @@ function one(box, h1, P, W, rows, r, svg, rosWhy, wline, origin) {
     U.ok(p.bye) ? ` · Bye W${p.bye}` : null,
     p.pos === 'D/ST' ? [' · ', h('a', {href: '#dst'}, 'D/ST-Faktoren')] : null), stand(W),
   p.team > 0 && origin?.(p) ? h('p', {class: 'note'}, 'Herkunft: ', h('strong', null, origin(p)[0]), ' · ',
-    origin(p)[1] ? [origin(p)[1], ' · '] : null,
+    origin(p)[1] ? [origin(p)[1], ' ', U.ib('alter', ''), ' · '] : null,   // i-Text nennt Stichtag, Quelle und Lizenz
     h('a', {href: '#keeper/kader?team=' + p.team}, 'Keeper und Kader'), ' ', U.ib('herkunft', '')) : null,
   h('div', {class: 'tiles'},
     U.tile('Pkt Saison', U.num(p.pts), spiele(p.g), 'spiele'),

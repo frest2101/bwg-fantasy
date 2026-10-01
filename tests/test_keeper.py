@@ -253,7 +253,10 @@ def test_echte_daten_kader_heute(result):
         assert (r["art"] in ("keeper", "draft")) <= (r["pick"] is not None and r["von"] == r["team"])
         assert r["art"] != "keeper" or r["seit"] is None
         assert r["art"] not in ("draft", "waiver", "free_agent") or r["seit"] >= k["draft_datum"]
-        assert r["rookie"] is None or r["rookie"] == (r["vj_pts"] is None)
+        if r["nfl_jahr"] is not None:      # mit Stammdaten (Stufe 2) gilt die Rookie-Saison
+            assert r["rookie"] == (r["nfl_jahr"] == 1)
+        else:                              # ohne sie die Näherung aus dem Vorjahres-Eintrag
+            assert r["rookie"] is None or r["rookie"] == (r["vj_pts"] is None)
 
 
 # ---------------------------------------------------------------- Altersprofil (Stufe 2)
@@ -276,6 +279,11 @@ def test_altersprofil_konstruiert():
     t2 = keeper.age_profile(rows[2:], weight, pos_age)
     assert t2 == {"n": 2, "kader": D("26"), "ros": D("26"), "bereinigt": D("0"), "bereinigt_ros": D("-2"),
                   "jung": 0, "alt": 0, "rookies": 0, "zweites_jahr": 1}
+    # Grenzen wie angezeigt (eine Stelle, round half up): 25,96 steht als 26,0 da und zählt nicht mehr als unter 26,
+    # 29,95 steht als 30,0 da und zählt als ab 30; 25,94 und 29,94 bleiben darunter
+    grenze = [zeile(11, 3, QB, "25.96", 3), zeile(12, 3, QB, "25.94", 3), zeile(13, 3, QB, "29.95", 8), zeile(14, 3, QB, "29.94", 8)]
+    g = keeper.age_profile(grenze, {}, keeper.position_ages(grenze))
+    assert (g["jung"], g["alt"]) == (1, 1)
     ohne = keeper.age_profile(rows[:2], {}, pos_age)                # ohne Gewichte (kein ROS-Auszug)
     assert (ohne["kader"], ohne["ros"], ohne["bereinigt_ros"]) == (D("26"), None, None)
     assert keeper.age_profile(rows[4:5], weight, pos_age) is None   # nur die D/ST: kein Profil
@@ -342,6 +350,10 @@ def test_echte_kader_mit_erfundenen_stammdaten():
         assert set(p) == {"n", "kader", "ros", "bereinigt", "bereinigt_ros", "jung", "alt", "rookies", "zweites_jahr"}
         assert D(18) < p["kader"] < D(40) and D(18) < p["ros"] < D(40)
     assert all(r["rookie"] == (r["nfl_jahr"] == 1) for r in mit)
+    # Spieler ohne Vorjahres-Eintrag (nach W3 geholt oder Rookie): Mit Stammdaten entscheidet die Rookie-Saison – auch
+    # ein Veteran ohne Eintrag ist dann kein Rookie mehr (Befund Gegenprüfung 01.10.2026: der Alt-Test verlangte das)
+    ohne_vj = [r for r in mit if r["vj_pts"] is None]
+    assert ohne_vj and any(r["rookie"] is False for r in ohne_vj)
 
 
 def test_vorjahr_aus_mroster():
