@@ -2,7 +2,8 @@
 // Ersatz (Tagesstand), Bedarf je Team, Waiver-Reihenfolge, Claims der letzten 7 Tage. Zahlen kommen aus Python; hier nur
 // Anzeige, Filter und die Zusammenführung von Tagesstand (waiver.json) und Wochenstand (players.json) je Spieler-ID.
 // Positions-Matchup je Spieler (Feld mu) aus dem Wochenstand; Wetter-Fähnchen aus wetter.json (Prognose der laufenden Woche).
-// Horizont (Beschluss 30.09.2026): Woche N+1 (Standard), Σ N+1…N+3 oder ROS – für die Liste und den Bedarf je Team.
+// Horizont (Beschluss 30.09.2026): Woche N+1 (Standard), Σ N+1…N+3 oder ROS – für die Liste und den Bedarf je Team;
+// dazu „Zukunft“ (Session 9): freie Spieler nach Marktwert (FantasyCalc, waiver.json), nur für die Liste.
 let U, S, h;
 const POS = ['QB', 'RB', 'WR', 'TE', 'K', 'D/ST'];
 const FREE = ['WAIVERS', 'FREEAGENT'];
@@ -10,7 +11,7 @@ const ART = {WAIVER: 'Waiver', FREEAGENT: 'Free Agent'};
 const DAYS7 = 7 * 864e5;
 const KEY = 'bwg-team';                  // eigenes Team (Kürzel-Auswahl), nur Komfort im Browser
 const fz = v => 'fz' + (U.ok(v) ? ' ' + U.fcls(v) : '');   // Farbzelle um F = 1,00; ohne Wert ohne Farbe
-const HOR = ['woche', 'drei', 'ros'];
+const HOR = ['woche', 'drei', 'ros', 'zukunft'];
 const GRUND = {BYE: 'Bye', OUT: 'fällt aus', INJURY_RESERVE: 'IR', SUSPENSION: 'gesperrt', QUESTIONABLE: 'fraglich',
   DOUBTFUL: 'zweifelhaft', DAY_TO_DAY: 'Day-to-Day'};
 // Spiel der Woche N+1 schon angepfiffen: Der Spieler bringt in dieser Woche nichts mehr (Anstoß aus waiver.json)
@@ -31,6 +32,8 @@ export async function render(box, ctx, r) {
   const [T, WX] = await Promise.all([ctx.load('transactions.json').catch(() => null),
     S.man.files?.['wetter.json'] ? ctx.load('wetter.json').catch(() => null) : null]);
   const wx = WX ? await ctx.mod('v_wetter').catch(() => null) : null;
+  // Horizont „Zukunft“ nur mit Marktwerten; Quelle, Format und Verweise kommen aus dem Keeper-Tab
+  const kp = W.wert_stand ? await ctx.mod('v_keeper').catch(() => null) : null;
   if (!r.alive()) return;
   const byId = new Map(P.players.map(p => [p.id, p]));
   // Tagesstand je Spieler, Stammdaten und ROS aus dem Wochenstand; wer dort fehlt, heißt wie im Tagesstand (ohne ROS)
@@ -48,7 +51,7 @@ export async function render(box, ctx, r) {
   }}, h('option', {value: 0}, 'Mein Team wählen'), S.teams.map(t => h('option', {value: t.team_id, selected: t.team_id === me.mine}, `${t.kuerzel} · ${t.name}`)));
   U.ap(box, h('p', {class: 'note'}, `Tagesstand ${U.stamp(W.stand)} · Projektion und Bye-Hinweis für W${W.woche}`, ' ', U.ib('tagesstand', '')),
     h('div', {class: 'row'}, h('label', null, qTeam ? 'Sicht von ' : 'Mein Team ', mineSel)));
-  const av = available(box, W, P, rows, r, wx && (nfl => wx.flagLink(wx.gameOf(WX, nfl))), me);
+  const av = available(box, W, P, rows, r, wx && (nfl => wx.flagLink(wx.gameOf(WX, nfl))), me, kp);
   const grid = h('div', {class: 'two'});
   U.ap(box, grid);
   let bsicht = W.bedarf_woche ? 'woche' : 'ros';
@@ -62,17 +65,25 @@ export async function render(box, ctx, r) {
 }
 
 // ---------------------------------------------------------------- beste verfügbare Spieler je Position
-function available(box, W, P, rows, r, wflag, me) {
+function available(box, W, P, rows, r, wflag, me, kp) {
   const q = r.q;
   const narrow = matchMedia('(max-width:599px)').matches;
-  const hasWeek = !!W.ersatz_woche;
+  const hasWeek = !!W.ersatz_woche, hasWert = !!kp;
+  // erlaubte Horizonte: Woche und Σ nur mit Wochensicht, Zukunft nur mit Marktwerten
+  const hors = HOR.filter(x => x === 'ros' || (x === 'zukunft' ? hasWert : hasWeek));
   const st = {pos: POS.includes(q.get('pos')) ? q.get('pos') : '', text: '',
-    hor: HOR.includes(q.get('h')) && (hasWeek || q.get('h') === 'ros') ? q.get('h') : (hasWeek ? 'woche' : 'ros'),
+    hor: hors.includes(q.get('h')) ? q.get('h') : (hasWeek ? 'woche' : 'ros'),
     sicht: ['alle', 'ros', 'besitz'].includes(q.get('sicht')) ? q.get('sicht') : (narrow ? 'ros' : 'alle')};
   const free = rows.filter(x => FREE.includes(x.status));
-  const rowsNow = () => free.filter(x => (!st.pos || x.pos === st.pos) && (!st.text || x.name.toLowerCase().includes(st.text)));
-  const rosWhy = P.ros_nach_woche == null ? `ab Wochenabruf W${S.tw + 1}` : 'keine ROS-Projektion';
-  const num = (k, l, f = U.num, why) => ({k, l, num: 1, v: x => x[k], f: x => U.val(x[k], f, why)});
+  // Zukunft: nur Spieler mit Marktwert (K und D/ST haben keinen)
+  const rowsNow = () => free.filter(x => (!st.pos || x.pos === st.pos) && (!st.text || x.name.toLowerCase().includes(st.text))
+    && (st.hor !== 'zukunft' || U.ok(x.wert)));
+  // Spieler, die nur der Tagesstand kennt (unter der Woche geholt, frei mit Marktwert), haben keine Wochenwerte
+  const inWeek = new Set(P.players.map(p => p.id));
+  const rosWhyBase = P.ros_nach_woche == null ? `ab Wochenabruf W${S.tw + 1}` : 'keine ROS-Projektion';
+  const rosWhy = x => inWeek.has(x.id) ? rosWhyBase : 'nicht im Wochenstand';
+  // why: Text oder Funktion der Zeile (Grund für „–“)
+  const num = (k, l, f = U.num, why) => ({k, l, num: 1, v: x => x[k], f: x => U.val(x[k], f, typeof why === 'function' ? why(x) : why)});
   // Wetter-Fähnchen als eigener Link nach #wetter neben dem Spielerlink (kein Link im Link)
   const spieler = {k: 'name', l: 'Spieler', v: x => x.name.toLowerCase(), d: 1, flt: false, f: x => {
     const a = h('a', {href: '#spieler/' + x.id, class: 'pl'},
@@ -82,7 +93,7 @@ function available(box, W, P, rows, r, wflag, me) {
     return fl ? h('span', {class: 'plw'}, a, fl) : a;
   }};
   // Positions-Matchup (players.json mu, Wochenstand): Gegner in Woche mu_woche mit F als Farbzelle wie im D/ST-Tab, Bye grau
-  const hasMu = 'mu_woche' in P, week = new Set(P.players.map(p => p.id));
+  const hasMu = 'mu_woche' in P, week = inWeek;
   const muWhy = x => !hasMu ? 'ab dem nächsten Wochenabruf' : x.mu ? 'keine offene Woche' : !x.nfl ? 'kein NFL-Team'
     : week.has(x.id) ? 'kein Positions-Matchup' : 'nicht im Wochenstand';
   const mu = {k: 'mu', l: U.ok(P.mu_woche) ? `Matchup W${P.mu_woche}` : 'Matchup', num: 1, v: x => x.mu?.n1?.opp ? x.mu.n1.f ?? null : null,
@@ -94,14 +105,14 @@ function available(box, W, P, rows, r, wflag, me) {
     }};
   const mu3 = {k: 'mu3', l: 'Ø nächste 3', num: 1, v: x => x.mu?.naechste3 ?? null, cls: x => fz(x.mu?.naechste3),
     f: x => U.val(x.mu?.naechste3, v => U.num(v, 2), x.mu ? 'kein Spiel in den nächsten 3 Wochen' : muWhy(x))};
-  const bye = {k: 'bye', l: 'Bye', num: 1, cat: 1, v: x => x.bye, d: 1, f: x => !U.ok(x.bye) ? U.na('kein NFL-Team')
+  const bye = {k: 'bye', l: 'Bye', num: 1, cat: 1, v: x => x.bye, d: 1, f: x => !U.ok(x.bye) ? U.na(x.nfl && !inWeek.has(x.id) ? 'nicht im Wochenstand' : 'kein NFL-Team')
     : x.bye === W.woche ? h('span', {class: 'dn'}, 'W' + x.bye, h('span', {class: 'vh'}, ' – nächste Woche spielfrei')) : 'W' + x.bye};
   const verl = {k: 'inj', l: 'Verletzung', v: x => U.INJ[x.inj] ? x.inj : null, d: 1, f: x => U.INJ[x.inj]?.[1] || (x.inj === 'ACTIVE' ? 'aktiv' : '–')};
   const frist = {k: 'frist', l: 'Frist', v: x => x.status === 'WAIVERS' ? x.waiver_bis : null, d: 1,
     f: x => x.status === 'WAIVERS' ? U.val(x.waiver_bis, U.stamp, 'keine Frist gemeldet') : U.na('Free Agent, sofort')};
   // Zugewinn für das Bezugsteam (waiver.json spieler[].zug, Python): brutto, netto nur, wenn ein Drop etwas kostet
   const gain = x => x.zug?.[st.hor]?.[String(me.mine)] ?? null;
-  const lost = x => st.hor !== 'ros' && played(W, x);
+  const lost = x => (st.hor === 'woche' || st.hor === 'drei') && played(W, x);
   const zugCol = () => ({k: 'zug', l: `Für ${U.kz(me.mine)}`, num: 1, v: x => lost(x) ? null : gain(x)?.b ?? null,
     f: x => {
       const z = gain(x);
@@ -114,14 +125,19 @@ function available(box, W, P, rows, r, wflag, me) {
   const projUe = {k: 'proj_ue', l: `W${W.woche} ü. Ersatz`, num: 1, v: x => played(W, x) ? null : x.proj_ue,
     f: x => played(W, x) ? U.na('Spiel der Woche schon angepfiffen') : U.val(x.proj_ue, U.sgn, weekWhy(x))};
   const proj = num('proj', `Proj. W${W.woche}`, U.num, 'noch keine ESPN-Projektion');
+  // Zukunft: Marktwert (FantasyCalc), Abstand zur Keeper-Linie, Gesamtrang mit Positionsrang, Trend 30 Tage, Alter
+  const zukunft = hasWert ? [spieler, num('wert', 'Wert', kp.wertTxt), num('wert_ue', 'ü. Linie', kp.wertSgn, 'keine Keeper-Linie'),
+    {k: 'wert_rang', l: 'Wert-Rang', num: 1, d: 1, v: x => x.wert_rang, f: x => [String(x.wert_rang), h('small', null, `${x.pos} ${x.wert_posrang}`)]},
+    num('wert_trend', 'Trend 30 T.', kp.wertSgn), {...num('alter', 'Alter', v => U.num(v, 1), 'nicht in den Stammdaten'), d: 1}] : [];
   const base = {
     woche: [spieler, projUe, proj],
     drei: [spieler, num('proj3_ue', `Σ ${span(W)} ü. Ersatz`, U.sgn, 'keine ROS-Projektion'),
       num('proj3', `Σ ${span(W)}`, U.num, 'keine ROS-Projektion'), proj],
-    ros: [spieler, num('ros_ue', 'ROS ü. Ersatz', U.sgn, rosWhy), proj]};
-  const SORT = {woche: 'proj_ue', drei: 'proj3_ue', ros: 'ros_ue'};
+    ros: [spieler, num('ros_ue', 'ROS ü. Ersatz', U.sgn, rosWhy), proj],
+    zukunft};
+  const SORT = {woche: 'proj_ue', drei: 'proj3_ue', ros: 'ros_ue', zukunft: 'wert'};
   const CAP = {woche: `Verfügbare Spieler nach Projektion W${W.woche} über Ersatz`, drei: `Verfügbare Spieler nach Σ ${span(W)} über Ersatz`,
-    ros: 'Verfügbare Spieler nach ROS über Ersatz'};
+    ros: 'Verfügbare Spieler nach ROS über Ersatz', zukunft: 'Verfügbare Spieler nach Marktwert'};
   const ros = [mu, mu3, bye, verl, num('ros_g', 'ROS/Sp.', U.num, rosWhy)];
   const besitz = [num('own', 'Besitz %', v => U.pct(v)), num('own_d', 'Δ Tag', v => U.sgn(v, 2)), num('started', 'gestartet %', v => U.pct(v))];
   const extra = {alle: [...ros, ...besitz, frist], ros: [...ros, frist], besitz: [...besitz, frist]};
@@ -131,10 +147,12 @@ function available(box, W, P, rows, r, wflag, me) {
     {k: 'status', l: 'Status', v: x => x.status, d: 1, cat: 1, f: x => U.STAT[x.status] || x.status}];
   let tbl;
   const build = () => {
+    // „Für Mein Team“ nur in den Punkte-Horizonten; die Zukunft hat keinen Zugewinn
+    const zug = me.mine && st.hor !== 'zukunft' ? [zugCol()] : [];
     tbl = U.table({cap: CAP[st.hor], cls: 'nr', rh: 0, rows: rowsNow(), sort: [SORT[st.hor], -1], limit: 50, filter: true,
-      filters, fstate: fst, cols: [base[st.hor][0], ...(me.mine ? [zugCol()] : []), ...base[st.hor].slice(1), ...extra[st.sicht]],
-      rc: x => st.hor !== 'ros' && played(W, x) ? 'gsp' : null,
-      note: 'Verfügbar = Waivers oder Free Agent laut Tagesstand.'});
+      filters, fstate: fst, cols: [base[st.hor][0], ...zug, ...base[st.hor].slice(1), ...extra[st.sicht]],
+      rc: x => lost(x) ? 'gsp' : null,
+      note: 'Verfügbar = Waivers oder Free Agent laut Tagesstand.' + (st.hor === 'zukunft' ? ' Nur Spieler mit Marktwert (K und D/ST haben keinen).' : '')});
     slot.replaceChildren(tbl);
   };
   const refresh = rebuild => {
@@ -145,15 +163,18 @@ function available(box, W, P, rows, r, wflag, me) {
     ersNote.replaceChildren(); U.ap(ersNote, ersText());
   };
   let timer;
-  // Ersatzniveau passend zum Horizont: Projektion W(N+1), Σ N+1…N+3 oder ROS/Spiel
+  // Ersatzniveau passend zum Horizont: Projektion W(N+1), Σ N+1…N+3 oder ROS/Spiel; in der Zukunft die Keeper-Linie mit Quelle
   const ersText = () => {
+    if (st.hor === 'zukunft') return ['Keeper-Linie ', U.val(W.keeper_linie, kp.wertTxt, 'zu wenige Kaderspieler mit Wert'), ' ', U.ib('keeper-linie', ''),
+      ' · ', kp.fcQuelle(), `, Stand ${U.stamp(W.wert_stand)} · `, kp.fcRechner()];
     const [lbl, ers, gid] = {woche: [`Projektion W${W.woche}`, W.ersatz_woche, 'proj-ue'], drei: [`Σ ${span(W)}`, W.ersatz_3, 'proj3'],
       ros: ['ROS/Spiel', P.ersatz, 'ersatz']}[st.hor];
     return [`Ersatzniveau (${lbl}): `, POS.map((p, i) => [i ? ' · ' : '', `${p} ${U.ok(ers?.[p]) ? U.num(ers[p]) : '–'}`]),
       ' ', U.ib(gid, '')];
   };
   const ersNote = h('p', {class: 'note'});
-  const horSeg = hasWeek ? U.seg('Horizont', [['woche', `W${W.woche}`], ['drei', `Σ ${span(W)}`], ['ros', 'ROS']], st.hor,
+  const HLABEL = {woche: `W${W.woche}`, drei: `Σ ${span(W)}`, ros: 'ROS', zukunft: 'Zukunft'};
+  const horSeg = hors.length > 1 ? U.seg('Horizont', hors.map(x => [x, HLABEL[x]]), st.hor,
     v => { st.hor = v; refresh(true); }) : null;
   U.ap(box, h('h2', null, 'Beste verfügbare Spieler'),
     horSeg && h('div', {class: 'row'}, horSeg, U.ib('horizont', '')),
@@ -167,7 +188,7 @@ function available(box, W, P, rows, r, wflag, me) {
     U.seg('Spalten', [['alle', 'Alle'], ['ros', 'Ausblick'], ['besitz', 'Besitz']], st.sicht, v => { st.sicht = v; refresh(true); })),
     count, slot,
     U.legend(['verfuegbar', 'horizont', 'proj-ue', 'proj3', 'gespielt', 'ros-ue', 'ersatz', 'ros-spiel', 'proj-naechste', 'mu-n1', 'mu-naechste3', 'bye-hinweis', 'besitz-trend', 'frist',
-      'wetter-markierung', 'filter', 'projektionen']));
+      'wetter-markierung', ...(hasWert ? ['marktwert', 'keeper-linie', 'wert-ue', 'wert-trend'] : []), 'filter', 'projektionen']));
   refresh(true);
   return {rebuild: () => refresh(true)};
 }

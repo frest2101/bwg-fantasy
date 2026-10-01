@@ -182,3 +182,22 @@ Gegenprüfung, Ansichten im Browser bei 320/360/390 px und am Desktop, dann Pull
 - Kein eigener Trade-Rechner und keine Ranglisten-Seite in der App; keine Pick-Werte; keine getauschten Picks.
 - Keine Trade-Überlegungen, Keeper-Pläne oder Ziele einzelner Teams im Repo – die entstehen im Claude-Projekt.
 - Nichts automatisch nach Notion.
+
+## Ergebnis Stufe 3 (01.10.2026, Branch `claude/keeper-marktwert`)
+- Beschluss 2 von Stufe 4 („je ein Spiel um Platz 3 und um Platz 5“) hat Stephan zu Beginn der Session bestätigt.
+- Probe: Der Runner erreicht FantasyCalc (Probe-Lauf 36836250337: HTTP 200, 420 Einträge, 396 Spieler, 393 mit `espnId`, 24 Picks).
+- Gebaut wie beschrieben: `scripts/fantasycalc.py` (`--marktwert` im Tageslauf, Tagessperre über `stand`, jeder Fehler eine
+  Warnung), Rechenwerk in `keeper.py`, App (Keeper › Wert, Wertspalten in Keeper › Kader, Abschnitt Marktwert auf der
+  Spielerseite, Horizont „Zukunft“ im Waiver-Tab), `claude_marktwert.json`, Glossar, Datenvertrag, CLAUDE.md, README.
+- Abweichung vom Auftragstext: Die freien Spieler mit Wert, die `players.json` nicht führt (01.10.: 47), kommen nur in
+  `waiver.json` (wie unter der Woche geholte Kaderspieler, mit Name aus dem Wochenpool), nicht in `players.json` – sonst
+  wäre `players.json` schon nach W3 über der Testgrenze von 60 KB gzip gewesen (60,2 KB). Die App gibt ihnen trotzdem eine
+  Spielerseite (ohne Wochenwerte).
+- Generalprobe mit dem echten Auszug (nur lokal): Keeper-Linie 1.661, alle 202 Offense-Kaderspieler mit Wert, bester
+  freier Spieler auf Gesamtrang 126, 121 Kaderspieler auf oder über der Linie (Gleichstand an der Linie). Zwei
+  Testdefinitionen („hat eine Spielerseite“) mussten der neuen Regel folgen; danach 566 Tests grün mit und ohne Auszug.
+  Größen mit Auszug: `waiver.json` 30,8 KB gzip, `keeper.json` 23,8 KB, `claude_marktwert.json` 31 KB (11,9 KB gzip).
+- Gegenprüfung (vier Blickwinkel, je Befund ein Skeptiker): 8 Befunde, 2 bestätigt und umgesetzt (Kaderspieler, die der
+  Wochenpool nicht kennt, fehlten in `waiver.json` und `claude_marktwert.json`; Vertrag zu `in_app`), 6 widerlegt (u. a.
+  der erneute Abruf nach einem Fehlschlag – so bestellt).
+- Offen für Stephan: den Absatz für die Projektanweisung des Claude-Projekts einfügen (Wortlaut im Chat vorgelegt).

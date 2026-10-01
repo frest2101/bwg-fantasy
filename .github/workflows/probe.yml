@@ -1,5 +1,5 @@
 # Probe (Session 6): fragt Open-Meteo und die ESPN-Site-API (Scoreboard mit Wetter und Spielort, News je Spieler)
-# einmal ab und schreibt die Antworten gekürzt ins Log. Nur von Hand, ohne Commit, ohne Schreibrecht – dient der
+# einmal ab und schreibt die Antworten gekürzt ins Log; seit Session 9 auch FantasyCalc (nur Status, Einträge, Größe). Nur von Hand, ohne Commit, ohne Schreibrecht – dient der
 # Entscheidung, welche Wetter- und News-Quelle der Tageslauf nutzt (aus der Claude-Session sind die Quellen nicht
 # immer erreichbar, aus der Action schon). Start: gh workflow run probe.yml, Log: gh run view --log.
 name: Probe

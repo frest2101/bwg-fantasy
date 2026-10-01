@@ -39,7 +39,8 @@ def data(content):
 def test_alle_dateien_und_gueltiges_json(data):
     immer = {"manifest.json", "teams.json", "schedule.json", "players.json", "dst.json", "matchup.json", "history.json",
              "transactions.json", "keeper.json", "claude.json"}
-    tageslauf = {"waiver.json", "wetter.json"}  # erst, wenn der Tageslauf Pool-Auszug und Wetter geliefert hat
+    # erst, wenn der Tageslauf Pool-Auszug, Wetter und Marktwerte geliefert hat
+    tageslauf = {"waiver.json", "wetter.json", "claude_marktwert.json"}
     assert immer <= set(data) <= immer | tageslauf
 
 
@@ -74,7 +75,8 @@ def test_waiver_vertrag(result):
     out = app_export.round_file("waiver.json", app_export.build_waiver(dict(result, pool_latest=pool)))
     assert (out["stand"], out["woche"]) == ("2026-09-29T0645Z", 3)
     assert set(out) == {"stand", "woche", "reihenfolge", "reihenfolge_quelle", "reihenfolge_stand", "bedarf", "spieler",
-                        "horizont", "ersatz_woche", "ersatz_3", "anstoss", "bedarf_woche", "bedarf_basis", "bedarf_ersatz", "profil"}
+                        "horizont", "ersatz_woche", "ersatz_3", "anstoss", "bedarf_woche", "bedarf_basis", "bedarf_ersatz", "profil",
+                        "wert_stand", "keeper_linie"}
     assert out["horizont"] == [3, 4, 5] and len(out["anstoss"]) == 32   # W3: alle 32 Teams spielen
     # ohne Reihenfolge im Pool-Auszug: Wochenstand (waiver_prio aus mTeam des Wochenabrufs); ohne ROS kein Bedarf
     weekly = sorted(result["teams"], key=lambda t: t["waiver_prio"])
@@ -267,8 +269,10 @@ def test_dst_und_transaktionen(data):
     assert set(data["transactions.json"]) == {"spieler", "items", "aufstellungswechsel"}   # Draft: keeper.json
 
 
-KEEPER_TEAM = {"keeper", "keeper_da", "picks", "picks_da", "kader", "pf", "kern", "altersprofil"}
+KEEPER_TEAM = {"keeper", "keeper_da", "picks", "picks_da", "kader", "pf", "kern", "altersprofil", "marktwert"}
 KEEPER_ALTER = {"n", "kader", "ros", "bereinigt", "bereinigt_ros", "jung", "alt", "rookies", "zweites_jahr"}
+KEEPER_WERT = {"n", "kern", "ueber_linie", "n_linie", "alter"}
+WERT_KEYS = {"wert", "wert_rang", "wert_posrang", "wert_trend", "wert_ue"}
 KEEPER_GRUPPEN = {"keeper", "draft", "zugang", "trade"}
 
 
@@ -277,7 +281,7 @@ def test_keeper_vertrag(data):
     Punkte mit zwei; Positionen als Kürzel; in_app wie in transactions.json."""
     k = data["keeper.json"]
     assert set(k) == {"through_week", "stand", "draft_datum", "keeper_zahl", "kader_plaetze", "alter_stichtag", "alter_gewicht",
-                      "liga", "teams", "kader", "picks"}
+                      "marktwert_stand", "keeper_linie", "liga", "teams", "kader", "picks"}
     assert (k["through_week"], k["keeper_zahl"], k["kader_plaetze"]) == (2, 12, 24)
     assert data["manifest.json"]["files"]["keeper.json"]["lazy"]
     assert k["stand"] == data["manifest.json"]["datenstand"]["pool_stand"]
@@ -292,15 +296,13 @@ def test_keeper_vertrag(data):
     pf = {t["team_id"]: t["pf"] for t in data["teams.json"]["teams"]}
     assert all(t["pf"]["summe"] == pf[t["team_id"]] for t in k["teams"])
     assert all(set(r) == {"id", "name", "pos", "nfl", "team", "art", "pick", "runde", "von", "seit", "g", "avg", "vj_g",
-                          "vj_pts", "vj_avg", "vj_delta", "rookie", "alter", "nfl_jahr", "in_app"} for r in k["kader"])
+                          "vj_pts", "vj_avg", "vj_delta", "rookie", "alter", "nfl_jahr", "in_app"} | WERT_KEYS for r in k["kader"])
     assert all(set(p) == {"pick", "runde", "runden_pick", "team_id", "player_id", "name", "pos", "keeper", "da",
                           "team_jetzt", "g", "pts", "avg", "starts", "pf", "in_app"} for p in k["picks"])
     assert len(k["picks"]) == 240 and sum(p["keeper"] for p in k["picks"]) == 119
     assert {p["pos"] for p in k["picks"]} <= {"QB", "RB", "WR", "TE", "K", "D/ST"}
     assert {r["pos"] for r in k["kader"]} <= {"QB", "RB", "WR", "TE", "K", "D/ST", None}
-    known = {p["id"] for p in data["players.json"]["players"]}
-    known |= {s["id"] for s in data.get("waiver.json", {}).get("spieler", []) if s["team"] > 0}
-    assert all(p["in_app"] == (p["player_id"] in known) for p in k["picks"])
+    assert all(p["in_app"] == (p["player_id"] in app_known(data)) for p in k["picks"])
     assert all(r["in_app"] for r in k["kader"]) if "waiver.json" in data else True
     # Altersprofil: ohne nflverse-Stammdaten überall null, mit ihnen je Team die Felder der Positivliste
     if k["alter_stichtag"] is None:
@@ -311,6 +313,15 @@ def test_keeper_vertrag(data):
         assert set(k["liga"]["altersprofil"]) == KEEPER_ALTER | {"positionen"}
         assert set(k["liga"]["altersprofil"]["positionen"]) <= {"QB", "RB", "WR", "TE", "K"}
         assert all(places(r["alter"]) <= 1 for r in k["kader"] if r["alter"] is not None)
+    # Marktwert (Stufe 3): ohne Auszug überall null, mit ihm Werte als ganze Zahlen und je Team die Positivliste
+    if k["marktwert_stand"] is None:
+        assert k["keeper_linie"] is None and all(t["marktwert"] is None for t in k["teams"] + [k["liga"]])
+        assert all(r[key] is None for r in k["kader"] for key in WERT_KEYS)
+    else:
+        assert isinstance(k["keeper_linie"], int)
+        assert all(set(t["marktwert"]) == KEEPER_WERT for t in k["teams"] + [k["liga"]] if t["marktwert"])
+        assert all(isinstance(r[key], int) for r in k["kader"] if r["wert"] is not None for key in WERT_KEYS)
+        assert all(r["wert"] is None for r in k["kader"] if r["pos"] in ("K", "D/ST"))
 
 
 def test_keeper_alter_export(result):
@@ -340,7 +351,77 @@ def test_keeper_alter_export(result):
     assert findings == []
 
 
-MATCHUP_POS = {"z25", "z26", "n", "r25", "r26", "f", "f_vorwoche", "delta", "rang", "rang_vorwoche"}
+def test_marktwert_export(result):
+    """Marktwert (Stufe 3) mit erfundenen Werten für die echten Kader und drei freie Spieler, die players.json nicht
+    führt: Keeper-Linie = 120. Wert der Kaderspieler, Kern-Wert = Σ der zwölf wertvollsten je Team; keeper.json,
+    waiver.json (Felder nur bei Spielern mit Wert, freie Spieler mit Wert samt Name aus dem Wochenpool) und
+    claude_marktwert.json (Gesamtrangliste) – alles erfunden bis auf Kader, Namen und Tagesstand."""
+    import keeper
+    import records
+    if not result.get("pool_latest"):
+        pytest.skip("noch kein Tagesstand")
+    ssn = rawdata.Season(2026, 2)
+    names = records.player_names(ssn)
+    # erfundener Kaderspieler (Team 2), den der Wochenpool nicht kennt – unter der Woche geholt (Befund Gegenprüfung)
+    neu = 99_999_991
+    pool_latest = dict(result["pool_latest"], players=result["pool_latest"]["players"] + [{"id": neu, "onTeamId": 2,
+                                                                                          "status": "ONTEAM"}])
+    ssn._memo["pool_latest"] = pool_latest
+    base = keeper.compute_keeper(ssn, [1, 2], result["players"], names)
+    weekly, keep = result["players"]["players"], app_export.player_selection(result)
+    offense = [r["id"] for r in base["kader"] if r["pos"] in (1, 2, 3, 4)]
+    daily = {p["id"]: p for p in result["pool_latest"]["players"]}
+    free = [pid for pid in sorted(weekly) if pid not in keep and pid > 0 and pid in daily
+            and not daily[pid].get("onTeamId") and daily[pid].get("status") in ("WAIVERS", "FREEAGENT")][:3]
+    ids = offense + free
+    value = {pid: 1000 + (pid * 7919) % 9000 for pid in ids}                         # erfunden, aus der ID abgeleitet
+    value[neu] = 999                                                                # unter allen: Linie bleibt gleich
+    order = sorted(ids, key=lambda pid: (-value[pid], pid)) + [neu]
+    ssn._memo["marktwert"] = {"stand": "2026-10-01T0826Z", "spieler": {
+        str(pid): {"wert": value[pid], "rang": i, "pos_rang": i, "trend30": pid % 50 - 25, "redraft": 0 if i % 2 else 99}
+        for i, pid in enumerate(order, start=1)}}
+    k = keeper.compute_keeper(ssn, [1, 2], result["players"], names)
+    line = sorted((value[pid] for pid in offense), reverse=True)[119]
+    assert (k["keeper_linie"], k["marktwert_stand"]) == (line, "2026-10-01T0826Z")
+    for t in k["teams"]:
+        mine = sorted((value[r["id"]] for r in k["kader"] if r["team"] == t["team_id"] and r["id"] in value), reverse=True)
+        assert t["marktwert"]["kern"] == sum(mine[:12]) and t["marktwert"]["n"] == len(mine)
+        assert t["marktwert"]["ueber_linie"] == sum(v - line for v in mine if v > line)
+        assert t["marktwert"]["n_linie"] == sum(1 for v in mine if v >= line)
+    assert k["liga"]["marktwert"]["n_linie"] >= 120 and k["liga"]["marktwert"]["n"] == len(offense) + 1
+    assert set(k["werte"]) == set(ids) | {neu} and all(k["werte"][pid]["team"] == 0 for pid in free)
+    assert (k["werte"][neu]["team"], k["werte"][neu]["wert"], k["werte"][neu]["alter"]) == (2, 999, None)
+    assert all(k["werte"][pid]["wert_redraft"] is None for pid in order[::2])        # Redraft 0 = keiner
+    fake = dict(result, keeper=k, pool_latest=pool_latest)
+    kj = app_export.round_file("keeper.json", app_export.build_keeper(fake))
+    assert all(set(t["marktwert"]) == KEEPER_WERT and isinstance(t["marktwert"]["kern"], int) for t in kj["teams"] + [kj["liga"]])
+    assert all(r["wert"] == value[r["id"]] and r["wert_ue"] == value[r["id"]] - line for r in kj["kader"] if r["id"] in value)
+    # waiver.json: die freien Spieler mit Wert stehen mit ESPN-Name darin, Spieler ohne Wert ohne Wertfelder
+    w = app_export.round_file("waiver.json", app_export.build_waiver(fake))
+    assert (w["wert_stand"], w["keeper_linie"]) == ("2026-10-01T0826Z", line)
+    rows = {s["id"]: s for s in w["spieler"]}
+    assert all(rows[pid]["name"] == weekly[pid]["name"] and rows[pid]["wert"] == value[pid] for pid in free)
+    assert all(set(rows[pid]) >= WERT_KEYS for pid in ids + [neu]) and all("wert" not in s for s in w["spieler"] if s["id"] not in value)
+    assert (rows[neu]["team"], rows[neu]["name"], rows[neu]["wert"]) == (2, None, 999)   # Wert auch ohne Wochenpool
+    assert set(free) <= app_export.app_player_ids(fake) and not set(free) & {p["id"] for p in app_export.build_players(fake)["players"]}
+    # claude_marktwert.json: Gesamtrangliste nach Rang, team = Kürzel oder Status, Texte unter der Grenze
+    c = app_export.round_file("claude_marktwert.json", app_export.build_claude_marktwert(fake))
+    assert c["spalten"] == list(app_export.MARKTWERT_COLS) and len(c["spieler"]) == len(ids) + 1
+    col = {name: i for i, name in enumerate(c["spalten"])}
+    assert [r[col["rang"]] for r in c["spieler"]] == list(range(1, len(ids) + 2))
+    assert c["spieler"][-1][:4] == [f"Spieler {neu}", None, None, "HJS"]             # ohne Wochenpool: kein „None“-Text
+    assert {r[col["team"]] for r in c["spieler"]} <= set(app_export.KUERZEL.values()) | {"WAIVERS", "FREEAGENT"}
+    assert all(r[col["herkunft"]] is None for r in c["spieler"] if r[col["team"]] in ("WAIVERS", "FREEAGENT"))
+    assert (c["keeper_linie"], c["keeper_zahl"], c["stand"]["marktwert"]) == (line, 12, "2026-10-01T0826Z")
+    assert all(len(c[key]) <= check_public.MAX_TEXT for key in ("legende", "legende_spalten", "quelle"))
+    assert "FantasyCalc" in c["quelle"] and "fantasycalc.com" in c["quelle"]
+    findings = []
+    check_public.check_json(c, "", findings, "claude_marktwert.json")
+    assert findings == []
+    assert app_export.build_claude_marktwert(result) is None or result["keeper"]["werte"]   # ohne Auszug keine Datei
+
+
+MATCHUP_POS ={"z25", "z26", "n", "r25", "r26", "f", "f_vorwoche", "delta", "rang", "rang_vorwoche"}
 
 
 def test_matchup_vertrag(data, result):
@@ -487,13 +568,18 @@ def test_claude_tagesstand(result):
         (app_export.KUERZEL[atl["besitzer"]] if atl["besitzer"] else atl["status"])
 
 
-def test_transaktionen_markieren_spieler_ohne_seite(data):
-    """in_app stimmt mit den Spielern überein, die der Spieler-Tab kennt (players.json plus Kader laut Tagesstand)."""
-    t = data["transactions.json"]
+def app_known(data) -> set[int]:
+    """Spieler mit Seite in der App wie merge() in app/js/v_spieler.js: players.json, dazu aus waiver.json die
+    Kaderspieler laut Tagesstand und die Spieler mit Marktwert."""
     known = {p["id"] for p in data["players.json"]["players"]}
-    known |= {s["id"] for s in data.get("waiver.json", {}).get("spieler", []) if s["team"] > 0}
+    return known | {s["id"] for s in data.get("waiver.json", {}).get("spieler", []) if s["team"] > 0 or "wert" in s}
+
+
+def test_transaktionen_markieren_spieler_ohne_seite(data):
+    """in_app stimmt mit den Spielern überein, die der Spieler-Tab kennt (app_known)."""
+    t = data["transactions.json"]
     moves = [i for x in t["items"] for i in x["items"]]
-    assert moves and all(i["in_app"] == (i["player_id"] in known) for i in moves)
+    assert moves and all(i["in_app"] == (i["player_id"] in app_known(data)) for i in moves)
 
 
 def test_oeffentlich(tmp_path, content):

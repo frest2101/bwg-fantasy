@@ -33,9 +33,11 @@ PRECISION = {"z": 3, "e": 3, "f": 3, "f_vorwoche": 3, "delta": 3, "r25": 3, "r26
              # Wetter (wetter.json): eine Stelle wie Open-Meteo, Regenwahrscheinlichkeit ganzzahlig
              "temp": 1, "wind": 1, "boeen": 1, "niederschlag": 1, "schnee": 1, "regen_wahrsch": 0,
              # Alter je Spieler und Altersprofil je Team (keeper.json): eine Stelle wie in der Anzeige
-             "alter": 1, "altersprofil": 1}
+             "alter": 1, "altersprofil": 1,
+             # Marktwert je Team (keeper.json): Werte ganzzahlig wie bei FantasyCalc, das gewichtete Alter mit einer Stelle
+             "marktwert": 0}
 LAZY = ("players.json", "dst.json", "matchup.json", "history.json", "transactions.json", "keeper.json", "waiver.json",
-        "wetter.json", "claude.json")
+        "wetter.json", "claude.json", "claude_marktwert.json")
 
 
 # ---------------------------------------------------------------- Hilfen
@@ -162,6 +164,11 @@ def build_schedule(result: dict) -> dict:
 FREE_AGENTS_PER_POS = 20
 
 
+def market_values(result: dict) -> dict[int, dict]:
+    """Alle Spieler mit Marktwert (keeper.value_rows: Werte, team, art, alter je ESPN-ID); leer ohne Auszug oder Draft."""
+    return (result.get("keeper") or {}).get("werte") or {}
+
+
 def player_selection(result: dict) -> set[int]:
     """Spieler der App: mindestens ein Spiel oder im Kader (Wochenstand), dazu die 20 besten Free Agents je Position
     nach ROS/Spiel. Leer ohne Spielerdaten."""
@@ -175,6 +182,18 @@ def player_selection(result: dict) -> set[int]:
                        and p["ros_pro_spiel"] is not None), key=lambda p: (-p["ros_pro_spiel"], p["player_id"]))
         keep |= {p["player_id"] for p in free[:FREE_AGENTS_PER_POS]}
     return keep
+
+
+def daily_selection(result: dict) -> set[int]:
+    """Spieler von waiver.json: die Auswahl von players.json, dazu alle, die laut Tagesstand in einem Kader stehen, und
+    alle Spieler mit Marktwert (Horizont „Zukunft“: Der Auswahl fehlten am 01.10.2026 47 der 190 freien Spieler mit
+    Wert, meist verletzt oder ohne Einsatz – sie kommen wie Kaderspieler ohne players.json-Zeile mit Name, Position und
+    NFL-Team aus dem Wochenpool dazu). Leer ohne Spielerdaten oder Tagesstand."""
+    selection, pool = player_selection(result), result.get("pool_latest")
+    if not selection or not pool:
+        return set()
+    werte = market_values(result)
+    return selection | {p["id"] for p in pool["players"] if p.get("onTeamId") or p["id"] in werte}
 
 
 def add_fantasypros(rows: list[dict], result: dict) -> None:
@@ -257,13 +276,9 @@ def build_matchup(result: dict) -> dict | None:
 
 
 def app_player_ids(result: dict) -> set[int]:
-    """Spieler, die der Spieler-Tab zeigen kann: die Auswahl von players.json plus die Kaderspieler laut Tagesstand
-    (waiver.json); leer ohne Spielerdaten."""
-    selection = player_selection(result)
-    pool = result.get("pool_latest")
-    if selection and pool:
-        selection |= {p["id"] for p in pool["players"] if p.get("onTeamId")}
-    return selection
+    """Spieler, die der Spieler-Tab zeigen kann: die Auswahl von players.json plus die Spieler, die nur waiver.json
+    führt (Kader laut Tagesstand, Spieler mit Marktwert; daily_selection); leer ohne Spielerdaten."""
+    return daily_selection(result) or player_selection(result)
 
 
 def build_transactions(result: dict) -> dict | None:
@@ -277,10 +292,13 @@ def build_transactions(result: dict) -> dict | None:
     return {"spieler": data["spieler"], "items": items, "aufstellungswechsel": data["aufstellungswechsel"]}
 
 
-KEEPER_HEAD = ("through_week", "stand", "draft_datum", "keeper_zahl", "kader_plaetze", "alter_stichtag", "alter_gewicht")
-KEEPER_TEAM = ("keeper", "keeper_da", "picks", "picks_da", "kader", "pf", "kern", "altersprofil")
+KEEPER_HEAD = ("through_week", "stand", "draft_datum", "keeper_zahl", "kader_plaetze", "alter_stichtag", "alter_gewicht",
+               "marktwert_stand", "keeper_linie")
+KEEPER_TEAM = ("keeper", "keeper_da", "picks", "picks_da", "kader", "pf", "kern", "altersprofil", "marktwert")
+# Marktwert je Spieler (FantasyCalc) in keeper.json und waiver.json; den Redraft-Wert führt nur claude_marktwert.json
+WERT_KEYS = ("wert", "wert_rang", "wert_posrang", "wert_trend", "wert_ue")
 KEEPER_ROSTER = ("id", "name", "pos", "nfl", "team", "art", "pick", "runde", "von", "seit", "g", "avg", "vj_g", "vj_pts",
-                 "vj_avg", "vj_delta", "rookie", "alter", "nfl_jahr")
+                 "vj_avg", "vj_delta", "rookie", "alter", "nfl_jahr") + WERT_KEYS
 KEEPER_PICK = ("pick", "runde", "runden_pick", "team_id", "player_id", "name", "pos", "keeper", "da", "team_jetzt", "g",
                "pts", "avg", "starts", "pf")
 
@@ -500,14 +518,16 @@ def build_waiver(result: dict) -> dict | None:
     Besitz ESPN-weit mit Trend, Waiver-Frist, Projektion der nächsten Woche, letzte ESPN-News. Dazu (Session 7) die
     Waiver-Reihenfolge der Teams und der Bedarf je Team.
 
-    Spieler: die Auswahl von players.json (Kader, mit Spiel, 20 beste Free Agents je Position) plus alle, die laut
-    Tagesstand in einem Kader stehen. Grundlage des Waiver-Tabs; None ohne Pool-Auszug oder Spielerdaten.
+    Spieler: daily_selection (die Auswahl von players.json plus alle, die laut Tagesstand in einem Kader stehen, und
+    alle mit Marktwert); Spieler mit Marktwert tragen WERT_KEYS (Stufe 3) und – mit Stammdaten – alter, der Kopf
+    wert_stand und keeper_linie.
+    Grundlage des Waiver-Tabs; None ohne Pool-Auszug oder Spielerdaten.
     """
     pool = result.get("pool_latest")
     selection = player_selection(result)
     if not pool or not selection:
         return None
-    keep = selection | {p["id"] for p in pool["players"] if p.get("onTeamId")}
+    keep = daily_selection(result)
     weekly = result["players"]["players"]  # ganzer Wochenpool mit Stammdaten (Name, Position, NFL-Team)
     number = lambda v: dec(v) if v is not None else None  # noqa: E731 – ESPN-Floats erst beim Schreiben runden
     rows, extra = [], []
@@ -519,14 +539,20 @@ def build_waiver(result: dict) -> dict | None:
                "started": number(p.get("percentStarted")), "waiver_bis": p.get("waiverProcessDate"),
                "proj": number(p.get("proj_naechste_woche")), "news": p.get("lastNewsDate")}
         if p["id"] not in selection:
-            # Kaderspieler, den players.json nicht führt (unter der Woche geholt, ohne Spiel, nicht Top 20 seiner
-            # Position): Stammdaten aus dem Wochenpool, damit die App ihn benennen kann; None, wenn auch dort unbekannt
+            # Spieler, den players.json nicht führt (Kaderspieler unter der Woche geholt, ohne Spiel, nicht Top 20 seiner
+            # Position; oder freier Spieler mit Marktwert): Stammdaten aus dem Wochenpool, damit die App ihn benennen
+            # kann; None, wenn auch dort unbekannt
             w = weekly.get(p["id"])
             row.update(name=w["name"] if w else None, pos=POSITION_NAMES.get(w["pos"], str(w["pos"])) if w else None,
                        nfl=w["nfl"] if w else None)
             extra.append(row)
         rows.append(row)
     add_fantasypros(extra, result)
+    werte = market_values(result)   # Marktwert (FantasyCalc) nur bei Spielern mit Wert, sonst fehlen die Felder
+    for row in rows:
+        w = werte.get(row["id"])
+        if w:
+            row.update({k: w[k] for k in WERT_KEYS} | ({"alter": w["alter"]} if w["alter"] is not None else {}))
     reihenfolge, quelle, stand = waiver_order(pool, result)
     view = week_view(pool, result)
     if view:
@@ -538,11 +564,14 @@ def build_waiver(result: dict) -> dict | None:
             row["zug"] = gains[row["id"]]
     head = {k: v for k, v in (view or dict.fromkeys(WEEK_VIEW_HEAD)).items() if k in WEEK_VIEW_HEAD}
     basis = need_basis(result)
+    keeper = result.get("keeper") or {}
     return {"stand": pool["stand"], "woche": pool["woche"], "reihenfolge": reihenfolge, "reihenfolge_quelle": quelle,
             "reihenfolge_stand": stand, "bedarf": team_needs(pool, result),
             "bedarf_basis": basis[2] if basis else None,
             "bedarf_ersatz": {POSITION_NAMES.get(k, str(k)): v for k, v in basis[1].items()} if basis else None,
-            "profil": profil} | head | {"spieler": rows}
+            "profil": profil,
+            # Horizont „Zukunft“: Stand des Marktwert-Auszugs und Keeper-Linie (beide None ohne Auszug)
+            "wert_stand": keeper.get("marktwert_stand"), "keeper_linie": keeper.get("keeper_linie")} | head | {"spieler": rows}
 
 
 CLAUDE_PLAYER_COLS = ("name", "pos", "nfl", "inj", "avg", "form", "trend", "ros_g", "ros_rang", "gegner_n1", "mu_n1")
@@ -643,6 +672,50 @@ def build_claude(result: dict, teams: dict, schedule: dict, players: dict | None
     return out
 
 
+MARKTWERT_COLS = ("name", "pos", "nfl", "team", "wert", "rang", "pos_rang", "trend30", "redraft", "ue_linie", "alter",
+                  "herkunft")
+
+
+def build_claude_marktwert(result: dict) -> dict | None:
+    """Datei für das Claude-Projekt (claude.ai, Beschluss Stephan 01.10.2026): alle Spieler mit Marktwert als Gesamt-
+    rangliste, spaltenweise wie claude.json, aber eigene Datei (claude.json bleibt unter 50 KB). Keine Liste „beste
+    zwölf je Team“ – das Projekt rechnet selbst. Namen, Position und NFL-Team aus dem Wochenpool (ESPN-Namen, nicht
+    FantasyCalcs), team = Kürzel laut Tagesstand oder Status (WAIVERS, FREEAGENT), herkunft = Art bei Kaderspielern.
+    None ohne Marktwert-Auszug."""
+    werte, keeper = market_values(result), result.get("keeper") or {}
+    if not werte:
+        return None
+    weekly = result["players"]["players"]
+    daily = {p["id"]: p.get("status") for p in (result.get("pool_latest") or {}).get("players", [])}
+    roster = {k["id"]: k for k in keeper.get("kader", [])}
+    rows = []
+    for pid, w in sorted(werte.items(), key=lambda kv: kv[1]["wert_rang"]):
+        # Stammdaten aus dem Wochenpool; ein unter der Woche geholter Kaderspieler, den er nicht kennt, aus der Kaderzeile
+        p = weekly.get(pid) or roster.get(pid) or {}
+        pos = p.get("pos")
+        rows.append([p.get("name") or f"Spieler {pid}", POSITION_NAMES.get(pos, str(pos)) if pos is not None else None,
+                     p.get("nfl"), KUERZEL.get(w["team"]) if w["team"] else daily.get(pid) or p.get("status"),
+                     w["wert"], w["wert_rang"], w["wert_posrang"], w["wert_trend"], w["wert_redraft"], w["wert_ue"],
+                     fixed(w["alter"], 1), w["art"]])
+    return {"legende": "BWG Fantasy Liga (ESPN 1166555857): Marktwerte aller Spieler mit Wert als Gesamtrangliste. "
+                       "Werte: FantasyCalc (https://fantasycalc.com), Dynasty, Superflex, 10 Teams, PPR – Tauschpreise "
+                       "aus Ligen mit rund 300 gehaltenen Spielern; die BWG hält 120 (12 je Team). Oberhalb der "
+                       "keeper_linie passen sie, darunter überzeichnen sie. Keine Punktprognose; K und D/ST ohne Wert.",
+            "legende_spalten": "team = Kürzel (teams) oder Status; rang/pos_rang = FantasyCalc gesamt/Position; "
+                               "trend30 = Wertänderung 30 Tage; redraft = Wert nur für diese Saison (null = keiner); "
+                               "ue_linie = wert − keeper_linie; alter am stand.alter_stichtag; herkunft = keeper, "
+                               "draft, waiver, free_agent, trade (null = frei). ROS und Form: claude.json.",
+            "quelle": "Werte: FantasyCalc (https://fantasycalc.com); Namen, Teams und Herkunft: ESPN; Alter: nflverse "
+                      "(CC BY 4.0). Inoffizielle Auswertung.",
+            "stand": {"saison": result["season"], "nach_woche": result["through_week"],
+                      "marktwert": keeper.get("marktwert_stand"),
+                      "pool_stand": (result.get("pool_latest") or {}).get("stand"),
+                      "alter_stichtag": keeper.get("alter_stichtag")},
+            "keeper_linie": keeper.get("keeper_linie"), "keeper_zahl": keeper.get("keeper_zahl"),
+            "teams": {KUERZEL[t["team_id"]]: t["name"] for t in result["teams"]},
+            "spalten": list(MARKTWERT_COLS), "spieler": rows}
+
+
 def build(result: dict) -> dict[str, dict]:
     """Alle App-Dateien (ohne manifest) als Python-Objekte, noch ungerundet."""
     teams, schedule = build_teams(result), build_schedule(result)
@@ -651,7 +724,8 @@ def build(result: dict) -> dict[str, dict]:
     optional = {"players.json": players, "dst.json": dst, "matchup.json": build_matchup(result),
                 "history.json": result.get("history"),
                 "transactions.json": build_transactions(result), "keeper.json": build_keeper(result),
-                "waiver.json": waiver, "wetter.json": result.get("wetter")}
+                "waiver.json": waiver, "wetter.json": result.get("wetter"),
+                "claude_marktwert.json": build_claude_marktwert(result)}
     files.update({name: obj for name, obj in optional.items() if obj})
     files["claude.json"] = build_claude(result, teams, schedule, players, dst, result.get("transactions"), waiver)
     return files

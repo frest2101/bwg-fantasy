@@ -1,5 +1,5 @@
-"""Keeper-Bilanz (Keeper-Tab): Herkunft je Kaderspieler, Punkte nach Herkunft je Team, Ertrag des Drafts (Stufe 1)
-und Altersprofil je Team aus den nflverse-Stammdaten (Stufe 2).
+"""Keeper-Bilanz (Keeper-Tab): Herkunft je Kaderspieler, Punkte nach Herkunft je Team, Ertrag des Drafts (Stufe 1),
+Altersprofil je Team aus den nflverse-Stammdaten (Stufe 2) und Marktwert aus FantasyCalc (Stufe 3).
 
 Die Liga behält 12 von 24 Kaderspielern über den Winter (mSettings draftSettings.keeperCount, Keeper am Draft-Ende
 ohne Kosten). Dieses Modul zeigt, woher die Punkte eines Teams kommen: von Keepern, aus dem Draft der Saison oder
@@ -12,6 +12,9 @@ einem Team, zu dem ihn keine Bewegung geführt hat, kam er per Trade; der Tagesl
 (pool/latest.json, Kopf trades aus mRoster acquisitionType TRADE).
 Wochen ordnet die ESPN-Periode der Bewegung zu (scoringPeriodId), nicht die Uhrzeit: Ein Zugang in Periode w zählt
 ab Woche w, ein Abgang in Periode w beendet den Abschnitt nach Woche w.
+Marktwert (Stufe 3): Tauschwerte aus Dynasty-Ligen mit rund 300 gehaltenen Spielern; die BWG hält 120. Die Keeper-Linie
+ist der Wert des 120.-wertvollsten Kaderspielers – oberhalb passen die Werte, darunter überzeichnen sie. K und D/ST
+haben keinen Wert. Kein Wert fließt in Score, Power Ranking oder Simulation.
 
 Reine Funktionen, ungerundete Decimal; gerundet wird erst beim Export. memberId & Co. gibt dieses Modul nie heraus.
 """
@@ -20,6 +23,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 import espn_fetch as ef
+import fantasycalc
 import nflverse
 import players
 import rawdata
@@ -275,6 +279,76 @@ def ros_weights(spieler: dict) -> tuple[dict[int, Decimal], str | None]:
     return {pid: p[key] for pid, p in spieler["players"].items() if p.get(key) is not None}, key
 
 
+# ---------------------------------------------------------------- Marktwert (Stufe 3)
+
+# Werte je Spieler (fantasycalc.werte) → Felder je Zeile; dazu wert_ue = Wert − Keeper-Linie
+WERT_FELDER = {"wert": "wert", "rang": "wert_rang", "pos_rang": "wert_posrang", "trend30": "wert_trend",
+               "redraft": "wert_redraft"}
+
+
+def keeper_line(values: list[int], count: int | None) -> int | None:
+    """Keeper-Linie: Wert des count-wertvollsten Kaderspielers der Liga (count = Keeper je Team × Teams, also 120);
+    None ohne count oder wenn weniger Kaderspieler einen Wert haben."""
+    ranked_values = sorted(values, reverse=True)
+    return ranked_values[count - 1] if count and len(ranked_values) >= count else None
+
+
+def value_fields(w: dict | None, line: int | None) -> dict:
+    """Felder einer Zeile aus den Werten w eines Spielers (None ohne Wert): WERT_FELDER und wert_ue (None ohne Linie)."""
+    out = {new: (w[old] if w else None) for old, new in WERT_FELDER.items()}
+    out["wert_ue"] = w["wert"] - line if w and line is not None else None
+    return out
+
+
+def value_profile(rows: list[dict], line: int | None, count: int | None) -> dict | None:
+    """Marktwert eines Teams aus seinen Kaderzeilen (mit wert und alter); None ohne Spieler mit Wert.
+
+    n = Spieler mit Wert; kern = Σ der count wertvollsten (die Summe, nicht die Spieler); ueber_linie = Σ der Beträge
+    über der Keeper-Linie (nur positive); n_linie = Spieler mit Wert ≥ Linie (beide None ohne Linie); alter = Ø Alter
+    gewichtet mit dem Wert (None ohne Alter).
+    """
+    valued = [r for r in rows if r["wert"] is not None]
+    if not valued:
+        return None
+    aged = [r for r in valued if r["alter"] is not None]
+    total = sum(r["wert"] for r in aged)
+    return {"n": len(valued), "kern": sum(sorted((r["wert"] for r in valued), reverse=True)[:count or 0]),
+            "ueber_linie": sum(max(r["wert"] - line, 0) for r in valued) if line is not None else None,
+            "n_linie": sum(1 for r in valued if r["wert"] >= line) if line is not None else None,
+            "alter": sum((Decimal(r["wert"]) * r["alter"] for r in aged), ZERO) / total if total > 0 else None}
+
+
+def league_values(profiles: list[dict | None], rows: list[dict]) -> dict | None:
+    """Marktwert der Liga: kern und ueber_linie als Ø je Team (Teams mit Wert), n und n_linie als Summe, alter über
+    alle Kaderspieler mit Wert und Alter; None ohne ein Team mit Wert."""
+    teams = [p for p in profiles if p]
+    if not teams:
+        return None
+    mean = lambda key: sum((Decimal(p[key]) for p in teams), ZERO) / len(teams) if teams[0][key] is not None else None  # noqa: E731
+    return {"n": sum(p["n"] for p in teams), "kern": mean("kern"), "ueber_linie": mean("ueber_linie"),
+            "n_linie": sum(p["n_linie"] for p in teams) if teams[0]["n_linie"] is not None else None,
+            "alter": value_profile(rows, None, 0)["alter"]}
+
+
+def value_rows(werte: dict[int, dict], pool: dict[int, dict], kader: list[dict], stamm: dict[int, dict], day,
+               line: int | None) -> dict[int, dict]:
+    """Alle Spieler mit Marktwert, die im Kader stehen oder die der Wochenpool kennt, je ESPN-ID (Grundlage für
+    Waiver-Tab und die Datei für das Claude-Projekt): value_fields, team (heute, 0 = frei), art (Herkunft bei
+    Kaderspielern, sonst None) und alter (am Stichtag day; Kaderspieler wie add_ages, None ohne Stammdaten).
+    Kaderspieler zählen immer – auch unter der Woche geholte, die der Wochenpool noch nicht kennt, denn sie zählen
+    auch in der Keeper-Linie (Befund Gegenprüfung 01.10.2026); freie Spieler nur mit Eintrag im Wochenpool."""
+    roster = {k["id"]: k for k in kader}
+    out = {}
+    for pid in sorted(werte):
+        k, s = roster.get(pid), stamm.get(pid)
+        if pid not in pool and not k:
+            continue
+        out[pid] = value_fields(werte[pid], line) | {
+            "team": k["team"] if k else 0, "art": k["art"] if k else None,
+            "alter": k["alter"] if k else (nflverse.age(s["geb"], day) if s else None)}
+    return out
+
+
 # ---------------------------------------------------------------- Einstieg
 
 def compute_keeper(ssn: rawdata.Season, weeks: list[int], spieler: dict, names: dict[int, str]) -> dict | None:
@@ -288,6 +362,9 @@ def compute_keeper(ssn: rawdata.Season, weeks: list[int], spieler: dict, names: 
     vj_delta = avg − vj_avg (Punkte je Spiel gegen das Vorjahr, None ohne einen der beiden Werte) sowie alter und
     nfl_jahr (add_ages). Kopf: alter_stichtag (Dienstag nach der letzten gewerteten Woche) und alter_gewicht
     ("ros" oder "ros_po", None ohne ROS-Auszug), beide None ohne Stammdaten.
+    Marktwert (Stufe 3, FantasyCalc): je Kaderzeile value_fields (wert … wert_ue); je Team marktwert (value_profile),
+    liga.marktwert (league_values); Kopf keeper_linie und marktwert_stand (Abrufzeit des Auszugs); werte = alle
+    Spieler mit Wert (value_rows). Ohne Auszug sind alle Werte None und werte leer.
     picks: alle Picks mit Ertrag – da (der Spieler steht heute beim Team des Picks und wird dort als dieser Keeper-
     bzw. Draft-Pick geführt, also nicht entlassen und nicht getauscht), team_jetzt (0 = frei), g, pts und avg
     (Saison des Spielers, None ohne Eintrag im Wochenpool), starts und pf (für das Team des Picks, solange der
@@ -317,6 +394,15 @@ def compute_keeper(ssn: rawdata.Season, weeks: list[int], spieler: dict, names: 
     add_ages(kader, stamm, day, ssn.season)
     pos_age = position_ages(kader)
     weight, weight_key = ros_weights(spieler)
+    # Marktwert (Stufe 3): Keeper-Linie = Wert des (Keeper je Team × Teams)-wertvollsten Kaderspielers heute
+    team_ids = [t["id"] for t in ssn.teams()]
+    keeper_zahl = (ssn.settings().get("draftSettings") or {}).get("keeperCount")
+    market = ssn.marktwert()
+    werte = fantasycalc.werte(market)
+    line = keeper_line([werte[k["id"]]["wert"] for k in kader if k["id"] in werte],
+                       keeper_zahl * len(team_ids) if keeper_zahl else None)
+    for k in kader:
+        k.update(value_fields(werte.get(k["id"]), line))
 
     pick_rows = []
     for no in sorted(picks):
@@ -341,16 +427,19 @@ def compute_keeper(ssn: rawdata.Season, weeks: list[int], spieler: dict, names: 
                 "picks": len(drafted), "picks_da": sum(1 for r in drafted if r["da"]),
                 "kader": {art: sum(1 for k in now if k["art"] == art) for art in ARTEN},
                 "pf": shares(total(pf)), "kern": shares(total(kern)),
-                "altersprofil": age_profile(now, weight, pos_age)}
+                "altersprofil": age_profile(now, weight, pos_age),
+                "marktwert": value_profile(now, line, keeper_zahl) if werte else None}
 
-    team_ids = [t["id"] for t in ssn.teams()]
     rules = players.roster_rules(ssn.settings())
+    teams = [{"team_id": tid} | summary([tid]) for tid in team_ids]
     liga = summary(team_ids)
     if liga["altersprofil"]:
         liga["altersprofil"]["positionen"] = pos_age
+    liga["marktwert"] = league_values([t["marktwert"] for t in teams], kader) if werte else None
     return {"through_week": weeks[-1], "stand": stand, "draft_datum": draft_end,
-            "keeper_zahl": (ssn.settings().get("draftSettings") or {}).get("keeperCount"),
-            "kader_plaetze": rules["plaetze"] - rules["ir"],
+            "keeper_zahl": keeper_zahl, "kader_plaetze": rules["plaetze"] - rules["ir"],
             "alter_stichtag": day.isoformat() if stamm else None, "alter_gewicht": weight_key if stamm else None,
-            "teams": [{"team_id": tid} | summary([tid]) for tid in team_ids], "liga": liga,
-            "kader": kader, "picks": pick_rows, "warnungen": warnings}
+            "marktwert_stand": (market or {}).get("stand") if werte else None, "keeper_linie": line,
+            "teams": teams, "liga": liga, "kader": kader, "picks": pick_rows, "warnungen": warnings,
+            # alle Spieler mit Marktwert (Waiver-Tab, Datei für das Claude-Projekt); leer ohne Auszug
+            "werte": value_rows(werte, pool, kader, stamm, day, line)}
