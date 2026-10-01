@@ -200,7 +200,7 @@ Gegenprüfung, Ansichten im Browser bei 320/360/390 px und am Desktop, dann Pull
 - Gegenprüfung (vier Blickwinkel, je Befund ein Skeptiker): 8 Befunde, 2 bestätigt und umgesetzt (Kaderspieler, die der
   Wochenpool nicht kennt, fehlten in `waiver.json` und `claude_marktwert.json`; Vertrag zu `in_app`), 6 widerlegt (u. a.
   der erneute Abruf nach einem Fehlschlag – so bestellt).
-- Offen für Stephan: den Absatz für die Projektanweisung des Claude-Projekts einfügen (Wortlaut im Chat vorgelegt).
+- ✓ 01.10.2026: Der Absatz für die Projektanweisung des Claude-Projekts ist in der neuen, schlanken Anweisung aufgegangen (Abschnitt MARKTWERT; siehe CLAUDE.md, Notion, „claude.ai-Projekt“).
 - Gemergt als PR #45. Der erste Tageslauf danach (36846153258) holte den Auszug, war aber rot: Ein Test erwartete den
   lokalen Warn-Präfix „Warnung: “, in der Action schreibt `espn_fetch.warn` „::warning::“. Behoben in PR #46 (Test prüft
   nur den Text; App-Daten mit dem ersten echten Auszug). Lehre: Tests, die Ausgaben prüfen, auch mit
