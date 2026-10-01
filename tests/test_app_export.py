@@ -549,10 +549,11 @@ def test_claude_tagesstand(result):
                            woche(2, "Erfundener RB Eins", "RB", 0, "FREEAGENT", 12),  # von Team 3 geholt
                            woche(3, "Erfundener RB Zwei", "RB", 0, "FREEAGENT", 10),  # frei, jetzt auf Waivers
                            woche(4, "Erfundener RB Drei", "RB", 0, "WAIVERS", 11),    # fehlt im Tagesstand
-                           woche(5, "Erfundener RB Vier", "RB", 1, "ONTEAM", 9)]}     # von Team 1 entlassen
+                           woche(5, "Erfundener RB Vier", "RB", 1, "ONTEAM", 9),      # von Team 1 entlassen
+                           woche(6, "Erfundener WR Fünf", "WR", 6, "ONTEAM", 8)]}     # Kader, fehlt im Tagesstand
     waiver = {"stand": "2026-10-06T0845Z", "woche": 5,
               "spieler": [tag(-16001, 0, "FREEAGENT"), tag(1, 5, "ONTEAM", inj="OUT"),
-                          tag(2, 3, "ONTEAM", proj=Decimal("14.125"), proj3=Decimal("41.2")),
+                          tag(2, 3, "ONTEAM", proj=Decimal("14.125"), proj3=Decimal("41.205")),
                           tag(3, 0, "WAIVERS", proj=Decimal("11.456"), proj3=Decimal("30.1")),
                           tag(5, 0, "FREEAGENT"),
                           tag(99, 2, "ONTEAM", name="Erfundener Neuzugang", pos="WR", nfl="KC",  # nur Tagesstand
@@ -574,8 +575,11 @@ def test_claude_tagesstand(result):
     assert names(out["kader"]["TTY"]) == ["Erfundener QB"] and out["kader"]["TTY"][0][cols["inj"]] == "OUT"
     assert out["kader"]["TTY"][0][cols["proj"]] is None   # Wochenwerte nur aus dem Tagesstand (dort None)
     assert out["kader"]["4DS"] == [[2, "Erfundener RB Eins", "RB", "KC", "ACTIVE"] + [None] * 3 + [12.0]
-                                   + [None] * 3 + [14.13, 41.2]]   # proj round half up
+                                   + [None] * 3 + [14.13, 41.21]]   # proj, proj3 round half up
     assert out["kader"]["HJS"] == [[99, "Erfundener Neuzugang", "WR", "KC", "ACTIVE"] + [None] * 7 + [7.5, None]]
+    # Kaderspieler ohne Eintrag im Tagesstand: Wochenstand, aber keine Wochenwerte (proj 99 im Wochenstand bleibt draußen)
+    assert [(r[cols["id"]], r[cols["name"]], r[cols["proj"]], r[cols["proj3"]]) for r in out["kader"]["SAM"]] == [
+        (6, "Erfundener WR Fünf", None, None)]
     assert out["kader"]["RTZ"] == [[97, "Spieler 97", None, None, "ACTIVE"] + [None] * 9]
     assert out["kader"]["ACB"] == [] and out["kader"]["CRN"] == []
     assert [(r[cols["id"]], r[cols["name"]], r[cols["status"]], r[cols["proj"]], r[cols["proj3"]])

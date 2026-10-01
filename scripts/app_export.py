@@ -611,10 +611,10 @@ def claude_player(p: dict, cols: tuple = CLAUDE_PLAYER_COLS) -> list:
 
 def claude_rows(players: dict, waiver: dict | None) -> list[dict]:
     """Spieler für claude.json, nach ID: players.json (Wochenstand), je Spieler team, status, inj, proj und proj3 aus
-    dem Tagesstand überlagert – wie merge() in app/js/v_spieler.js. Kaderspieler, die nur der Tagesstand kennt, kommen
-    mit name, pos, nfl aus waiver.json dazu (unbekannter Name: „Spieler <id>“ wie in der App), ihre Wochenwerte
-    fehlen. Spieler ohne Eintrag im Tagesstand und alle ohne waiver bleiben beim Wochenstand, proj und proj3 (nur
-    Tagesstand) sind dann None."""
+    dem Tagesstand überlagert (team, status, inj wie merge() in app/js/v_spieler.js). Kaderspieler, die nur der
+    Tagesstand kennt, kommen mit name, pos, nfl aus waiver.json dazu (unbekannter Name: „Spieler <id>“ wie in der App),
+    ihre Werte des Wochenstands (avg bis mu_n1) fehlen. Spieler ohne Eintrag im Tagesstand und alle ohne waiver
+    bleiben beim Wochenstand, proj und proj3 (nur Tagesstand) sind dann None."""
     daily = {s["id"]: s for s in (waiver or {}).get("spieler", [])}
     rows = [p | dict.fromkeys(CLAUDE_DAILY_ONLY) | {c: daily[p["id"]].get(c) for c in CLAUDE_DAILY if p["id"] in daily}
             for p in players["players"]]
@@ -646,9 +646,10 @@ def build_claude(result: dict, teams: dict, schedule: dict, players: dict | None
                       "Definitionen: docs/app_daten.md "
                       "und CLAUDE.md (Rechenregeln) im Repo frest2101/bwg-fantasy.",
            "legende_stand": "Tagesstand (pool_stand): Zuordnung zu kader/free_agents, inj, status, proj (ESPN-Projektion "
-                            "pool_woche), proj3 (Σ pool_woche…+2; erste Woche Bye/OUT/IR 0, dann ROS-Auszug), "
-                            "D/ST-besitzer, transaktionen. Wochenstand (nach_woche): alles Übrige; Spieler nur aus dem "
-                            "Tagesstand ohne Wochenwerte. pool_stand null: alles Wochenstand, proj/proj3 null.",
+                            "pool_woche, roh: bei Bye/OUT/IR nicht 0), proj3 (Σ pool_woche…+2; erste Woche Bye/OUT/IR "
+                            "0, dann ROS-Auszug), D/ST-besitzer, transaktionen. Wochenstand (nach_woche): alles Übrige; "
+                            "Spieler nur aus dem Tagesstand: avg…mu_n1 null. pool_stand null: alles Wochenstand, "
+                            "proj/proj3 null.",
            "stand": {"saison": result["season"], "nach_woche": result["through_week"],
                      "kader_quelle": teams["meta"]["kader_quelle"], "ros_nach_woche": result.get("ros_after_week"),
                      "matchup_woche": (result.get("matchup") or {}).get("wochen", {}).get("n1"),
