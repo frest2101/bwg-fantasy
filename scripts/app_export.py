@@ -31,7 +31,9 @@ METRIC_LABELS = {"pf": "PF/Spiel", "allplay": "All-Play-Quote", "win": "Win %", 
 PRECISION = {"z": 3, "e": 3, "f": 3, "f_vorwoche": 3, "delta": 3, "r25": 3, "r26": 3, "naechste3": 3, "rest": 3,
              "sos_po": 3, "playoff": 4, "division": 4, "bye": 4, "seeds": 4, "p_home": 4, "anteil": 1,
              # Wetter (wetter.json): eine Stelle wie Open-Meteo, Regenwahrscheinlichkeit ganzzahlig
-             "temp": 1, "wind": 1, "boeen": 1, "niederschlag": 1, "schnee": 1, "regen_wahrsch": 0}
+             "temp": 1, "wind": 1, "boeen": 1, "niederschlag": 1, "schnee": 1, "regen_wahrsch": 0,
+             # Alter je Spieler und Altersprofil je Team (keeper.json): eine Stelle wie in der Anzeige
+             "alter": 1, "altersprofil": 1}
 LAZY = ("players.json", "dst.json", "matchup.json", "history.json", "transactions.json", "keeper.json", "waiver.json",
         "wetter.json", "claude.json")
 
@@ -275,10 +277,10 @@ def build_transactions(result: dict) -> dict | None:
     return {"spieler": data["spieler"], "items": items, "aufstellungswechsel": data["aufstellungswechsel"]}
 
 
-KEEPER_HEAD = ("through_week", "stand", "draft_datum", "keeper_zahl", "kader_plaetze")
-KEEPER_TEAM = ("keeper", "keeper_da", "picks", "picks_da", "kader", "pf", "kern")
+KEEPER_HEAD = ("through_week", "stand", "draft_datum", "keeper_zahl", "kader_plaetze", "alter_stichtag", "alter_gewicht")
+KEEPER_TEAM = ("keeper", "keeper_da", "picks", "picks_da", "kader", "pf", "kern", "altersprofil")
 KEEPER_ROSTER = ("id", "name", "pos", "nfl", "team", "art", "pick", "runde", "von", "seit", "g", "avg", "vj_g", "vj_pts",
-                 "vj_avg", "vj_delta", "rookie")
+                 "vj_avg", "vj_delta", "rookie", "alter", "nfl_jahr")
 KEEPER_PICK = ("pick", "runde", "runden_pick", "team_id", "player_id", "name", "pos", "keeper", "da", "team_jetzt", "g",
                "pts", "avg", "starts", "pf")
 
@@ -292,8 +294,12 @@ def build_keeper(result: dict) -> dict | None:
         return None
     known = app_player_ids(result)
     pos = lambda p: POSITION_NAMES.get(p, str(p)) if p is not None else None  # noqa: E731
+    liga = {k: data["liga"][k] for k in KEEPER_TEAM}
+    if liga["altersprofil"]:   # Positionsschnitt der Liga mit Kürzeln als Schlüssel
+        liga["altersprofil"] = liga["altersprofil"] | {
+            "positionen": {pos(p): v for p, v in liga["altersprofil"]["positionen"].items()}}
     return {k: data[k] for k in KEEPER_HEAD} | {
-        "liga": {k: data["liga"][k] for k in KEEPER_TEAM},
+        "liga": liga,
         "teams": [{"team_id": t["team_id"]} | {k: t[k] for k in KEEPER_TEAM} for t in data["teams"]],
         "kader": [{k: r[k] for k in KEEPER_ROSTER} | {"pos": pos(r["pos"]), "in_app": r["id"] in known}
                   for r in data["kader"]],

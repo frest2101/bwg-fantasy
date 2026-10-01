@@ -5,6 +5,7 @@ Die Archiv-Antworten sind erfundene Testdaten (IDs wie „t1“, „k1“ – ke
 Aufruf: python -m pytest
 """
 
+import gzip
 import importlib.util
 import itertools
 import json
@@ -16,6 +17,7 @@ import pytest
 
 import espn_fetch as ef
 import fantasypros
+import nflverse
 
 SOURCE_WEEK = ef.week_dir(2026, 1)  # echte, abgeschlossene Woche als Vorlage (Spielplan enthält alle Perioden 1–14)
 
@@ -205,6 +207,7 @@ class FakeLeague:
         self.standings_echo = None        # abweichende Woche im mStandings-Echo
         self.pool_without_week: set[int] = set()  # Wochen, für die der Spielerpool keine Werte liefert
         self.fantasypros_status = 200     # Antwort der FantasyPros-Sitemaps
+        self.nflverse_status = 200        # Antwort der nflverse-Spielerliste
 
     def __enter__(self):
         return self
@@ -218,6 +221,11 @@ class FakeLeague:
             slugs = [f"testspieler-{params['position'].lower()}-{i}" for i in range(fantasypros.MIN_PLAYERS[params["position"]])]
             return FakeResponse(self.fantasypros_status, "".join(
                 f"<loc>https://www.fantasypros.com/nfl/players/{s}.php</loc>" for s in slugs).encode())
+        if url == nflverse.URL:             # erfundene Spielerliste: die 300 Testspieler des Spielerpools
+            self.requests.append(("nflverse",))
+            rows = ["espn_id,birth_date,rookie_season,draft_year,draft_round,draft_pick,last_season"]
+            rows += [f"{pid},2000-01-{pid % 28 + 1:02d},2022,2022,1,{pid},2026" for pid in range(1, 301)]
+            return FakeResponse(self.nflverse_status, gzip.compress("\n".join(rows).encode()))
         view, week = params["view"], params.get("scoringPeriodId")
         if view == ef.KONA_VIEW:
             flt = json.loads(headers["X-Fantasy-Filter"])["players"]
@@ -291,8 +299,8 @@ def test_neue_datei_je_woche_ueberschreibt_finale_wochen_nicht(espn_week3):
         assert not (ef.week_dir(2026, week) / ef.ROS_FILE).exists()  # … ROS/Standings nicht (nur „jetzt“ zu haben)
     assert ("kona", 1) in espn_week3.requests and ("kona", 2) in espn_week3.requests
     espn_week3.requests.clear()
-    assert ef.cmd_due(2026, date(2026, 9, 30)) == 0                 # Nachlauf: nur Spielplan und FantasyPros-Sitemap
-    assert espn_week3.requests == [("spielplan", 2026)] + [("fantasypros", p) for p in fantasypros.POSITIONS]
+    assert ef.cmd_due(2026, date(2026, 9, 30)) == 0                 # Nachlauf: nur Spielplan, FantasyPros-Sitemap und nflverse
+    assert espn_week3.requests == [("spielplan", 2026)] + [("fantasypros", p) for p in fantasypros.POSITIONS] + [("nflverse",)]
 
 
 def test_cmd_fetch_teilfehler_schreibt_nichts(espn_week3):
@@ -399,6 +407,23 @@ def test_fantasypros_ausfall_blockiert_die_woche_nicht(espn_week3, capsys):
     assert "FantasyPros-Sitemap QB: HTTP 503" in out.err and "Fehler bei Saisondateien" in out.out
 
 
+def test_nflverse_auszug_und_ausfall(espn_week3, capsys):
+    """Stammdaten von nflverse: Der erste Lauf hat noch keinen Spielerpool (kein Abruf), der Nachlauf legt den Auszug
+    für die Pool-Spieler an; ein Ausfall warnt nur und lässt den Auszug stehen."""
+    assert ef.cmd_due(2026, date(2026, 9, 29)) == 0
+    assert ("nflverse",) not in espn_week3.requests and not nflverse.path(2026).exists()
+    assert ef.cmd_due(2026, date(2026, 9, 30)) == 0
+    saved = nflverse.path(2026).read_bytes()
+    data = json.loads(saved)
+    assert len(data["spieler"]) == 300 and data["spieler"]["7"] == {"geb": "2000-01-08", "rookie": 2022, "draft": [2022, 1, 7]}
+    assert "CC BY 4.0" in data["lizenz"]
+    capsys.readouterr()
+    espn_week3.nflverse_status = 503
+    assert ef.cmd_due(2026, date(2026, 9, 30)) == 0 and nflverse.path(2026).read_bytes() == saved
+    out = capsys.readouterr()
+    assert "nflverse players: HTTP 503" in out.err and "Fehler bei Saisondateien" in out.out
+
+
 def test_skriptaufruf_fantasypros_ausfall_nur_warnung(espn_week3, monkeypatch, capsys):
     """Wie in der Action (python scripts/espn_fetch.py): Das Skript ist ein zweites espn_fetch-Modul neben dem, das fantasypros
     importiert, mit eigener FetchError-Klasse. Ein FantasyPros-Ausfall darf trotzdem nur warnen (Befund Gegenprüfung
@@ -441,8 +466,8 @@ def test_positionen_vorjahr_einmalig(espn_week3):
     assert b"Testspieler" not in path.read_bytes()
     assert path.stat().st_size < 50_000                              # Auszug (echt rund 25 KB), nicht die 4-MB-Rohantwort
     espn_week3.requests.clear()
-    assert ef.cmd_due(2026, date(2026, 9, 30)) == 0                 # Nachlauf: nur Spielplan und FantasyPros-Sitemap
-    assert espn_week3.requests == [("spielplan", 2026)] + [("fantasypros", p) for p in fantasypros.POSITIONS]
+    assert ef.cmd_due(2026, date(2026, 9, 30)) == 0                 # Nachlauf: nur Spielplan, FantasyPros-Sitemap und nflverse
+    assert espn_week3.requests == [("spielplan", 2026)] + [("fantasypros", p) for p in fantasypros.POSITIONS] + [("nflverse",)]
 
 
 def test_positionen_vorjahr_fehler_nur_warnung(espn_week3, capsys):
