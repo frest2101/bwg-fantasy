@@ -158,10 +158,18 @@ class Season:
     def _optional(self, path: Path):
         return ef.load_json(path) if path.exists() else None
 
+    def at(self, through: int) -> "Season":
+        """Dieselbe Saison mit anderer Stand-Woche (Playoff-Stand, Stufe 4): Einstellungen, Spielplan, ROS und Standings
+        kommen aus der Woche through; die Wochendateien (Kader, Pool) teilt sie mit dieser, nichts wird doppelt geladen."""
+        other = Season(self.season, through)
+        other._memo = self._memo
+        return other
+
     # -------------------------------------------------------- Liga
     def settings(self) -> dict:
         """mSettings der Woche through (settings-Block)."""
-        return self._get("settings", lambda: ef.load_json(ef.week_dir(self.season, self.through) / "mSettings.json")["settings"])
+        return self._get(("settings", self.through),
+                         lambda: ef.load_json(ef.week_dir(self.season, self.through) / "mSettings.json")["settings"])
 
     def matchups(self, week: int) -> list[dict]:
         """Paarungen einer Woche (espn_fetch.load_week_matchups)."""
@@ -169,7 +177,8 @@ class Season:
 
     def schedule(self) -> list[dict]:
         """Ganzer Liga-Spielplan (mMatchupScore.schedule) aus der Woche through, inklusive offener Paarungen."""
-        return self._get("schedule", lambda: ef.load_json(ef.week_dir(self.season, self.through) / "mMatchupScore.json")["schedule"])
+        return self._get(("schedule", self.through),
+                         lambda: ef.load_json(ef.week_dir(self.season, self.through) / "mMatchupScore.json")["schedule"])
 
     def teams(self) -> list[dict]:
         """Teams laut jüngstem mTeam-Abruf, nur Ligafelder (ohne owners, members, logo), sortiert nach id."""
@@ -205,11 +214,12 @@ class Season:
 
     def ros(self) -> dict | None:
         """ROS-Auszug nach Woche through: {"after_week", "weeks", "players": {pid: {"4": x, …}}}; None, wenn er fehlt."""
-        return self._get("ros", lambda: self._optional(ef.week_dir(self.season, self.through) / ef.ROS_FILE))
+        return self._get(("ros", self.through), lambda: self._optional(ef.week_dir(self.season, self.through) / ef.ROS_FILE))
 
     def standings(self) -> dict | None:
         """ESPN-Simulation (mStandings) nach Woche through, nur zum Vergleich; None, wenn sie fehlt."""
-        return self._get("standings", lambda: self._optional(ef.week_dir(self.season, self.through) / ef.STANDINGS_FILE))
+        return self._get(("standings", self.through),
+                         lambda: self._optional(ef.week_dir(self.season, self.through) / ef.STANDINGS_FILE))
 
     # -------------------------------------------------------- Tageslauf (Pool-Auszug, Wetter) – Stand des jüngsten Laufs
     def pool_latest(self) -> dict | None:

@@ -6,7 +6,10 @@ Beschluss Stephan 28.09.2026 (docs/auftraege/session4_vorbereitung.md §2) mit d
 - Erwartete All-Play-Quote Eᵢ = 1/(T − 1)·Σⱼ Φ((μᵢ − μⱼ)/(σ√2)) mit dem gepoolten σ (compute.pooled_sigma).
 - Rang nach μ; Trend nur zwischen zwei Wochen mit derselben P-Quelle, sonst „neu“ (None).
 - Playoff-Simulation: je Lauf μ̃ᵢ ~ N(μᵢ, σ²/(n + k)), dann PF je offene Woche ~ N(μ̃ᵢ + devᵢ,w, σ²); Seeding
-  „espn“ (W + 0,5·T, dann PF) oder „div“ (Divisionssieger auf 1–2).
+  „espn“ (W + 0,5·T, dann PF) oder „liga“ (Top 3 je Division, Divisionssieger auf 1–2).
+- Endplatz (Stufe 4, Session 9): das Feld „liga“ spielt W15–17 aus (play_bracket, Annahme zur ESPN-Mechanik), gespielte
+  Playoff-Spiele zählen wie ESPN sie meldet; daraus Endplatz-Verteilung und Draft-Position des Folgejahrs (umgekehrte
+  Endplatzierung, linear, ohne Lotterie), nach W17 die feste Reihenfolge (final_places).
 
 Reine Funktionen. σ und die Team-Werte übergibt compute.py (kein Import von compute). Gerechnet wird mit Decimal,
 nur Φ und die Simulation intern mit float; alle Ausgaben sind Decimal (gerundet wird erst beim Export).
@@ -193,9 +196,134 @@ def bye_count(playoff_teams: int) -> int:
     return (1 << (playoff_teams - 1).bit_length()) - playoff_teams if playoff_teams > 0 else 0
 
 
+# ---------------------------------------------------------------- Endplatz: Bracket W15–17 (Stufe 4)
+# Annahme zur ESPN-Mechanik (vor dem 15.12.2026 nicht belegbar; nach W15, W16 und W17 gegen die echten Paarungen
+# prüfen, Abweichungen meldet bracket_warnings): sechs Playoff-Teams, Seeds 1–2 mit Freilos in der ersten Runde, kein
+# Reseeding (mSettings playoffReseed false); Spiel um Platz 5 der beiden Verlierer der ersten Runde in der zweiten,
+# Finale und Spiel um Platz 3 in der dritten Runde; Trostrunde der vier übrigen als Leiter (nach jeder Runde: Sieger
+# 7–8 auf Platz 7, Sieger 9–10 auf 8, Verlierer 7–8 auf 9, Verlierer 9–10 auf 10). Gleichstand gewinnt der höhere Seed.
+BRACKET_FIELD, BRACKET_TEAMS, BRACKET_ROUNDS = 6, 10, 3
+TIE = "T"
+
+
+def playoff_weeks(settings: dict) -> list[int]:
+    """NFL-Wochen der Playoff-Perioden laut mSettings (Perioden nach matchupPeriodCount), aufsteigend, z. B. [15, 16, 17]."""
+    ss = settings["scheduleSettings"]
+    return sorted(w for mp, wks in ss["matchupPeriods"].items() if int(mp) > ss["matchupPeriodCount"] for w in wks)
+
+
+def playoff_games(schedule: list[dict], settings: dict) -> tuple[dict, dict]:
+    """Playoff-Spiele aus mMatchupScore.schedule (Stand-Woche): (entschieden, Paarungen).
+
+    entschieden: (Woche, frozenset{Heim, Gast}) → Sieger-team_id laut ESPN-Feld winner (nicht der Punktevergleich,
+    Beschluss 8) oder TIE; Paarungen: Woche → Menge der Paarungen mit Gegner, auch offene. Freilose (ohne Gast) fehlen.
+    """
+    ss = settings["scheduleSettings"]
+    week_of = {int(mp): min(wks) for mp, wks in ss["matchupPeriods"].items() if int(mp) > ss["matchupPeriodCount"]}
+    decided, pairs = {}, {}
+    for m in schedule:
+        week = week_of.get(m.get("matchupPeriodId"))
+        if week is None or not m.get("home") or not m.get("away"):
+            continue
+        home, away = m["home"]["teamId"], m["away"]["teamId"]
+        key = frozenset((home, away))
+        pairs.setdefault(week, set()).add(key)
+        winner = {"HOME": home, "AWAY": away, "TIE": TIE}.get(m.get("winner"))
+        if winner is not None:
+            decided[(week, key)] = winner
+    return decided, pairs
+
+
+def _other(a, b, winner):
+    return b if winner == a else a
+
+
+def play_bracket(seeds: list, game) -> list:
+    """Endplätze 1–10 nach der Annahme oben. seeds = Teams in Seed-Reihenfolge 1–10 (1–6 Playoffs, 7–10 Trostrunde nach
+    Stand); game(runde, a, b) → Sieger, Runde 0–2 (W15–17); den Gleichstand entscheidet game nach dem Seed (der höhere
+    gewinnt). Die Aufrufe kommen Runde für Runde (trace_bracket verlässt sich darauf)."""
+    s = seeds
+
+    def ladder(r: int, lad: list) -> list:
+        top, bottom = game(r, lad[0], lad[1]), game(r, lad[2], lad[3])
+        return [top, bottom, _other(lad[0], lad[1], top), _other(lad[2], lad[3], bottom)]
+
+    # Runde 1: 3 gegen 6, 4 gegen 5 (Seeds 1–2 Freilos); Trostrunde 7–8 und 9–10
+    w36, w45 = game(0, s[2], s[5]), game(0, s[3], s[4])
+    lad = ladder(0, s[6:10])
+    # Runde 2: 1 gegen Sieger 4–5, 2 gegen Sieger 3–6; Spiel um Platz 5 der Verlierer der Runde 1
+    l36, l45 = _other(s[2], s[5], w36), _other(s[3], s[4], w45)
+    semi1, semi2 = game(1, s[0], w45), game(1, s[1], w36)
+    fifth = game(1, *sorted((l36, l45), key=s.index))
+    lad = ladder(1, lad)
+    # Runde 3: Finale, Spiel um Platz 3
+    lost1, lost2 = _other(s[0], w45, semi1), _other(s[1], w36, semi2)
+    champ = game(2, *sorted((semi1, semi2), key=s.index))
+    third = game(2, *sorted((lost1, lost2), key=s.index))
+    lad = ladder(2, lad)
+    return [champ, _other(semi1, semi2, champ), third, _other(lost1, lost2, third),
+            fifth, _other(l36, l45, fifth)] + lad
+
+
+def trace_bracket(seeds: list, decided: dict, weeks: list[int]) -> tuple[dict, list | None, list]:
+    """Bracket nur aus entschiedenen Spielen (decided wie playoff_games): Paarungen je Woche, soweit sie feststehen
+    (bis einschließlich der ersten Runde mit offenem Spiel), Endplätze (None, solange ein Spiel offen ist oder ESPN
+    ein Unentschieden meldet) und die Unentschieden [(Woche, a, b)]."""
+    rank = {t: i for i, t in enumerate(seeds)}
+    pairs: dict[int, set] = {w: set() for w in weeks}
+    state = {"open": len(weeks)}
+    ties = []
+
+    def game(r, a, b):
+        w = weeks[r]
+        if r <= state["open"]:
+            pairs[w].add(frozenset((a, b)))
+        res = decided.get((w, frozenset((a, b))))
+        if res is None:
+            state["open"] = min(state["open"], r)
+        elif res == TIE:
+            ties.append((w, a, b))
+        else:
+            return res
+        return a if rank[a] < rank[b] else b
+
+    places = play_bracket(seeds, game)
+    known = {w: pairs[w] for i, w in enumerate(weeks) if i <= state["open"] and i < len(weeks)}
+    return known, places if state["open"] == len(weeks) and not ties else None, ties
+
+
+def bracket_warnings(known: dict, espn_pairs: dict, ties: list) -> list[str]:
+    """Abweichungen der ESPN-Paarungen von der Annahme (je Woche, die ESPN schon angelegt hat) und Unentschieden laut
+    ESPN – beides heißt: Annahme prüfen, Stephan fragen (Auftrag Session 9, Schritte 7 und 8). Nur team_ids."""
+    fmt = lambda ps: ", ".join("–".join(map(str, sorted(p))) for p in sorted(ps, key=sorted))  # noqa: E731
+    out = [f"Playoffs W{w}: Paarungen laut ESPN ({fmt(espn_pairs[w])}) weichen von der Annahme ({fmt(rule)}) ab – "
+           f"Annahme prüfen (CLAUDE.md, Playoff-Simulation), Stephan fragen"
+           for w, rule in sorted(known.items()) if w in espn_pairs and espn_pairs[w] != rule]
+    out += [f"Playoffs W{w}: ESPN meldet ein Unentschieden zwischen Team {a} und Team {b} – Endplatz offen, Stephan fragen"
+            for w, a, b in ties]
+    return out
+
+
+def liga_order(order: list, division: list, playoff_teams: int) -> tuple[list, list]:
+    """Seeding „liga“ aus der Rangfolge order (bester zuerst; Einträge sind Indizes in division): Divisionssieger
+    zuerst, dann die übrigen der besten playoff_teams/Divisionen je Division nach Stand, aufgefüllt nach Stand – danach
+    alle übrigen nach Stand (Trostrunde). Rückgabe (alle Teams in Seed-Reihenfolge, Divisionssieger)."""
+    divisions = sorted(set(division))
+    per_division = playoff_teams // len(divisions) if divisions else 0
+    winners, seen = [], set()
+    for i in order:
+        if division[i] not in seen:
+            seen.add(division[i])
+            winners.append(i)
+    qualified = {i for d in divisions for i in [j for j in order if division[j] == d][:per_division]}
+    liga = winners + [i for i in order if i in qualified and i not in winners]
+    liga += [i for i in order if i not in liga][:max(0, playoff_teams - len(liga))]  # falls Divisionen ungleich
+    return liga + [i for i in order if i not in liga], winners
+
+
 def simulate(teams: list[dict], games: list[dict], mu: dict[int, Decimal], sigma: Decimal,
              p_dev: dict[int, dict[int, Decimal]] | None = None, runs: int = RUNS, seed: int = 0,
-             playoff_teams: int = 6, k: int = K) -> dict:
+             playoff_teams: int = 6, k: int = K, bracket: dict | None = None) -> dict:
     """Playoff-Simulation (Beschluss §2); beide Seedings werten dieselben Läufe aus.
 
     teams: Zeilen mit team_id, division, games, w, t, pf (Stand nach Woche N); games: open_games; mu: μ je Team.
@@ -205,6 +333,12 @@ def simulate(teams: list[dict], games: list[dict], mu: dict[int, Decimal], sigma
     die übrigen nach Stand; „espn“: die besten playoff_teams nach Stand. Byes = Seeds 1…bye_count.
     Ausgabe je Seeding und Team: playoff, division, bye (Anteile 0–1), restsiege (Ø W + 0,5·T in den offenen
     Spielen), seeds (Anteil je Seed 1…playoff_teams) – als Decimal, exakt aus den Zählern.
+    Endplatz (Stufe 4): bracket = {"weeks": Playoff-Wochen, "entschieden": playoff_games[0]}; passt die Liga zum Bracket
+    (BRACKET_TEAMS Teams, BRACKET_FIELD Playoff-Teams, BRACKET_ROUNDS Wochen), spielt jeder Lauf das Feld „liga“ nach
+    play_bracket aus: entschiedene Spiele zählen wie ESPN sie meldet (TIE: höherer Seed), offene mit
+    PF ~ N(μ̃ + dev, σ²) aus einem eigenen Zufallsstrom (die Läufe der Regular Season bleiben gleich). „liga“ trägt dann
+    zusätzlich endplatz (Anteil je Platz 1–10), pick (erwartete Draft-Position des Folgejahrs = Ø (11 − Endplatz)),
+    pick1 (Anteil Endplatz 10) und pick_top3 (Anteil Endplatz 8–10); „espn“ bekommt keine Endplatz-Verteilung.
     """
     if runs < 1:
         raise ValueError("runs muss mindestens 1 sein")
@@ -218,13 +352,19 @@ def simulate(teams: list[dict], games: list[dict], mu: dict[int, Decimal], sigma
     half_wins0 = [2 * by_id[t]["w"] + by_id[t]["t"] for t in ids]      # halbe Siege: W zählt 2, T zählt 1
     pf0 = [float(by_id[t]["pf"]) for t in ids]
     division = [by_id[t]["division"] for t in ids]
-    divisions = sorted(set(division))
-    per_division = playoff_teams // len(divisions) if divisions else 0
     dev = p_dev or {}
     plan = [(idx[g["home"]], idx[g["away"]],
              [(float(dev.get(g["home"], {}).get(w, 0)), float(dev.get(g["away"], {}).get(w, 0))) for w in g["weeks"]])
             for g in games]
     byes = bye_count(playoff_teams)
+    # Endplatz (Stufe 4): nur wenn die Liga zum Bracket passt; eigener Zufallsstrom für die Playoff-Wochen
+    with_bracket = (bracket is not None and size == BRACKET_TEAMS and playoff_teams == BRACKET_FIELD
+                    and len(bracket["weeks"]) == BRACKET_ROUNDS)
+    if with_bracket:
+        b_weeks, decided = bracket["weeks"], bracket["entschieden"]
+        b_gauss = random.Random(seed * 1000 + 17).gauss
+        b_dev = [[float(dev.get(t, {}).get(w, 0)) for w in b_weeks] for t in ids]
+        place_counts = [[0] * size for _ in ids]
 
     rng = random.Random(seed)
     gauss = rng.gauss
@@ -249,16 +389,9 @@ def simulate(teams: list[dict], games: list[dict], mu: dict[int, Decimal], sigma
                 hw[h] += 1
                 hw[a] += 1
         order = sorted(range(size), key=lambda i: (hw[i], pf[i]), reverse=True)  # stabil: Gleichstand nach team_id
-        winners, seen = [], set()
-        for i in order:
-            if division[i] not in seen:
-                seen.add(division[i])
-                winners.append(i)
+        liga, winners = liga_order(order, division, playoff_teams)
         for i in winners:
             division_wins[i] += 1
-        qualified = {i for d in divisions for i in [j for j in order if division[j] == d][:per_division]}
-        liga = winners + [i for i in order if i in qualified and i not in winners]
-        liga += [i for i in order if i not in liga][:max(0, playoff_teams - len(liga))]  # falls Divisionen ungleich
         seeded = {"liga": liga[:playoff_teams], "espn": order[:playoff_teams]}
         for name in SEEDINGS:
             counts = seed_counts[name]
@@ -266,6 +399,21 @@ def simulate(teams: list[dict], games: list[dict], mu: dict[int, Decimal], sigma
                 counts[i][pos] += 1
         for i in range(size):
             half_wins_sum[i] += hw[i]
+        if with_bracket:
+            rank = {i: r for r, i in enumerate(liga)}
+
+            def game(r, a, b, rank=rank, mt=mt):
+                res = decided.get((b_weeks[r], frozenset((ids[a], ids[b]))))
+                if res is not None and res != TIE:
+                    return a if res == ids[a] else b
+                if res is None:   # offen: simulieren
+                    pa, pb = b_gauss(mt[a] + b_dev[a][r], s), b_gauss(mt[b] + b_dev[b][r], s)
+                    if pa != pb:
+                        return a if pa > pb else b
+                return a if rank[a] < rank[b] else b   # Gleichstand (auch TIE laut ESPN): höherer Seed
+
+            for place, i in enumerate(play_bracket(liga, game)):
+                place_counts[i][place] += 1
 
     def share(count: int) -> Decimal:
         return Decimal(count) / runs
@@ -280,6 +428,12 @@ def simulate(teams: list[dict], games: list[dict], mu: dict[int, Decimal], sigma
                 "restsiege": Decimal(half_wins_sum[i] - runs * half_wins0[i]) / (2 * runs),
                 "seeds": [share(c) for c in counts],
             }
+            if with_bracket and name == "liga":
+                places = place_counts[i]
+                result[name][t].update(
+                    endplatz=[share(c) for c in places],
+                    pick=Decimal(sum(c * (size - p) for p, c in enumerate(places))) / runs,   # Pick = 11 − Endplatz
+                    pick1=share(places[-1]), pick_top3=share(sum(places[-3:])))
     return result
 
 
@@ -332,14 +486,38 @@ def espn_simulation(ssn: rawdata.Season) -> dict[int, dict] | None:
 
 # ---------------------------------------------------------------- Einstieg
 
+def final_places(teams: list[dict], settings: dict, decided: dict, espn_pairs: dict) -> dict:
+    """Endplatz aus den Ergebnissen (Stufe 4, Schritt 8), nur bei abgeschlossener Regular Season: Seeding „liga“ aus der
+    Schlusstabelle (W + 0,5·T, dann PF, Gleichstand nach team_id wie in simulate), Bracket nach play_bracket mit den
+    entschiedenen Spielen. fest = team_ids in Endplatz-Reihenfolge 1–10, sobald alle Spiele entschieden sind und kein
+    Unentschieden vorliegt (sonst None); draft = Draft-Reihenfolge des Folgejahrs (Pick 1 = Endplatz 10, linear, ohne
+    Lotterie, ohne getauschte Picks) oder None; warnungen = bracket_warnings."""
+    weeks = playoff_weeks(settings)
+    playoff_teams = settings["scheduleSettings"]["playoffTeamCount"]
+    if len(teams) != BRACKET_TEAMS or playoff_teams != BRACKET_FIELD or len(weeks) != BRACKET_ROUNDS:
+        return {"fest": None, "draft": None, "warnungen": []}
+    ids = sorted(t["team_id"] for t in teams)
+    by_id = {t["team_id"]: t for t in teams}
+    order = sorted(range(len(ids)), key=lambda i: (2 * by_id[ids[i]]["w"] + by_id[ids[i]]["t"], by_id[ids[i]]["pf"]),
+                   reverse=True)
+    liga, _ = liga_order(order, [by_id[t]["division"] for t in ids], playoff_teams)
+    known, places, ties = trace_bracket([ids[i] for i in liga], decided, weeks)
+    return {"fest": places, "draft": places[::-1] if places else None,
+            "warnungen": bracket_warnings(known, espn_pairs, ties)}
+
+
 def compute_power_ranking(ssn: rawdata.Season, weeks: list[int], team_weeks: list[dict], teams: list[dict],
                           sigma: Decimal, p_by_week: dict[int, dict[int, Decimal]] | None = None,
-                          p_dev: dict[int, dict[int, Decimal]] | None = None, runs: int = RUNS) -> dict:
+                          p_dev: dict[int, dict[int, Decimal]] | None = None, runs: int = RUNS,
+                          stand: rawdata.Season | None = None) -> dict:
     """Power Ranking nach Woche N = weeks[-1] mit Wochenreihe 1…N, Playoff-Simulation und ESPN-Vergleich.
 
     teams: compute_teams-Ausgabe (team_id, division, w, l, t, pf, games, pf_per_game); sigma: gepooltes σ nach N.
     p_by_week: P je Woche und Team aus der Kader-Projektion (Woche fehlt → Vorjahres-Prior); p_dev: devᵢ,w =
-    Pᵢ,w − P̄ᵢ je Team und offene Woche für die Simulation (fehlt → 0). Seed der Simulation = Saison·100 + N.
+    Pᵢ,w − P̄ᵢ je Team und offene Woche für die Simulation (fehlt → 0).
+    stand: Season der Stand-Woche (Stufe 4: letzte finale Playoff-Woche, sonst ssn) – aus ihrem Spielplan kommen die
+    gespielten Playoff-Spiele; Seed der Simulation = Saison·100 + Stand-Woche. Endplatz und Draft-Reihenfolge des
+    Folgejahrs: sim.liga (Verteilung) und endplatz (final_places, erst nach der Regular Season).
     """
     through = weeks[-1]
     if ssn.through != through:
@@ -378,7 +556,11 @@ def compute_power_ranking(ssn: rawdata.Season, weeks: list[int], team_weeks: lis
     settings = ssn.settings()
     games = open_games(ssn.schedule(), settings, through)
     playoff_teams = settings["scheduleSettings"]["playoffTeamCount"]
-    seed = ssn.season * 100 + through
+    stand = stand or ssn
+    seed = ssn.season * 100 + stand.through
+    decided, espn_pairs = playoff_games(stand.schedule(), settings)
+    bracket = {"weeks": playoff_weeks(settings), "entschieden": decided}
+    endplatz = final_places(teams, settings, decided, espn_pairs) if not games else None
     dev = p_dev or {}
     spiele = [{"id": g["id"], "week": g["weeks"][0], "home": g["home"], "away": g["away"],
                "p_home": win_probability(mu[g["home"]] + dec(dev.get(g["home"], {}).get(g["weeks"][0], 0)),
@@ -387,9 +569,11 @@ def compute_power_ranking(ssn: rawdata.Season, weeks: list[int], team_weeks: lis
     return {
         "l_bar": now["l_bar"], "l_bar_2025": l_bar_prev, "vorjahr": vorjahr, "sigma": sigma,
         "teams": result_teams,
-        "sim": simulate(teams, games, mu, sigma, p_dev, runs, seed, playoff_teams),
+        "sim": simulate(teams, games, mu, sigma, p_dev, runs, seed, playoff_teams, bracket=bracket),
         "sim_info": {"runs": runs, "seed": seed, "offene_spiele": len(games), "playoff_teams": playoff_teams,
-                     "byes": bye_count(playoff_teams)},
+                     "byes": bye_count(playoff_teams), "stand_woche": stand.through,
+                     "playoff_entschieden": len(decided)},
+        "endplatz": endplatz,
         "spiele": spiele,
         "espn_sim": espn_simulation(ssn),
     }

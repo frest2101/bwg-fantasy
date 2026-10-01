@@ -176,6 +176,18 @@ def test_nur_regular_season():
         compute.completed_weeks(2026, through=15)
 
 
+def test_finale_playoff_wochen(monkeypatch):
+    """Playoff-Stand (Stufe 4): W15 … W17 ohne Lücke, nur nach ganz gerechneter Regular Season, höchstens bis through
+    (konstruiert: is_final aus einer erfundenen Menge finaler Wochen)."""
+    regular = list(range(1, 15))
+    for final, through, expected in (({15, 16}, None, [15, 16]), ({15, 17}, None, [15]), ({16, 17}, None, []),
+                                     ({15, 16, 17}, 16, [15, 16]), ({15, 16, 17}, None, [15, 16, 17])):
+        monkeypatch.setattr(ef, "is_final", lambda season, week, final=final: week in final)
+        assert compute.final_playoff_weeks(2026, regular, 14, through) == expected
+    assert compute.final_playoff_weeks(2026, list(range(1, 14)), 14) == []   # Regular Season noch nicht ganz gerechnet
+    assert compute.final_playoff_weeks(2026, [], 14) == []
+
+
 def test_laufende_woche_zaehlt_nicht(tmp_path, monkeypatch):
     """Konstruierte Datenlage (unabhängig vom wachsenden Repo-Stand): W1 abgeschlossen, W2 läuft noch."""
     for week in (1, 2):

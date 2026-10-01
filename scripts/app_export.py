@@ -30,6 +30,7 @@ METRIC_LABELS = {"pf": "PF/Spiel", "allplay": "All-Play-Quote", "win": "Win %", 
 # Stellen je Schlüssel (gilt für den Teilbaum), sonst zwei (Frage 11 a); Anteile in % mit einer Stelle wie in der Anzeige
 PRECISION = {"z": 3, "e": 3, "f": 3, "f_vorwoche": 3, "delta": 3, "r25": 3, "r26": 3, "naechste3": 3, "rest": 3,
              "sos_po": 3, "playoff": 4, "division": 4, "bye": 4, "seeds": 4, "p_home": 4, "anteil": 1,
+             "endplatz": 4, "pick1": 4, "pick_top3": 4,
              # Wetter (wetter.json): eine Stelle wie Open-Meteo, Regenwahrscheinlichkeit ganzzahlig
              "temp": 1, "wind": 1, "boeen": 1, "niederschlag": 1, "schnee": 1, "regen_wahrsch": 0,
              # Alter je Spieler und Altersprofil je Team (keeper.json): eine Stelle wie in der Anzeige
@@ -81,6 +82,8 @@ TEAM_FIELDS = ("team_id", "name", "division", "games", "w", "l", "t", "pf", "pa"
                "rang_division", "rang_score", "norm", "score")
 PR_FIELDS = ("mu", "se", "p", "p_quelle", "e", "rang", "rang_vorwoche", "trend", "kernsatz")
 SIM_FIELDS = ("playoff", "division", "bye", "restsiege", "seeds")
+# nur Seeding „liga“ (Stufe 4): Endplatz-Verteilung und Draft-Position des Folgejahrs, solange das Bracket passt
+SIM_ENDPLATZ = ("endplatz", "pick", "pick1", "pick_top3")
 # je Woche (Arrays in teams.json › wochen); Matchup-Glück, laufende Summe und Effizienz kommen aus compute.py
 WEEK_FIELDS = ("pf", "pa", "optimal", "verschenkt", "efficiency", "wochenrang", "allplay_w", "allplay_l", "allplay_t",
                "allplay_pct", "median_win", "median_abstand", "gegner_abstand", "matchup_glueck", "matchup_kum", "gegner_pkt",
@@ -108,6 +111,9 @@ def build_teams(result: dict) -> dict:
             row["pr"]["rang_vorwoche"] = None  # kein gültiger Vergleich (Quellwechsel Vorjahr → Projektion, W1)
         row["sim"] = {seeding: pick(sim.get(seeding, {}).get(tid), SIM_FIELDS) for seeding in ("liga", "espn")} \
             if sim else None
+        liga = sim.get("liga", {}).get(tid) or {}
+        if row["sim"] and "endplatz" in liga:
+            row["sim"]["liga"].update({k: liga[k] for k in SIM_ENDPLATZ})
         row["espn_sim"] = ((result.get("power_ranking") or {}).get("espn_sim") or {}).get(tid)
         row["positionen"] = positions.get(tid)
         verlauf = {v["week"]: v for v in (pr.get(tid) or {}).get("verlauf", [])}
@@ -316,7 +322,10 @@ def build_keeper(result: dict) -> dict | None:
     if liga["altersprofil"]:   # Positionsschnitt der Liga mit Kürzeln als Schlüssel
         liga["altersprofil"] = liga["altersprofil"] | {
             "positionen": {pos(p): v for p, v in liga["altersprofil"]["positionen"].items()}}
-    return {k: data[k] for k in KEEPER_HEAD} | {
+    # Draft des Folgejahrs (Stufe 4): feste Reihenfolge erst, wenn alle Playoff-Spiele entschieden sind
+    endplatz = (result.get("power_ranking") or {}).get("endplatz") or {}
+    draft_next = {"saison": result["season"] + 1, "reihenfolge": endplatz.get("draft"), "endplatz": endplatz.get("fest")}
+    return {k: data[k] for k in KEEPER_HEAD} | {"draft_folgejahr": draft_next} | {
         "liga": liga,
         "teams": [{"team_id": t["team_id"]} | {k: t[k] for k in KEEPER_TEAM} for t in data["teams"]],
         "kader": [{k: r[k] for k in KEEPER_ROSTER} | {"pos": pos(r["pos"]), "in_app": r["id"] in known}
@@ -750,6 +759,8 @@ def render(files: dict[str, dict], result: dict) -> dict[str, bytes]:
     content = {name: dumps(round_file(name, obj)).encode("utf-8") for name, obj in sorted(files.items())}
     manifest = {"schema": SCHEMA, "season": result["season"], "through_week": result["through_week"],
                 "datenstand": {"woche_final": result["through_week"], "ros_nach_woche": result.get("ros_after_week"),
+                               # Stufe 4: letzte finale Playoff-Woche (W15–17), null bis dahin
+                               "playoff_woche": result.get("playoff_woche"),
                                "pool_woche": result.get("pool_week"),
                                "transaktionen_bis": result.get("transactions_until"),
                                # Tageslauf: Abrufzeit (UTC, ISO) des jüngsten Pool-Auszugs bzw. Wetterabrufs

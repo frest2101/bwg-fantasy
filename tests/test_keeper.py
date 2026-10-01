@@ -308,6 +308,11 @@ def test_ros_gewichte():
     assert keeper.ros_weights({"ros_after_week": 14, "players": pool}) == ({1: D("30")}, "ros_po")
     assert keeper.ros_weights({"ros_after_week": None, "players": pool}) == ({}, None)
     assert keeper.ros_weights({"ros_after_week": 17, "players": pool}) == ({}, None)
+    # Offseason (Stufe 4): ohne ROS-Projektion gewichtet das Altersprofil mit dem Marktwert, mit ROS bleibt es bei ROS
+    werte = {1: {"wert": 5000}, 3: {"wert": 120}}
+    assert keeper.age_weights({"ros_after_week": 17, "players": pool}, werte) == ({1: D(5000), 3: D(120)}, "wert")
+    assert keeper.age_weights({"ros_after_week": 3, "players": pool}, werte) == ({1: D("100")}, "ros")
+    assert keeper.age_weights({"ros_after_week": 17, "players": pool}, {}) == ({}, None)
 
 
 def keeper_mit_stammdaten(stammdaten):

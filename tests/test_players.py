@@ -276,8 +276,21 @@ def test_kader_projektion_randfaelle():
 
 
 def test_ros_passt_nicht_zur_woche():
+    """Der ROS-Auszug muss zur Stand-Woche passen (ssn.through; in den Playoffs die letzte finale Woche, Stufe 4)."""
     with pytest.raises(ef.FetchError, match="passt nicht"):
-        players.compute_players(FakeSeason(ros=ros_extract(after_week=3)), [1, 2])
+        players.compute_players(FakeSeason(through=2, ros=ros_extract(after_week=3)), [1, 2])
+    # Playoff-Stand: Wochenreihe bis W3, ROS nach der Stand-Woche – hier nach W15 (nur noch W16–17 offen)
+    po = players.compute_players(FakeSeason(through=15, ros=ros_extract(after_week=15)), [1, 2, 3])
+    assert po["ros_after_week"] == 15 and po["players"][10]["ros"] == 0 and po["players"][10]["ros_po"] > 0
+
+
+def test_nach_w17_keine_restwoche():
+    """Nach W17 legt der Wochenabruf keinen ROS-Auszug mehr ab: ROS nach W17 ohne Werte statt „noch kein Auszug“
+    (App: „Nach W17 gibt es keinen Bedarf mehr“)."""
+    end = players.compute_players(FakeSeason(through=17, ros=None), [1, 2, 3])
+    assert end["ros_after_week"] == 17 and end["ersatz"] == {} and end["ersatz_po"] == {}
+    assert all(p[key] is None for p in end["players"].values() for key in players.ROS_KEYS)
+    assert players.compute_players(FakeSeason(through=16, ros=None), [1, 2, 3])["ros_after_week"] is None
 
 
 def test_fehlender_pool_nimmt_kader_werte():

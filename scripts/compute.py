@@ -102,6 +102,20 @@ def completed_weeks(season: int, through: int | None = None) -> list[int]:
     return weeks
 
 
+def final_playoff_weeks(season: int, weeks: list[int], last_regular: int, through: int | None = None) -> list[int]:
+    """Finale Playoff-Wochen (Stufe 4): W15 … W17 ohne Lücke nach einer ganz gerechneten Regular Season, höchstens bis
+    through. Final wie espn_fetch.is_final (alle Spiele mit Gegner entschieden; Freilose zählen nicht). Tabelle,
+    All-Play und Score bleiben bei der Regular Season; diese Wochen bestimmen nur den Playoff-Stand."""
+    if not weeks or weeks[-1] != last_regular:
+        return []
+    out = []
+    for week in range(last_regular + 1, ef.MAX_WEEK + 1):
+        if (through and week > through) or not ef.is_final(season, week):
+            break
+        out.append(week)
+    return out
+
+
 def season_started(season: int) -> bool:
     """Gibt es lokal schon eine abgeschlossene Woche 1 der Saison?"""
     if 1 not in ef.local_weeks(season):
@@ -386,9 +400,17 @@ def projection_by_week(season: int, weeks: list[int], team_weeks: list[dict], cu
 
 
 def compute_season(season: int = ef.DEFAULT_SEASON, through: int | None = None) -> dict:
-    """Komplettes Rechenwerk mit allen Modulen; Zahlen als ungerundete Decimal (gerundet wird erst beim Schreiben)."""
-    weeks = completed_weeks(season, through)
+    """Komplettes Rechenwerk mit allen Modulen; Zahlen als ungerundete Decimal (gerundet wird erst beim Schreiben).
+
+    Playoff-Stand (Stufe 4): Tabelle, All-Play, Score und Power Ranking rechnen mit der Regular Season (bis W14).
+    Stand-Woche = letzte finale Playoff-Woche (W15–17), sonst die letzte gerechnete Woche: aus ihr kommen ROS, Bedarf
+    und Altersgewicht (players.compute_players), die gespielten Playoff-Spiele der Endplatz-Simulation und deren Seed.
+    """
+    last_regular = last_regular_week(season)
+    weeks = completed_weeks(season, min(through, last_regular) if through else None)
+    playoffs = final_playoff_weeks(season, weeks, last_regular, through)
     ssn = rawdata.Season(season, weeks[-1])
+    stand = ssn.at(playoffs[-1]) if playoffs else ssn
     team_weeks = compute_team_weeks(ssn, weeks)
     sigma = pooled_sigma(team_weeks)
     add_matchup(team_weeks, sigma)
@@ -397,11 +419,12 @@ def compute_season(season: int = ef.DEFAULT_SEASON, through: int | None = None) 
     teams = compute_teams(ssn, weeks, team_weeks, sigma, kader_projection=kader["teams"] if kader else None)
     pr = powerranking.compute_power_ranking(ssn, weeks, team_weeks, teams, sigma,
                                             p_by_week=projection_by_week(season, weeks, team_weeks, kader),
-                                            p_dev=kader["dev"] if kader else None)
+                                            p_dev=kader["dev"] if kader else None, stand=stand)
     transactions = records.compute_transactions(ssn)
-    spieler = players.compute_players(ssn, weeks)
+    spieler = players.compute_players(stand, weeks)
     settings = ssn.settings()["scheduleSettings"]
-    return {"season": season, "through_week": weeks[-1], "last_regular_week": last_regular_week(season),
+    return {"season": season, "through_week": weeks[-1], "last_regular_week": last_regular,
+            "playoff_woche": playoffs[-1] if playoffs else None,
             "active_profile": ACTIVE_PROFILE, "active_norm": ACTIVE_NORM, "sigma": sigma, "ligafaktor": faktor,
             "divisions": {d["id"]: d["name"] for d in settings.get("divisions", [])},
             "teams": teams, "team_weeks": team_weeks, "weeks": compute_weeks(team_weeks, weeks),
@@ -412,13 +435,13 @@ def compute_season(season: int = ef.DEFAULT_SEASON, through: int | None = None) 
             "dst": dst.compute_dst(ssn, weeks), "matchup": matchup.compute_matchup(ssn, weeks),
             "history": history.compute_history(ssn),
             "players": spieler, "ros_after_week": spieler["ros_after_week"],
-            "keeper": keeper.compute_keeper(ssn, weeks, spieler, records.player_names(ssn)),
+            "keeper": keeper.compute_keeper(ssn, weeks, spieler, records.player_names(ssn), stand_week=stand.through),
             "pool_week": weeks[-1] if ssn.pool(weeks[-1]) is not None else None,
             # Tageslauf (Session 6): Pool-Auszug und Wetter, Stand des jüngsten Laufs – None, solange er nicht lief
             "pool_latest": ssn.pool_latest(),
             # Wochensicht im Waiver-Tab: NFL-Spielplan (Byes, Anstoß) und Wochenprojektionen des ROS-Auszugs
             "nfl": ssn.nfl(), "nfl_spiele": wetter.season_games(ef.load_json(ef.season_files(season)["schedule"])),
-            "ros_projektion": (ssn.ros() or {}).get("players"),
+            "ros_projektion": (stand.ros() or {}).get("players"),
             "kader_regeln": players.roster_rules(ssn.settings()),
             "wetter": wetter.compute_wetter(ssn.wetter_prognose(), ssn.wetter_ist(),
                                             {tid: t.abbrev for tid, t in ssn.nfl().items()}),
@@ -461,7 +484,8 @@ def main(argv: list[str] | None = None) -> int:
     sys.stdout.reconfigure(errors="replace", line_buffering=True)
     parser = argparse.ArgumentParser(description="Team-Kennzahlen der BWG Fantasy Liga aus den lokalen Rohdaten.")
     parser.add_argument("--season", type=int, default=ef.DEFAULT_SEASON, help=f"Saison (Standard: {ef.DEFAULT_SEASON})")
-    parser.add_argument("--through", type=int, metavar="N", help="nur bis Woche N rechnen")
+    parser.add_argument("--through", type=int, metavar="N",
+                        help="nur bis Woche N rechnen (N über W14: Regular Season ganz, Playoff-Stand bis N)")
     args = parser.parse_args(argv)
     if args.through is not None and args.through < 1:
         parser.error("--through muss mindestens 1 sein")
@@ -484,6 +508,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Warnung: Positions-Matchup {warning}", file=sys.stderr)
     for warning in (season_data["keeper"] or {}).get("warnungen", []):
         print(f"Warnung: Keeper-Bilanz {warning}", file=sys.stderr)
+    for warning in (season_data["power_ranking"].get("endplatz") or {}).get("warnungen", []):
+        print(f"Warnung: {warning}", file=sys.stderr)
     path = ef.REPO_DIR / "data" / f"season_{args.season}.json"
     path.write_text(json.dumps(to_json(season_data), ensure_ascii=False, indent=1) + "\n",
                     encoding="utf-8", newline="\n")

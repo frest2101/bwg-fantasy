@@ -8,6 +8,7 @@
 "alter_gewicht":"ros",
 "marktwert_stand":null,
 "keeper_linie":null,
+"draft_folgejahr":{"saison":2027,"reihenfolge":null,"endplatz":null},
 "liga":{"keeper":119,"keeper_da":117,"picks":121,"picks_da":99,"kader":{"keeper":117,"draft":99,"waiver":13,"free_agent":15,"trade":2},"pf":{"summe":6126.2,"pts":{"keeper":4644.55,"draft":1424.44,"zugang":52.21,"trade":5.0},"anteil":{"keeper":75.8,"draft":23.3,"zugang":0.9,"trade":0.1}},"kern":{"summe":4934.2,"pts":{"keeper":4388.55,"draft":508.44,"zugang":32.21,"trade":5.0},"anteil":{"keeper":88.9,"draft":10.3,"zugang":0.7,"trade":0.1}},"altersprofil":{"n":214,"kader":27.1,"ros":27.6,"bereinigt":0.0,"bereinigt_ros":0.2,"jung":96,"alt":43,"rookies":24,"zweites_jahr":26,"positionen":{"QB":{"n":37,"alter":29.2},"RB":{"n":61,"alter":26.2},"WR":{"n":81,"alter":26.3},"TE":{"n":23,"alter":27.4},"K":{"n":12,"alter":29.5}}},"marktwert":null},
 "teams":[
 {"team_id":1,"keeper":12,"keeper_da":12,"picks":12,"picks_da":9,"kader":{"keeper":12,"draft":9,"waiver":1,"free_agent":3,"trade":0},"pf":{"summe":744.81,"pts":{"keeper":647.81,"draft":97.0,"zugang":0.0,"trade":0.0},"anteil":{"keeper":87.0,"draft":13.0,"zugang":0.0,"trade":0.0}},"kern":{"summe":589.81,"pts":{"keeper":589.81,"draft":0.0,"zugang":0.0,"trade":0.0},"anteil":{"keeper":100.0,"draft":0.0,"zugang":0.0,"trade":0.0}},"altersprofil":{"n":22,"kader":26.4,"ros":27.1,"bereinigt":-0.6,"bereinigt_ros":0.0,"jung":11,"alt":4,"rookies":3,"zweites_jahr":3},"marktwert":null},

@@ -395,6 +395,9 @@ def team_week_needs(rosters: dict[int, list[tuple[int, int]]], value: dict[int, 
 def compute_players(ssn: rawdata.Season, weeks: list[int]) -> dict:
     """Alle Spieler des Pools und der Kader: Wochenreihe, Kennzahlen und – sobald ros.json vorliegt – ROS.
 
+    weeks = gewertete Wochen der Regular Season (Wochenreihe); der ROS-Auszug kommt aus der Stand-Woche ssn.through –
+    in den Playoffs der letzten finalen Woche 15–17 (Stufe 4, compute.season_stand). Nach W17 gibt es keine Restwoche
+    und keinen Auszug mehr: Dann gilt ROS nach W17 (alle ROS-Werte None, ros_after_week 17), nicht „noch kein Auszug“.
     Rückgabe: {"weeks", "players": {pid: {...}}, "ersatz": {pos: Decimal|None} (leer ohne ros), "ersatz_po" (dasselbe
     nach ROS Playoffs/Spiel),
     "ros_after_week" (None ohne ros), "cv": POSITION_CV, "wochen_ohne_pool": [Wochen ohne kona]}.
@@ -404,10 +407,13 @@ def compute_players(ssn: rawdata.Season, weeks: list[int]) -> dict:
         p.update(player_stats(p["weeks"], p["pos"]))
         p.update(dict.fromkeys(ROS_KEYS))
     ros, levels, levels_po = ssn.ros(), {}, {}
+    if ros is None and ssn.through >= LAST_PLAYOFF_WEEK:
+        ros = {"after_week": ssn.through, "weeks": [], "players": {}}   # Saisonende: keine Restwoche mehr
     if ros is not None:
-        if weeks and ros["after_week"] != max(weeks):
-            raise ef.FetchError(f"ROS-Auszug nach W{ros['after_week']} passt nicht zu Woche {max(weeks)}")
-        levels, levels_po = add_ros(players, ssn, ros)
+        if ros["after_week"] != ssn.through:
+            raise ef.FetchError(f"ROS-Auszug nach W{ros['after_week']} passt nicht zur Stand-Woche W{ssn.through}")
+        if ros["players"]:
+            levels, levels_po = add_ros(players, ssn, ros)
     return {"weeks": sorted(weeks), "players": players, "ersatz": levels, "ersatz_po": levels_po,
             "ros_after_week": ros["after_week"] if ros is not None else None,
             "cv": dict(POSITION_CV), "wochen_ohne_pool": missing}
