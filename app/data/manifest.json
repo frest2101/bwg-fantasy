@@ -7,13 +7,13 @@
 "claude.json":{"v":"b0012cfed365","bytes":31341,"lazy":true},
 "dst.json":{"v":"fb7a76f70c6e","bytes":11625,"lazy":true},
 "history.json":{"v":"d7c4d8da8907","bytes":42016,"lazy":true},
-"keeper.json":{"v":"026be922ced0","bytes":120995,"lazy":true},
+"keeper.json":{"v":"0668465f9c69","bytes":141399,"lazy":true},
 "matchup.json":{"v":"3877738fad55","bytes":22970,"lazy":true},
 "players.json":{"v":"cf680cd1aafb","bytes":319919,"lazy":true},
 "schedule.json":{"v":"4a84d3142d78","bytes":17583,"lazy":false},
 "teams.json":{"v":"9666e1b31d26","bytes":31435,"lazy":false},
 "transactions.json":{"v":"38d4727f3b11","bytes":22214,"lazy":true},
-"waiver.json":{"v":"e295b8c292c6","bytes":139279,"lazy":true},
+"waiver.json":{"v":"09fba08440be","bytes":139319,"lazy":true},
 "wetter.json":{"v":"1e72cd58a2d1","bytes":17539,"lazy":true}
 }
 }

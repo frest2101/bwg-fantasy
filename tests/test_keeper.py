@@ -356,6 +356,72 @@ def test_echte_kader_mit_erfundenen_stammdaten():
     assert ohne_vj and any(r["rookie"] is False for r in ohne_vj)
 
 
+# ---------------------------------------------------------------- Marktwert (Stufe 3)
+
+def test_keeper_linie():
+    assert keeper.keeper_line([5, 9, 7, 7, 3], 3) == 7                    # 9, 7, 7: der dritte teilt den Wert
+    assert keeper.keeper_line([5, 9], 3) is None and keeper.keeper_line([5, 9], None) is None
+    assert keeper.keeper_line([], 0) is None
+
+
+def test_wertfelder():
+    w = {"wert": 1700, "rang": 110, "pos_rang": 40, "trend30": -12, "redraft": None}
+    assert keeper.value_fields(w, 1661) == {"wert": 1700, "wert_rang": 110, "wert_posrang": 40, "wert_trend": -12,
+                                            "wert_redraft": None, "wert_ue": 39}
+    assert keeper.value_fields(w, None)["wert_ue"] is None
+    assert set(keeper.value_fields(None, 1661).values()) == {None}
+
+
+def wzeile(pid, team, wert, alter):
+    return {"id": pid, "team": team, "wert": wert, "alter": None if alter is None else D(alter)}
+
+
+def test_wertprofil_konstruiert():
+    """Erfundener Kader: drei Spieler mit Wert (einer ohne Alter), einer ohne Wert (K); Keeper-Zahl 2, Linie 100."""
+    rows = [wzeile(1, 1, 300, "24"), wzeile(2, 1, 100, "30"), wzeile(3, 1, 50, None), wzeile(4, 1, None, "33")]
+    p = keeper.value_profile(rows, 100, 2)
+    # kern = 300 + 100; über der Linie nur 300 − 100; auf oder über der Linie: 300 und 100; Alter (300·24 + 100·30)/400
+    assert p == {"n": 3, "kern": 400, "ueber_linie": 200, "n_linie": 2, "alter": D("25.5")}
+    assert keeper.value_profile(rows, None, 2) == {"n": 3, "kern": 400, "ueber_linie": None, "n_linie": None,
+                                                   "alter": D("25.5")}
+    assert keeper.value_profile(rows[3:], 100, 2) is None                  # nur der K: kein Profil
+    assert keeper.value_profile([wzeile(5, 2, 80, None)], 100, 2)["alter"] is None
+    other = [wzeile(6, 2, 200, "28")]
+    liga = keeper.league_values([p, keeper.value_profile(other, 100, 2), None], rows + other)
+    assert liga == {"n": 4, "kern": D(300), "ueber_linie": D(150), "n_linie": 3,
+                    "alter": (300 * D(24) + 100 * D(30) + 200 * D(28)) / 600}
+    assert keeper.league_values([None, None], rows) is None
+
+
+def test_wertzeilen():
+    """value_rows: alle Spieler mit Wert, die der Wochenpool kennt; Kaderspieler mit Team, Herkunft und Alter aus der
+    Kaderzeile, freie mit Team 0 und Alter aus den Stammdaten."""
+    from datetime import date
+    werte = {1: {"wert": 500, "rang": 1, "pos_rang": 1, "trend30": 3, "redraft": 400},
+             2: {"wert": 90, "rang": 2, "pos_rang": 1, "trend30": 0, "redraft": None},
+             3: {"wert": 80, "rang": 3, "pos_rang": 2, "trend30": 0, "redraft": None}}   # 3 nicht im Wochenpool
+    kader = [{"id": 1, "team": 4, "art": "keeper", "alter": D("26.5")}]
+    stamm = {2: {"geb": date(2000, 9, 29), "rookie": 2022}}
+    rows = keeper.value_rows(werte, {1: {}, 2: {}}, kader, stamm, date(2026, 9, 29), 100)
+    assert list(rows) == [1, 2]
+    assert (rows[1]["team"], rows[1]["art"], rows[1]["alter"], rows[1]["wert_ue"]) == (4, "keeper", D("26.5"), 400)
+    assert (rows[2]["team"], rows[2]["art"], rows[2]["wert_ue"]) == (0, None, -10)
+    assert rows[2]["alter"].quantize(D("0.01")) == D("26.00")
+    assert keeper.value_rows(werte, {2: {}}, [], {}, date(2026, 9, 29), None)[2]["alter"] is None
+
+
+def test_echte_daten_ohne_marktwert():
+    """Ohne Auszug: Kopf, Teams und Kaderzeilen ohne Werte, keine Liste werte."""
+    import players
+    import records
+    ssn = rawdata.Season(2026, 3)
+    ssn._memo["marktwert"] = None
+    k = keeper.compute_keeper(ssn, [1, 2, 3], players.compute_players(ssn, [1, 2, 3]), records.player_names(ssn))
+    assert (k["keeper_linie"], k["marktwert_stand"], k["werte"]) == (None, None, {})
+    assert all(t["marktwert"] is None for t in k["teams"]) and k["liga"]["marktwert"] is None
+    assert all(r["wert"] is None and r["wert_ue"] is None for r in k["kader"])
+
+
 def test_vorjahr_aus_mroster():
     """Saison-Ist des Vorjahrs je Kaderzeile (rawdata.roster_rows): Punkte und Spiele, None ohne Eintrag."""
     def player(pid, stats):

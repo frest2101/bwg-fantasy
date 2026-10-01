@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 import espn_fetch as ef
+import fantasycalc
 import fantasypros
 import nflverse
 import wetter
@@ -234,6 +235,11 @@ class Season:
     def nflverse(self) -> dict | None:
         """Spieler-Stammdaten von nflverse (nflverse/players.json, Wochenabruf); None, solange er sie nicht holte."""
         return self._get("nflverse", lambda: self._optional(nflverse.path(self.season)))
+
+    def marktwert(self) -> dict | None:
+        """Marktwerte von FantasyCalc (fantasycalc/latest.json, Tageslauf, Stand des jüngsten Abrufs); None, solange
+        der Tageslauf sie nicht holte."""
+        return self._get("marktwert", lambda: self._optional(fantasycalc.path(self.season)))
 
     # -------------------------------------------------------- Saisondateien
     def nfl(self) -> dict[int, NflTeam]:
