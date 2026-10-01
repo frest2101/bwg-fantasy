@@ -281,7 +281,10 @@ def test_keeper_vertrag(data):
     Punkte mit zwei; Positionen als Kürzel; in_app wie in transactions.json."""
     k = data["keeper.json"]
     assert set(k) == {"through_week", "stand", "draft_datum", "keeper_zahl", "kader_plaetze", "alter_stichtag", "alter_gewicht",
-                      "marktwert_stand", "keeper_linie", "liga", "teams", "kader", "picks"}
+                      "marktwert_stand", "keeper_linie", "draft_folgejahr", "liga", "teams", "kader", "picks"}
+    # Draft des Folgejahrs: vor dem Ende der Playoffs ohne feste Reihenfolge (Stufe 4)
+    assert k["draft_folgejahr"] == {"saison": 2027, "reihenfolge": None, "endplatz": None, "abweichung": [],
+                                    "espn_bestaetigt": None}
     assert (k["through_week"], k["keeper_zahl"], k["kader_plaetze"]) == (2, 12, 24)
     assert data["manifest.json"]["files"]["keeper.json"]["lazy"]
     assert k["stand"] == data["manifest.json"]["datenstand"]["pool_stand"]
@@ -339,7 +342,8 @@ def test_keeper_alter_export(result):
                                          for r in base["kader"] if r["id"] > 0}}
     fake = dict(result, keeper=keeper.compute_keeper(ssn, [1, 2], result["players"], records.player_names(ssn)))
     k = app_export.round_file("keeper.json", app_export.build_keeper(fake))
-    assert k["alter_stichtag"] == "2026-09-22" and k["alter_gewicht"] in ("ros", None)
+    # ohne ROS-Auszug gewichtet das Altersprofil mit dem Marktwert, sobald es einen Auszug gibt (Stufe 4)
+    assert k["alter_stichtag"] == "2026-09-22" and k["alter_gewicht"] in ("ros", "wert", None)
     liga = k["liga"]["altersprofil"]
     assert set(liga) == KEEPER_ALTER | {"positionen"} and set(liga["positionen"]) == {"QB", "RB", "WR", "TE", "K"}
     places = lambda v: len(str(v).split(".")[-1])  # noqa: E731
@@ -645,6 +649,12 @@ def test_profil_und_zugewinn_echte_daten():
     if not res.get("pool_latest") or res["players"]["ros_after_week"] is None:
         pytest.skip("noch kein Tagesstand oder ROS-Auszug")
     out = app_export.build_waiver(res)
+    if app_export.need_basis(res) is None:
+        # Saisonende (ROS nach W17 ohne Restwoche, Stufe 4): kein Bedarf, kein Profil, kein Zugewinn – statt eines roten
+        # Laufs den ganzen Winter (Befund Gegenprüfung 01.10.2026)
+        assert out["bedarf_basis"] is None and out["bedarf"] is None and out["profil"] is None
+        assert out["bedarf_ersatz"] is None and not any("zug" in s for s in out["spieler"])
+        return
     assert out["bedarf_basis"] in ("regular", "playoffs") and set(out["profil"]) == set(range(1, 11))
     for p in out["profil"].values():
         assert list(p["gruppen"]) == ["QB", "RB", "WR", "TE", "FLEX", "D/ST", "K"]

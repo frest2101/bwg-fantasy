@@ -80,7 +80,8 @@ function available(box, W, P, rows, r, wflag, me, kp) {
     && (st.hor !== 'zukunft' || U.ok(x.wert)));
   // Spieler, die nur der Tagesstand kennt (unter der Woche geholt, frei mit Marktwert), haben keine Wochenwerte
   const inWeek = new Set(P.players.map(p => p.id));
-  const rosWhyBase = P.ros_nach_woche == null ? `ab Wochenabruf W${S.tw + 1}` : 'keine ROS-Projektion';
+  const rosWhyBase = P.ros_nach_woche == null ? `ab Wochenabruf W${S.tw + 1}`
+    : P.ros_nach_woche >= (S.weeks.at(-1)?.week ?? 17) ? 'Saison beendet, keine Restwoche' : 'keine ROS-Projektion';
   const rosWhy = x => inWeek.has(x.id) ? rosWhyBase : 'nicht im Wochenstand';
   // why: Text oder Funktion der Zeile (Grund für „–“)
   const num = (k, l, f = U.num, why) => ({k, l, num: 1, v: x => x[k], f: x => U.val(x[k], f, typeof why === 'function' ? why(x) : why)});

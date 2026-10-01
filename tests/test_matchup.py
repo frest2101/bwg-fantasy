@@ -308,6 +308,11 @@ def test_attrappe_wochen_und_bye(fake3):
     end = run(14)
     assert end["wochen"] == {"n1": 15, "naechste3": [15, 16, 17], "rest": [], "sos_po": [15, 16, 17]}
     assert run(17)["wochen"]["n1"] is None
+    # Playoff-Stand (Stufe 4): Vorausschau ab der Stand-Woche, Faktoren beim Stand W14; nach W17 kein N+1 mehr
+    po = matchup.compute_matchup(FakeSeason(14), list(range(1, 15)), ab_woche=16)
+    assert po["wochen"] == {"n1": 17, "naechste3": [17], "rest": [], "sos_po": [17]} and po["f"] == end["f"]
+    assert matchup.compute_matchup(FakeSeason(14), list(range(1, 15)), ab_woche=17)["wochen"] == {
+        "n1": None, "naechste3": [], "rest": [], "sos_po": []}
 
 
 def test_attrappe_fehlende_daten():

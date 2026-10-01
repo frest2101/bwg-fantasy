@@ -386,6 +386,13 @@ def test_attrappe_saisonende():
     for t in r14["teams"]:
         assert t["rest"] is None and t["rest_alt"] is None and t["naechste3"] == t["sos_po"]
         assert len(t["f_verlauf"]) == len(t["punkte_dst"]) == len(t["zugelassen"]) == 14 and len(t["gegner"]) == 17
+    # Playoff-Stand (Stufe 4): Vorausschau ab der letzten finalen Playoff-Woche, F und Rang bleiben beim Stand W14
+    r15 = dst.compute_dst(FakeSeason(14), list(range(1, 15)), ab_woche=15)
+    assert r15["wochen"] == {"naechste3": [16, 17], "rest": [], "sos_po": [16, 17]}
+    assert r15["through_week"] == 14 and [t["f"] for t in r15["teams"]] == [t["f"] for t in r14["teams"]]
+    r17 = dst.compute_dst(FakeSeason(14), list(range(1, 15)), ab_woche=17)
+    assert r17["wochen"] == {"naechste3": [], "rest": [], "sos_po": []}
+    assert all(t["naechste3"] is None and t["sos_po"] is None for t in r17["teams"])
 
 
 def test_attrappe_fehlende_daten():

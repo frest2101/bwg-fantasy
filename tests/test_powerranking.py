@@ -251,7 +251,7 @@ def test_offene_spiele(ssn):
 def test_simulation_summen(result):
     """Σ Playoff = 6, Σ Division = 2, Σ Bye = 2, Σ Restsiege = offene Spiele (jedes verteilt genau einen Sieg)."""
     assert result["sim_info"] == {"runs": 2000, "seed": 202602, "offene_spiele": OFFENE_SPIELE_W2,
-                                  "playoff_teams": 6, "byes": 2}
+                                  "playoff_teams": 6, "byes": 2, "stand_woche": 2, "playoff_entschieden": 0}
     for name in pr.SEEDINGS:
         sim = result["sim"][name]
         assert sorted(sim) == list(range(1, 11))
@@ -261,6 +261,14 @@ def test_simulation_summen(result):
         assert sum(t["restsiege"] for t in sim.values()) == OFFENE_SPIELE_W2
         for pos in range(6):
             assert sum(t["seeds"][pos] for t in sim.values()) == 1
+    # Endplatz (Stufe 4): nur „liga“; je Platz und je Team Σ = 1, Pick = 11 − Endplatz, vor W14 keine feste Reihenfolge
+    liga = result["sim"]["liga"]
+    assert all("endplatz" not in t for t in result["sim"]["espn"].values()) and result["endplatz"] is None
+    assert all(sum(t["endplatz"]) == 1 for t in liga.values())
+    assert all(sum(t["endplatz"][p] for t in liga.values()) == 1 for p in range(10))
+    assert sum(t["pick"] for t in liga.values()) == 55 and sum(t["pick1"] for t in liga.values()) == 1
+    assert sum(t["pick_top3"] for t in liga.values()) == 3
+    assert all(t["playoff"] == sum(t["endplatz"][:6]) for t in liga.values())   # Plätze 1–6 = Playoff-Feld
 
 
 def test_simulation_stimmig(result):
@@ -509,3 +517,172 @@ def test_ausgabe_decimal_und_json(result):
     assert set(team) == {"mu", "se", "p", "p_quelle", "e", "rang", "rang_vorwoche", "trend", "kernsatz", "verlauf"}
     assert set(result) >= {"l_bar", "l_bar_2025", "sigma", "teams", "sim", "espn_sim"}
     json.dumps(rounded(result), ensure_ascii=False)
+
+
+# ---------------------------------------------------------------- Endplatz: Bracket W15–17 (Stufe 4, konstruiert)
+
+SEEDS = list(range(1, 11))   # erfundene team_ids = Seed, damit die Erwartung lesbar bleibt
+WEEKS = [15, 16, 17]
+
+
+def higher(r, a, b):
+    return min(a, b)          # der höhere Seed gewinnt immer
+
+
+def lower(r, a, b):
+    return max(a, b)          # der niedrigere Seed gewinnt immer
+
+
+def test_bracket_hoeherer_seed_gewinnt():
+    """Ohne Überraschung: Plätze 1–6 nach Seed; die Leiter wechselt jede Runde (Sieger 9–10 rückt auf Platz 8,
+    Verlierer 7–8 ab auf 9) und endet nach drei Runden mit 7, 9, 8, 10."""
+    assert pr.play_bracket(SEEDS, higher) == [1, 2, 3, 4, 5, 6, 7, 9, 8, 10]
+
+
+def test_bracket_niedrigerer_seed_gewinnt():
+    """Immer die Überraschung: W15 6 schlägt 3, 5 schlägt 4; W16 5 schlägt 1, 6 schlägt 2, Platz 5: 4 schlägt 3;
+    W17 Finale 6 schlägt 5, Platz 3: 2 schlägt 1. Leiter: [8, 10, 7, 9] → [10, 9, 8, 7] → [10, 8, 9, 7]."""
+    assert pr.play_bracket(SEEDS, lower) == [6, 5, 2, 1, 4, 3, 10, 8, 9, 7]
+
+
+def test_bracket_runden_und_paarungen():
+    calls = []
+    pr.play_bracket(SEEDS, lambda r, a, b: calls.append((r, frozenset((a, b)))) or min(a, b))
+    assert [r for r, _ in calls] == sorted(r for r, _ in calls)          # Runde für Runde
+    by_round = {r: {p for q, p in calls if q == r} for r in range(3)}
+    assert by_round[0] == {frozenset(p) for p in ((3, 6), (4, 5), (7, 8), (9, 10))}   # Seeds 1–2 Freilos
+    assert by_round[1] == {frozenset(p) for p in ((1, 4), (2, 3), (5, 6), (7, 9), (8, 10))}
+    assert by_round[2] == {frozenset(p) for p in ((1, 2), (3, 4), (7, 8), (9, 10))}
+
+
+def entschieden(seeds, game) -> dict:
+    """Alle Spiele eines Bracket-Verlaufs als „entschieden laut ESPN“ (decided wie pr.playoff_games)."""
+    out = {}
+
+    def rec(r, a, b):
+        w = game(r, a, b)
+        out[(WEEKS[r], frozenset((a, b)))] = w
+        return w
+    pr.play_bracket(seeds, rec)
+    return out
+
+
+def test_trace_bracket_offen_fest_und_unentschieden():
+    alle = entschieden(SEEDS, lower)
+    w15 = {k: v for k, v in alle.items() if k[0] == 15}
+    known, places, ties = pr.trace_bracket(SEEDS, w15, WEEKS)
+    # nach W15: Paarungen W15 und W16 stehen fest, W17 noch nicht; kein fester Endplatz
+    assert set(known) == {15, 16} and places is None and ties == []
+    assert known[16] == {frozenset(p) for p in ((1, 5), (2, 6), (3, 4), (8, 10), (7, 9))}
+    known, places, ties = pr.trace_bracket(SEEDS, alle, WEEKS)
+    assert set(known) == {15, 16, 17} and places == [6, 5, 2, 1, 4, 3, 10, 8, 9, 7]
+    # ESPN meldet ein Unentschieden im Finale: kein fester Endplatz, Warnung statt geratenem Platz (Beschluss 8)
+    _, places, ties = pr.trace_bracket(SEEDS, alle | {(17, frozenset((5, 6))): pr.TIE}, WEEKS)
+    assert places is None and ties == [(17, 5, 6)]
+    warn = pr.bracket_warnings({}, {}, ties)
+    assert len(warn) == 1 and "Unentschieden" in warn[0] and "Stephan fragen" in warn[0]
+
+
+def test_bracket_warnung_bei_abweichender_paarung():
+    known, _, _ = pr.trace_bracket(SEEDS, {}, WEEKS)
+    assert set(known) == {15}                                          # ohne Ergebnis steht nur W15 fest
+    espn = {15: {frozenset(p) for p in ((3, 6), (4, 5), (7, 8), (9, 10))}}
+    assert pr.bracket_warnings(known, espn, []) == []
+    espn = {15: {frozenset(p) for p in ((3, 4), (5, 6), (7, 8), (9, 10))}}   # ESPN setzt anders (erfunden)
+    warn = pr.bracket_warnings(known, espn, [])
+    assert len(warn) == 1 and warn[0].startswith("Playoffs W15") and "3–4" in warn[0] and "3–6" in warn[0]
+    assert pr.bracket_warnings(known, {16: set()}, []) == []           # Woche, die nicht feststeht: kein Vergleich
+
+
+def test_playoff_games_aus_dem_spielplan():
+    """Erfundener Spielplan: Regular Season zählt nicht, Freilos ohne Gast fehlt, Sieger laut ESPN-Feld winner (auch bei
+    weniger Punkten), UNDECIDED nur als Paarung."""
+    settings = {"scheduleSettings": {"matchupPeriodCount": 14, "matchupPeriods": {str(p): [p] for p in range(1, 18)}}}
+    side = lambda t, pts: {"teamId": t, "totalPoints": pts}  # noqa: E731
+    schedule = [{"matchupPeriodId": 14, "home": side(1, 100), "away": side(2, 90), "winner": "HOME"},
+                {"matchupPeriodId": 15, "home": side(1, 0), "winner": "UNDECIDED"},                 # Freilos
+                {"matchupPeriodId": 15, "home": side(3, 80), "away": side(6, 95), "winner": "HOME"},  # Sieger laut ESPN
+                {"matchupPeriodId": 15, "home": side(4, 99), "away": side(5, 99), "winner": "TIE"},
+                {"matchupPeriodId": 16, "home": side(1, 0), "away": side(6, 0), "winner": "UNDECIDED"}]
+    decided, pairs = pr.playoff_games(schedule, settings)
+    assert decided == {(15, frozenset((3, 6))): 3, (15, frozenset((4, 5))): pr.TIE}
+    assert pairs == {15: {frozenset((3, 6)), frozenset((4, 5))}, 16: {frozenset((1, 6))}}
+    assert pr.playoff_weeks(settings) == WEEKS
+
+
+def liga_teams():
+    """Wie test_seeding_liga_top3_je_division: Seeding „liga“ 1, 10, 3, 5, 2, 4, Trostrunde 7, 9, 6, 8."""
+    division = {t: 1 if t % 2 else 2 for t in range(1, 11)}
+    wins = {t: 2 if t % 2 else 0 for t in range(1, 11)}
+    wins[10] = 1
+    return konstruiert(wins, division)
+
+
+LIGA_SEEDS = [1, 10, 3, 5, 2, 4, 7, 9, 6, 8]
+SETTINGS_PO = {"scheduleSettings": {"matchupPeriodCount": 14, "playoffTeamCount": 6,
+                                    "matchupPeriods": {str(p): [p] for p in range(1, 18)}}}
+
+
+def test_endplatz_alle_spiele_entschieden():
+    """Sind alle Playoff-Spiele entschieden, ist die Verteilung in jedem Lauf dieselbe: Endplatz wie im Bracket,
+    Pick = 11 − Endplatz; final_places liefert dieselbe Reihenfolge und die Draft-Reihenfolge umgekehrt."""
+    rank = {t: i for i, t in enumerate(LIGA_SEEDS)}
+    decided = entschieden(LIGA_SEEDS, lambda r, a, b: a if rank[a] > rank[b] else b)   # immer der niedrigere Seed
+    expected = pr.trace_bracket(LIGA_SEEDS, decided, WEEKS)[1]
+    assert expected[0] == 4                                             # Seed 6 (Team 4) wird Meister
+    mu = {t: Decimal(200) for t in range(1, 11)}
+    liga = pr.simulate(liga_teams(), [], mu, Decimal(35), runs=50, seed=3,
+                       bracket={"weeks": WEEKS, "entschieden": decided})["liga"]
+    for place, t in enumerate(expected):
+        assert liga[t]["endplatz"][place] == 1 and liga[t]["pick"] == 10 - place
+    assert liga[expected[-1]]["pick1"] == 1 and {t for t in liga if liga[t]["pick_top3"] == 1} == set(expected[-3:])
+    pairs = {}
+    for w, p in decided:
+        pairs.setdefault(w, set()).add(p)
+    assert pr.final_places(liga_teams(), SETTINGS_PO, decided, pairs) == {
+        "fest": expected, "draft": expected[::-1], "abweichung": [], "espn_bestaetigt": None, "warnungen": []}
+    # ESPN bestätigt die Endplätze (rankCalculatedFinal) bzw. weicht ab: dann keine feste Reihenfolge, Warnung
+    ranks = {t: place for place, t in enumerate(expected, start=1)}
+    assert pr.final_places(liga_teams(), SETTINGS_PO, decided, pairs, ranks)["espn_bestaetigt"] is True
+    swapped = ranks | {expected[6]: 8, expected[7]: 7}
+    off = pr.final_places(liga_teams(), SETTINGS_PO, decided, pairs, swapped)
+    assert (off["fest"], off["draft"], off["abweichung"], off["espn_bestaetigt"]) == (None, None, [17], False)
+    assert any("rankFinal" in w for w in off["warnungen"])
+    # ESPN führt in W17 ein weiteres Spiel der beiden W15-Verlierer (Spiel um Platz 5 erst in W17?): Abweichung von der
+    # Annahme – keine feste Reihenfolge, obwohl jedes angenommene Spiel entschieden ist (Befund Gegenprüfung 01.10.2026)
+    losers = next(p for (w, p), win in decided.items() if w == 16 and not ({LIGA_SEEDS[0], LIGA_SEEDS[1]} & p))
+    extra = pairs | {17: pairs[17] | {losers}}
+    dev = pr.final_places(liga_teams(), SETTINGS_PO, decided, extra)
+    assert (dev["fest"], dev["draft"], dev["abweichung"]) == (None, None, [17]) and len(dev["warnungen"]) == 1
+
+
+def test_endplatz_simuliert_staerker_gewinnt():
+    """Nichts entschieden, sehr große Stärkeunterschiede und kleine Streuung: Es gewinnt das stärkere Team. Stärke
+    absteigend nach Seed → Plätze wie „höherer Seed gewinnt“. Die Läufe der Regular Season bleiben dieselben."""
+    mu = {t: Decimal(1000 - 50 * i) for i, t in enumerate(LIGA_SEEDS)}
+    res = pr.simulate(liga_teams(), [], mu, Decimal("0.01"), runs=40, seed=5,
+                      bracket={"weeks": WEEKS, "entschieden": {}})["liga"]
+    expected = pr.play_bracket(LIGA_SEEDS, lambda r, a, b: a if LIGA_SEEDS.index(a) < LIGA_SEEDS.index(b) else b)
+    assert [next(t for t in res if res[t]["endplatz"][p] == 1) for p in range(10)] == expected
+    plain = pr.simulate(liga_teams(), [], mu, Decimal("0.01"), runs=40, seed=5)["liga"]
+    assert all(res[t]["seeds"] == plain[t]["seeds"] and "endplatz" not in plain[t] for t in plain)
+
+
+def test_endplatz_nur_bei_passendem_bracket():
+    """Nur 10 Teams mit 6 Playoff-Teams und drei Playoff-Wochen; sonst keine Endplatz-Verteilung und kein final_places."""
+    mu = {t: Decimal(200) for t in range(1, 11)}
+    bracket = {"weeks": WEEKS, "entschieden": {}}
+    four = pr.simulate(liga_teams(), [], mu, Decimal(35), runs=5, seed=1, playoff_teams=4, bracket=bracket)["liga"]
+    two = pr.simulate(liga_teams(), [], mu, Decimal(35), runs=5, seed=1, bracket={"weeks": [15, 16], "entschieden": {}})
+    assert all("endplatz" not in v for v in four.values()) and all("endplatz" not in v for v in two["liga"].values())
+    four_settings = {"scheduleSettings": dict(SETTINGS_PO["scheduleSettings"], playoffTeamCount=4)}
+    assert pr.final_places(liga_teams(), four_settings, {}, {}) == {"fest": None, "draft": None, "abweichung": [],
+                                                                   "espn_bestaetigt": None, "warnungen": []}
+
+
+def test_espn_endplatz_nur_wenn_vollstaendig():
+    teams = [{"id": t, "rankCalculatedFinal": 11 - t, "rankFinal": 0} for t in range(1, 11)]
+    assert pr.espn_ranks(teams) == {t: 11 - t for t in range(1, 11)}
+    assert pr.espn_ranks([dict(t, rankFinal=t["id"]) for t in teams]) == {t: t for t in range(1, 11)}   # Handkorrektur
+    assert pr.espn_ranks([dict(t, rankCalculatedFinal=0) for t in teams]) is None                       # vor Saisonende
+    assert pr.espn_ranks([]) is None

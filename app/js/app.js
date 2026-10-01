@@ -93,13 +93,18 @@ function header() {
   const ds = S.man.datenstand || {};
   const btn = $('stand');
   const wk = n => S.weeks.find(w => w.week === n);
+  // Stand-Woche: in den Playoffs die letzte finale Playoff-Woche (Stufe 4), sonst die letzte gewertete Woche
+  const po = ds.playoff_woche ?? null, sw = po ?? S.tw;
+  const fertig = po != null && po >= (S.weeks.at(-1)?.week ?? 17);   // nach W17 kein Wochenabruf bis zum Saisonwechsel
+  // Dienstag, an dem Woche n beginnt; nach der letzten Woche des Spielplans eine Woche weiter (Abruf nach W17)
+  const start = n => wk(n)?.start ?? (wk(n - 1) ? new Date(Date.parse(wk(n - 1).start + 'T12:00:00Z') + 7 * 864e5).toISOString().slice(0, 10) : null);
   // nächster Wochenabruf: Dienstag nach der laufenden Woche, 08:30 UTC
-  const nxt = wk(S.tw + 2)?.start;
+  const nxt = fertig ? null : start(sw + 2);
   const due = nxt ? new Date(nxt + 'T08:30:00Z') : null;
   const alt = due && Date.now() > due.getTime() + 27.5 * 36e5;     // Mittwoch 12:00 UTC ohne neue Woche
-  btn.textContent = S.tw ? `nach W${S.tw}` : 'vor W1';
+  btn.textContent = sw ? `nach W${sw}` : 'vor W1';
   btn.classList.toggle('alt', !!alt);
-  btn.setAttribute('aria-label', `Datenstand: nach Woche ${S.tw}${alt ? ', Daten älter als erwartet' : ''}`);
+  btn.setAttribute('aria-label', `Datenstand: nach Woche ${sw}${alt ? ', Daten älter als erwartet' : ''}`);
   btn.hidden = false;
   const pool = ds.pool_woche != null ? wk(ds.pool_woche + 1)?.start : null;
   // Tagesstand (Tageslauf): Besitz, Verletzung, Projektion der nächsten Woche und Wetter; davor nur der Wochenstand
@@ -108,12 +113,13 @@ function header() {
     alt ? h('p', {class: 'warn'}, 'Daten älter als erwartet – der Wochenabruf ist noch nicht durchgelaufen.') : null,
     h('dl', null,
       h('dt', null, 'Wertung'), h('dd', null, `nach W${ds.woche_final ?? S.tw} (final)`),
-      h('dt', null, 'Projektionen ROS'), h('dd', null, ds.ros_nach_woche != null ? `Stand nach W${ds.ros_nach_woche}` : `ab Wochenabruf W${S.tw + 1}`),
+      po ? [h('dt', null, 'Playoffs'), h('dd', null, `nach W${po} (final)`)] : null,
+      h('dt', null, 'Projektionen ROS'), h('dd', null, ds.ros_nach_woche != null ? `Stand nach W${ds.ros_nach_woche}` : `ab Wochenabruf W${sw + 1}`),
       h('dt', null, ds.pool_stand ? 'Besitz, Verletzung, Projektion nächste Woche' : 'Besitz, Verletzung'), h('dd', null, tag),
       h('dt', null, 'Wetter'), h('dd', null, ds.wetter_stand ? `Tagesstand ${U.stamp(ds.wetter_stand)}` : '–'),
       h('dt', null, 'Letzter Move'), h('dd', null, ds.transaktionen_bis ? U.stamp(ds.transaktionen_bis) : '–'),
       h('dt', null, 'Nächster Tageslauf'), h('dd', null, U.stamp(nextDaily())),
-      h('dt', null, 'Nächster Wochenabruf'), h('dd', null, U.stamp(due))),
+      h('dt', null, 'Nächster Wochenabruf'), h('dd', null, fertig ? '– (Saison beendet, erst wieder nach dem Saisonwechsel)' : U.stamp(due))),
     h('p', {class: 'note'}, 'Wertung und Projektionen rechnen nur mit abgeschlossenen Wochen; der Tageslauf frischt Besitz, Verletzung, Transaktionen und Wetter stündlich vormittags und abends auf. ', h('a', {href: '#lesart/aktualisierung'}, 'Mehr zur Aktualisierung')),
   ]);
   const tb = $('theme'), de = document.documentElement, mq = matchMedia('(prefers-color-scheme: dark)');

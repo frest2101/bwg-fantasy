@@ -95,9 +95,11 @@ def scoring_points(settings: dict) -> dict[str, Decimal]:
 
 # ---------------------------------------------------------------- Einstieg
 
-def compute_matchup(ssn: rawdata.Season, weeks: list[int]) -> dict:
+def compute_matchup(ssn: rawdata.Season, weeks: list[int], ab_woche: int | None = None) -> dict:
     """Positions-Matchup nach Woche N = weeks[-1]: je NFL-Defense und Position Z, r, F und Rang, dazu der
     NFL-Spielplan und F/Rang je Position für die Spielerwerte (player_mu). weeks = abgeschlossene Wochen 1…N.
+    ab_woche = Stand-Woche der Vorausschau (N+1, nächste 3, Rest, SoS; in den Playoffs die letzte finale Woche,
+    Stufe 4), Standard N; Z, F und Rang bleiben beim Stand nach N. Nach W17 gibt es kein N+1 mehr (n1 None).
 
     Vorwoche von W1 ist der Stand vor der Saison (n = 0 für alle). Zahlen als ungerundete Decimal; beim Export mit
     zahlen.rounded(…, precision=PRECISION) runden. Warnungen (Liste „warnungen“) gibt compute.py auf stderr aus.
@@ -133,10 +135,12 @@ def compute_matchup(ssn: rawdata.Season, weeks: list[int]) -> dict:
     warnings += found
     states = {pos: {w: dst.season_state(games26[pos], w, r25[pos]) for w in range(0, through + 1)} for pos in POSITIONS}
 
-    regular, playoffs = dst.season_weeks(ssn.settings())
-    all_weeks = range(1, max(regular + playoffs) + 1)
-    next_weeks = [w for w in range(through + 1, through + dst.NEXT_WEEKS + 1) if w in all_weeks]
-    rest_weeks = [w for w in regular if w > through]
+    regular, all_playoffs = dst.season_weeks(ssn.settings())
+    all_weeks = range(1, max(regular + all_playoffs) + 1)
+    start = ab_woche or through
+    next_weeks = [w for w in range(start + 1, start + dst.NEXT_WEEKS + 1) if w in all_weeks]
+    rest_weeks = [w for w in regular if w > start]
+    playoffs = [w for w in all_playoffs if w > start]   # gespielte Playoff-Wochen fallen aus der SoS heraus
 
     defenses = []
     for t in sorted(nfl):
@@ -160,7 +164,7 @@ def compute_matchup(ssn: rawdata.Season, weeks: list[int]) -> dict:
         "ligaschnitt": {NAMES[pos]: {str(ssn.season - 1): ls25[pos], str(ssn.season): states[pos][through]["ls26"]}
                         for pos in POSITIONS},
         "formel": FORMEL,
-        "wochen": {"n1": through + 1 if through + 1 in all_weeks else None, "naechste3": next_weeks,
+        "wochen": {"n1": start + 1 if start + 1 in all_weeks else None, "naechste3": next_weeks,
                    "rest": rest_weeks, "sos_po": playoffs},
         "defenses": defenses,
         "spielplan": {t: dict(nfl[t].opponents) for t in sorted(nfl)},

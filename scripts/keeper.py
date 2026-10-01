@@ -246,8 +246,8 @@ def position_ages(rows: list[dict]) -> dict[int, dict]:
 def age_profile(rows: list[dict], weight: dict[int, Decimal], pos_age: dict[int, dict]) -> dict | None:
     """Altersprofil einer Gruppe von Kaderzeilen (ein Team oder die Liga); None ohne einen Spieler mit Alter.
 
-    kader = Ø Alter; ros = mit den Gewichten weight (Restpunkte laut ESPN-Projektion) gewichtet – das Alter der
-    Spieler, von denen die Punkte kommen sollen; bereinigt = Ø (Alter − Liga-Schnitt der Position, pos_age), weil
+    kader = Ø Alter; ros = mit den Gewichten weight (age_weights: Restpunkte laut ESPN-Projektion, ohne sie der
+    Marktwert) gewichtet – das Alter der Spieler, von denen die Punkte kommen sollen (bzw. in denen der Wert steckt); bereinigt = Ø (Alter − Liga-Schnitt der Position, pos_age), weil
     Quarterbacks und Kicker im Schnitt älter sind; bereinigt_ros = dasselbe gewichtet. Beide ros-Werte None ohne
     Gewichte. jung = Alter unter JUNG_UNTER, alt = ab ALT_AB, verglichen wie angezeigt (auf eine Stelle, round half
     up); rookies und zweites_jahr nach nfl_jahr.
@@ -277,6 +277,15 @@ def ros_weights(spieler: dict) -> tuple[dict[int, Decimal], str | None]:
         return {}, None
     key = "ros" if after < players.LAST_REGULAR_WEEK else "ros_po"
     return {pid: p[key] for pid, p in spieler["players"].items() if p.get(key) is not None}, key
+
+
+def age_weights(spieler: dict, werte: dict[int, dict]) -> tuple[dict[int, Decimal], str | None]:
+    """Gewichte des Altersprofils: ROS (ros_weights); ohne ROS-Projektion – vor dem ersten ROS-Auszug und nach W17,
+    also in der Offseason (Stufe 4) – der Marktwert ("wert"); leer und None ohne beides."""
+    weight, key = ros_weights(spieler)
+    if key is None and werte:
+        return {pid: Decimal(w["wert"]) for pid, w in werte.items()}, "wert"
+    return weight, key
 
 
 # ---------------------------------------------------------------- Marktwert (Stufe 3)
@@ -351,7 +360,8 @@ def value_rows(werte: dict[int, dict], pool: dict[int, dict], kader: list[dict],
 
 # ---------------------------------------------------------------- Einstieg
 
-def compute_keeper(ssn: rawdata.Season, weeks: list[int], spieler: dict, names: dict[int, str]) -> dict | None:
+def compute_keeper(ssn: rawdata.Season, weeks: list[int], spieler: dict, names: dict[int, str],
+                   stand_week: int | None = None) -> dict | None:
     """Keeper-Bilanz der Saison; None, solange es keinen abgeschlossenen Draft gibt.
 
     teams (nach team_id) und liga: keeper / keeper_da (Keeper-Picks und wie viele davon noch als Keeper im Kader
@@ -360,8 +370,9 @@ def compute_keeper(ssn: rawdata.Season, weeks: list[int], spieler: dict, names: 
     des Kaders heute, None ohne nflverse-Stammdaten; liga zusätzlich positionen = position_ages).
     kader: Herkunft je Kaderspieler heute (roster_origins), dazu name, pos, nfl, g und avg (Saison) aus dem Wochenpool,
     vj_delta = avg − vj_avg (Punkte je Spiel gegen das Vorjahr, None ohne einen der beiden Werte) sowie alter und
-    nfl_jahr (add_ages). Kopf: alter_stichtag (Dienstag nach der letzten gewerteten Woche) und alter_gewicht
-    ("ros" oder "ros_po", None ohne ROS-Auszug), beide None ohne Stammdaten.
+    nfl_jahr (add_ages). Kopf: alter_stichtag (Dienstag nach der letzten gewerteten Woche, in den Playoffs nach
+    stand_week) und alter_gewicht ("ros" oder "ros_po"; ohne ROS-Projektion "wert", ohne beides None), beide None ohne
+    Stammdaten.
     Marktwert (Stufe 3, FantasyCalc): je Kaderzeile value_fields (wert … wert_ue); je Team marktwert (value_profile),
     liga.marktwert (league_values); Kopf keeper_linie und marktwert_stand (Abrufzeit des Auszugs); werte = alle
     Spieler mit Wert (value_rows). Ohne Auszug sind alle Werte None und werte leer.
@@ -388,12 +399,12 @@ def compute_keeper(ssn: rawdata.Season, weeks: list[int], spieler: dict, names: 
         k.update(name=names.get(k["id"]) or (info["name"] if info else None), pos=info["pos"] if info else None,
                  nfl=info["nfl"] if info else None, g=info["games"] if info else None, avg=avg,
                  vj_delta=avg - k["vj_avg"] if avg is not None and k["vj_avg"] is not None else None)
-    # Alter zum Dienstag nach der letzten gewerteten Woche (kein „heute“: die Rechnung bleibt reproduzierbar)
+    # Alter zum Dienstag nach der letzten gewerteten Woche – in den Playoffs der Stand-Woche (Stufe 4) – (kein „heute“:
+    # die Rechnung bleibt reproduzierbar)
     stamm = nflverse.stammdaten(ssn.nflverse())
-    day = ef.WEEK1_START[ssn.season] + timedelta(weeks=weeks[-1])
+    day = ef.WEEK1_START[ssn.season] + timedelta(weeks=stand_week or weeks[-1])
     add_ages(kader, stamm, day, ssn.season)
     pos_age = position_ages(kader)
-    weight, weight_key = ros_weights(spieler)
     # Marktwert (Stufe 3): Keeper-Linie = Wert des (Keeper je Team × Teams)-wertvollsten Kaderspielers heute
     team_ids = [t["id"] for t in ssn.teams()]
     keeper_zahl = (ssn.settings().get("draftSettings") or {}).get("keeperCount")
@@ -403,6 +414,7 @@ def compute_keeper(ssn: rawdata.Season, weeks: list[int], spieler: dict, names: 
                        keeper_zahl * len(team_ids) if keeper_zahl else None)
     for k in kader:
         k.update(value_fields(werte.get(k["id"]), line))
+    weight, weight_key = age_weights(spieler, werte)
 
     pick_rows = []
     for no in sorted(picks):

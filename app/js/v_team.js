@@ -179,7 +179,9 @@ function roster(box, t, P, all, W, nflTxt, K, kp) {
   const last = (P.weeks || []).length - 1;
   const rows = all.filter(p => p.team === t.team_id)
     .sort((a, b) => POS.indexOf(a.pos) - POS.indexOf(b.pos) || (b.avg ?? -1) - (a.avg ?? -1));
-  const ros = 'ab Wochenabruf W' + (S.tw + 1);
+  // Grund für „–“ bei ROS/Spiel: noch kein Auszug, Saisonende (ROS nach W17, Stufe 4) oder keine Projektion des Spielers
+  const ros = P.ros_nach_woche == null ? 'ab Wochenabruf W' + (S.tw + 1)
+    : P.ros_nach_woche >= (S.weeks.at(-1)?.week ?? 17) ? 'Saison beendet, keine Restwoche' : 'keine Projektion';
   // Herkunft (keeper.json, Kader heute): nur Zeilen dieses Teams, sonst wäre ein eben gewechselter Spieler falsch beschriftet
   const org = K ? kp.byPlayer(K) : null;
   const mine = p => { const o = org.get(p.id); return o && o.team === t.team_id ? o : null; };

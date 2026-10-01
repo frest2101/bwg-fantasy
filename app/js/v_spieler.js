@@ -15,6 +15,8 @@ export const nflTxt = p => p.nfl || 'FA';
 export const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
   .replace(/-/g, ' ').replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
 const spiele = n => `${n ?? 0} ${n === 1 ? 'Spiel' : 'Spiele'}`;
+// nach der letzten Woche (ROS nach W17, Stufe 4) gibt es keine Restwoche mehr – kein „ab Wochenabruf“, kein Ersatzniveau
+const seasonEnd = P => P.ros_nach_woche != null && P.ros_nach_woche >= (S.weeks.at(-1)?.week ?? 17);
 // Rückweg-Ziele für den Link oben im Spielerdetail
 const BACK = {spieler: 'Spielerliste', team: 'Team', moves: 'Moves', spielplan: 'Spielplan', waiver: 'Waiver', dst: 'D/ST-Faktoren',
   tabelle: 'Tabelle', rekorde: 'Rekorde', ranking: 'Ranking', keeper: 'Keeper'};
@@ -36,7 +38,7 @@ export async function render(box, ctx, r) {
   const kp = detail ? await ctx.mod('v_keeper').catch(() => null) : null;
   if (!r.alive()) return;
   const svg = await ctx.mod('svg');
-  const rosWhy = P.ros_nach_woche == null ? `ab Wochenabruf W${S.tw + 1}` : 'keine Projektion';
+  const rosWhy = P.ros_nach_woche == null ? `ab Wochenabruf W${S.tw + 1}` : seasonEnd(P) ? 'Saison beendet, keine Restwoche' : 'keine Projektion';
   const rows = merge(P, W);
   const wline = wx ? p => { const g = wx.gameOf(WX, p.nfl); return g ? wx.line(g) : null; } : null;
   // Herkunft nur, wenn keeper.json den Spieler beim selben Team führt wie der Tagesstand
@@ -44,7 +46,8 @@ export async function render(box, ctx, r) {
     const o = kp.byPlayer(K).get(p.id);
     return o && o.team === p.team ? [kp.herkunft(o, K, true), kp.alterTxt(o)] : null;
   } : null;
-  if (detail) one(box, h1, P, W, rows, r, svg, rosWhy, wline, origin, kp); else list(box, W, rows, r, rosWhy, P.ersatz || {}, P.ros_nach_woche != null);
+  if (detail) one(box, h1, P, W, rows, r, svg, rosWhy, wline, origin, kp);
+  else list(box, W, rows, r, rosWhy, P.ersatz || {}, P.ros_nach_woche != null && !seasonEnd(P));
 }
 
 // Wochenwerte je Spieler mit dem Tagesstand überlagern (Schlüssel: Spieler-ID); ohne Tagesstand unverändert.
@@ -285,8 +288,8 @@ function one(box, h1, P, W, rows, r, svg, rosWhy, wline, origin, kp) {
       U.tile('ROS', U.val(p.ros, U.num, rosWhy), U.ok(p.rest_g) ? `${p.rest_g} Restspiele` : null, 'ros'),
       U.tile('ROS Playoffs', U.val(p.ros_po, U.num, rosWhy), null, 'ros-po'),
       U.tile('ROS-Rang', U.val(p.ros_rang, v => `${p.pos} ${v}`, rosWhy), null, 'ros-rang'),
-      U.tile('Ersatzniveau', U.val(ers, U.num, P.ros_nach_woche != null ? 'kein freier Spieler der Position' : rosWhy), p.pos, 'ersatz'),
-      U.tile('ROS über Ersatz', U.val(p.ros_ue, U.sgn, P.ros_nach_woche != null && !U.ok(ers) ? 'kein freier Spieler der Position' : rosWhy), null, 'ros-ue')),
+      U.tile('Ersatzniveau', U.val(ers, U.num, P.ros_nach_woche != null && !seasonEnd(P) ? 'kein freier Spieler der Position' : rosWhy), p.pos, 'ersatz'),
+      U.tile('ROS über Ersatz', U.val(p.ros_ue, U.sgn, P.ros_nach_woche != null && !seasonEnd(P) && !U.ok(ers) ? 'kein freier Spieler der Position' : rosWhy), null, 'ros-ue')),
     h('p', {class: 'note'}, 'Alle Projektionen sind ESPN-Schätzungen. ', U.ib('projektionen', '')));
   matchup(box, p, P, wline?.(p));
 }

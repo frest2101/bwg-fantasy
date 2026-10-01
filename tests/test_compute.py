@@ -176,6 +176,60 @@ def test_nur_regular_season():
         compute.completed_weeks(2026, through=15)
 
 
+def test_finale_playoff_wochen(monkeypatch):
+    """Playoff-Stand (Stufe 4): W15 … W17 ohne Lücke, nur nach ganz gerechneter Regular Season, höchstens bis through
+    (konstruiert: is_final aus einer erfundenen Menge finaler Wochen)."""
+    regular = list(range(1, 15))
+    for final, through, expected in (({15, 16}, None, [15, 16]), ({15, 17}, None, [15]), ({16, 17}, None, []),
+                                     ({15, 16, 17}, 16, [15, 16]), ({15, 16, 17}, None, [15, 16, 17])):
+        monkeypatch.setattr(ef, "is_final", lambda season, week, final=final: week in final)
+        assert compute.final_playoff_weeks(2026, regular, 14, through) == expected
+    assert compute.final_playoff_weeks(2026, list(range(1, 14)), 14) == []   # Regular Season noch nicht ganz gerechnet
+    assert compute.final_playoff_weeks(2026, [], 14) == []
+
+
+def test_playoff_stand_verdrahtung(monkeypatch):
+    """Verdrahtung des Playoff-Stands mit echten Dateien (konstruierte Lage): Die Regular Season endet hier bei W2,
+    W3 gilt als finale Playoff-Woche. Tabelle und Score bleiben bei W2; ROS, Alters-Stichtag und Seed kommen aus W3."""
+    import app_export
+    monkeypatch.setattr(compute, "last_regular_week", lambda season: 2)
+    monkeypatch.setattr(ef, "is_final", lambda season, week: week == 3)
+    res = compute.compute_season(2026)
+    assert (res["through_week"], res["playoff_woche"], res["ros_after_week"]) == (2, 3, 3)
+    assert all(t["games"] == 2 for t in res["teams"]) and [w["week"] for w in res["weeks"]] == [1, 2]
+    info = res["power_ranking"]["sim_info"]
+    assert (info["seed"], info["stand_woche"], info["playoff_entschieden"]) == (202603, 3, 0)
+    assert res["keeper"]["alter_stichtag"] in (None, "2026-09-29")          # Dienstag nach der Stand-Woche W3
+    # Vorausschau von Positions-Matchup und D/ST ab der Stand-Woche, Faktoren beim Stand W2
+    assert res["matchup"]["wochen"]["n1"] == 4 and res["matchup"]["wochen"]["naechste3"] == [4, 5, 6]
+    assert res["matchup"]["through_week"] == 2 and res["dst"]["wochen"]["naechste3"] == [4, 5, 6]
+    manifest = json.loads(app_export.render(app_export.build(res), res)["manifest.json"])
+    assert manifest["datenstand"]["playoff_woche"] == 3 and manifest["datenstand"]["woche_final"] == 2
+
+
+def test_saisonende_verdrahtung(monkeypatch):
+    """Saisonende über den echten Rechenweg (konstruierte Lage): Regular Season bis W2, W3 ist die letzte Playoff-Woche
+    und hat – wie W17 – keinen ROS-Auszug. compute_season und der ganze App-Export laufen durch; ROS nach der letzten
+    Woche ohne Werte, kein Bedarf und kein Profil, Altersgewicht nach Marktwert, sobald es einen Auszug gibt."""
+    import app_export
+    import players
+    original = rawdata.Season.ros
+    monkeypatch.setattr(compute, "last_regular_week", lambda season: 2)
+    monkeypatch.setattr(ef, "is_final", lambda season, week: week == 3)
+    monkeypatch.setattr(players, "LAST_PLAYOFF_WEEK", 3)
+    monkeypatch.setattr(rawdata.Season, "ros", lambda self: None if self.through == 3 else original(self))
+    res = compute.compute_season(2026)
+    assert (res["playoff_woche"], res["ros_after_week"]) == (3, 3)
+    assert all(p["ros"] is None and p["ros_pro_spiel"] is None for p in res["players"]["players"].values())
+    assert app_export.need_basis(res) is None
+    waiver = app_export.build_waiver(res)
+    if waiver:
+        assert waiver["bedarf"] is None and waiver["profil"] is None and waiver["bedarf_basis"] is None
+    assert res["keeper"]["alter_gewicht"] in (None, "wert")
+    content = app_export.render(app_export.build(res), res)
+    assert json.loads(content["manifest.json"])["datenstand"]["ros_nach_woche"] == 3
+
+
 def test_laufende_woche_zaehlt_nicht(tmp_path, monkeypatch):
     """Konstruierte Datenlage (unabhängig vom wachsenden Repo-Stand): W1 abgeschlossen, W2 läuft noch."""
     for week in (1, 2):
