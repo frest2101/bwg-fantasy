@@ -7,6 +7,7 @@ import gzip
 import hashlib
 import json
 from collections import Counter
+from datetime import datetime, timezone
 from decimal import Decimal
 
 import pytest
@@ -602,6 +603,25 @@ def test_claude_tagesstand(result):
                for rows in [*weekly["kader"].values(), *weekly["free_agents"].values()] for r in rows)
     assert next(d for d in weekly["dst"] if d[0] == "ATL")[-1] == \
         (app_export.KUERZEL[atl["besitzer"]] if atl["besitzer"] else atl["status"])
+
+
+def test_claude_free_agents_woche():
+    """Free Agents in claude.json (erfundene Spieler und Werte): je Position zuerst die 10 besten nach ROS/Spiel, dann
+    die übrigen der 10 besten nach Wochenprojektion (proj_ue) ohne Spieler, deren Spiel zum Tagesstand schon lief;
+    ohne Tagesstand nur nach ROS/Spiel."""
+    # TE 100…111: ROS/Spiel fällt, proj_ue steigt; 111 (PHI) hat zum Stand schon gespielt; 112 ohne ROS/Spiel, aber
+    # mit bester Wochenprojektion; 113 steht im Kader und zählt nie
+    rows = [{"id": 100 + i, "pos": "TE", "nfl": "PHI" if i == 11 else "KC", "status": "FREEAGENT",
+             "ros_g": Decimal(20 - i)} for i in range(12)]
+    rows += [{"id": 112, "pos": "TE", "nfl": "KC", "status": "WAIVERS", "ros_g": None},
+             {"id": 113, "pos": "TE", "nfl": "KC", "status": "ONTEAM", "ros_g": Decimal(30)}]
+    stand = int(datetime(2026, 10, 6, 8, 45, tzinfo=timezone.utc).timestamp() * 1000)
+    waiver = {"stand": "2026-10-06T0845Z", "anstoss": {"PHI": stand - 3_600_000, "KC": stand + 86_400_000},
+              "spieler": [{"id": 100 + i, "proj_ue": Decimal(i)} for i in range(14)]}
+    out = app_export.claude_free_agents(rows, waiver)
+    assert list(out) == list(app_export.POSITION_NAMES.values()) and all(not v for k, v in out.items() if k != "TE")
+    assert [p["id"] for p in out["TE"]] == [*range(100, 110), 112, 110]   # Woche: 112 (12) vor 110 (10), ohne 111
+    assert [p["id"] for p in app_export.claude_free_agents(rows, None)["TE"]] == list(range(100, 110))
 
 
 def app_known(data) -> set[int]:
