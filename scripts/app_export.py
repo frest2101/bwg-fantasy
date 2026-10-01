@@ -519,7 +519,8 @@ def build_waiver(result: dict) -> dict | None:
     Waiver-Reihenfolge der Teams und der Bedarf je Team.
 
     Spieler: daily_selection (die Auswahl von players.json plus alle, die laut Tagesstand in einem Kader stehen, und
-    alle mit Marktwert); Spieler mit Marktwert tragen WERT_KEYS (Stufe 3), der Kopf wert_stand und keeper_linie.
+    alle mit Marktwert); Spieler mit Marktwert tragen WERT_KEYS (Stufe 3) und – mit Stammdaten – alter, der Kopf
+    wert_stand und keeper_linie.
     Grundlage des Waiver-Tabs; None ohne Pool-Auszug oder Spielerdaten.
     """
     pool = result.get("pool_latest")
@@ -549,8 +550,9 @@ def build_waiver(result: dict) -> dict | None:
     add_fantasypros(extra, result)
     werte = market_values(result)   # Marktwert (FantasyCalc) nur bei Spielern mit Wert, sonst fehlen die Felder
     for row in rows:
-        if row["id"] in werte:
-            row.update({k: werte[row["id"]][k] for k in WERT_KEYS})
+        w = werte.get(row["id"])
+        if w:
+            row.update({k: w[k] for k in WERT_KEYS} | ({"alter": w["alter"]} if w["alter"] is not None else {}))
     reihenfolge, quelle, stand = waiver_order(pool, result)
     view = week_view(pool, result)
     if view:

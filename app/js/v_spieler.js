@@ -1,10 +1,12 @@
 // Tab Spieler (lädt players.json, dazu waiver.json als Tagesstand): Liste mit Filtern in 50er-Blöcken, Detail #spieler/<id>
-// mit Formkurve, ROS, Positions-Matchup (Feld mu, Wetterzeile aus wetter.json) und News-Kasten (nur Datum der letzten
-// ESPN-Meldung und Verweise, nie Text).
+// mit Formkurve, ROS, Positions-Matchup (Feld mu, Wetterzeile aus wetter.json), Marktwert (FantasyCalc, aus waiver.json) und
+// News-Kasten (nur Datum der letzten ESPN-Meldung und Verweise, nie Text).
 let U, S, h;
 const POS = ['QB', 'RB', 'WR', 'TE', 'K', 'D/ST'];
 // Tagesstand je Spieler (waiver.json, stündlich) überlagert diese Wochenwerte: Team, Status, Verletzung, Besitz
 const DAILY = ['team', 'status', 'inj', 'own'];
+// Marktwert je Spieler (waiver.json, nur bei Spielern mit Wert; täglich von FantasyCalc)
+const WERT = ['wert', 'wert_rang', 'wert_posrang', 'wert_trend', 'wert_ue'];
 // Rückweg zur Liste: zuletzt geöffneter Spieler und die Spaltenfilter der Liste (Modul bleibt geladen, gilt bis zum Neuladen)
 let lastOpened = null, keptFilters = {};
 // Spieler ohne NFL-Team (entlassen, vereinslos) heißen „FA“ statt „null“
@@ -29,38 +31,41 @@ export async function render(box, ctx, r) {
   // Wetter ebenso (nur Spielerseite): ohne wetter.json keine Wetterzeile
   const WX = detail && S.man.files?.['wetter.json'] ? await ctx.load('wetter.json').catch(() => null) : null;
   const wx = WX ? await ctx.mod('v_wetter').catch(() => null) : null;
-  // Herkunft (nur Spielerseite): ohne keeper.json fehlt die Zeile
+  // Herkunft (nur Spielerseite): ohne keeper.json fehlt die Zeile; v_keeper liefert auch die Marktwert-Hilfen
   const K = detail && S.man.files?.['keeper.json'] ? await ctx.load('keeper.json').catch(() => null) : null;
-  const kp = K ? await ctx.mod('v_keeper').catch(() => null) : null;
+  const kp = detail ? await ctx.mod('v_keeper').catch(() => null) : null;
   if (!r.alive()) return;
   const svg = await ctx.mod('svg');
   const rosWhy = P.ros_nach_woche == null ? `ab Wochenabruf W${S.tw + 1}` : 'keine Projektion';
   const rows = merge(P, W);
   const wline = wx ? p => { const g = wx.gameOf(WX, p.nfl); return g ? wx.line(g) : null; } : null;
   // Herkunft nur, wenn keeper.json den Spieler beim selben Team führt wie der Tagesstand
-  const origin = kp ? p => {
+  const origin = kp && K ? p => {
     const o = kp.byPlayer(K).get(p.id);
     return o && o.team === p.team ? [kp.herkunft(o, K, true), kp.alterTxt(o)] : null;
   } : null;
-  if (detail) one(box, h1, P, W, rows, r, svg, rosWhy, wline, origin); else list(box, W, rows, r, rosWhy, P.ersatz || {}, P.ros_nach_woche != null);
+  if (detail) one(box, h1, P, W, rows, r, svg, rosWhy, wline, origin, kp); else list(box, W, rows, r, rosWhy, P.ersatz || {}, P.ros_nach_woche != null);
 }
 
 // Wochenwerte je Spieler mit dem Tagesstand überlagern (Schlüssel: Spieler-ID); ohne Tagesstand unverändert.
-// Kaderspieler, die nur der Tagesstand kennt (unter der Woche geholt, ohne Wochendaten), kommen mit „–“ dazu statt zu fehlen.
+// Spieler, die nur der Tagesstand kennt, kommen mit „–“ dazu statt zu fehlen: Kaderspieler, die unter der Woche geholt
+// wurden, und freie Spieler mit Marktwert, die players.json nicht führt (ohne Einsatz, nicht unter den besten Free Agents).
 export function merge(P, W) {
   const daily = new Map((W?.spieler || []).map(x => [x.id, x]));
   const rows = P.players.map(p => {
     const d = daily.get(p.id);
     if (!d) return p;
     const out = {...p, own_d: d.own_d, started: d.started, waiver_bis: d.waiver_bis, proj_n: d.proj, news: d.news};
-    for (const k of DAILY) if (d[k] !== undefined) out[k] = d[k];
+    for (const k of [...DAILY, ...WERT]) if (d[k] !== undefined) out[k] = d[k];
     return out;
   });
   const known = new Set(P.players.map(p => p.id));
   for (const d of daily.values()) {
-    if (known.has(d.id) || !(d.team > 0)) continue;
-    rows.push({id: d.id, name: d.name ?? `Spieler ${d.id}`, pos: d.pos ?? null, nfl: d.nfl ?? null, team: d.team, status: d.status, inj: d.inj,
-      own: d.own, own_d: d.own_d, started: d.started, waiver_bis: d.waiver_bis, proj_n: d.proj, news: d.news, fp: d.fp, nur_tag: true});
+    if (known.has(d.id) || !(d.team > 0 || d.wert != null)) continue;
+    const out = {id: d.id, name: d.name ?? `Spieler ${d.id}`, pos: d.pos ?? null, nfl: d.nfl ?? null, team: d.team, status: d.status, inj: d.inj,
+      own: d.own, own_d: d.own_d, started: d.started, waiver_bis: d.waiver_bis, proj_n: d.proj, news: d.news, fp: d.fp, nur_tag: true};
+    for (const k of WERT) if (d[k] !== undefined) out[k] = d[k];
+    rows.push(out);
   }
   return rows;
 }
@@ -212,7 +217,20 @@ function newsBox(p, W) {
     h('p', {class: 'note'}, 'Nur Verweise: Die App übernimmt keine Texte. ', W?.stand ? `Tagesstand ${U.stamp(W.stand)}.` : ''));
 }
 
-function one(box, h1, P, W, rows, r, svg, rosWhy, wline, origin) {
+// Marktwert (FantasyCalc, Tagesstand waiver.json): Wert, Rang, Trend und Abstand zur Keeper-Linie mit Quelle nahe bei den Zahlen
+function marktwert(p, W, kp) {
+  if (!kp || !W?.wert_stand) return null;
+  const why = p.pos === 'K' || p.pos === 'D/ST' ? 'K und D/ST ohne Marktwert' : 'nicht bei FantasyCalc';
+  if (!U.ok(p.wert)) return [h('h2', null, 'Marktwert'), h('p', {class: 'note'}, `Kein Marktwert: ${why}. `, kp.fcQuelle(), '.')];
+  return [h('h2', null, 'Marktwert'), h('div', {class: 'tiles'},
+    U.tile('Wert', kp.wertTxt(p.wert), 'Dynasty, Superflex', 'marktwert'),
+    U.tile('Rang', `${p.wert_rang}.`, `${p.pos} ${p.wert_posrang}.`, 'marktwert'),
+    U.tile('Trend 30 Tage', kp.wertSgn(p.wert_trend), null, 'wert-trend'),
+    U.tile('über Keeper-Linie', U.val(p.wert_ue, kp.wertSgn, 'keine Keeper-Linie'), U.ok(W.keeper_linie) ? `Linie ${kp.wertTxt(W.keeper_linie)}` : null, 'wert-ue')),
+  h('p', {class: 'note'}, kp.fcQuelle(), ` · Stand ${U.stamp(W.wert_stand)} · Tauschpreis, keine Punktprognose. Vergleich mit anderen Spielern: `, kp.fcRechner(), '.')];
+}
+
+function one(box, h1, P, W, rows, r, svg, rosWhy, wline, origin, kp) {
   const pid = r.sub;
   const p = rows.find(x => String(x.id) === pid);
   // Rückweg: kam man per Link aus der App, führt „← zurück“ per Verlauf dorthin (mit Filtern und Scrollposition)
@@ -222,7 +240,7 @@ function one(box, h1, P, W, rows, r, svg, rosWhy, wline, origin) {
     ? h('a', {href: S.prevHash, onclick: e => { e.preventDefault(); history.back(); }}, '← ' + (prev === 'team' ? 'zurück zum Team' : 'zurück: ' + BACK[prev]))
     : h('a', {href: '#spieler'}, '← Spielerliste')));
   if (p) lastOpened = p.id;
-  if (!p) { h1.textContent = 'Spieler nicht gefunden'; U.ap(box, h('p', {class: 'note'}, 'Dieser Spieler steht nicht in den App-Daten (nur Kader, Spieler mit Einsatz und die besten Free Agents).')); return; }
+  if (!p) { h1.textContent = 'Spieler nicht gefunden'; U.ap(box, h('p', {class: 'note'}, 'Dieser Spieler steht nicht in den App-Daten (nur Kader, Spieler mit Einsatz, die besten Free Agents und Spieler mit Marktwert).')); return; }
   h1.textContent = p.name;
   const ers = P.ersatz?.[p.pos];
   U.ap(box, h('p', null, `${p.pos ?? '–'} · ${nflTxt(p)} · `, p.team > 0 ? U.tl(p.team) : U.STAT[p.status] || 'frei',
@@ -243,9 +261,11 @@ function one(box, h1, P, W, rows, r, svg, rosWhy, wline, origin) {
     U.tile('Besitz', U.val(p.own, v => U.pct(v)), [U.STAT[p.status] || p.status, W && U.ok(p.own_d) ? ` · Δ ${U.sgn(p.own_d, 2)}` : ''], W ? 'besitz-trend' : 'besitz'),
     W ? U.tile(`Proj. W${W.woche}`, U.val(p.proj_n, U.num, 'noch keine ESPN-Projektion'),
       p.status === 'WAIVERS' && U.ok(p.waiver_bis) ? `Frist ${U.stamp(p.waiver_bis)}` : null, 'proj-naechste') : null),
-  newsBox(p, W));
+  newsBox(p, W), marktwert(p, W, kp));
   if (p.nur_tag) {
-    U.ap(box, h('p', {class: 'warn'}, 'Noch keine Wochendaten: Der Spieler steht laut Tagesstand im Kader, Saison- und ROS-Werte kommen mit dem nächsten Wochenabruf.'));
+    U.ap(box, h('p', {class: 'warn'}, p.team > 0
+      ? 'Noch keine Wochendaten: Der Spieler steht laut Tagesstand im Kader, Saison- und ROS-Werte kommen mit dem nächsten Wochenabruf.'
+      : 'Keine Wochendaten: Saison- und ROS-Werte führt die App für Kaderspieler, Spieler mit Einsatz und die besten Free Agents; dieser Spieler steht wegen seines Marktwerts hier.'));
     return;
   }
   const Wk = P.weeks || [], wk = p.wk || [];

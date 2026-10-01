@@ -1,6 +1,7 @@
 // Tab Keeper (lädt keeper.json): Keeper-Bilanz – woher die Punkte kommen (Keeper, Draft, Zugänge, Trades), Herkunft je
-// Kaderspieler mit Vorjahresvergleich, Altersprofil je Team (Stammdaten von nflverse), Draft 2026 inklusive Keeper mit
-// Ertrag. Alle Zahlen aus Python (scripts/keeper.py).
+// Kaderspieler mit Vorjahresvergleich und Marktwert, Altersprofil je Team (Stammdaten von nflverse), Marktwert je Team
+// (FantasyCalc, nur Summen, kein Spieler-Ranking), Draft 2026 inklusive Keeper mit Ertrag. Alle Zahlen aus Python
+// (scripts/keeper.py).
 let U, S, h;
 export const init = c => { U = c.ui; S = U.S; h = U.h; };
 const KEY = 'bwg-team';                  // eigenes Team wie im Waiver-Tab, nur Komfort im Browser
@@ -35,8 +36,18 @@ export const byPlayer = K => new Map((K?.kader || []).map(r => [r.id, r]));
 export const alterTxt = r => r && U.ok(r.alter) ? `${U.num(r.alter, 1)} Jahre` + (r.rookie ? ', Rookie' : U.ok(r.nfl_jahr) ? `, ${r.nfl_jahr}. NFL-Jahr` : '') : null;
 const POS = ['QB', 'RB', 'WR', 'TE', 'K'];
 
+// ---------------------------------------------------------------- Marktwert (FantasyCalc), gemeinsam mit Waiver- und Spieler-Tab
+// Nennung laut Nutzungsbedingungen auf jeder Ansicht mit den Werten, nahe bei den Zahlen, mit Link; neutral (keine Partnerschaft)
+const extA = (href, text) => h('a', {href, target: '_blank', rel: 'noopener'}, text, h('span', {class: 'vh'}, ' (neues Fenster)'));
+export const fcQuelle = () => ['Werte: ', extA('https://fantasycalc.com', 'FantasyCalc')];
+// Trade-Rechner von FantasyCalc statt eines eigenen; die Einstellungen stehen dort nicht in der Adresse
+export const fcRechner = () => [extA('https://fantasycalc.com/trade-calculator', 'Trade-Rechner von FantasyCalc'), ' (dort Dynasty, Superflex, 10 Teams, PPR wählen)'];
+// Wert als ganze Zahl mit Tausenderpunkt; Trend mit Vorzeichen
+export const wertTxt = v => U.num(v, 0);
+export const wertSgn = v => U.sgn(v, 0);
+
 export async function render(box, ctx, r) {
-  const sub = ['kader', 'alter', 'draft'].includes(r.sub) ? r.sub : '';
+  const sub = ['kader', 'alter', 'wert', 'draft'].includes(r.sub) ? r.sub : '';
   // ?team=N gilt, auch 0 = Alle Teams (sonst fiele die Wahl auf dem Rückweg wieder auf das eigene Team); nur ohne
   // Parameter nimmt die Kader-Ansicht das gespeicherte Mein Team
   let team = r.q.has('team') ? +r.q.get('team') : sub === 'kader' ? +U.store.get(KEY) || 0 : 0;
@@ -46,13 +57,14 @@ export async function render(box, ctx, r) {
     return;
   }
   const views = U.chips('Ansichten Keeper', [['#keeper', 'Bilanz', ''], ['#keeper/kader', 'Kader', 'kader'], ['#keeper/alter', 'Alter', 'alter'],
-    ['#keeper/draft', 'Draft', 'draft']], sub);
-  U.ap(box, h('h1', null, {draft: `Draft ${S.man.season}`, kader: 'Keeper und Kader', alter: 'Alter der Kader'}[sub] || 'Keeper'), views);
+    ['#keeper/wert', 'Wert', 'wert'], ['#keeper/draft', 'Draft', 'draft']], sub);
+  U.ap(box, h('h1', null, {draft: `Draft ${S.man.season}`, kader: 'Keeper und Kader', alter: 'Alter der Kader', wert: 'Marktwert der Kader'}[sub] || 'Keeper'), views);
   const K = await ctx.lazy('keeper.json', 'Keeper-Bilanz', box);
   if (!r.alive()) return;
   if (sub === 'draft') draft(box, K, team);
   else if (sub === 'kader') kader(box, K, team);
   else if (sub === 'alter') alter(box, K, await ctx.mod('svg'));
+  else if (sub === 'wert') wert(box, K, await ctx.mod('svg'));
   else bilanz(box, K, await ctx.mod('svg'));
 }
 
@@ -114,13 +126,20 @@ function kader(box, K, team) {
       ...(K.alter_stichtag ? [
         {k: 'al', l: 'Alter', num: 1, v: r => r.alter, f: r => U.val(r.alter, v => U.num(v, 1), ohneAlter(r))},
         {k: 'nj', l: 'NFL-Jahr', num: 1, d: 1, v: r => r.nfl_jahr, f: r => U.val(r.nfl_jahr, v => v, ohneAlter(r))}] : []),
+      // Marktwert (FantasyCalc): Wert, Gesamtrang mit Positionsrang, Trend 30 Tage
+      ...(K.marktwert_stand ? [
+        {k: 'w', l: 'Wert', num: 1, v: r => r.wert, f: r => U.val(r.wert, wertTxt, ohneWert(r))},
+        {k: 'wr', l: 'Wert-Rang', num: 1, d: 1, v: r => r.wert_rang,
+          f: r => U.ok(r.wert_rang) ? [String(r.wert_rang), h('small', null, `${r.pos} ${r.wert_posrang}`)] : U.na(ohneWert(r))},
+        {k: 'wt', l: 'Trend 30 T.', num: 1, v: r => r.wert_trend, f: r => U.val(r.wert_trend, wertSgn, ohneWert(r))}] : []),
       {k: 'g', l: 'Sp.', num: 1, v: r => r.g, f: r => U.val(r.g, v => v, 'keine Wochendaten')},
       {k: 'a', l: `Ø ${S.man.season}`, num: 1, v: r => r.avg, f: r => U.val(r.avg, U.num, 'ohne Spiel')},
       {k: 'v', l: `Ø ${S.man.season - 1}`, num: 1, v: r => r.vj_avg, f: r => r.rookie ? h('span', {class: 'note'}, 'Rookie') : U.val(r.vj_avg, U.num, 'kein Vorjahreswert')},
       {k: 'd', l: 'Δ', num: 1, v: r => r.vj_delta, f: r => U.val(r.vj_delta, U.sgn, 'kein Vergleich')},
       {k: 'vg', l: `Sp. ${S.man.season - 1}`, num: 1, v: r => r.vj_g, f: r => U.val(r.vj_g, v => v, 'kein Vorjahreswert')}]}),
-    U.legend(['herkunft', 'vorjahr', ...(K.alter_stichtag ? ['alter'] : [])]),
-    h('p', {class: 'note'}, standTxt(K) + '.', K.alter_stichtag ? quelle(K) : null));
+    U.legend(['herkunft', 'vorjahr', ...(K.alter_stichtag ? ['alter'] : []), ...(K.marktwert_stand ? ['marktwert', 'wert-trend'] : [])]),
+    h('p', {class: 'note'}, standTxt(K) + '.', K.alter_stichtag ? quelle(K) : null,
+      K.marktwert_stand ? [' ', fcQuelle(), ` (Stand ${U.stamp(K.marktwert_stand)}); Vergleich einzelner Spieler: `, fcRechner(), '.'] : null));
   };
   U.ap(box, h('div', {class: 'row'}, teamSelect(team, v => { team = v; U.setQ('keeper/kader', {team}); draw(); })), wrap);
   draw();
@@ -155,6 +174,7 @@ function draft(box, K, team) {
 
 // ---------------------------------------------------------------- Alter: Altersprofil je Team
 const ohneAlter = r => r.pos === 'D/ST' ? 'D/ST ohne Alter' : 'nicht in den Stammdaten';
+const ohneWert = r => r.pos === 'K' || r.pos === 'D/ST' ? 'K und D/ST ohne Marktwert' : 'nicht bei FantasyCalc';
 const ext = (href, text) => h('a', {href, target: '_blank', rel: 'noopener'}, text, h('span', {class: 'vh'}, ' (neues Fenster)'));
 // Namensnennung laut CC BY 4.0: Quelle, Lizenz und der Hinweis, dass es ein Auszug ist
 const nflverse = () => [ext('https://github.com/nflverse/nflverse-data', 'nflverse'), ' (', ext('https://creativecommons.org/licenses/by/4.0/', 'CC BY 4.0'), ', Auszug)'];
@@ -197,4 +217,40 @@ function alter(box, K, svg) {
     h('p', {class: 'note'}, 'Links jünger, rechts älter als der Liga-Schnitt der jeweiligen Position.')),
     U.legend(['alter', 'alter-ros', 'alter-bereinigt']),
     h('p', {class: 'note'}, standTxt(K) + '.', quelle(K)));
+}
+
+// ---------------------------------------------------------------- Wert: Marktwert je Team (FantasyCalc), nur Summen
+// Keine Liste der wertvollsten Spieler je Team (Beschluss 01.10.2026): Kern-Wert, Wert über der Linie und Alter als Zahlen
+function wert(box, K, svg) {
+  const L = K.liga.marktwert;
+  if (!L) {
+    U.ap(box, h('p', {class: 'note'}, 'Noch keine Marktwerte: Der Tageslauf holt sie einmal am Tag. ', fcQuelle(), '.'));
+    return;
+  }
+  const rows = K.teams.filter(t => t.marktwert), M = t => t.marktwert, line = U.ok(K.keeper_linie);
+  const n = K.keeper_zahl, total = n * S.teams.length;
+  const by = new Map(rows.map(t => [t.team_id, t]));
+  const bars = S.teams.filter(t => by.has(t.team_id)).map(t => ({label: t.kuerzel, name: t.name, v: M(by.get(t.team_id)).kern - L.kern}))
+    .sort((a, b) => b.v - a.v);
+  const noLine = 'keine Keeper-Linie', noAge = 'keine Altersdaten';
+  U.ap(box, h('p', null, `Was die Kader auf dem Tauschmarkt wert sind: je Team die Summe der ${n} wertvollsten Spieler – so viele bleiben über den Winter – und wie viel Wert über der Keeper-Linie liegt. Tauschpreise aus Dynasty-Ligen, keine Punktprognose; K und D/ST haben keinen Wert. `, U.ib('marktwert', '')),
+    h('p', {class: 'note'}, fcQuelle(), ` · Stand ${U.stamp(K.marktwert_stand)}`),
+    h('div', {class: 'tiles'},
+      U.tile('Keeper-Linie', U.val(K.keeper_linie, wertTxt, `weniger als ${total} Kaderspieler mit Wert`), `Wert des ${total}. Kaderspielers`, 'keeper-linie'),
+      U.tile('Ø Kern-Wert', wertTxt(L.kern), `${n} wertvollste je Team`, 'kern-wert'),
+      U.tile('Alter nach Wert', U.val(L.alter, v => U.num(v, 1), noAge), `Liga, ${L.n} Spieler mit Wert`, 'alter-wert')),
+    U.table({cap: 'Marktwert je Team', cls: 'nr kurz', rh: 0, rows, sort: ['kern', -1], cols: [
+      {k: 't', l: 'Team', v: t => U.kz(t.team_id), d: 1, f: t => U.tl(t.team_id)},
+      {k: 'kern', l: 'Kern-Wert', num: 1, v: t => M(t).kern, f: t => wertTxt(M(t).kern)},
+      {k: 'ab', l: 'zum Schnitt', num: 1, v: t => M(t).kern - L.kern, f: t => wertSgn(M(t).kern - L.kern)},
+      {k: 'ue', l: 'ü. Linie', num: 1, v: t => M(t).ueber_linie, f: t => U.val(M(t).ueber_linie, wertTxt, noLine)},
+      {k: 'nl', l: 'ab Linie', num: 1, v: t => M(t).n_linie, f: t => U.val(M(t).n_linie, v => v, noLine)},
+      {k: 'al', l: 'Alter nach Wert', num: 1, d: 1, v: t => M(t).alter, f: t => U.val(M(t).alter, v => U.num(v, 1), noAge)},
+      {k: 'n', l: 'mit Wert', num: 1, v: t => M(t).n, f: t => M(t).n}]}),
+    svg.fig('Kern-Wert zum Ligaschnitt', svg.hbars({title: `Summe der ${n} wertvollsten Spieler je Team, Abstand zum Ligaschnitt`,
+      desc: 'Balken nach rechts = mehr Wert als der Schnitt, nach links = weniger; genaue Werte in der Tabelle.', fmt: wertSgn, rows: bars}),
+    {heads: ['Team', 'Kern-Wert zum Schnitt'], rows: bars.map(b => [b.name, wertSgn(b.v)])},
+    h('p', {class: 'note'}, `Ligaschnitt ${wertTxt(L.kern)}.`)),
+    U.legend(['marktwert', 'keeper-linie', 'kern-wert', 'wert-ue', 'alter-wert']),
+    h('p', {class: 'note'}, standTxt(K) + '. ', fcQuelle(), line ? ` · ${L.n_linie} Kaderspieler liegen auf oder über der Linie.` : '', ' Einzelne Spieler vergleichen: ', fcRechner(), '.'));
 }
