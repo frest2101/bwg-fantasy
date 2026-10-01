@@ -241,7 +241,8 @@ def test_cmd_daily_mit_marktwert(raw, monkeypatch, capsys):
     saved = fc.path(2026).read_bytes()
     capsys.readouterr()
     assert ef.cmd_daily(2026, at(2, 6), pool=True, marktwert=True) == 0 and fc.path(2026).read_bytes() == saved
-    assert "Warnung: Marktwert: FantasyCalc: HTTP 503" in capsys.readouterr().out
+    # Präfix je Umgebung verschieden (lokal „Warnung: “, in der Action „::warning::“, espn_fetch.warn)
+    assert "Marktwert: FantasyCalc: HTTP 503" in capsys.readouterr().out
     session.calc.status = 200
     assert ef.cmd_daily(2026, at(2, 7), pool=True, marktwert=True) == 0 and stand() == "2026-10-02T0745Z"
 
