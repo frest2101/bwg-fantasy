@@ -8,7 +8,7 @@ Format: eine Zeile je Datensatz, damit Diffs lesbar bleiben.
 import hashlib
 import json
 from collections import Counter
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
 
@@ -624,6 +624,32 @@ def claude_rows(players: dict, waiver: dict | None) -> list[dict]:
     return sorted(rows, key=lambda p: p["id"])
 
 
+CLAUDE_FREE_PER_POS = 10
+
+
+def claude_free_agents(rows: list[dict], waiver: dict | None) -> dict[str, list[dict]]:
+    """Free Agents für claude.json je Position (frei = WAIVERS oder FREEAGENT laut rows): zuerst die 10 besten nach
+    ROS/Spiel, danach die übrigen der 10 besten nach Wochenprojektion (proj_ue aus waiver.json wie im Waiver-Tab,
+    Horizont Woche), ohne Spieler, deren Spiel in pool_woche zum Stand des Tagesstands schon angepfiffen war (anstoss,
+    wie played() in app/js/v_waiver.js mit dem Stand statt der Uhrzeit). Ohne Tagesstand nur nach ROS/Spiel."""
+    ue = {s["id"]: s.get("proj_ue") for s in (waiver or {}).get("spieler", [])}
+    kick = (waiver or {}).get("anstoss") or {}
+    stand = (int(datetime.strptime(waiver["stand"], "%Y-%m-%dT%H%MZ").replace(tzinfo=timezone.utc).timestamp() * 1000)
+             if waiver else None)
+    free = [p for p in rows if p.get("status") in players_module.REPLACEMENT_STATUS]
+    out = {}
+    for pos in POSITION_NAMES.values():
+        mine = [p for p in free if p["pos"] == pos]
+        by_ros = sorted((p for p in mine if p.get("ros_g") is not None),
+                        key=lambda p: (-p["ros_g"], p["id"]))[:CLAUDE_FREE_PER_POS]
+        by_week = sorted((p for p in mine if ue.get(p["id"]) is not None
+                          and not (p.get("nfl") in kick and kick[p["nfl"]] <= stand)),
+                         key=lambda p: (-ue[p["id"]], p["id"]))[:CLAUDE_FREE_PER_POS]
+        seen = {p["id"] for p in by_ros}
+        out[pos] = by_ros + [p for p in by_week if p["id"] not in seen]
+    return out
+
+
 def build_claude(result: dict, teams: dict, schedule: dict, players: dict | None, dst: dict | None,
                  transactions: dict | None, waiver: dict | None = None) -> dict:
     """Kompakte Datei für Claude-Sessions unterwegs (< 50 KB): Tabellen als Spaltenkopf plus Zeilen, Teams als Kürzel.
@@ -668,10 +694,8 @@ def build_claude(result: dict, teams: dict, schedule: dict, players: dict | None
         out["spieler_spalten"] = list(CLAUDE_PLAYER_COLS)
         out["free_agents_spalten"] = list(CLAUDE_FREE_COLS)
         out["kader"] = {k(tid): [claude_player(p) for p in rows if p["team"] == tid] for tid in sorted(KUERZEL)}
-        free = [p for p in rows if p.get("status") in players_module.REPLACEMENT_STATUS and p.get("ros_g") is not None]
-        out["free_agents"] = {pos: [claude_player(p, CLAUDE_FREE_COLS)
-                                    for p in sorted((p for p in free if p["pos"] == pos), key=lambda p: -p["ros_g"])[:10]]
-                              for pos in POSITION_NAMES.values()}
+        out["free_agents"] = {pos: [claude_player(p, CLAUDE_FREE_COLS) for p in free]
+                              for pos, free in claude_free_agents(rows, waiver).items()}
         daily = {s["id"] for s in (waiver or {}).get("spieler", [])}
         owner = {p["nfl"]: (p["team"], p["status"]) for p in rows if p["pos"] == "D/ST" and p["id"] in daily}
     if dst:
