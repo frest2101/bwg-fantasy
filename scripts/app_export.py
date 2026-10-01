@@ -585,11 +585,15 @@ def build_waiver(result: dict) -> dict | None:
             "wert_stand": keeper.get("marktwert_stand"), "keeper_linie": keeper.get("keeper_linie")} | head | {"spieler": rows}
 
 
-CLAUDE_PLAYER_COLS = ("name", "pos", "nfl", "inj", "avg", "form", "trend", "ros_g", "ros_rang", "gegner_n1", "mu_n1")
-# Free Agents zusätzlich mit Status und den Wochenwerten des Tagesstands (waiver.json: proj, proj3)
-CLAUDE_FREE_COLS = CLAUDE_PLAYER_COLS + ("status", "proj", "proj3")
-# je Spieler aus dem Tagesstand (waiver.json) überlagert
+# id = ESPN-Spieler-ID (Schlüssel von waiver.json, das die meisten Spieler nur per id führt); proj und proj3 sind die
+# Wochenwerte des Tagesstands (waiver.json), ohne Eintrag dort None
+CLAUDE_PLAYER_COLS = ("id", "name", "pos", "nfl", "inj", "avg", "form", "trend", "ros_g", "ros_rang", "gegner_n1",
+                      "mu_n1", "proj", "proj3")
+# Free Agents zusätzlich mit Status
+CLAUDE_FREE_COLS = CLAUDE_PLAYER_COLS + ("status",)
+# je Spieler aus dem Tagesstand (waiver.json) überlagert; die Wochenwerte gibt es nur dort
 CLAUDE_DAILY = ("team", "status", "inj", "proj", "proj3")
+CLAUDE_DAILY_ONLY = ("proj", "proj3")
 
 
 def fixed(value, places: int):
@@ -609,9 +613,10 @@ def claude_rows(players: dict, waiver: dict | None) -> list[dict]:
     """Spieler für claude.json, nach ID: players.json (Wochenstand), je Spieler team, status, inj, proj und proj3 aus
     dem Tagesstand überlagert – wie merge() in app/js/v_spieler.js. Kaderspieler, die nur der Tagesstand kennt, kommen
     mit name, pos, nfl aus waiver.json dazu (unbekannter Name: „Spieler <id>“ wie in der App), ihre Wochenwerte
-    fehlen. Spieler ohne Eintrag im Tagesstand und alle ohne waiver bleiben beim Wochenstand."""
+    fehlen. Spieler ohne Eintrag im Tagesstand und alle ohne waiver bleiben beim Wochenstand, proj und proj3 (nur
+    Tagesstand) sind dann None."""
     daily = {s["id"]: s for s in (waiver or {}).get("spieler", [])}
-    rows = [p | ({c: daily[p["id"]].get(c) for c in CLAUDE_DAILY} if p["id"] in daily else {})
+    rows = [p | dict.fromkeys(CLAUDE_DAILY_ONLY) | {c: daily[p["id"]].get(c) for c in CLAUDE_DAILY if p["id"] in daily}
             for p in players["players"]]
     known = {p["id"] for p in players["players"]}
     rows += [{"id": d["id"], "name": d.get("name") or f"Spieler {d['id']}", "pos": d.get("pos"), "nfl": d.get("nfl")}
@@ -636,13 +641,14 @@ def build_claude(result: dict, teams: dict, schedule: dict, players: dict | None
                         pr.get("rang"), pr.get("mu"), fixed(pr.get("e"), 3), pr.get("trend"),
                         fixed(sim.get("playoff"), 4)])
     out = {"legende": "BWG Fantasy Liga (ESPN 1166555857), inoffizielle Auswertung. Punkte = ESPN appliedTotal; "
-                      "Projektionen sind ESPN-Input. Zeilen gehören zu den *_spalten; mu_n1 = Positions-Matchup F des "
-                      "Gegners in matchup_woche, > 1 günstig. Definitionen: docs/app_daten.md "
+                      "Projektionen sind ESPN-Input. Zeilen gehören zu den *_spalten; id = ESPN-Spieler-ID wie in "
+                      "waiver.json; mu_n1 = Positions-Matchup F des Gegners in matchup_woche, > 1 günstig. "
+                      "Definitionen: docs/app_daten.md "
                       "und CLAUDE.md (Rechenregeln) im Repo frest2101/bwg-fantasy.",
            "legende_stand": "Tagesstand (pool_stand): Zuordnung zu kader/free_agents, inj, status, proj (ESPN-Projektion "
                             "pool_woche), proj3 (Σ pool_woche…+2; erste Woche Bye/OUT/IR 0, dann ROS-Auszug), "
                             "D/ST-besitzer, transaktionen. Wochenstand (nach_woche): alles Übrige; Spieler nur aus dem "
-                            "Tagesstand ohne Wochenwerte. pool_stand null: alles Wochenstand.",
+                            "Tagesstand ohne Wochenwerte. pool_stand null: alles Wochenstand, proj/proj3 null.",
            "stand": {"saison": result["season"], "nach_woche": result["through_week"],
                      "kader_quelle": teams["meta"]["kader_quelle"], "ros_nach_woche": result.get("ros_after_week"),
                      "matchup_woche": (result.get("matchup") or {}).get("wochen", {}).get("n1"),
