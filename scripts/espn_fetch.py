@@ -16,19 +16,21 @@ Ablage je Saison (--due):
     basis/positionen_<vorjahr>.json                        Positions-Grundlage des Vorjahrs (QB, RB, WR, TE, K), einmalig
     fantasypros/sitemap.json                               FantasyPros-Adressen je Position (scripts/fantasypros.py), wird aktualisiert
     nflverse/players.json                                  Geburtsdatum, Rookie-Saison und Draft je Pool-Spieler (scripts/nflverse.py), wird aktualisiert
-Tageslauf (--transactions --pool --wetter, Action stündlich vormittags und abends):
+Tageslauf (--transactions --pool --wetter --marktwert, Action stündlich vormittags und abends):
     transactions/                                          Transaktions-Archiv (mTransactions2 je Periode, Aktivitäten)
     pool/latest.json                                       Pool-Auszug: Status, Besitz, Verletzung, Waiver-Frist, Projektion;
                                                            dazu die Waiver-Reihenfolge der Teams (mTeam.waiverRank) sowie
                                                            IR-Slots und per Trade gekommene Spieler (mRoster)
     wetter/prognose/wNN_<UTC>.json, wetter/ist_<saison>.json   Wetter je Spiel (scripts/wetter.py, Open-Meteo)
+    fantasycalc/latest.json                                Marktwerte je Pool-Spieler (scripts/fantasycalc.py), höchstens
+                                                           ein Abruf je UTC-Tag
     news/<UTC>.json                                        News je Spieler (scripts/news.py, --news, vorbereitet, aus)
 
 Aufrufe:
     python scripts/espn_fetch.py --weeks 1 2 3            # Kern-Views abrufen, Vorhandenes bleibt stehen
     python scripts/espn_fetch.py --weeks 3 --force        # vorhandene Dateien überschreiben
     python scripts/espn_fetch.py --due                    # alles Fällige (Action dienstags), siehe cmd_due
-    python scripts/espn_fetch.py --transactions --pool --wetter   # Tageslauf (Action stündlich), siehe cmd_daily
+    python scripts/espn_fetch.py --transactions --pool --wetter --marktwert   # Tageslauf (Action stündlich), siehe cmd_daily
     python scripts/espn_fetch.py --transactions           # nur das Transaktions-Archiv fortschreiben
     python scripts/espn_fetch.py --summary                # Matchups aller lokalen Wochen ausgeben
     python scripts/espn_fetch.py --summary --weeks 1 2    # nur bestimmte Wochen
@@ -1057,12 +1059,13 @@ def update_pool(session: requests.Session, season: int, now: datetime, stamp: st
 # ---------------------------------------------------------------- Tageslauf (Action stündlich)
 
 def cmd_daily(season: int, now: datetime, transactions: bool = False, pool: bool = False, wetter: bool = False,
-              news: bool = False) -> int:
-    """Tageslauf: Transaktions-Archiv, Pool-Auszug, Wetter und – vorbereitet, bleibt aber aus – News je Spieler.
+              news: bool = False, marktwert: bool = False) -> int:
+    """Tageslauf: Transaktions-Archiv, Pool-Auszug, Wetter, Marktwerte (FantasyCalc, höchstens einmal je UTC-Tag) und
+    – vorbereitet, bleibt aber aus – News je Spieler.
 
     Jeder Teil läuft für sich, geschriebene Rohdaten bleiben auch stehen, wenn ein anderer Teil scheitert. Fehler bei
-    ESPN (Transaktionen, Pool) und fehlende Grundlagen machen den Lauf rot; Ausfälle von Open-Meteo und der News-
-    Abfrage sind Warnungen, denn der nächste Lauf folgt spätestens eine Stunde später.
+    ESPN (Transaktionen, Pool) und fehlende Grundlagen machen den Lauf rot; Ausfälle von Open-Meteo, FantasyCalc und
+    der News-Abfrage sind Warnungen, denn der nächste Lauf folgt spätestens eine Stunde später.
     """
     stamp = now.strftime("%Y-%m-%dT%H%MZ")
     errors, warnings = 0, []
@@ -1086,6 +1089,10 @@ def cmd_daily(season: int, now: datetime, transactions: bool = False, pool: bool
             print("Pool-Auszug")
             pool_errors, current = update_pool(session, season, now, stamp)
             errors += pool_errors
+        if marktwert:
+            import fantasycalc  # erst hier: das Modul importiert espn_fetch
+            print("Marktwert (FantasyCalc)")
+            warnings += fantasycalc.update(session, season, now)
         if wetter:
             import wetter as wetter_module  # erst hier: das Modul importiert espn_fetch
             print("Wetter")
@@ -1121,6 +1128,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                         help="Tageslauf: Pool-Auszug pool/latest.json (Status, Besitz, Verletzung, Waiver-Frist, Projektion, Waiver-Reihenfolge)")
     parser.add_argument("--wetter", action="store_true",
                         help="Tageslauf: Wetterprognose der laufenden Woche und Ist-Wetter gespielter Spiele (Open-Meteo)")
+    parser.add_argument("--marktwert", action="store_true",
+                        help="Tageslauf: Marktwerte je Pool-Spieler von FantasyCalc (höchstens ein Abruf je UTC-Tag)")
     parser.add_argument("--news", action="store_true",
                         help="Tageslauf: News je Spieler mit geändertem lastNewsDate (nur mit --pool; Stufe 2, bleibt aus)")
     args = parser.parse_args(argv)
@@ -1130,7 +1139,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             parser.error(f"ungültige Woche(n) {bad}, erlaubt 1–{MAX_WEEK}")
         args.weeks = sorted(set(args.weeks))
     daily = [flag for flag, on in (("--transactions", args.transactions), ("--pool", args.pool),
-                                   ("--wetter", args.wetter), ("--news", args.news)) if on]
+                                   ("--wetter", args.wetter), ("--marktwert", args.marktwert), ("--news", args.news)) if on]
     modes = [flag for flag, on in (("--summary", args.summary), ("--due", args.due)) if on] + daily[:1]
     if len(modes) > 1:
         parser.error(f"{' und '.join(modes)} schließen sich aus")
@@ -1154,8 +1163,9 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_summary(args.season, args.weeks)
     if args.due:
         return cmd_due(args.season, datetime.now(timezone.utc).date())
-    if args.transactions or args.pool or args.wetter or args.news:
-        return cmd_daily(args.season, datetime.now(timezone.utc), args.transactions, args.pool, args.wetter, args.news)
+    if args.transactions or args.pool or args.wetter or args.news or args.marktwert:
+        return cmd_daily(args.season, datetime.now(timezone.utc), args.transactions, args.pool, args.wetter, args.news,
+                         args.marktwert)
     return cmd_fetch(args.season, args.weeks, args.force)
 
 
