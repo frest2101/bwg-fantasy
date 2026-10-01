@@ -302,9 +302,7 @@ def test_keeper_vertrag(data):
     assert len(k["picks"]) == 240 and sum(p["keeper"] for p in k["picks"]) == 119
     assert {p["pos"] for p in k["picks"]} <= {"QB", "RB", "WR", "TE", "K", "D/ST"}
     assert {r["pos"] for r in k["kader"]} <= {"QB", "RB", "WR", "TE", "K", "D/ST", None}
-    known = {p["id"] for p in data["players.json"]["players"]}
-    known |= {s["id"] for s in data.get("waiver.json", {}).get("spieler", []) if s["team"] > 0}
-    assert all(p["in_app"] == (p["player_id"] in known) for p in k["picks"])
+    assert all(p["in_app"] == (p["player_id"] in app_known(data)) for p in k["picks"])
     assert all(r["in_app"] for r in k["kader"]) if "waiver.json" in data else True
     # Altersprofil: ohne nflverse-Stammdaten überall null, mit ihnen je Team die Felder der Positivliste
     if k["alter_stichtag"] is None:
@@ -561,13 +559,18 @@ def test_claude_tagesstand(result):
         (app_export.KUERZEL[atl["besitzer"]] if atl["besitzer"] else atl["status"])
 
 
-def test_transaktionen_markieren_spieler_ohne_seite(data):
-    """in_app stimmt mit den Spielern überein, die der Spieler-Tab kennt (players.json plus Kader laut Tagesstand)."""
-    t = data["transactions.json"]
+def app_known(data) -> set[int]:
+    """Spieler mit Seite in der App wie merge() in app/js/v_spieler.js: players.json, dazu aus waiver.json die
+    Kaderspieler laut Tagesstand und die Spieler mit Marktwert."""
     known = {p["id"] for p in data["players.json"]["players"]}
-    known |= {s["id"] for s in data.get("waiver.json", {}).get("spieler", []) if s["team"] > 0}
+    return known | {s["id"] for s in data.get("waiver.json", {}).get("spieler", []) if s["team"] > 0 or "wert" in s}
+
+
+def test_transaktionen_markieren_spieler_ohne_seite(data):
+    """in_app stimmt mit den Spielern überein, die der Spieler-Tab kennt (app_known)."""
+    t = data["transactions.json"]
     moves = [i for x in t["items"] for i in x["items"]]
-    assert moves and all(i["in_app"] == (i["player_id"] in known) for i in moves)
+    assert moves and all(i["in_app"] == (i["player_id"] in app_known(data)) for i in moves)
 
 
 def test_oeffentlich(tmp_path, content):
