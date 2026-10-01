@@ -47,7 +47,7 @@ export const wertTxt = v => U.num(v, 0);
 export const wertSgn = v => U.sgn(v, 0);
 
 export async function render(box, ctx, r) {
-  const sub = ['kader', 'alter', 'wert', 'draft'].includes(r.sub) ? r.sub : '';
+  const sub = ['kader', 'alter', 'wert', 'draft', 'draft-folgejahr'].includes(r.sub) ? r.sub : '';
   // ?team=N gilt, auch 0 = Alle Teams (sonst fiele die Wahl auf dem Rückweg wieder auf das eigene Team); nur ohne
   // Parameter nimmt die Kader-Ansicht das gespeicherte Mein Team
   let team = r.q.has('team') ? +r.q.get('team') : sub === 'kader' ? +U.store.get(KEY) || 0 : 0;
@@ -56,12 +56,15 @@ export async function render(box, ctx, r) {
     U.ap(box, h('h1', null, 'Keeper'), h('p', {class: 'note'}, 'Noch keine Keeper-Bilanz: Sie erscheint mit dem ersten Wochenabruf nach dem Draft.'));
     return;
   }
+  const next = S.man.season + 1;
   const views = U.chips('Ansichten Keeper', [['#keeper', 'Bilanz', ''], ['#keeper/kader', 'Kader', 'kader'], ['#keeper/alter', 'Alter', 'alter'],
-    ['#keeper/wert', 'Wert', 'wert'], ['#keeper/draft', 'Draft', 'draft']], sub);
-  U.ap(box, h('h1', null, {draft: `Draft ${S.man.season}`, kader: 'Keeper und Kader', alter: 'Alter der Kader', wert: 'Marktwert der Kader'}[sub] || 'Keeper'), views);
+    ['#keeper/wert', 'Wert', 'wert'], ['#keeper/draft', 'Draft', 'draft'], ['#keeper/draft-folgejahr', `Draft ${next}`, 'draft-folgejahr']], sub);
+  U.ap(box, h('h1', null, {draft: `Draft ${S.man.season}`, 'draft-folgejahr': `Draft ${next}`, kader: 'Keeper und Kader',
+    alter: 'Alter der Kader', wert: 'Marktwert der Kader'}[sub] || 'Keeper'), views);
   const K = await ctx.lazy('keeper.json', 'Keeper-Bilanz', box);
   if (!r.alive()) return;
   if (sub === 'draft') draft(box, K, team);
+  else if (sub === 'draft-folgejahr') draftNext(box, K);
   else if (sub === 'kader') kader(box, K, team);
   else if (sub === 'alter') alter(box, K, await ctx.mod('svg'));
   else if (sub === 'wert') wert(box, K, await ctx.mod('svg'));
@@ -172,6 +175,40 @@ function draft(box, K, team) {
   draw();
 }
 
+// ---------------------------------------------------------------- Draft des Folgejahrs (Stufe 4): umgekehrte Endplatzierung
+// Bis zum Saisonende die Simulation (teams.json sim.liga), danach die feste Reihenfolge aus keeper.json draft_folgejahr
+function draftNext(box, K) {
+  const season = S.man.season, next = season + 1, fest = K.draft_folgejahr?.reihenfolge;
+  const po = S.man.datenstand?.playoff_woche;
+  const note = h('p', {class: 'note'}, fest ? `Fest nach den Playoffs ${season} (Ergebnisse laut ESPN). ` : `Simulation nach W${S.tw}` +
+    (po ? `, Playoffs gespielt bis W${po}` : '') + ', 10 000 Läufe. Die Playoff-Mechanik von ESPN (Spiel um Platz 5, Trostrunde) ist eine Annahme, die nach W15–17 geprüft wird. ',
+    'Getauschte Picks sind nicht berücksichtigt.');
+  U.ap(box, h('p', null, `Die Draft-Reihenfolge ${next} ist die umgekehrte Endplatzierung ${season}: Der Letzte hat Pick 1, der Meister Pick 10 – in jeder der zwölf Runden gleich (linear, ohne Lotterie). `,
+    U.ib('draft-folgejahr', '')));
+  if (fest) {
+    U.ap(box, U.table({cap: `Draft-Reihenfolge ${next}`, cls: 'nr kurz', rh: 1, sortable: false,
+      rows: fest.map((tid, i) => ({pick: i + 1, tid, platz: fest.length - i})), cols: [
+        {k: 'p', l: 'Pick', num: 1, f: x => x.pick},
+        {k: 't', l: 'Team', f: x => U.tl(x.tid)},
+        {k: 'e', l: `Endplatz ${season}`, num: 1, f: x => x.platz + '.'}]}),
+    U.legend(['draft-folgejahr', 'endplatz-sim']), note);
+    return;
+  }
+  const rows = S.teams.filter(t => t.sim?.liga?.endplatz), L = t => t.sim.liga, pct = v => U.po(U.sp(v));
+  if (!rows.length) {
+    U.ap(box, h('p', {class: 'note'}, 'Noch keine Endplatz-Simulation.'));
+    return;
+  }
+  U.ap(box, U.table({cap: `Erwartete Draft-Position ${next} laut Simulation`, cls: 'nr kurz', rh: 0, rows, sort: ['pk', 1], cols: [
+    {k: 't', l: 'Team', v: t => U.kz(t.team_id), d: 1, f: t => U.tl(t.team_id)},
+    {k: 'pk', l: 'Ø Pick', num: 1, d: 1, v: t => L(t).pick, f: t => U.num(L(t).pick, 1)},
+    {k: 'p1', l: 'Pick 1', num: 1, v: t => U.sp(L(t).pick1), f: t => pct(L(t).pick1)},
+    {k: 'p3', l: 'Pick 1–3', num: 1, v: t => U.sp(L(t).pick_top3), f: t => pct(L(t).pick_top3)},
+    {k: 'me', l: 'Meister', num: 1, v: t => U.sp(L(t).endplatz[0]), f: t => pct(L(t).endplatz[0])},
+    {k: 'po', l: 'Playoffs', num: 1, v: t => U.sp(L(t).playoff), f: t => pct(L(t).playoff)}]}),
+  U.legend(['draft-folgejahr', 'endplatz-sim', 'simulation']), note);
+}
+
 // ---------------------------------------------------------------- Alter: Altersprofil je Team
 const ohneAlter = r => r.pos === 'D/ST' ? 'D/ST ohne Alter' : 'nicht in den Stammdaten';
 const ohneWert = r => r.pos === 'K' || r.pos === 'D/ST' ? 'K und D/ST ohne Marktwert' : 'nicht bei FantasyCalc';
@@ -187,7 +224,9 @@ function alter(box, K, svg) {
     return;
   }
   const rows = K.teams.filter(t => t.altersprofil), P = t => t.altersprofil;
-  const ros = K.alter_gewicht, rosWhy = 'keine ROS-Projektion';
+  // Gewicht: Restpunkte laut ROS; ohne ROS-Projektion (Offseason) der Marktwert (Stufe 4), ohne beides keins
+  const ros = K.alter_gewicht, rosWhy = 'keine ROS-Projektion und kein Marktwert';
+  const byWert = ros === 'wert', gw = byWert ? 'Wert' : 'ROS';
   const age = v => U.num(v, 1), dev = v => U.sgn(v, 1);
   const by = new Map(rows.map(t => [t.team_id, t]));
   const key = ros ? 'bereinigt_ros' : 'bereinigt';
@@ -202,8 +241,8 @@ function alter(box, K, svg) {
     U.table({cap: 'Altersprofil je Team', cls: 'nr kurz', rh: 0, rows, sort: [key, 1], cols: [
       {k: 't', l: 'Team', v: t => U.kz(t.team_id), d: 1, f: t => U.tl(t.team_id)},
       // die gewichteten Werte zuerst: auf dem Handy sind nur drei bis vier Spalten ohne Wischen zu sehen
-      {k: 'bereinigt_ros', l: 'bereinigt ROS', num: 1, d: 1, v: t => P(t).bereinigt_ros, f: t => U.val(P(t).bereinigt_ros, dev, rosWhy)},
-      {k: 'ros', l: 'nach ROS', num: 1, d: 1, v: t => P(t).ros, f: t => U.val(P(t).ros, age, rosWhy)},
+      {k: 'bereinigt_ros', l: `bereinigt ${gw}`, num: 1, d: 1, v: t => P(t).bereinigt_ros, f: t => U.val(P(t).bereinigt_ros, dev, rosWhy)},
+      {k: 'ros', l: `nach ${gw}`, num: 1, d: 1, v: t => P(t).ros, f: t => U.val(P(t).ros, age, rosWhy)},
       {k: 'bereinigt', l: 'bereinigt', num: 1, d: 1, v: t => P(t).bereinigt, f: t => dev(P(t).bereinigt)},
       {k: 'kader', l: 'Ø Alter', num: 1, d: 1, v: t => P(t).kader, f: t => age(P(t).kader)},
       {k: 'jung', l: '< 26', num: 1, v: t => P(t).jung, f: t => P(t).jung},
@@ -211,11 +250,11 @@ function alter(box, K, svg) {
       {k: 'rk', l: 'Rookies', num: 1, v: t => P(t).rookies, f: t => P(t).rookies},
       {k: 'zj', l: '2. Jahr', num: 1, v: t => P(t).zweites_jahr, f: t => P(t).zweites_jahr},
       {k: 'n', l: 'Spieler', num: 1, v: t => P(t).n, f: t => P(t).n}]}),
-    svg.fig(ros ? 'Alter bereinigt, nach ROS gewichtet' : 'Alter bereinigt', svg.hbars({title: 'Abstand zum Liga-Schnitt der Positionen je Team, in Jahren',
+    svg.fig(ros ? `Alter bereinigt, nach ${gw} gewichtet` : 'Alter bereinigt', svg.hbars({title: 'Abstand zum Liga-Schnitt der Positionen je Team, in Jahren',
       desc: 'Balken nach links = jünger als der Schnitt, nach rechts = älter; genaue Werte in der Tabelle.', fmt: dev, rows: bars}),
     {heads: ['Team', 'Jahre zum Schnitt'], rows: bars.map(b => [b.name, dev(b.v)])},
     h('p', {class: 'note'}, 'Links jünger, rechts älter als der Liga-Schnitt der jeweiligen Position.')),
-    U.legend(['alter', 'alter-ros', 'alter-bereinigt']),
+    U.legend(['alter', byWert ? 'alter-wert' : 'alter-ros', 'alter-bereinigt']),
     h('p', {class: 'note'}, standTxt(K) + '.', quelle(K)));
 }
 

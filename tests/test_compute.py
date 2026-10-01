@@ -188,6 +188,22 @@ def test_finale_playoff_wochen(monkeypatch):
     assert compute.final_playoff_weeks(2026, [], 14) == []
 
 
+def test_playoff_stand_verdrahtung(monkeypatch):
+    """Verdrahtung des Playoff-Stands mit echten Dateien (konstruierte Lage): Die Regular Season endet hier bei W2,
+    W3 gilt als finale Playoff-Woche. Tabelle und Score bleiben bei W2; ROS, Alters-Stichtag und Seed kommen aus W3."""
+    import app_export
+    monkeypatch.setattr(compute, "last_regular_week", lambda season: 2)
+    monkeypatch.setattr(ef, "is_final", lambda season, week: week == 3)
+    res = compute.compute_season(2026)
+    assert (res["through_week"], res["playoff_woche"], res["ros_after_week"]) == (2, 3, 3)
+    assert all(t["games"] == 2 for t in res["teams"]) and [w["week"] for w in res["weeks"]] == [1, 2]
+    info = res["power_ranking"]["sim_info"]
+    assert (info["seed"], info["stand_woche"], info["playoff_entschieden"]) == (202603, 3, 0)
+    assert res["keeper"]["alter_stichtag"] in (None, "2026-09-29")          # Dienstag nach der Stand-Woche W3
+    manifest = json.loads(app_export.render(app_export.build(res), res)["manifest.json"])
+    assert manifest["datenstand"]["playoff_woche"] == 3 and manifest["datenstand"]["woche_final"] == 2
+
+
 def test_laufende_woche_zaehlt_nicht(tmp_path, monkeypatch):
     """Konstruierte Datenlage (unabhängig vom wachsenden Repo-Stand): W1 abgeschlossen, W2 läuft noch."""
     for week in (1, 2):
