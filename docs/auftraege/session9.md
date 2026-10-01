@@ -201,3 +201,24 @@ Gegenprüfung, Ansichten im Browser bei 320/360/390 px und am Desktop, dann Pull
   Wochenpool nicht kennt, fehlten in `waiver.json` und `claude_marktwert.json`; Vertrag zu `in_app`), 6 widerlegt (u. a.
   der erneute Abruf nach einem Fehlschlag – so bestellt).
 - Offen für Stephan: den Absatz für die Projektanweisung des Claude-Projekts einfügen (Wortlaut im Chat vorgelegt).
+- Gemergt als PR #45. Der erste Tageslauf danach (36846153258) holte den Auszug, war aber rot: Ein Test erwartete den
+  lokalen Warn-Präfix „Warnung: “, in der Action schreibt `espn_fetch.warn` „::warning::“. Behoben in PR #46 (Test prüft
+  nur den Text; App-Daten mit dem ersten echten Auszug). Lehre: Tests, die Ausgaben prüfen, auch mit
+  `GITHUB_ACTIONS=true` laufen lassen.
+
+## Ergebnis Stufe 4 (01.10.2026, Branch `claude/keeper-offseason`)
+- Playoff-Stand: `compute.final_playoff_weeks`, `rawdata.Season.at` (Stand-Woche teilt die geladenen Wochendateien);
+  Tabelle, All-Play, Score, Power Ranking und Kader-Projektion bleiben bei W14. Aus der Stand-Woche: ROS (nach W17 ohne
+  Werte), Bedarf/Profil, Altersgewicht und Stichtag, Vorausschau von Positions-Matchup und D/ST, gespielte Playoff-Spiele,
+  Seed. `schedule.json` zeigt Playoff-Wochen weiter nicht als final (Playoff-Session).
+- Endplatz-Simulation (`powerranking.play_bracket`, eigener Zufallsstrom – die bisherigen Werte bleiben gleich) mit
+  Draft-Position des Folgejahrs; nach W17 feste Reihenfolge (`final_places`), nur ohne Abweichung von ESPN (Paarungen,
+  TIE, ESPN-Endplatz `rankFinal`/`rankCalculatedFinal`); bei Abweichung keine Verteilung und keine Reihenfolge, Hinweis
+  am Lauf. Stand W3: SaureGurken Ø Pick 2,6, Asse's Cowboys 8,7.
+- App: Ansicht `#keeper/draft-folgejahr` (statt `#keeper/draft2027`, damit die Route jede Saison stimmt), Alter „nach
+  Wert“ in der Offseason, Datenstand-Chip in den Playoffs; Glossar mit gekennzeichneter Annahme.
+- Gegenprüfung: 13 Befunde, 11 bestätigt und umgesetzt (u. a. Echtdaten-Test hätte nach W17 jede Action rot gemacht;
+  feste Reihenfolge trotz Abweichung; FantasyCalc-Nennung in der Alter-Ansicht; Datenstand-Chip ab 23.12.).
+- Offen (in CLAUDE.md): Annahme zur ESPN-Mechanik nach W15, W16 und W17 an den echten Paarungen prüfen (ab 15.12.);
+  im Januar prüfen, ob sich der Kader nach W17 bewegt und ob ESPN `rankCalculatedFinal` füllt; Entscheidung Stephan vor
+  dem Saisonwechsel: eigener Vorsaison-Pfad.
