@@ -1,11 +1,11 @@
 {
-"stand":"2026-10-01T0757Z",
+"stand":"2026-10-01T0858Z",
 "woche":4,
 "einheiten":{"temp":"°C","wind":"km/h","boeen":"km/h","regen_wahrsch":"%","niederschlag":"mm","schnee":"cm"},
 "schwellen":{"wind":25,"boeen":40,"regen_wahrsch":60,"schnee":0},
 "prognose":[
-{"id":401872964,"woche":4,"kickoff":"2026-10-02T00:15Z","tbd":false,"heim":"CLE","gast":"PIT","stadion":"Huntington Bank Field","ort":"Cleveland, OH","dach":"offen","neutral":false,"temp":24.9,"wind":18.4,"boeen":40.0,"regen_wahrsch":9,"niederschlag":0.0,"schnee":0.0,"markierung":["boeen"]},
-{"id":401872965,"woche":4,"kickoff":"2026-10-04T13:30Z","tbd":false,"heim":"WSH","gast":"IND","stadion":"Tottenham Hotspur Stadium","ort":"London, England","dach":"offen","neutral":true,"temp":19.4,"wind":5.2,"boeen":22.3,"regen_wahrsch":2,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
+{"id":401872964,"woche":4,"kickoff":"2026-10-02T00:15Z","tbd":false,"heim":"CLE","gast":"PIT","stadion":"Huntington Bank Field","ort":"Cleveland, OH","dach":"offen","neutral":false,"temp":24.3,"wind":18.2,"boeen":37.4,"regen_wahrsch":9,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
+{"id":401872965,"woche":4,"kickoff":"2026-10-04T13:30Z","tbd":false,"heim":"WSH","gast":"IND","stadion":"Tottenham Hotspur Stadium","ort":"London, England","dach":"offen","neutral":true,"temp":19.4,"wind":10.1,"boeen":22.3,"regen_wahrsch":2,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
 {"id":401872966,"woche":4,"kickoff":"2026-10-04T17:00Z","tbd":false,"heim":"NYG","gast":"ARI","stadion":"MetLife Stadium","ort":"East Rutherford, NJ","dach":"offen","neutral":false,"temp":18.4,"wind":11.4,"boeen":22.3,"regen_wahrsch":34,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
 {"id":401872967,"woche":4,"kickoff":"2026-10-04T17:00Z","tbd":false,"heim":"HOU","gast":"DAL","stadion":"NRG Stadium","ort":"Houston, TX","dach":"beweglich","neutral":false,"temp":26.1,"wind":9.9,"boeen":24.1,"regen_wahrsch":58,"niederschlag":0.1,"schnee":0.0,"markierung":[]},
 {"id":401872968,"woche":4,"kickoff":"2026-10-04T17:00Z","tbd":false,"heim":"TB","gast":"GB","stadion":"Raymond James Stadium","ort":"Tampa, FL","dach":"offen","neutral":false,"temp":32.9,"wind":17.0,"boeen":20.5,"regen_wahrsch":63,"niederschlag":0.0,"schnee":0.0,"markierung":["regen_wahrsch"]},
