@@ -477,12 +477,12 @@ def test_players_mu(data, result):
 
 def test_claude_matchup_spalten(data):
     c = data["claude.json"]
-    assert c["spieler_spalten"][-2:] == ["gegner_n1", "mu_n1"] and c["stand"]["matchup_woche"] == 3
+    assert {"gegner_n1", "mu_n1"} <= set(c["spieler_spalten"]) and c["stand"]["matchup_woche"] == 3
     cols = {name: i for i, name in enumerate(c["spieler_spalten"])}
     kader = [r for team in c["kader"].values() for r in team]
     free = [r for pos in c["free_agents"].values() for r in pos]
     assert kader and all(len(r) == len(cols) for r in kader)
-    assert all(len(r) == len(c["free_agents_spalten"]) for r in free)  # Free Agents zusätzlich status, proj, proj3
+    assert all(len(r) == len(c["free_agents_spalten"]) for r in free)  # Free Agents zusätzlich status
     assert all((r[cols["gegner_n1"]] is None) == (r[cols["mu_n1"]] is None) for r in kader + free)
     assert any(isinstance(r[cols["mu_n1"]], float) for r in kader + free) and "mu_n1" in c["legende"]
 
@@ -500,25 +500,46 @@ def test_claude_vertrag(data):
     assert c["stand"]["pool_stand"] == data["manifest.json"]["datenstand"]["pool_stand"]
     assert c["stand"]["pool_woche"] == data.get("waiver.json", {}).get("woche")
     assert c["spieler_spalten"] == list(app_export.CLAUDE_PLAYER_COLS)
-    assert c["free_agents_spalten"] == c["spieler_spalten"] + ["status", "proj", "proj3"]
+    assert c["spieler_spalten"][0] == "id" and {"proj", "proj3"} <= set(c["spieler_spalten"])
+    assert c["free_agents_spalten"] == c["spieler_spalten"] + ["status"]
     assert list(c["kader"]) == [app_export.KUERZEL[t] for t in sorted(app_export.KUERZEL)]
     assert all(len(c[k]) <= check_public.MAX_TEXT for k in ("legende", "legende_stand"))
     status = c["free_agents_spalten"].index("status")
     assert all(r[status] in ("WAIVERS", "FREEAGENT") for rows in c["free_agents"].values() for r in rows)
+    # id ist eindeutig: kein Spieler steht zweimal, keiner zugleich im Kader und frei
+    ids = [r[0] for rows in [*c["kader"].values(), *c["free_agents"].values()] for r in rows]
+    assert ids and all(isinstance(i, int) for i in ids) and len(ids) == len(set(ids))
+    proj, proj3 = c["free_agents_spalten"].index("proj"), c["free_agents_spalten"].index("proj3")
     if "waiver.json" in data:   # jeder Kaderspieler laut Tagesstand steht im Kader seines Teams
         daily = Counter(s["team"] for s in data["waiver.json"]["spieler"] if s["team"])
         assert all(len(c["kader"][kz]) >= daily[tid] for tid, kz in app_export.KUERZEL.items())
+        # je id Team, Status und Wochenwerte wie in waiver.json (beide gleich gerundet); ohne Eintrag dort null
+        tag = {s["id"]: s for s in data["waiver.json"]["spieler"]}
+        team_id = {kz: tid for tid, kz in app_export.KUERZEL.items()}
+        for kz, rows in c["kader"].items():
+            for r in rows:
+                s = tag.get(r[0], {"team": None, "proj": None, "proj3": None})
+                assert s["team"] in (None, team_id[kz]) and (r[proj], r[proj3]) == (s["proj"], s["proj3"])
+        for r in (r for rows in c["free_agents"].values() for r in rows):
+            s = tag.get(r[0], {"status": r[status], "proj": None, "proj3": None})
+            assert (r[status], r[proj], r[proj3]) == (s["status"], s["proj"], s["proj3"])
+    else:                       # ohne Tagesstand keine Wochenwerte
+        assert all(r[proj] is None and r[proj3] is None
+                   for rows in [*c["kader"].values(), *c["free_agents"].values()] for r in rows)
 
 
 def test_claude_tagesstand(result):
     """claude.json mit erfundenen Spielern und erfundenem Tagesstand (IDs, Namen, Werte erfunden; nur Tabelle, Spiele
     und D/ST-Faktoren sind echt): Kader, Free Agents und D/ST-Besitzer folgen dem Tagesstand; Spieler ohne Eintrag
-    dort und die ganze Datei ohne Tagesstand bleiben beim Wochenstand."""
+    dort und die ganze Datei ohne Tagesstand bleiben beim Wochenstand; proj und proj3 gibt es nur im Tagesstand, auch
+    im Kader."""
     teams, schedule, dst = app_export.build_teams(result), app_export.build_schedule(result), app_export.build_dst(result)
 
     def woche(pid, name, pos, team, status, ros_g, nfl="KC"):
+        # proj/proj3 hier erfunden: ein gleichnamiges Feld im Wochenstand darf nicht in claude.json durchrutschen
         return {"id": pid, "name": name, "pos": pos, "nfl": nfl, "team": team, "status": status, "inj": "ACTIVE",
-                "avg": None, "form": None, "trend": None, "ros_g": Decimal(ros_g), "ros_rang": None, "mu": None}
+                "avg": None, "form": None, "trend": None, "ros_g": Decimal(ros_g), "ros_rang": None, "mu": None,
+                "proj": Decimal(99), "proj3": Decimal(99)}
 
     def tag(pid, team, status, **extra):
         return {"id": pid, "team": team, "status": status, "inj": "ACTIVE", "proj": None, "proj3": None} | extra
@@ -528,12 +549,15 @@ def test_claude_tagesstand(result):
                            woche(2, "Erfundener RB Eins", "RB", 0, "FREEAGENT", 12),  # von Team 3 geholt
                            woche(3, "Erfundener RB Zwei", "RB", 0, "FREEAGENT", 10),  # frei, jetzt auf Waivers
                            woche(4, "Erfundener RB Drei", "RB", 0, "WAIVERS", 11),    # fehlt im Tagesstand
-                           woche(5, "Erfundener RB Vier", "RB", 1, "ONTEAM", 9)]}     # von Team 1 entlassen
+                           woche(5, "Erfundener RB Vier", "RB", 1, "ONTEAM", 9),      # von Team 1 entlassen
+                           woche(6, "Erfundener WR Fünf", "WR", 6, "ONTEAM", 8)]}     # Kader, fehlt im Tagesstand
     waiver = {"stand": "2026-10-06T0845Z", "woche": 5,
-              "spieler": [tag(-16001, 0, "FREEAGENT"), tag(1, 5, "ONTEAM", inj="OUT"), tag(2, 3, "ONTEAM"),
+              "spieler": [tag(-16001, 0, "FREEAGENT"), tag(1, 5, "ONTEAM", inj="OUT"),
+                          tag(2, 3, "ONTEAM", proj=Decimal("14.125"), proj3=Decimal("41.205")),
                           tag(3, 0, "WAIVERS", proj=Decimal("11.456"), proj3=Decimal("30.1")),
                           tag(5, 0, "FREEAGENT"),
-                          tag(99, 2, "ONTEAM", name="Erfundener Neuzugang", pos="WR", nfl="KC"),  # nur Tagesstand
+                          tag(99, 2, "ONTEAM", name="Erfundener Neuzugang", pos="WR", nfl="KC",  # nur Tagesstand
+                              proj=Decimal("7.5")),
                           tag(97, 7, "ONTEAM", name=None, pos=None, nfl=None),                   # Name unbekannt
                           tag(98, 0, "FREEAGENT", name="Erfundener Freier", pos="WR", nfl="KC")]}  # frei: fehlt
 
@@ -541,23 +565,30 @@ def test_claude_tagesstand(result):
         return app_export.round_file("claude.json",
                                      app_export.build_claude(result, teams, schedule, players, dst, None, w))
 
+    cols = {name: i for i, name in enumerate(app_export.CLAUDE_FREE_COLS)}  # Kaderzeilen: dieselben ohne status
+
     def names(rows):
-        return [r[0] for r in rows]
+        return [r[cols["name"]] for r in rows]
 
     out, weekly = claude(waiver), claude(None)
-    cols = {name: i for i, name in enumerate(out["free_agents_spalten"])}
     assert (out["stand"]["pool_stand"], out["stand"]["pool_woche"]) == ("2026-10-06T0845Z", 5)
     assert names(out["kader"]["TTY"]) == ["Erfundener QB"] and out["kader"]["TTY"][0][cols["inj"]] == "OUT"
-    assert names(out["kader"]["4DS"]) == ["Erfundener RB Eins"]
-    assert out["kader"]["HJS"] == [["Erfundener Neuzugang", "WR", "KC", "ACTIVE"] + [None] * 7]
-    assert out["kader"]["RTZ"] == [["Spieler 97", None, None, "ACTIVE"] + [None] * 7]
+    assert out["kader"]["TTY"][0][cols["proj"]] is None   # Wochenwerte nur aus dem Tagesstand (dort None)
+    assert out["kader"]["4DS"] == [[2, "Erfundener RB Eins", "RB", "KC", "ACTIVE"] + [None] * 3 + [12.0]
+                                   + [None] * 3 + [14.13, 41.21]]   # proj, proj3 round half up
+    assert out["kader"]["HJS"] == [[99, "Erfundener Neuzugang", "WR", "KC", "ACTIVE"] + [None] * 7 + [7.5, None]]
+    # Kaderspieler ohne Eintrag im Tagesstand: Wochenstand, aber keine Wochenwerte (proj 99 im Wochenstand bleibt draußen)
+    assert [(r[cols["id"]], r[cols["name"]], r[cols["proj"]], r[cols["proj3"]]) for r in out["kader"]["SAM"]] == [
+        (6, "Erfundener WR Fünf", None, None)]
+    assert out["kader"]["RTZ"] == [[97, "Spieler 97", None, None, "ACTIVE"] + [None] * 9]
     assert out["kader"]["ACB"] == [] and out["kader"]["CRN"] == []
-    assert [(r[0], r[cols["status"]], r[cols["proj"]], r[cols["proj3"]]) for r in out["free_agents"]["RB"]] == [
-        ("Erfundener RB Drei", "WAIVERS", None, None), ("Erfundener RB Zwei", "WAIVERS", 11.46, 30.1),
-        ("Erfundener RB Vier", "FREEAGENT", None, None)]
-    assert names(out["free_agents"]["D/ST"]) == ["Falcons D/ST"] and out["free_agents"]["QB"] == []
-    assert "Erfundener Freier" not in {r[0] for rows in [*out["kader"].values(), *out["free_agents"].values()]
-                                      for r in rows}
+    assert [(r[cols["id"]], r[cols["name"]], r[cols["status"]], r[cols["proj"]], r[cols["proj3"]])
+            for r in out["free_agents"]["RB"]] == [
+        (4, "Erfundener RB Drei", "WAIVERS", None, None), (3, "Erfundener RB Zwei", "WAIVERS", 11.46, 30.1),
+        (5, "Erfundener RB Vier", "FREEAGENT", None, None)]
+    assert names(out["free_agents"]["D/ST"]) == ["Falcons D/ST"] and out["free_agents"]["D/ST"][0][0] == -16001
+    assert out["free_agents"]["QB"] == []
+    assert 98 not in {r[0] for rows in [*out["kader"].values(), *out["free_agents"].values()] for r in rows}
     atl = next(d for d in dst["teams"] if d["abbrev"] == "ATL")
     assert next(d for d in out["dst"] if d[0] == "ATL")[-1] == "FREEAGENT"
     assert [d for d in out["dst"] if d[0] != "ATL"] == [d for d in weekly["dst"] if d[0] != "ATL"]
@@ -565,9 +596,10 @@ def test_claude_tagesstand(result):
     assert (weekly["stand"]["pool_stand"], weekly["stand"]["pool_woche"]) == (None, None)
     assert names(weekly["kader"]["HJS"]) == ["Erfundener QB"] and names(weekly["kader"]["ACB"]) == ["Erfundener RB Vier"]
     assert names(weekly["kader"]["CRN"]) == ["Falcons D/ST"] and weekly["free_agents"]["D/ST"] == []
-    assert [(r[0], r[cols["status"]], r[cols["proj"]]) for r in weekly["free_agents"]["RB"]] == [
-        ("Erfundener RB Eins", "FREEAGENT", None), ("Erfundener RB Drei", "WAIVERS", None),
-        ("Erfundener RB Zwei", "FREEAGENT", None)]
+    assert [(r[cols["name"]], r[cols["status"]]) for r in weekly["free_agents"]["RB"]] == [
+        ("Erfundener RB Eins", "FREEAGENT"), ("Erfundener RB Drei", "WAIVERS"), ("Erfundener RB Zwei", "FREEAGENT")]
+    assert all(r[cols["proj"]] is None and r[cols["proj3"]] is None   # proj 99 im Wochenstand bleibt draußen
+               for rows in [*weekly["kader"].values(), *weekly["free_agents"].values()] for r in rows)
     assert next(d for d in weekly["dst"] if d[0] == "ATL")[-1] == \
         (app_export.KUERZEL[atl["besitzer"]] if atl["besitzer"] else atl["status"])
 
