@@ -437,15 +437,18 @@ def kader_projection(ssn: rawdata.Season, ligafaktor, last_regular: int = LAST_R
     """Kader-Projektion ROS je Team (Beschluss §2, Frage 8); None ohne ros.json oder ohne Restwoche.
 
     Kader = onTeamId im Pool N. P_i,w = projektionsoptimale Aufstellung × Ligafaktor für w = N+1 … 14;
-    kader_projektion_i = Ø_w P_i,w; dev_i,w = P_i,w − Ø (Wochenabweichung für die Playoff-Simulation).
-    Nach der letzten Woche der Regular Season zählen die Playoff-Wochen 15 … 17; nach W17 gibt es keine Projektion.
-    Rückgabe: {"teams": {team_id: Ø}, "wochen": {team_id: {week: P}}, "dev": {team_id: {week: P − Ø}}}.
+    kader_projektion_i = Ø_w P_i,w; dev_i,w = P_i,w − Ø (Wochenabweichung für die Playoff-Simulation) – auch für die
+    Playoff-Wochen 15 … 17, gegen dasselbe Ø der Regular Season (Endplatz-Simulation, Stufe 4; Befund Gegenprüfung
+    01.10.2026: sonst gingen sie mit 0 ein). Nach der letzten Woche der Regular Season zählen die Playoff-Wochen
+    15 … 17 auch für das Ø; nach W17 gibt es keine Projektion.
+    Rückgabe: {"teams": {team_id: Ø}, "wochen": {team_id: {week: P}} (Wochen des Ø), "dev": {team_id: {week: P − Ø}}}.
     """
     ros = ssn.ros()
     if ros is None:
         return None
     after = ros["after_week"]
     regular, playoffs = ros_weeks(after, last_regular)
+    extra = playoffs if regular else []   # Playoff-Wochen nur für dev, solange es noch Regular-Season-Wochen gibt
     regular = regular or playoffs  # nach W14 (Schlusstabelle) über die Playoff-Wochen, damit P nicht aufs Vorjahr fällt
     if not regular:
         return None
@@ -454,10 +457,11 @@ def kader_projection(ssn: rawdata.Season, ligafaktor, last_regular: int = LAST_R
     for r in pool_now(ssn, after):
         if r.on_team:
             rosters.setdefault(r.on_team, []).append(r)
-    wochen = {tid: {w: team_week_projection(rows, w, after + 1, projections, nfl) * factor for w in regular}
-              for tid, rows in sorted(rosters.items())}
+    projection = lambda rows, w: team_week_projection(rows, w, after + 1, projections, nfl) * factor  # noqa: E731
+    wochen = {tid: {w: projection(rows, w) for w in regular} for tid, rows in sorted(rosters.items())}
     teams = {tid: statistics.mean(values.values()) for tid, values in wochen.items()}
-    dev = {tid: {w: p - teams[tid] for w, p in values.items()} for tid, values in wochen.items()}
+    dev = {tid: {w: p - teams[tid] for w, p in values.items()} | {w: projection(rosters[tid], w) - teams[tid] for w in extra}
+           for tid, values in wochen.items()}
     return {"teams": teams, "wochen": wochen, "dev": dev}
 
 

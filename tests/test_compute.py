@@ -200,8 +200,34 @@ def test_playoff_stand_verdrahtung(monkeypatch):
     info = res["power_ranking"]["sim_info"]
     assert (info["seed"], info["stand_woche"], info["playoff_entschieden"]) == (202603, 3, 0)
     assert res["keeper"]["alter_stichtag"] in (None, "2026-09-29")          # Dienstag nach der Stand-Woche W3
+    # Vorausschau von Positions-Matchup und D/ST ab der Stand-Woche, Faktoren beim Stand W2
+    assert res["matchup"]["wochen"]["n1"] == 4 and res["matchup"]["wochen"]["naechste3"] == [4, 5, 6]
+    assert res["matchup"]["through_week"] == 2 and res["dst"]["wochen"]["naechste3"] == [4, 5, 6]
     manifest = json.loads(app_export.render(app_export.build(res), res)["manifest.json"])
     assert manifest["datenstand"]["playoff_woche"] == 3 and manifest["datenstand"]["woche_final"] == 2
+
+
+def test_saisonende_verdrahtung(monkeypatch):
+    """Saisonende über den echten Rechenweg (konstruierte Lage): Regular Season bis W2, W3 ist die letzte Playoff-Woche
+    und hat – wie W17 – keinen ROS-Auszug. compute_season und der ganze App-Export laufen durch; ROS nach der letzten
+    Woche ohne Werte, kein Bedarf und kein Profil, Altersgewicht nach Marktwert, sobald es einen Auszug gibt."""
+    import app_export
+    import players
+    original = rawdata.Season.ros
+    monkeypatch.setattr(compute, "last_regular_week", lambda season: 2)
+    monkeypatch.setattr(ef, "is_final", lambda season, week: week == 3)
+    monkeypatch.setattr(players, "LAST_PLAYOFF_WEEK", 3)
+    monkeypatch.setattr(rawdata.Season, "ros", lambda self: None if self.through == 3 else original(self))
+    res = compute.compute_season(2026)
+    assert (res["playoff_woche"], res["ros_after_week"]) == (3, 3)
+    assert all(p["ros"] is None and p["ros_pro_spiel"] is None for p in res["players"]["players"].values())
+    assert app_export.need_basis(res) is None
+    waiver = app_export.build_waiver(res)
+    if waiver:
+        assert waiver["bedarf"] is None and waiver["profil"] is None and waiver["bedarf_basis"] is None
+    assert res["keeper"]["alter_gewicht"] in (None, "wert")
+    content = app_export.render(app_export.build(res), res)
+    assert json.loads(content["manifest.json"])["datenstand"]["ros_nach_woche"] == 3
 
 
 def test_laufende_woche_zaehlt_nicht(tmp_path, monkeypatch):

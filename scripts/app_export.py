@@ -322,9 +322,11 @@ def build_keeper(result: dict) -> dict | None:
     if liga["altersprofil"]:   # Positionsschnitt der Liga mit Kürzeln als Schlüssel
         liga["altersprofil"] = liga["altersprofil"] | {
             "positionen": {pos(p): v for p, v in liga["altersprofil"]["positionen"].items()}}
-    # Draft des Folgejahrs (Stufe 4): feste Reihenfolge erst, wenn alle Playoff-Spiele entschieden sind
+    # Draft des Folgejahrs (Stufe 4): feste Reihenfolge erst, wenn alle Playoff-Spiele entschieden sind und ESPN nicht von
+    # der Annahme abweicht; abweichung = Wochen mit Abweichung (dann auch keine Endplatz-Verteilung in teams.json)
     endplatz = (result.get("power_ranking") or {}).get("endplatz") or {}
-    draft_next = {"saison": result["season"] + 1, "reihenfolge": endplatz.get("draft"), "endplatz": endplatz.get("fest")}
+    draft_next = {"saison": result["season"] + 1, "reihenfolge": endplatz.get("draft"), "endplatz": endplatz.get("fest"),
+                  "abweichung": endplatz.get("abweichung") or [], "espn_bestaetigt": endplatz.get("espn_bestaetigt")}
     return {k: data[k] for k in KEEPER_HEAD} | {"draft_folgejahr": draft_next} | {
         "liga": liga,
         "teams": [{"team_id": t["team_id"]} | {k: t[k] for k in KEEPER_TEAM} for t in data["teams"]],

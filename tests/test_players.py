@@ -262,8 +262,15 @@ def test_kader_projektion():
     assert result["teams"][1] == (D("26.1") + D("28.8") + 9 * D("46.8")) / 11
     assert result["wochen"][2] == {w: (D(0) if w in (4, 5) else D("10.8")) for w in range(4, 15)}
     for tid in (1, 2):
-        assert abs(sum(result["dev"][tid].values())) < D("1e-20")
-        assert result["dev"][tid][4] == result["wochen"][tid][4] - result["teams"][tid]
+        dev = result["dev"][tid]
+        assert abs(sum(dev[w] for w in range(4, 15))) < D("1e-20")          # Ø über die Regular Season
+        assert dev[4] == result["wochen"][tid][4] - result["teams"][tid]
+        # Playoff-Wochen nur in dev (Endplatz-Simulation), gegen dasselbe Ø; das Ø selbst bleibt bei W4–14
+        assert list(dev) == list(range(4, 18))
+    fake = FakeSeason(ros=ros_extract())
+    rows1 = [r for r in fake.pool(3) if r.on_team == 1]
+    w16 = players.team_week_projection(rows1, 16, 4, ros_extract()["players"], NFL) * D("0.9")
+    assert result["dev"][1][16] == w16 - result["teams"][1]
 
 
 def test_kader_projektion_randfaelle():
@@ -382,7 +389,8 @@ def test_w03_kader_projektion_echt(ssn3):
     for tid, values in result["wochen"].items():
         assert list(values) == list(range(4, 15))
         assert all(v > 0 for v in values.values())
-        assert abs(sum(result["dev"][tid].values())) < D("1e-18")
+        assert abs(sum(result["dev"][tid][w] for w in values)) < D("1e-18")
+        assert list(result["dev"][tid]) == list(range(4, 18))              # dazu W15–17 für die Endplatz-Simulation
 
 
 # ---------------------------------------------------------------- Bedarf je Team (Waiver-Tab, Session 7)

@@ -246,8 +246,8 @@ def position_ages(rows: list[dict]) -> dict[int, dict]:
 def age_profile(rows: list[dict], weight: dict[int, Decimal], pos_age: dict[int, dict]) -> dict | None:
     """Altersprofil einer Gruppe von Kaderzeilen (ein Team oder die Liga); None ohne einen Spieler mit Alter.
 
-    kader = Ø Alter; ros = mit den Gewichten weight (Restpunkte laut ESPN-Projektion) gewichtet – das Alter der
-    Spieler, von denen die Punkte kommen sollen; bereinigt = Ø (Alter − Liga-Schnitt der Position, pos_age), weil
+    kader = Ø Alter; ros = mit den Gewichten weight (age_weights: Restpunkte laut ESPN-Projektion, ohne sie der
+    Marktwert) gewichtet – das Alter der Spieler, von denen die Punkte kommen sollen (bzw. in denen der Wert steckt); bereinigt = Ø (Alter − Liga-Schnitt der Position, pos_age), weil
     Quarterbacks und Kicker im Schnitt älter sind; bereinigt_ros = dasselbe gewichtet. Beide ros-Werte None ohne
     Gewichte. jung = Alter unter JUNG_UNTER, alt = ab ALT_AB, verglichen wie angezeigt (auf eine Stelle, round half
     up); rookies und zweites_jahr nach nfl_jahr.

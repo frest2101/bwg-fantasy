@@ -486,24 +486,47 @@ def espn_simulation(ssn: rawdata.Season) -> dict[int, dict] | None:
 
 # ---------------------------------------------------------------- Einstieg
 
-def final_places(teams: list[dict], settings: dict, decided: dict, espn_pairs: dict) -> dict:
+def espn_ranks(teams: list[dict]) -> dict[int, int] | None:
+    """Endplatz laut ESPN aus mTeam: rankFinal (Handkorrektur des Commissioners), sonst rankCalculatedFinal – nur wenn
+    alle Teams einen Wert über 0 haben (bis zum Saisonende stehen beide auf 0), sonst None."""
+    ranks = {t["id"]: t.get("rankFinal") or t.get("rankCalculatedFinal") for t in teams}
+    return ranks if ranks and all(isinstance(r, int) and r > 0 for r in ranks.values()) else None
+
+
+def final_places(teams: list[dict], settings: dict, decided: dict, espn_pairs: dict,
+                 espn_rank: dict[int, int] | None = None) -> dict:
     """Endplatz aus den Ergebnissen (Stufe 4, Schritt 8), nur bei abgeschlossener Regular Season: Seeding „liga“ aus der
     Schlusstabelle (W + 0,5·T, dann PF, Gleichstand nach team_id wie in simulate), Bracket nach play_bracket mit den
-    entschiedenen Spielen. fest = team_ids in Endplatz-Reihenfolge 1–10, sobald alle Spiele entschieden sind und kein
-    Unentschieden vorliegt (sonst None); draft = Draft-Reihenfolge des Folgejahrs (Pick 1 = Endplatz 10, linear, ohne
-    Lotterie, ohne getauschte Picks) oder None; warnungen = bracket_warnings."""
+    entschiedenen Spielen.
+
+    abweichung = Wochen, in denen ESPN anders paart als die Annahme oder ein Unentschieden meldet (bracket_warnings),
+    dazu 17, wenn der Endplatz laut ESPN (espn_ranks) von dem nach der Annahme abweicht. fest = team_ids in Endplatz-
+    Reihenfolge 1–10, sobald alle Spiele entschieden sind und es keine Abweichung gibt (Befund Gegenprüfung 01.10.2026:
+    eine Reihenfolge, die das Rechenwerk selbst als ungeprüft meldet, ist keine Tatsache), sonst None; draft = Draft-
+    Reihenfolge des Folgejahrs (Pick 1 = Endplatz 10, linear, ohne Lotterie, ohne getauschte Picks) oder None;
+    espn_bestaetigt = True/False nach dem Abgleich mit espn_rank, None ohne ESPN-Endplatz; warnungen für den Lauf."""
     weeks = playoff_weeks(settings)
     playoff_teams = settings["scheduleSettings"]["playoffTeamCount"]
     if len(teams) != BRACKET_TEAMS or playoff_teams != BRACKET_FIELD or len(weeks) != BRACKET_ROUNDS:
-        return {"fest": None, "draft": None, "warnungen": []}
+        return {"fest": None, "draft": None, "abweichung": [], "espn_bestaetigt": None, "warnungen": []}
     ids = sorted(t["team_id"] for t in teams)
     by_id = {t["team_id"]: t for t in teams}
     order = sorted(range(len(ids)), key=lambda i: (2 * by_id[ids[i]]["w"] + by_id[ids[i]]["t"], by_id[ids[i]]["pf"]),
                    reverse=True)
     liga, _ = liga_order(order, [by_id[t]["division"] for t in ids], playoff_teams)
     known, places, ties = trace_bracket([ids[i] for i in liga], decided, weeks)
-    return {"fest": places, "draft": places[::-1] if places else None,
-            "warnungen": bracket_warnings(known, espn_pairs, ties)}
+    warnungen = bracket_warnings(known, espn_pairs, ties)
+    abweichung = {w for w, rule in known.items() if w in espn_pairs and espn_pairs[w] != rule} | {w for w, _, _ in ties}
+    bestaetigt = None
+    if places and espn_rank:
+        bestaetigt = all(espn_rank.get(t) == place for place, t in enumerate(places, start=1))
+        if not bestaetigt:
+            abweichung.add(weeks[-1])
+            warnungen.append("Endplatz laut ESPN (rankFinal/rankCalculatedFinal) weicht von der Annahme ab – keine feste "
+                             "Draft-Reihenfolge, Annahme prüfen, Stephan fragen")
+    ok = places is not None and not abweichung
+    return {"fest": places if ok else None, "draft": places[::-1] if ok else None, "abweichung": sorted(abweichung),
+            "espn_bestaetigt": bestaetigt, "warnungen": warnungen}
 
 
 def compute_power_ranking(ssn: rawdata.Season, weeks: list[int], team_weeks: list[dict], teams: list[dict],
@@ -559,8 +582,10 @@ def compute_power_ranking(ssn: rawdata.Season, weeks: list[int], team_weeks: lis
     stand = stand or ssn
     seed = ssn.season * 100 + stand.through
     decided, espn_pairs = playoff_games(stand.schedule(), settings)
-    bracket = {"weeks": playoff_weeks(settings), "entschieden": decided}
-    endplatz = final_places(teams, settings, decided, espn_pairs) if not games else None
+    endplatz = final_places(teams, settings, decided, espn_pairs, espn_ranks(ssn.teams())) if not games else None
+    # Weicht ESPN von der Annahme ab, zählten echte Spiele in falschen Rollen: Endplatz-Verteilung aussetzen, bis die
+    # Annahme angepasst ist (Befund Gegenprüfung 01.10.2026)
+    bracket = None if endplatz and endplatz["abweichung"] else {"weeks": playoff_weeks(settings), "entschieden": decided}
     dev = p_dev or {}
     spiele = [{"id": g["id"], "week": g["weeks"][0], "home": g["home"], "away": g["away"],
                "p_home": win_probability(mu[g["home"]] + dec(dev.get(g["home"], {}).get(g["weeks"][0], 0)),

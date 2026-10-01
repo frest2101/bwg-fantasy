@@ -184,7 +184,8 @@ class Season:
         """Teams laut jüngstem mTeam-Abruf, nur Ligafelder (ohne owners, members, logo), sortiert nach id."""
         def load():
             latest = ef.local_weeks(self.season)[-1]
-            keep = ("id", "name", "abbrev", "divisionId", "waiverRank", "transactionCounter", "playoffSeed")
+            keep = ("id", "name", "abbrev", "divisionId", "waiverRank", "transactionCounter", "playoffSeed",
+                    "rankCalculatedFinal", "rankFinal")   # Endplatz laut ESPN (0 bis zum Saisonende), Abgleich Stufe 4
             teams = ef.load_json(ef.week_dir(self.season, latest) / "mTeam.json")["teams"]
             return sorted(({k: t.get(k) for k in keep} for t in teams), key=lambda t: t["id"])
         return self._get("teams", load)

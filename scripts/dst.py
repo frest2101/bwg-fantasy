@@ -139,9 +139,11 @@ def season_weeks(settings: dict) -> tuple[list[int], list[int]]:
     return regular, playoffs
 
 
-def compute_dst(ssn: rawdata.Season, weeks: list[int]) -> dict:
+def compute_dst(ssn: rawdata.Season, weeks: list[int], ab_woche: int | None = None) -> dict:
     """D/ST-Faktoren nach Woche N = weeks[-1]: je NFL-Team die Offense-Werte (Z, r, F, Rang) und die Sicht
     seiner D/ST (Spielplan-Faktoren, Besitzer). weeks = abgeschlossene Wochen 1…N (compute.completed_weeks).
+    ab_woche = Stand-Woche der Vorausschau (nächste 3, Rest, SoS; in den Playoffs die letzte finale Woche, Stufe 4),
+    Standard N; F und Rang bleiben beim Stand nach N.
 
     Vorwoche von W1 ist der Stand vor der Saison (n = 0 für alle). Zahlen als ungerundete Decimal; beim Export mit
     zahlen.rounded(…, precision=PRECISION) runden.
@@ -173,10 +175,12 @@ def compute_dst(ssn: rawdata.Season, weeks: list[int]) -> dict:
     states = {w: season_state(allowed26, w, r25) for w in range(0, through + 1)}
     now, before = states[through], states[through - 1]
 
-    regular, playoffs = season_weeks(ssn.settings())
-    all_weeks = range(1, max(regular + playoffs) + 1)
-    next_weeks = [w for w in range(through + 1, through + NEXT_WEEKS + 1) if w in all_weeks]
-    rest_weeks = [w for w in regular if w > through]
+    regular, all_playoffs = season_weeks(ssn.settings())
+    all_weeks = range(1, max(regular + all_playoffs) + 1)
+    start = ab_woche or through
+    next_weeks = [w for w in range(start + 1, start + NEXT_WEEKS + 1) if w in all_weeks]
+    rest_weeks = [w for w in regular if w > start]
+    playoffs = [w for w in all_playoffs if w > start]   # gespielte Playoff-Wochen fallen aus der SoS heraus
     owners = {r.pro_team: r for r in pools[through] if r.pos == DST}
 
     teams = []

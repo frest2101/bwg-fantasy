@@ -178,13 +178,21 @@ function draft(box, K, team) {
 // ---------------------------------------------------------------- Draft des Folgejahrs (Stufe 4): umgekehrte Endplatzierung
 // Bis zum Saisonende die Simulation (teams.json sim.liga), danach die feste Reihenfolge aus keeper.json draft_folgejahr
 function draftNext(box, K) {
-  const season = S.man.season, next = season + 1, fest = K.draft_folgejahr?.reihenfolge;
-  const po = S.man.datenstand?.playoff_woche;
-  const note = h('p', {class: 'note'}, fest ? `Fest nach den Playoffs ${season} (Ergebnisse laut ESPN). ` : `Simulation nach W${S.tw}` +
-    (po ? `, Playoffs gespielt bis W${po}` : '') + ', 10 000 Läufe. Die Playoff-Mechanik von ESPN (Spiel um Platz 5, Trostrunde) ist eine Annahme, die nach W15–17 geprüft wird. ',
+  const season = S.man.season, next = season + 1, D = K.draft_folgejahr || {}, fest = D.reihenfolge;
+  const po = S.man.datenstand?.playoff_woche, ab = D.abweichung || [];
+  const note = h('p', {class: 'note'}, fest
+    ? `Fest nach den Playoffs ${season}, aus den Ergebnissen laut ESPN` + (D.espn_bestaetigt ? ' (von ESPNs Endplätzen bestätigt). ' : '; ESPN hat die Endplätze noch nicht gemeldet. ')
+    : `Simulation nach W${S.tw}` + (po ? `, Playoffs gespielt bis W${po}` : '') + ', 10 000 Läufe. Die Playoff-Mechanik von ESPN (Spiel um Platz 5, Trostrunde) ist eine Annahme, die nach W15–17 geprüft wird. ',
     'Getauschte Picks sind nicht berücksichtigt.');
   U.ap(box, h('p', null, `Die Draft-Reihenfolge ${next} ist die umgekehrte Endplatzierung ${season}: Der Letzte hat Pick 1, der Meister Pick 10 – in jeder der zwölf Runden gleich (linear, ohne Lotterie). `,
     U.ib('draft-folgejahr', '')));
+  // ESPN paart anders als angenommen oder meldet ein Unentschieden: keine Simulation und keine feste Reihenfolge, bis die
+  // Annahme angepasst ist (sonst zählten echte Spiele in falschen Rollen)
+  if (ab.length && !fest) {
+    U.ap(box, h('p', {class: 'warn'}, `ESPN setzt die Playoffs ab W${ab[0]} anders an als angenommen – Endplatz und Draft-Reihenfolge ${next} werden geprüft und erscheinen danach hier.`),
+      U.legend(['draft-folgejahr', 'endplatz-sim']), h('p', {class: 'note'}, 'Getauschte Picks sind nicht berücksichtigt.'));
+    return;
+  }
   if (fest) {
     U.ap(box, U.table({cap: `Draft-Reihenfolge ${next}`, cls: 'nr kurz', rh: 1, sortable: false,
       rows: fest.map((tid, i) => ({pick: i + 1, tid, platz: fest.length - i})), cols: [
@@ -255,7 +263,9 @@ function alter(box, K, svg) {
     {heads: ['Team', 'Jahre zum Schnitt'], rows: bars.map(b => [b.name, dev(b.v)])},
     h('p', {class: 'note'}, 'Links jünger, rechts älter als der Liga-Schnitt der jeweiligen Position.')),
     U.legend(['alter', byWert ? 'alter-wert' : 'alter-ros', 'alter-bereinigt']),
-    h('p', {class: 'note'}, standTxt(K) + '.', quelle(K)));
+    // nach Wert gewichtet: abgeleitete FantasyCalc-Werte, Nennung mit Link wie in der Ansicht Wert
+    h('p', {class: 'note'}, standTxt(K) + '.', quelle(K),
+      byWert ? [' Gewichtet mit dem Marktwert; ', fcQuelle(), K.marktwert_stand ? ` (Stand ${U.stamp(K.marktwert_stand)})` : '', '.'] : null));
 }
 
 // ---------------------------------------------------------------- Wert: Marktwert je Team (FantasyCalc), nur Summen

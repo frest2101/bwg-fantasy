@@ -640,7 +640,20 @@ def test_endplatz_alle_spiele_entschieden():
     for w, p in decided:
         pairs.setdefault(w, set()).add(p)
     assert pr.final_places(liga_teams(), SETTINGS_PO, decided, pairs) == {
-        "fest": expected, "draft": expected[::-1], "warnungen": []}
+        "fest": expected, "draft": expected[::-1], "abweichung": [], "espn_bestaetigt": None, "warnungen": []}
+    # ESPN bestätigt die Endplätze (rankCalculatedFinal) bzw. weicht ab: dann keine feste Reihenfolge, Warnung
+    ranks = {t: place for place, t in enumerate(expected, start=1)}
+    assert pr.final_places(liga_teams(), SETTINGS_PO, decided, pairs, ranks)["espn_bestaetigt"] is True
+    swapped = ranks | {expected[6]: 8, expected[7]: 7}
+    off = pr.final_places(liga_teams(), SETTINGS_PO, decided, pairs, swapped)
+    assert (off["fest"], off["draft"], off["abweichung"], off["espn_bestaetigt"]) == (None, None, [17], False)
+    assert any("rankFinal" in w for w in off["warnungen"])
+    # ESPN führt in W17 ein weiteres Spiel der beiden W15-Verlierer (Spiel um Platz 5 erst in W17?): Abweichung von der
+    # Annahme – keine feste Reihenfolge, obwohl jedes angenommene Spiel entschieden ist (Befund Gegenprüfung 01.10.2026)
+    losers = next(p for (w, p), win in decided.items() if w == 16 and not ({LIGA_SEEDS[0], LIGA_SEEDS[1]} & p))
+    extra = pairs | {17: pairs[17] | {losers}}
+    dev = pr.final_places(liga_teams(), SETTINGS_PO, decided, extra)
+    assert (dev["fest"], dev["draft"], dev["abweichung"]) == (None, None, [17]) and len(dev["warnungen"]) == 1
 
 
 def test_endplatz_simuliert_staerker_gewinnt():
@@ -663,4 +676,13 @@ def test_endplatz_nur_bei_passendem_bracket():
     two = pr.simulate(liga_teams(), [], mu, Decimal(35), runs=5, seed=1, bracket={"weeks": [15, 16], "entschieden": {}})
     assert all("endplatz" not in v for v in four.values()) and all("endplatz" not in v for v in two["liga"].values())
     four_settings = {"scheduleSettings": dict(SETTINGS_PO["scheduleSettings"], playoffTeamCount=4)}
-    assert pr.final_places(liga_teams(), four_settings, {}, {}) == {"fest": None, "draft": None, "warnungen": []}
+    assert pr.final_places(liga_teams(), four_settings, {}, {}) == {"fest": None, "draft": None, "abweichung": [],
+                                                                   "espn_bestaetigt": None, "warnungen": []}
+
+
+def test_espn_endplatz_nur_wenn_vollstaendig():
+    teams = [{"id": t, "rankCalculatedFinal": 11 - t, "rankFinal": 0} for t in range(1, 11)]
+    assert pr.espn_ranks(teams) == {t: 11 - t for t in range(1, 11)}
+    assert pr.espn_ranks([dict(t, rankFinal=t["id"]) for t in teams]) == {t: t for t in range(1, 11)}   # Handkorrektur
+    assert pr.espn_ranks([dict(t, rankCalculatedFinal=0) for t in teams]) is None                       # vor Saisonende
+    assert pr.espn_ranks([]) is None

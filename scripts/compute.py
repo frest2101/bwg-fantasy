@@ -432,7 +432,9 @@ def compute_season(season: int = ef.DEFAULT_SEASON, through: int | None = None) 
             "power_ranking": pr, "kader": kader,
             "records": records.compute_records(ssn, weeks, team_weeks),
             "transactions": transactions, "transactions_until": transactions.get("bis"),
-            "dst": dst.compute_dst(ssn, weeks), "matchup": matchup.compute_matchup(ssn, weeks),
+            # Vorausschau (N+1, nächste 3, Rest, SoS) ab der Stand-Woche; Z, F und Rang bleiben beim Stand W14
+            "dst": dst.compute_dst(ssn, weeks, stand.through),
+            "matchup": matchup.compute_matchup(ssn, weeks, stand.through),
             "history": history.compute_history(ssn),
             "players": spieler, "ros_after_week": spieler["ros_after_week"],
             "keeper": keeper.compute_keeper(ssn, weeks, spieler, records.player_names(ssn), stand_week=stand.through),
@@ -509,7 +511,7 @@ def main(argv: list[str] | None = None) -> int:
     for warning in (season_data["keeper"] or {}).get("warnungen", []):
         print(f"Warnung: Keeper-Bilanz {warning}", file=sys.stderr)
     for warning in (season_data["power_ranking"].get("endplatz") or {}).get("warnungen", []):
-        print(f"Warnung: {warning}", file=sys.stderr)
+        ef.warn(warning)   # in der Action als Hinweis am Lauf sichtbar: Playoff-Annahme prüfen, Stephan fragen
     path = ef.REPO_DIR / "data" / f"season_{args.season}.json"
     path.write_text(json.dumps(to_json(season_data), ensure_ascii=False, indent=1) + "\n",
                     encoding="utf-8", newline="\n")
