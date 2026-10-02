@@ -80,12 +80,22 @@ function banner() {
 }
 
 // ---------------------------------------------------------------- Kopf: Datenstand-Chip, Hell/Dunkel
-// nächster Tageslauf (tageslauf.yml): stündlich 06:45–11:45 und 15:40–21:40 UTC
+// Nächster Tageslauf laut tageslauf.yml: Slots in deutscher Zeit (cron mit timezone "Europe/Berlin"), stündlich
+// 04:45–16:45 und 17:40–23:40 Uhr = 20 Läufe je Tag; GitHub startet erfahrungsgemäß 10–16 min später.
+// DAILY = [Minute, erste Stunde, letzte Stunde] je cron-Zeile – tests/test_zeitplan.py vergleicht mit dem Workflow.
+// Gerechnet wird in Berliner Uhrzeit, egal wo der Browser steht: Berlin ist UTC+1 oder UTC+2, es gilt der Kandidat,
+// dessen Berliner Uhr den Slot zeigt. Kein Slot liegt in der Umstellungsstunde 02–03 Uhr, also passt immer genau einer.
+const DAILY_TZ = 'Europe/Berlin';
+const DAILY = [[45, 4, 16], [40, 17, 23]];
+const BERLIN = new Intl.DateTimeFormat('en-GB', {timeZone: DAILY_TZ, hourCycle: 'h23', year: 'numeric', month: 'numeric',
+  day: 'numeric', hour: 'numeric', minute: 'numeric'});
+const berlin = t => Object.fromEntries(BERLIN.formatToParts(t).filter(p => p.type !== 'literal').map(p => [p.type, +p.value]));
 export function nextDaily(now = new Date()) {
-  const slots = [...Array(6)].map((_, i) => [6 + i, 45]).concat([...Array(7)].map((_, i) => [15 + i, 40]));
-  for (let day = 0; day < 2; day++) for (const [hh, mm] of slots) {
-    const t = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + day, hh, mm));
-    if (t > now) return t;
+  const b = berlin(now);
+  for (let day = 0; day < 2; day++) for (const [mm, von, bis] of DAILY) for (let hh = von; hh <= bis; hh++) for (const off of [2, 1]) {
+    const t = new Date(Date.UTC(b.year, b.month - 1, b.day + day, hh - off, mm));
+    const p = berlin(t);
+    if (p.hour === hh && p.minute === mm && t > now) return t;
   }
   return null;
 }
@@ -118,9 +128,10 @@ function header() {
       h('dt', null, ds.pool_stand ? 'Besitz, Verletzung, Projektion nächste Woche' : 'Besitz, Verletzung'), h('dd', null, tag),
       h('dt', null, 'Wetter'), h('dd', null, ds.wetter_stand ? `Tagesstand ${U.stamp(ds.wetter_stand)}` : '–'),
       h('dt', null, 'Letzter Move'), h('dd', null, ds.transaktionen_bis ? U.stamp(ds.transaktionen_bis) : '–'),
-      h('dt', null, 'Nächster Tageslauf'), h('dd', null, U.stamp(nextDaily())),
+      // „ab“: geplanter Slot, GitHub startet meist rund 15 min später (Glossar „Aktualisierung“)
+      h('dt', null, 'Nächster Tageslauf'), h('dd', null, `ab ${U.stamp(nextDaily())}`),
       h('dt', null, 'Nächster Wochenabruf'), h('dd', null, fertig ? '– (Saison beendet, erst wieder nach dem Saisonwechsel)' : U.stamp(due))),
-    h('p', {class: 'note'}, 'Wertung und Projektionen rechnen nur mit abgeschlossenen Wochen; der Tageslauf frischt Besitz, Verletzung, Transaktionen und Wetter stündlich vormittags und abends auf. ', h('a', {href: '#lesart/aktualisierung'}, 'Mehr zur Aktualisierung')),
+    h('p', {class: 'note'}, 'Wertung und Projektionen rechnen nur mit abgeschlossenen Wochen; der Tageslauf frischt Besitz, Verletzung, Transaktionen und Wetter stündlich von etwa 05:00 Uhr bis Mitternacht (deutsche Zeit) auf. ', h('a', {href: '#lesart/aktualisierung'}, 'Mehr zur Aktualisierung')),
   ]);
   const tb = $('theme'), de = document.documentElement, mq = matchMedia('(prefers-color-scheme: dark)');
   const dark = () => de.dataset.theme === 'dark' || (!de.dataset.theme && mq.matches);

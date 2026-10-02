@@ -250,7 +250,7 @@ def run(session: requests.Session, season: int, now: datetime, stamp: str) -> tu
     """Tageslauf-Teil Wetter: Prognose der laufenden Woche und Ist-Wetter fälliger Spiele. Rückgabe (Fehler, Warnungen).
 
     Fehler (rot) nur bei fehlenden Grundlagen (Stadion-Tabelle, NFL-Spielplan); Open-Meteo-Ausfälle sind Warnungen,
-    weil der nächste Lauf spätestens eine Stunde später neu versucht.
+    weil der nächste Lauf tagsüber eine Stunde später neu versucht.
     """
     try:
         stadien = load_stadien(season)

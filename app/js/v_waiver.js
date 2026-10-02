@@ -22,7 +22,7 @@ export async function render(box, ctx, r) {
   U = ctx.ui; S = U.S; h = U.h;
   U.ap(box, h('h1', null, 'Waiver'));
   if (!S.man.files?.['waiver.json']) {
-    U.ap(box, h('p', {class: 'warn'}, 'Noch keine Tagesdaten: Der Waiver-Tab füllt sich mit dem ersten Tageslauf (stündlich vormittags und abends).'),
+    U.ap(box, h('p', {class: 'warn'}, 'Noch keine Tagesdaten: Der Waiver-Tab füllt sich mit dem ersten Tageslauf (stündlich von etwa 05:00 Uhr bis Mitternacht deutscher Zeit).'),
       h('p', null, h('a', {href: '#spieler?status=frei&sicht=ros'}, 'Freie Spieler nach Wochenstand')));
     return;
   }
