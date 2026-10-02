@@ -12,7 +12,7 @@ const {h, S} = U;
 const $ = x => document.getElementById(x);
 const main = $('main'), live = $('live');
 const say = t => { live.textContent = t; };
-Object.assign(ctx, {ui: U, S, mod, load, lazy, say, route: () => route()});
+Object.assign(ctx, {ui: U, S, mod, load, lazy, say, refresh, onLeave, route: () => route()});
 
 // ---------------------------------------------------------------- Laden
 const cache = {};
@@ -21,10 +21,37 @@ async function getJSON(url, opt) {
   if (!r.ok) throw new Error(`${url.split('?')[0]}: HTTP ${r.status}`);
   return r.json();
 }
+const getManifest = () => getJSON('data/manifest.json?t=' + Date.now(), {cache: 'no-store'});
+const ver = (man, name) => man.files?.[name]?.v ?? man.through_week;
+const dataUrl = (man, name) => `data/${name}?v=${encodeURIComponent(ver(man, name))}`;
 function load(name) {
-  const v = S.man.files?.[name]?.v ?? S.man.through_week;
-  return cache[name] || (cache[name] = getJSON(`data/${name}?v=${encodeURIComponent(v)}`)
-    .catch(e => { delete cache[name]; throw e; }));
+  if (cache[name]) return cache[name];
+  const p = cache[name] = getJSON(dataUrl(S.man, name)).catch(e => { if (cache[name] === p) delete cache[name]; throw e; });
+  return p;
+}
+// Datenstand auffrischen, ohne die Seite neu zu laden (Live-Ansicht „Aktualisieren“, Datenstand-Fenster „Daten neu
+// laden“): Manifest ohne Cache holen; jede Datei mit neuer Version fällt aus dem Speicher, load() holt sie beim nächsten
+// Aufruf neu. Teams und Spielplan (Grundlage aller Ansichten) werden gleich neu gesetzt – erst geladen, dann
+// umgeschaltet, damit bei einem Fehler der alte Stand ganz stehen bleibt. Der Datenstand-Chip im Kopf folgt.
+// → true, wenn es einen neuen Stand gibt (die offene Ansicht zeichnet der Aufrufer neu); ein laufender Aufruf wird geteilt.
+const BASIS = ['teams.json', 'schedule.json'];
+let refreshing = null;
+function refresh() {
+  return refreshing || (refreshing = (async () => {
+    const man = await getManifest();
+    if (man.schema > APP_SCHEMA) { banner(); return false; }      // neue App-Version nötig: Hinweis „neu laden“
+    const alt = S.man, neu = n => ver(alt, n) !== ver(man, n);
+    if (JSON.stringify(man) === JSON.stringify(alt)) return false;
+    const basis = BASIS.some(neu) ? await Promise.all(BASIS.map(n => getJSON(dataUrl(man, n)))) : null;
+    for (const n of Object.keys(cache)) if (neu(n)) delete cache[n];
+    S.man = man;
+    if (basis) {
+      BASIS.forEach((n, i) => { cache[n] = Promise.resolve(basis[i]); });
+      setup(...basis);
+    }
+    standChip();
+    return true;
+  })().finally(() => { refreshing = null; }));
 }
 // Lazy-Datei mit sichtbarem Ladehinweis (aria-live); bei Fehler Hinweis mit „Erneut versuchen“
 async function lazy(name, label, box) {
@@ -45,7 +72,7 @@ async function lazy(name, label, box) {
 
 async function start() {
   try {
-    S.man = await getJSON('data/manifest.json?t=' + Date.now(), {cache: 'no-store'});
+    S.man = await getManifest();
     if (S.man.schema > APP_SCHEMA) banner();
     const [teams, sched] = await Promise.all([load('teams.json'), load('schedule.json')]);
     setup(teams, sched);
@@ -100,6 +127,11 @@ export function nextDaily(now = new Date()) {
   return null;
 }
 function header() {
+  standChip();
+  theme();
+}
+// Datenstand-Chip und sein Fenster; läuft nach refresh() erneut und zeigt dann den neuen Stand
+function standChip() {
   const ds = S.man.datenstand || {};
   const btn = $('stand');
   const wk = n => S.weeks.find(w => w.week === n);
@@ -119,20 +151,48 @@ function header() {
   const pool = ds.pool_woche != null ? wk(ds.pool_woche + 1)?.start : null;
   // Tagesstand (Tageslauf): Besitz, Verletzung, Projektion der nächsten Woche und Wetter; davor nur der Wochenstand
   const tag = ds.pool_stand ? `Tagesstand ${U.stamp(ds.pool_stand)}` : ds.pool_woche != null ? `nach W${ds.pool_woche}` + (pool ? ` (${U.datum(pool)})` : '') : '–';
-  btn.onclick = () => U.showPop(btn, 'Datenstand', [
-    alt ? h('p', {class: 'warn'}, 'Daten älter als erwartet – der Wochenabruf ist noch nicht durchgelaufen.') : null,
-    h('dl', null,
-      h('dt', null, 'Wertung'), h('dd', null, `nach W${ds.woche_final ?? S.tw} (final)`),
-      po ? [h('dt', null, 'Playoffs'), h('dd', null, `nach W${po} (final)`)] : null,
-      h('dt', null, 'Projektionen ROS'), h('dd', null, ds.ros_nach_woche != null ? `Stand nach W${ds.ros_nach_woche}` : `ab Wochenabruf W${sw + 1}`),
-      h('dt', null, ds.pool_stand ? 'Besitz, Verletzung, Projektion nächste Woche' : 'Besitz, Verletzung'), h('dd', null, tag),
-      h('dt', null, 'Wetter'), h('dd', null, ds.wetter_stand ? `Tagesstand ${U.stamp(ds.wetter_stand)}` : '–'),
-      h('dt', null, 'Letzter Move'), h('dd', null, ds.transaktionen_bis ? U.stamp(ds.transaktionen_bis) : '–'),
-      // „ab“: geplanter Slot, GitHub startet meist rund 15 min später (Glossar „Aktualisierung“)
-      h('dt', null, 'Nächster Tageslauf'), h('dd', null, `ab ${U.stamp(nextDaily())}`),
-      h('dt', null, 'Nächster Wochenabruf'), h('dd', null, fertig ? '– (Saison beendet, erst wieder nach dem Saisonwechsel)' : U.stamp(due))),
-    h('p', {class: 'note'}, 'Wertung und Projektionen rechnen nur mit abgeschlossenen Wochen; der Tageslauf frischt Besitz, Verletzung, Transaktionen und Wetter stündlich von etwa 05:00 Uhr bis Mitternacht (deutsche Zeit) auf. ', h('a', {href: '#lesart/aktualisierung'}, 'Mehr zur Aktualisierung')),
-  ]);
+  btn.onclick = () => {
+    // „Daten neu laden“: holt den Datenstand ohne Neuladen der Seite (refresh). Gibt es einen neuen, wird die offene
+    // Ansicht neu gezeichnet und das Fenster mit dem neuen Stand wieder geöffnet (über den dann neuen Klick-Handler).
+    const info = h('span', {class: 'note', role: 'status'});
+    const neu = h('button', {type: 'button', class: 'btn', onclick: async () => {
+      neu.disabled = true;
+      info.textContent = 'Lade Datenstand …';
+      try {
+        if (await refresh()) {
+          say('Neuer Datenstand geladen.');
+          await route();
+          btn.onclick();
+          return;
+        }
+        info.textContent = `Kein neuer Stand (geprüft ${U.zeit(Date.now())} Uhr).`;
+      } catch (e) {
+        console.error(e);
+        info.textContent = 'Datenstand nicht erreichbar – später erneut versuchen.';
+      }
+      neu.disabled = false;
+    }}, 'Daten neu laden');
+    U.showPop(btn, 'Datenstand', [
+      alt ? h('p', {class: 'warn'}, 'Daten älter als erwartet – der Wochenabruf ist noch nicht durchgelaufen.') : null,
+      h('dl', null,
+        h('dt', null, 'Wertung'), h('dd', null, `nach W${ds.woche_final ?? S.tw} (final)`),
+        po ? [h('dt', null, 'Playoffs'), h('dd', null, `nach W${po} (final)`)] : null,
+        h('dt', null, 'Projektionen ROS'), h('dd', null, ds.ros_nach_woche != null ? `Stand nach W${ds.ros_nach_woche}` : `ab Wochenabruf W${sw + 1}`),
+        h('dt', null, ds.pool_stand ? 'Besitz, Verletzung, Projektion nächste Woche' : 'Besitz, Verletzung'), h('dd', null, tag),
+        h('dt', null, 'Wetter'), h('dd', null, ds.wetter_stand ? `Tagesstand ${U.stamp(ds.wetter_stand)}` : '–'),
+        h('dt', null, 'Letzter Move'), h('dd', null, ds.transaktionen_bis ? U.stamp(ds.transaktionen_bis) : '–'),
+        // „ab“: geplanter Slot, GitHub startet meist rund 15 min später (Glossar „Aktualisierung“)
+        h('dt', null, 'Nächster Tageslauf'), h('dd', null, `ab ${U.stamp(nextDaily())}`),
+        // Tageslauf von Hand: nur ein Knopf zur Workflow-Seite, kein Start aus der App (kein Token im Browser)
+        h('dd', {class: 'full'}, U.tageslaufKnopf(), neu, info),
+        h('dt', null, 'Nächster Wochenabruf'), h('dd', null, fertig ? '– (Saison beendet, erst wieder nach dem Saisonwechsel)' : U.stamp(due))),
+      h('p', {class: 'note'}, '„Tageslauf starten“ öffnet GitHub: dort „Run workflow“ (GitHub-Anmeldung nötig). Etwa 2 Minuten später holt „Daten neu laden“ den neuen Stand. ',
+        h('a', {href: '#lesart/tageslauf-starten'}, 'Mehr dazu')),
+      h('p', {class: 'note'}, 'Wertung und Projektionen rechnen nur mit abgeschlossenen Wochen; der Tageslauf frischt Besitz, Verletzung, Transaktionen und Wetter stündlich von etwa 05:00 Uhr bis Mitternacht (deutsche Zeit) auf. ', h('a', {href: '#lesart/aktualisierung'}, 'Mehr zur Aktualisierung')),
+    ]);
+  };
+}
+function theme() {
   const tb = $('theme'), de = document.documentElement, mq = matchMedia('(prefers-color-scheme: dark)');
   const dark = () => de.dataset.theme === 'dark' || (!de.dataset.theme && mq.matches);
   const sync = () => {
@@ -162,9 +222,12 @@ function header() {
 // ---------------------------------------------------------------- Router
 const VIEWS = {tabelle: 'v_tabelle', ranking: 'v_ranking', spielplan: 'v_spielplan', team: 'v_team', spieler: 'v_spieler',
   dst: 'v_dst', matchup: 'v_matchup', wetter: 'v_wetter', moves: 'v_moves', waiver: 'v_waiver', keeper: 'v_keeper', rekorde: 'v_rekorde',
-  lesart: 'v_lesart'};
+  spieltag: 'v_spieltag', lesart: 'v_lesart'};       // spieltag = Live-Ansicht (Chip „Live“ im Kopf); „#live“ ist die aria-live-Region
 const NAV = {team: 'tabelle', dst: 'spieler', matchup: 'spieler', wetter: 'spieler', moves: 'spieler'};
 let seq = 0, cur = null, curHash = null;
+// Aufräumen einer Ansicht: fn läuft einmal beim nächsten Routenwechsel (auch wenn dieselbe Ansicht neu gezeichnet wird)
+const leaving = [];
+function onLeave(fn) { leaving.push(fn); }
 // Scrollposition je Verlaufseintrag: beim Verlassen (Link-Klick) und nach jedem Scrollen in history.state.y sichern,
 // damit „Zurück“ die alte Stelle wiederfindet. Neue Einträge haben keinen state – daran erkennt der Router den Rückweg.
 try { history.scrollRestoration = 'manual'; } catch { /* ältere Browser: Standardverhalten */ }
@@ -202,6 +265,7 @@ async function route() {
     return route();
   }
   U.closePop(false);
+  for (const fn of leaving.splice(0)) { try { fn(); } catch (e) { console.error(e); } }
   const my = ++seq;
   r.alive = () => my === seq;
   // Rückweg (Zurück/Vor): der Eintrag trägt eine gesicherte Position; neue Einträge nicht
@@ -214,6 +278,8 @@ async function route() {
   for (const a of document.querySelectorAll('.tabs a')) {
     if (a.dataset.s === navSec) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
   }
+  // Live-Ansicht: kein Tab, der Chip im Kopf zeigt, dass sie offen ist
+  if (r.sec === 'spieltag') $('lv')?.setAttribute('aria-current', 'page'); else $('lv')?.removeAttribute('aria-current');
   const key = viewKey(r), same = cur === key;
   cur = key;
   const box = h('div', {class: 'view'}, h('p', {class: 'loading'}, 'Lade …'));
