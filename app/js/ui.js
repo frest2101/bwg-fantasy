@@ -403,7 +403,7 @@ export function game(g, full) {
   if (fin) {
     meta = g.winner === 'T' ? 'Unentschieden' : 'Differenz ' + num(Math.abs(g.home_pf - g.away_pf));
     if (full && wi >= 0) meta += ` · Wochenrang ${team(g.home).wochen.wochenrang[wi]}. und ${team(g.away).wochen.wochenrang[wi]}.`;
-  } else if (st === 'laeuft') meta = 'läuft – Ergebnis nach dem Wochenabruf';
+  } else if (st === 'laeuft') meta = ['läuft – Ergebnis nach dem Wochenabruf · ', h('a', {href: '#spieltag'}, 'Spieltag live')];
   else if (chance != null) {
     meta = 'Siegchance';
     info = full ? ib('siegchance', '') : null;
@@ -411,6 +411,11 @@ export function game(g, full) {
   return h('li', {class: 'game'}, side(g.home, g.home_pf, chance), side(g.away, g.away_pf, chance == null ? null : 100 - chance),
     h('div', {class: 'gm row'}, h('span', null, meta), info));
 }
+// Tageslauf von Hand: Die App startet nichts selbst (kein Token im Browser). Der Knopf ist ein Link im Aussehen der
+// übrigen Knöpfe (Datenstand-Fenster und Live-Ansicht) und öffnet die Workflow-Seite bei GitHub in einem neuen Tab;
+// dort „Run workflow“ (GitHub-Anmeldung mit Schreibrecht nötig). tests/test_live_ansicht.py prüft Adresse und Aufrufe.
+export const TAGESLAUF_URL = 'https://github.com/frest2101/bwg-fantasy/actions/workflows/tageslauf.yml';
+export const tageslaufKnopf = () => h('a', {href: TAGESLAUF_URL, target: '_blank', rel: 'noopener', class: 'btn'}, 'Tageslauf starten (GitHub)');
 export const errBox = (e, retry) => h('div', {class: 'err', role: 'alert'},
   h('p', null, 'Die Daten konnten nicht geladen werden.'),
   h('p', {class: 'note'}, e instanceof TypeError ? 'Keine Verbindung – bitte später erneut versuchen.' : String(e?.message || e)),

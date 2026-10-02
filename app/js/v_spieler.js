@@ -19,7 +19,7 @@ const spiele = n => `${n ?? 0} ${n === 1 ? 'Spiel' : 'Spiele'}`;
 const seasonEnd = P => P.ros_nach_woche != null && P.ros_nach_woche >= (S.weeks.at(-1)?.week ?? 17);
 // Rückweg-Ziele für den Link oben im Spielerdetail
 const BACK = {spieler: 'Spielerliste', team: 'Team', moves: 'Moves', spielplan: 'Spielplan', waiver: 'Waiver', dst: 'D/ST-Faktoren',
-  tabelle: 'Tabelle', rekorde: 'Rekorde', ranking: 'Ranking', keeper: 'Keeper'};
+  tabelle: 'Tabelle', rekorde: 'Rekorde', ranking: 'Ranking', keeper: 'Keeper', spieltag: 'Spieltag live'};
 
 export async function render(box, ctx, r) {
   U = ctx.ui; S = U.S; h = U.h;

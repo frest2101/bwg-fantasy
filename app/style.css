@@ -30,20 +30,35 @@ p{margin:.4rem 0}
 .skip:focus{left:8px}
 /* Kopf und Navigation */
 .top{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:6px;padding:4px max(8px,env(safe-area-inset-right)) 4px max(16px,env(safe-area-inset-left));background:var(--sf);border-bottom:1px solid var(--bd);min-height:52px}
-.brand{font-weight:700;text-decoration:none;color:var(--tx);margin-right:auto;min-height:44px;display:flex;align-items:center;white-space:nowrap}
-@media (max-width:399px){.brand span{display:none}}
+/* Marke: Seit dem Live-Chip stehen fünf Elemente im Kopf. Das Jahr erscheint erst ab 460 px, „Fantasy“ ab 360 px; reicht
+   der Platz trotzdem nicht (breitere Systemschrift), kürzt die Marke mit „…“, statt die Knöpfe aus dem Bild zu schieben */
+.brand{font-weight:700;text-decoration:none;color:var(--tx);margin-right:auto;line-height:44px;display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.top>:not(.brand){flex:none}
+@media (max-width:459px){.brand span{display:none}}
+@media (max-width:359px){.brand b{display:none}}
+.brand b{font-weight:inherit}
 .brand span{color:var(--mu);font-weight:500;margin-left:.3em}
 .ico{min-width:44px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--bd);border-radius:22px;background:var(--sf);color:var(--tx);text-decoration:none;font-weight:700;cursor:pointer}
 .stand{min-height:44px;border:1px solid var(--bd);border-radius:22px;background:var(--ac2);padding:0 .8rem;cursor:pointer;font-size:.9rem;font-weight:600;white-space:nowrap}
 .stand.alt{background:var(--g1);border-color:var(--wa)}
+/* Live-Chip im Kopf (Link auf #spieltag, kein achter Tab); gefüllt, solange die Live-Ansicht offen ist */
+.lv{display:inline-flex;align-items:center;justify-content:center;min-width:44px;background:var(--sf);color:var(--tx);text-decoration:none;padding:0 .65rem}
+.lv[aria-current]{background:var(--ac);border-color:var(--ac);color:var(--on)}
+.lv[aria-busy]{opacity:.55}
+/* bis 399 px (iPhone 375–393): schmalere Chips, engere Abstände und 40 px breite Rundknöpfe (Höhe bleibt 44 px), damit
+   „BWG Fantasy“ mit Reserve neben vier Knöpfe passt – gemessen in Chromium (Segoe UI) mit dem längsten Chip „nach W14“:
+   bei 360, 375 und 400 px je 26–29 px frei, dazwischen mehr */
+@media (max-width:399px){.top{gap:4px}.ico{min-width:40px}.stand{padding:0 .6rem}.lv{padding:0 .5rem}}
+/* 360–374 px (viele Android-Geräte): dazu kleinere Schrift in Marke und Chips, schmalerer linker Rand */
+@media (max-width:374px){.top{padding-left:max(12px,env(safe-area-inset-left))}.brand{font-size:.95rem}.stand{padding:0 .5rem;font-size:.85rem}}
 .tabs{position:fixed;bottom:0;left:0;right:0;z-index:20;display:flex;background:var(--sf);border-top:1px solid var(--bd);padding:0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
 .tabs a{flex:1;min-height:56px;display:flex;align-items:center;justify-content:center;text-decoration:none;color:var(--mu);font-size:.8rem;font-weight:600;border-top:3px solid transparent}
 .tabs a[aria-current]{color:var(--ac);border-top-color:var(--ac)}
 /* sieben Tabs: bis 419 px Breite nach Textlänge statt gleich breit, sonst stößt „Spielplan“ an seine Nachbarn (bei 360 px
    blieben 2 px Abstand); kurze Tabs behalten 44 px Tippbreite */
 @media (max-width:419px){.tabs a{flex:1 1 auto;min-width:44px;font-size:.75rem}}
-/* bis 359 px (iPhone SE 1. Gen., mini mit Anzeigezoom): Kopf und Tabs ohne Querscrollen, Tippziele bleiben 44 px */
-@media (max-width:359px){.top{gap:4px;padding-left:max(12px,env(safe-area-inset-left))}.brand{font-size:.95rem}.stand{padding:0 .5rem;font-size:.85rem}.tabs a{font-size:.68rem}}
+/* bis 359 px (iPhone SE 1. Gen., mini mit Anzeigezoom): nur „BWG“ im Kopf (siehe oben), Tabs ohne Querscrollen */
+@media (max-width:359px){.tabs a{font-size:.68rem}}
 .banner{background:var(--g1);color:var(--tx);border-bottom:1px solid var(--wa);padding:.5rem max(16px,env(safe-area-inset-right)) .5rem max(16px,env(safe-area-inset-left));display:flex;gap:1rem;align-items:center;flex-wrap:wrap}
 main{display:block;padding:12px max(16px,env(safe-area-inset-right)) 24px max(16px,env(safe-area-inset-left));max-width:1240px;margin:0 auto}
 main:focus{outline:none}
@@ -61,6 +76,8 @@ html:not(.js) main .loading,html:not(.js) .tabs{display:none}
 .chips{display:flex;gap:6px;overflow-x:auto;padding:2px 2px 8px;margin:0 -2px 8px;scrollbar-width:thin}
 .chips a,.seg button,.btn{flex:none;min-height:44px;min-width:44px;justify-content:center;display:inline-flex;align-items:center;gap:.35rem;padding:0 .9rem;border:1px solid var(--bd);border-radius:22px;background:var(--sf);color:var(--tx);text-decoration:none;font-weight:600;font-size:.92rem;cursor:pointer;white-space:nowrap}
 .chips a[aria-current],.seg button[aria-pressed=true]{background:var(--ac);border-color:var(--ac);color:var(--on)}
+/* gesperrter Knopf (z. B. „Aktualisieren“ während des Ladens): blasser, gestrichelter Rand, kein Zeiger */
+.btn:disabled{opacity:.5;border-style:dashed;cursor:default}
 .seg{display:inline-flex;flex-wrap:nowrap;gap:6px;max-width:100%;overflow-x:auto;scrollbar-width:none;padding:2px}
 .seg::-webkit-scrollbar{display:none}
 @media (max-width:599px){.seg button,.chips a{padding:0 .75rem}.seg,.chips:not(.wk){flex-wrap:wrap;overflow:visible}
@@ -97,13 +114,18 @@ button.i::before{font:italic 700 .75rem/1 Georgia,serif}
 .lg{display:flex;flex-wrap:wrap;gap:4px 6px;align-items:center;font-size:.85rem;color:var(--mu);margin:.5rem 0 0}
 @media (max-width:599px){.lg{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding:2px 0 6px}.lg::-webkit-scrollbar{display:none}.lg>*{flex:none;white-space:nowrap}}
 .it{min-height:44px;display:inline-flex;align-items:center;gap:.35rem;border:1px solid var(--bd);border-radius:22px;background:var(--sf);padding:0 .6rem;font-size:.82rem;cursor:pointer;color:var(--tx)}
-.pop{position:absolute;z-index:40;background:var(--sf);color:var(--tx);border:1px solid var(--bd);border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,.25);padding:6px 12px 12px;font-size:.93rem}
+/* nie höher als das sichtbare Fenster: ein langes Fenster (Datenstand auf kleinen Handys) scrollt dann in sich */
+.pop{position:absolute;z-index:40;background:var(--sf);color:var(--tx);border:1px solid var(--bd);border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,.25);padding:6px 12px 12px;font-size:.93rem;max-height:calc(100vh - 24px);max-height:calc(100dvh - 24px);overflow-y:auto;overscroll-behavior:contain}
 .pop .ph{display:flex;align-items:center;gap:8px}
 .pop .ph strong{flex:1}
 .pop .x{width:44px;height:44px;border:0;background:none;font-size:1.4rem;cursor:pointer;color:var(--mu);margin-right:-8px}
-.pop dl{margin:.25rem 0;display:grid;grid-template-columns:auto 1fr;gap:4px 12px}
+/* zwei gleich breite Spalten: Mit „auto 1fr“ nahm der längste Begriff der Werte-Spalte den Platz, die Werte brachen
+   dreizeilig um und das Datenstand-Fenster wurde am Handy rund 150 px höher */
+.pop dl{margin:.25rem 0;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:4px 12px}
 .pop dt{color:var(--mu)}
 .pop dd{margin:0;font-weight:600}
+/* Knopfzeile über beide Spalten (Datenstand: „Tageslauf starten“ direkt unter „Nächster Tageslauf“) */
+.pop dd.full{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;font-weight:400;margin:2px 0 6px}
 /* Teamseite: Diagramm, Wochenliste, Kader, Positionen/H2H (ab 900 px als Raster) */
 .tg{display:grid;gap:16px;margin:0 0 16px}
 .tg>*{min-width:0}
@@ -221,8 +243,27 @@ td.wrap,th.wrap{white-space:normal;min-width:12rem}
 .gl.win .pts{font-weight:800}
 .gl .res{width:1.5rem;text-align:center}
 .gm{font-size:.82rem;color:var(--mu);border-top:1px dashed var(--bd);padding-top:4px;margin-top:2px}
+.gm a{display:inline-block;padding:.9em .15em;margin:-.9em -.15em}
 .strip{display:flex;gap:8px;overflow-x:auto;list-style:none;padding:0 0 6px;margin:0 0 12px}
 .strip .game{flex:none;min-width:12.5rem}
+/* Spieltag live (#spieltag): NFL-Spiele als Liste, Matchups mit Unterzeile je Team, Aufstellung mit umbrechender Unterzeile */
+.lvn{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin:.25rem 0 0;font-size:.92rem}
+.lvn dt{color:var(--mu);white-space:nowrap}
+.lvn dd{margin:0}
+.lvt{flex:1;min-width:0;padding:2px 0 6px}
+.lvt .tl2{display:flex}
+.lvt .sub{white-space:normal;margin-top:-8px}
+.lvt .lvi{margin-top:0;color:var(--ac);font-weight:700}
+.game.mine{border-color:var(--ac);box-shadow:inset 4px 0 0 var(--ac)}
+.lva>*{min-width:0}
+.lvz .pl{padding:4px 0}
+.lvz .sub{white-space:normal}
+.lvk{margin:.25rem 0;padding-left:1.2rem}
+.lvk li{margin:.2rem 0}
+/* Bewegungen: Zugang (+) und Abgang (−) in einer Zelle – nebeneinander, wenn Platz ist, auf dem Handy untereinander */
+td.lvc,.lvw thead th:last-child{white-space:normal;line-height:1.2}
+.lvs{display:flex;flex-wrap:wrap;gap:0 .9rem}
+.lvb{display:inline-flex;align-items:center;min-height:40px}
 /* Diagramme */
 .fig{margin:0 0 16px;background:var(--sf);border:1px solid var(--bd);border-radius:12px;padding:10px}
 .fig figcaption{font-weight:700;margin-bottom:6px}
@@ -305,6 +346,7 @@ main{padding:16px 24px 32px}
 .two .strip{display:grid;grid-template-columns:repeat(auto-fill,minmax(11.5rem,1fr));overflow:visible}
 .two .strip .game{min-width:0}
 .two2{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
+.lva>.blk+.blk{margin-top:0}
 .two>.side .seg{flex-wrap:wrap;overflow:visible}
 .two.sc2{grid-template-columns:minmax(0,1fr) 21rem}
 .ksl{columns:2;column-gap:24px}.ksl li{break-inside:avoid}
