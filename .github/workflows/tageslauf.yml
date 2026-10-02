@@ -1,7 +1,21 @@
-# Tageslauf (Baustein 3, Session 6): stündlich vormittags und abends Transaktionen, Pool-Auszug und Wetter sichern,
-# dann rechnen, testen, committen. Vormittag 06:45–11:45 UTC, damit ein Lauf die Waiver-Ergebnisse trifft (ESPN meldet
-# 07:00 UTC, sichtbar sind sie erfahrungsgemäß erst 10:30–11:00 Uhr deutscher Zeit); Abendblock 15:40–21:40 UTC für die
-# News-Zeit 18–22 Uhr, sonntags die Inactives vor dem 1-Uhr-Kickoff und die späten Kickoffs. 13 Läufe je Tag.
+# Tageslauf (Baustein 3, Session 6): stündlich von etwa 05:00 Uhr bis Mitternacht deutscher Zeit Transaktionen,
+# Pool-Auszug und Wetter sichern, dann rechnen, testen, committen (Beschluss Stephan 02.10.2026: durchgehend stündlich,
+# erster Lauf etwa 05:00 Uhr; die frühere Nachmittagslücke 11:45–15:40 UTC entfällt).
+# Zeitplan in deutscher Zeit (timezone "Europe/Berlin" je cron-Eintrag, GitHub rechnet Sommer- und Winterzeit selbst):
+# 04:45–16:45 Uhr und 17:40–23:40 Uhr = 13 + 7 = 20 Läufe je Tag. GitHub startet erfahrungsgemäß 10–16 min später,
+# also etwa 04:57 … 16:57 und 17:52 … 23:52 Uhr. Die Slots des alten UTC-Plans (in Sommerzeit 08:45–13:45 und
+# 17:40–23:40 Uhr) bleiben minutengenau erhalten, neu sind 04:45–07:45 und 14:45–16:45 Uhr.
+# Warum deutsche Zeit statt UTC: „ab 05:00 Uhr“ ist Ortszeit, und nach der US-Umstellung am 01.11. liegen die
+# NFL-Anstöße in deutscher Zeit wieder wie jetzt – UTC-Slots verrutschten dann eine Stunde gegen die Spiele. Nur in der
+# Woche 25.10.–01.11.2026 (Europa schon Winterzeit, USA noch nicht) liegen die Anstöße in deutscher Zeit eine Stunde
+# früher (Sonntagsspiele ab 18:00 statt 19:00 Uhr); weil die Läufe durchgehend stündlich kommen, ändert das nur,
+# welcher Lauf etwas zuerst sieht.
+# Minuten: :45 am Vormittag, damit ein Lauf die Waiver-Ergebnisse trifft (ESPN meldet 07:00 UTC, sichtbar sind sie
+# erfahrungsgemäß erst 10:30–11:00 Uhr deutscher Zeit); :40 im Abendblock wie bisher (News-Zeit 18–22 Uhr, sonntags die
+# Inactives 90 min vor dem Anstoß und die späten Kickoffs) – die Wirkung der Minute ist nicht gemessen, deshalb unverändert.
+# Kein Slot liegt in der Umstellungsstunde 02:00–03:00 Uhr (25.10.2026, 28.03.2027), keiner fällt also aus oder kommt
+# doppelt. tests/test_zeitplan.py hält diesen Plan, die Anzeige „Nächster Tageslauf“ (app/js/app.js, DAILY) und die
+# Zeiten in Glossar und README zusammen – wer die cron-Zeilen ändert, zieht dort nach.
 # espn_fetch.py holt alle Transaktions-Perioden (0 … laufend), den Pool-Auszug (Status, Besitz, Verletzung, Waiver-Frist,
 # Projektion; dazu die Waiver-Reihenfolge der Teams aus mTeam und die IR-Slots aus mRoster), das Wetter (Open-Meteo: Prognose der laufenden Woche, Ist-Wetter gespielter Spiele) und
 # höchstens einmal je UTC-Tag die Marktwerte von FantasyCalc (--marktwert, Keeper-Tab; Ausfall = Warnung) und schreibt nur,
@@ -12,8 +26,11 @@ name: Tageslauf
 
 on:
   schedule:
-    - cron: "45 6-11 * * *"   # stündlich 06:45–11:45 UTC (08:45–13:45 MESZ / 07:45–12:45 MEZ)
-    - cron: "40 15-21 * * *"  # stündlich 15:40–21:40 UTC (17:40–23:40 MESZ / 16:40–22:40 MEZ)
+    # Stunden in deutscher Zeit (timezone); in UTC: Sommerzeit −2 h, Winterzeit −1 h
+    - cron: "45 4-16 * * *"       # stündlich 04:45–16:45 Uhr, 13 Läufe (MESZ 02:45–14:45 UTC, MEZ 03:45–15:45 UTC)
+      timezone: "Europe/Berlin"
+    - cron: "40 17-23 * * *"      # stündlich 17:40–23:40 Uhr, 7 Läufe (MESZ 15:40–21:40 UTC, MEZ 16:40–22:40 UTC)
+      timezone: "Europe/Berlin"
   workflow_dispatch:          # von Hand: Actions › Tageslauf › Run workflow oder gh workflow run tageslauf.yml
 
 permissions:

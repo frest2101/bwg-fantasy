@@ -16,7 +16,7 @@ Ablage je Saison (--due):
     basis/positionen_<vorjahr>.json                        Positions-Grundlage des Vorjahrs (QB, RB, WR, TE, K), einmalig
     fantasypros/sitemap.json                               FantasyPros-Adressen je Position (scripts/fantasypros.py), wird aktualisiert
     nflverse/players.json                                  Geburtsdatum, Rookie-Saison und Draft je Pool-Spieler (scripts/nflverse.py), wird aktualisiert
-Tageslauf (--transactions --pool --wetter --marktwert, Action stündlich vormittags und abends):
+Tageslauf (--transactions --pool --wetter --marktwert, Action stündlich von etwa 05:00 Uhr bis Mitternacht deutscher Zeit):
     transactions/                                          Transaktions-Archiv (mTransactions2 je Periode, Aktivitäten)
     pool/latest.json                                       Pool-Auszug: Status, Besitz, Verletzung, Waiver-Frist, Projektion;
                                                            dazu die Waiver-Reihenfolge der Teams (mTeam.waiverRank) sowie
@@ -1065,7 +1065,8 @@ def cmd_daily(season: int, now: datetime, transactions: bool = False, pool: bool
 
     Jeder Teil läuft für sich, geschriebene Rohdaten bleiben auch stehen, wenn ein anderer Teil scheitert. Fehler bei
     ESPN (Transaktionen, Pool) und fehlende Grundlagen machen den Lauf rot; Ausfälle von Open-Meteo, FantasyCalc und
-    der News-Abfrage sind Warnungen, denn der nächste Lauf folgt spätestens eine Stunde später.
+    der News-Abfrage sind Warnungen, denn der nächste Lauf folgt tagsüber eine Stunde später (stündlich von etwa
+    05:00 Uhr bis Mitternacht deutscher Zeit, Plan in .github/workflows/tageslauf.yml).
     """
     stamp = now.strftime("%Y-%m-%dT%H%MZ")
     errors, warnings = 0, []

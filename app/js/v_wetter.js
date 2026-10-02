@@ -50,7 +50,7 @@ export async function render(box, ctx, r) {
   const ist = r.sub === 'ist';
   U.ap(box, h('h1', null, ist ? 'Wetter – Ist' : 'Wetter – Prognose'), U.spGroup('wetter'));
   if (!S.man.files?.['wetter.json']) {
-    U.ap(box, h('p', {class: 'warn'}, 'Noch keine Wetterdaten: Die Seite füllt sich mit dem ersten Tageslauf (stündlich vormittags und abends).'));
+    U.ap(box, h('p', {class: 'warn'}, 'Noch keine Wetterdaten: Die Seite füllt sich mit dem ersten Tageslauf (stündlich von etwa 05:00 Uhr bis Mitternacht deutscher Zeit).'));
     return;
   }
   // Umschalter erst nach dem Laden (die Woche der Prognose steht in der Datei); der Platzhalter hält die Stelle
