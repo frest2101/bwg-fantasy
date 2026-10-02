@@ -2,7 +2,7 @@
 "legende":"BWG Fantasy Liga (ESPN 1166555857): Marktwerte aller Spieler mit Wert als Gesamtrangliste. Werte: FantasyCalc (https://fantasycalc.com), Dynasty, Superflex, 10 Teams, PPR – Tauschpreise aus Ligen mit rund 300 gehaltenen Spielern; die BWG hält 120 (12 je Team). Oberhalb der keeper_linie passen sie, darunter überzeichnen sie. Keine Punktprognose; K und D/ST ohne Wert.",
 "legende_spalten":"team = Kürzel (teams) oder Status; rang/pos_rang = FantasyCalc gesamt/Position; trend30 = Wertänderung 30 Tage; redraft = Wert nur für diese Saison (null = keiner); ue_linie = wert − keeper_linie; alter am stand.alter_stichtag; herkunft = keeper, draft, waiver, free_agent, trade (null = frei). ROS und Form: claude.json.",
 "quelle":"Werte: FantasyCalc (https://fantasycalc.com); Namen, Teams und Herkunft: ESPN; Alter: nflverse (CC BY 4.0). Inoffizielle Auswertung.",
-"stand":{"saison":2026,"nach_woche":3,"marktwert":"2026-10-02T0700Z","pool_stand":"2026-10-02T1750Z","alter_stichtag":"2026-09-29"},
+"stand":{"saison":2026,"nach_woche":3,"marktwert":"2026-10-02T0700Z","pool_stand":"2026-10-02T1853Z","alter_stichtag":"2026-09-29"},
 "keeper_linie":1654,
 "keeper_zahl":12,
 "teams":{"ACB":"Asse's Cowboys","HJS":"Hugh Jass","SAM":"SaschaM","GLS":"gloane saubande","CRN":"cool runnings","DYN":"Dynamo","RTZ":"Rotzleffe","4DS":"4th Down Syndrom","TTY":"TeamTy","SGK":"SaureGurken"},
