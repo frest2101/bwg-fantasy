@@ -52,5 +52,5 @@
 {"id":"0d02f611-6f53-4b29-8d6b-230069f7cbc2","type":"FREEAGENT","team_id":10,"datum":1790854124982,"periode":4,"items":[{"type":"ADD","player_id":2576925,"name":"Darren Waller","from_team_id":0,"to_team_id":10,"in_app":true},{"type":"DROP","player_id":4362249,"name":"Jayden Reed","from_team_id":10,"to_team_id":0,"in_app":true}]},
 {"id":"d2fc852c-21f7-42f2-b277-22f840e4d1a5","type":"FREEAGENT","team_id":1,"datum":1790889249465,"periode":4,"items":[{"type":"ADD","player_id":4431492,"name":"Roman Wilson","from_team_id":0,"to_team_id":1,"in_app":true},{"type":"DROP","player_id":5081432,"name":"Antonio Williams","from_team_id":1,"to_team_id":0,"in_app":true}]}
 ],
-"aufstellungswechsel":{"1":15,"2":19,"3":5,"4":18,"5":22,"6":4,"7":9,"8":13,"9":18,"10":26}
+"aufstellungswechsel":{"1":16,"2":19,"3":5,"4":19,"5":22,"6":4,"7":9,"8":13,"9":18,"10":26}
 }
