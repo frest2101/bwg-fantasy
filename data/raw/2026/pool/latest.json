@@ -1,7 +1,7 @@
 {
 "season":2026,
 "woche":4,
-"stand":"2026-10-02T2038Z",
+"stand":"2026-10-02T2049Z",
 "quelle":"kona_player_info mit filterStatsForCurrentSeasonScoringPeriodId = [4], Auszug je Spieler; waiver_reihenfolge = waiverRank je Team aus mTeam (1 = zuerst), waiver_reihenfolge_stand = Abrufzeit ihrer letzten Änderung; ir_slot = Spieler-IDs im IR-Slot (lineupSlotId 21) je Team aus mRoster, ir_slot_stand = Abrufzeit ihrer letzten Änderung; trades = per Trade gekommene Kaderspieler (acquisitionType TRADE) aus mRoster: Spieler-ID → [team_id, acquisitionDate]; stand = Abrufzeit (UTC) des letzten Laufs, der etwas geändert hat",
 "waiver_reihenfolge":{"1": 4, "2": 7, "3": 8, "4": 5, "5": 2, "6": 1, "7": 3, "8": 6, "9": 9, "10": 10},
 "waiver_reihenfolge_stand":"2026-09-30T0757Z",
@@ -902,7 +902,7 @@
 {"id":4685472,"status":"ONTEAM","onTeamId":1,"injuryStatus":"ACTIVE","percentOwned":97.99,"percentChange":0.02,"percentStarted":84.69,"waiverProcessDate":null,"lastNewsDate":1790547559000,"proj_naechste_woche":15.47846878},
 {"id":4685477,"status":"FREEAGENT","onTeamId":0,"injuryStatus":"ACTIVE","percentOwned":0.03,"percentChange":0.0,"percentStarted":0.0,"waiverProcessDate":null,"lastNewsDate":1790726773000,"proj_naechste_woche":null},
 {"id":4685504,"status":"FREEAGENT","onTeamId":0,"injuryStatus":"ACTIVE","percentOwned":0.07,"percentChange":0.0,"percentStarted":0.01,"waiverProcessDate":null,"lastNewsDate":1790129905000,"proj_naechste_woche":1.60901176},
-{"id":4685512,"status":"ONTEAM","onTeamId":10,"injuryStatus":"QUESTIONABLE","percentOwned":88.43,"percentChange":-0.5,"percentStarted":24.01,"waiverProcessDate":null,"lastNewsDate":1790897178000,"proj_naechste_woche":10.22986591},
+{"id":4685512,"status":"ONTEAM","onTeamId":10,"injuryStatus":"OUT","percentOwned":88.43,"percentChange":-0.5,"percentStarted":24.01,"waiverProcessDate":null,"lastNewsDate":1790897178000,"proj_naechste_woche":10.22986591},
 {"id":4685522,"status":"ONTEAM","onTeamId":9,"injuryStatus":"ACTIVE","percentOwned":0.26,"percentChange":0.0,"percentStarted":0.01,"waiverProcessDate":null,"lastNewsDate":1790550741000,"proj_naechste_woche":0.0},
 {"id":4685526,"status":"FREEAGENT","onTeamId":0,"injuryStatus":"INJURY_RESERVE","percentOwned":0.37,"percentChange":-0.01,"percentStarted":0.01,"waiverProcessDate":null,"lastNewsDate":1788148335000,"proj_naechste_woche":0.0},
 {"id":4685540,"status":"WAIVERS","onTeamId":0,"injuryStatus":"ACTIVE","percentOwned":0.02,"percentChange":0.0,"percentStarted":0.0,"waiverProcessDate":1791356400000,"lastNewsDate":1787890003000,"proj_naechste_woche":0.0},
