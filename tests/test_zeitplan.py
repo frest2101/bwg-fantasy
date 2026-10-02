@@ -24,8 +24,10 @@ ZONE = "Europe/Berlin"       # Slots in deutscher Zeit (Beschluss 02.10.2026), G
 VERZUG_MIN = 15              # typischer Startverzug bei GitHub; Grundlage von „etwa 05:00 Uhr“ in den Texten
 # ein Eintrag: - cron: "<Minute> <Stunde von>-<Stunde bis> * * *", in der Zeile darunter timezone: "<IANA-Name>"
 CRON_ZEILE = re.compile(r"^\s*-\s*cron:", re.M)
-CRON = re.compile(r'^\s*-\s*cron:\s*"(\d+) (\d+)-(\d+) \* \* \*"[^\n]*\n\s*timezone:\s*"([^"]+)"\s*$', re.M)
-KURZFORMEL = re.compile(r"stündlich von etwa (\d\d:\d\d) Uhr bis Mitternacht")
+# die timezone-Zeile steht genau zwei Leerzeichen tiefer als der Listenstrich (Schlüssel desselben Eintrags) – anders
+# eingerückt wäre der Workflow ungültig und liefe still gar nicht mehr
+CRON = re.compile(r'^([ ]*)-[ ]cron:[ ]*"(\d+) (\d+)-(\d+) \* \* \*"[^\n]*\n\1[ ]{2}timezone:[ ]*"([^"]+)"[ ]*$', re.M)
+KURZFORMEL = re.compile(r"von etwa (\d\d:\d\d) Uhr bis Mitternacht")
 
 
 def read(path) -> str:
@@ -34,7 +36,7 @@ def read(path) -> str:
 
 def plan() -> list[tuple[int, int, int, str]]:
     """cron-Einträge des Workflows in Dateireihenfolge: (Minute, erste Stunde, letzte Stunde, Zeitzone)."""
-    return [(int(minute), int(von), int(bis), zone) for minute, von, bis, zone in CRON.findall(read(WORKFLOW))]
+    return [(int(minute), int(von), int(bis), zone) for _, minute, von, bis, zone in CRON.findall(read(WORKFLOW))]
 
 
 def slots() -> list[tuple[int, int]]:
@@ -92,7 +94,7 @@ def test_glossar_und_readme_nennen_die_slots():
 
 
 def test_kurzformel_passt_zum_plan():
-    """Die Kurzformel „stündlich von etwa 05:00 Uhr bis Mitternacht“ (App, Doku, Docstrings) folgt aus dem Plan:
+    """Die Kurzformel „von etwa 05:00 Uhr bis Mitternacht“ (App, Doku, Docstrings, Glossar) folgt aus dem Plan:
     „etwa“ = erster Slot plus der typische Startverzug, „bis Mitternacht“ = letzter Slot in der Stunde vor 24 Uhr."""
     hour, minute = slots()[0]
     start = hour * 60 + minute + VERZUG_MIN

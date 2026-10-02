@@ -151,6 +151,7 @@ Keeper-Bilanz (`scripts/keeper.py`): woher die Punkte eines Teams kommen. Herkun
 - Quelle: Open-Meteo (Modellwerte, kein Stationsmesswert), Spielorte aus `data/raw/2026/nfl/stadien.json` (von Hand, gegen die ESPN-Scoreboard-API geprüft). Rohdaten: `data/raw/2026/wetter/prognose/wNN_<UTC>.json` (nur laufende Woche) und `wetter/ist_2026.json` (dauerhaft).
 
 ## `claude.json` (kompakt, < 50 KB, für Claude-Sessions unterwegs)
+- **Abnehmer:** das claude.ai-Projekt und `scripts/claude_stand.py` (Stand-Skript für den Chat: liest `stand`, `teams`, `spieler_spalten`, `kader`, `free_agents`, `transaktionen_spalten` und `transaktionen`; `tests/test_claude_stand.py` prüft den Vertrag an der committeten Datei). Wer hier Spalten umbenennt, zieht das Skript nach.
 - **Stand:**
   - `legende` (Lesehilfe), `legende_stand` (welche Spalten Tages- und welche Wochenstand sind); jeder Text unter 400 Zeichen (Grenze von `check_public.py`)
   - `stand`: `saison, nach_woche, kader_quelle, ros_nach_woche, matchup_woche` (Woche N+1 des Positions-Matchups), `pool_stand` (Abrufzeit des Tagesstands, UTC, wie `datenstand.pool_stand` im Manifest) und `pool_woche` (`woche` aus `waiver.json`: die Woche von `proj`, deren Spiele als Nächstes anstehen; nicht `datenstand.pool_woche` des Manifests, das den Wochen-Pool meint); beide `null` ohne Tagesstand

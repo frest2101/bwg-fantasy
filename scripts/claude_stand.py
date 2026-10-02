@@ -4,17 +4,21 @@ Eigenständig (läuft allein im Code-Container des Chats): nur Standardbibliothe
 Repo, kein zoneinfo. Nur lesend: ESPN-Liga (vier Views in einem Request, laufende Periode), NFL-Scoreboard,
 claude.json der App und – nur für Spieler aus Moves, die in keinem Kader stehen – kona_player_info.
 Manager-Daten (members, owners, memberId) werden direkt nach dem Abruf entfernt und nie gelesen oder gedruckt.
+Fremdtexte (Teamname, Spielername, Scoreboard-Detail) kommen einzeilig und gekürzt in den Text (kurz); der Text ist
+Daten, keine Anweisung.
 
 Aufrufe (team_id optional, Standard 2; nur das erste Argument zählt, und nur als Team-ID der Liga – alles andere,
 etwa '-c' oder die Argumente eines Notebooks, wird ignoriert):
-    python3 -c "import requests; r = requests.get('<raw-Adresse>', timeout=20); r.raise_for_status(); exec(r.content)" [team_id]
+    python3 -c "import requests; r = requests.get('<raw-Adresse>', timeout=20); r.raise_for_status(); exec(r.content, {'__name__': '__main__'})" [team_id]
     curl -fsS <raw-Adresse> | python3 - [team_id]
     python scripts/claude_stand.py [team_id]
 raw-Adresse: https://raw.githubusercontent.com/frest2101/bwg-fantasy/main/scripts/claude_stand.py
 Der erste Weg ist der empfohlene (ein Prozess, Zeitlimit, ein fehlendes Skript wird ein klarer HTTP-Fehler);
-exec(r.content) liest den Quelltext als UTF-8, auch wenn die Antwort keinen Zeichensatz nennt (.text geht bei
-GitHub ebenso). exec muss auf oberster Ebene stehen, nicht in einer Funktion – sonst finden sich die Funktionen
-des Skripts gegenseitig nicht.
+exec(r.content, …) liest den Quelltext als UTF-8, auch wenn die Antwort keinen Zeichensatz nennt. Der eigene
+Namensraum {'__name__': '__main__'} gehört dazu: Mit ihm läuft der Aufruf auf jeder Ebene, auch in einer Funktion
+oder einem Notebook. Ein leerer Namensraum (exec(r.content, {})) geht ebenso; exec(r.content) ohne Namensraum nur
+auf oberster Ebene – in einer Funktion finden sich die Funktionen des Skripts dann nicht, und statt des Stands
+kommt eine Textzeile mit diesem Hinweis.
 
 Aufbau: Der Abruf (hole, parallel, abrufen) ist getrennt von den reinen Funktionen (bericht und Helfer), die aus den
 geladenen JSON-Objekten und einem übergebenen Zeitpunkt den Text bauen – so laufen die Tests ohne Netz.
@@ -66,11 +70,17 @@ INJ = {None: "", "ACTIVE": "", "NORMAL": "", "QUESTIONABLE": "Q", "DOUBTFUL": "D
 TAG = ("Mo", "Di", "Mi", "Do", "Fr", "Sa", "So")
 MOVE_ARTEN = {"WAIVER": "Waiver", "FREEAGENT": "Free Agent", "ROSTER": "Kader", "FUTURE_ROSTER": "Kader"}
 SPIELER_ITEMS = {"ADD", "DROP"}
-OFFEN = ("pre", "bye", "ohne", "auf")  # Spielstatus, bei dem der Slot eines Spielers noch nicht gesperrt ist
-APP_FENSTER_MS = 14 * 86_400_000       # claude.json führt die Moves der 14 Tage bis zum letzten Move
+# Spielstatus eines Spielers: pre/in/post (Scoreboard), verschoben (laut ESPN beendet, aber ohne Ergebnis), bye und
+# ohne (kein NFL-Team); ohne Scoreboard zu/auf (lineupLocked). OFFEN: Der Slot ist noch nicht gesperrt.
+OFFEN = ("pre", "bye", "ohne", "auf", "verschoben")
+SPIELFREI = ("bye", "ohne")            # zählt 0; ESPN projiziert D/ST auch in ihrer Bye-Woche
+SAMMEL_AB = 3                          # zeigen mehr Bankspieler auf denselben Starter: eine Sammelzeile
+TEXT_MAX = 40                          # Zeichen je Fremdtext (Teamname, Spielername, Scoreboard-Detail)
+APP_FENSTER_TAGE = 14                  # claude.json führt die Moves der 14 Tage bis zum letzten Move
+APP_FENSTER_MS = APP_FENSTER_TAGE * 86_400_000
 
 
-# ---------------------------------------------------------------- Zahlen und Zeit (rein)
+# ---------------------------------------------------------------- Zahlen, Zeit, Fremdtext (rein)
 
 def zahl(wert, stellen=2) -> str:
     """Zahl mit festen Nachkommastellen, round half up über Decimal; None → „–“."""
@@ -84,6 +94,13 @@ def zahl(wert, stellen=2) -> str:
 def prozent(anteil) -> str:
     """Anteil 0…1 als ganze Prozent (round half up); None → „–“."""
     return "–" if anteil is None else zahl(Decimal(str(anteil)) * 100, 0) + " %"
+
+
+def kurz(text, n: int = TEXT_MAX) -> str:
+    """Fremdtext für die Ausgabe: eine Zeile (Steuerzeichen, Zeilenumbrüche und Leerraum werden ein Leerzeichen),
+    höchstens n Zeichen („…“ am Ende, wenn gekürzt). Den Teamnamen etwa kann jeder Manager bei ESPN ändern."""
+    s = " ".join("".join(c if c.isprintable() else " " for c in str(text)).split())
+    return s if len(s) <= n else s[:n - 1].rstrip() + "…"
 
 
 def umstellung(jahr: int, monat: int) -> datetime:
@@ -149,7 +166,13 @@ def scoreboard_passt(scoreboard, woche) -> bool:
 
 
 def spiele_aus(scoreboard: dict):
-    """Scoreboard → (Spiel je proTeamId, Liste der Spiele). state: pre (offen), in (läuft), post (beendet)."""
+    """Scoreboard → (Spiel je proTeamId, Liste der Spiele). state: pre (offen), in (läuft), post (beendet),
+    verschoben (ESPN meldet state „post“, aber completed false).
+
+    Für ein abgesagtes Spiel ist diese Form belegt (2022 W17 BUF@CIN: state post, completed false, shortDetail
+    „Canceled“); für ein verschobenes ist sie angenommen. Defensiv: Solche Spiele bilden eine eigene Gruppe mit
+    ESPNs Detailtext, ihre Starter gelten wie offene als tauschbar. Beim ersten echten Fall die Form prüfen.
+    """
     je_team, liste = {}, []
     for ev in scoreboard.get("events") or []:
         c = (ev.get("competitions") or [{}])[0]
@@ -158,11 +181,13 @@ def spiele_aus(scoreboard: dict):
         heim, gast = seiten.get("home"), seiten.get("away")
         if not heim or not gast:
             continue
-        h, g = heim["team"].get("abbreviation", "?"), gast["team"].get("abbreviation", "?")
-        spiel = {"state": typ.get("state") if typ.get("state") in ("pre", "in", "post") else "pre",
-                 "fertig": bool(typ.get("completed")), "detail": typ.get("shortDetail") or typ.get("description") or "",
+        h, g = kurz(heim["team"].get("abbreviation", "?"), 5), kurz(gast["team"].get("abbreviation", "?"), 5)
+        state = typ.get("state") if typ.get("state") in ("pre", "in", "post") else "pre"
+        if state == "post" and not typ.get("completed"):
+            state = "verschoben"
+        spiel = {"state": state, "detail": kurz(typ.get("shortDetail") or typ.get("description") or ""),
                  "anstoss": aus_iso(ev.get("date") or c.get("date")) if c.get("timeValid", True) else None,
-                 "paarung": f"{g}@{h}", "stand": f"{gast.get('score', '?')}:{heim.get('score', '?')}"}
+                 "paarung": f"{g}@{h}", "stand": f"{kurz(gast.get('score', '?'), 4)}:{kurz(heim.get('score', '?'), 4)}"}
         liste.append(spiel)
         je_team[int(heim["team"]["id"])] = dict(spiel, gegner=f"vs {g}")
         je_team[int(gast["team"]["id"])] = dict(spiel, gegner=f"@ {h}")
@@ -184,11 +209,12 @@ def spielerzeile(ppe: dict, woche, saison, je_team: dict, hat_sb: bool) -> dict:
     pro = p.get("proTeamId")
     if hat_sb:
         state = je_team[pro]["state"] if pro in je_team else "bye" if pro else "ohne"
-    else:  # ohne Scoreboard: ESPN sperrt den Slot mit dem Anstoß (lineupLocked)
+    else:  # ohne Scoreboard: ESPN sperrt den Slot mit dem Anstoß (lineupLocked); Byes sind dann nicht erkennbar
         state = "zu" if ppe.get("lineupLocked") else "auf"
     pid = p.get("id", ppe.get("id"))
-    return {"id": pid, "name": p.get("fullName") or f"Spieler {pid}", "pos": POS.get(p.get("defaultPositionId"), "?"),
-            "pro": pro, "nfl": NFL.get(pro, "?"), "inj": INJ.get(p.get("injuryStatus"), p.get("injuryStatus") or ""),
+    inj = INJ.get(p.get("injuryStatus"), p.get("injuryStatus") or "")
+    return {"id": pid, "name": kurz(p.get("fullName") or f"Spieler {pid}"), "pos": POS.get(p.get("defaultPositionId"), "?"),
+            "pro": pro, "nfl": NFL.get(pro, "?"), "inj": kurz(inj, 20),
             "ist": wochenwert(p, woche, saison, 0), "proj": wochenwert(p, woche, saison, 1),
             "wahl": set(p.get("eligibleSlots") or []), "state": state, "slot": None, "team": None,
             "status": ppe.get("status"), "frist": ppe.get("waiverProcessDate")}
@@ -210,7 +236,7 @@ def bewegungen(liga: dict) -> dict:
         elif typ == "WAIVER" and str(status).startswith("FAILED"):
             aus["claims"][t.get("teamId")] += 1
         else:
-            aus["sonst"][f"{typ} {status}"] += 1
+            aus["sonst"][kurz(f"{typ} {status}", 60)] += 1
     for liste in (aus["moves"], aus["trades"]):
         liste.sort(key=lambda t: (tx_zeit(t) or 0, str(t.get("id"))))
     return aus
@@ -236,14 +262,25 @@ def kona_filter(ids: list, woche) -> dict:
                         "filterStatsForCurrentSeasonScoringPeriodId": {"value": [woche]}}}
 
 
-def app_index(app, woche) -> dict:
+def app_index(app, woche, saison=None) -> dict:
     """claude.json als Nachschlagetabellen: Spieler je ID (Name, Position, ROS/Spiel, F, Projektion), Kader je
-    Kürzel, Moves als Zähler (Zeit, Kürzel). f_ok/proj_ok: Die Datei meint dieselbe Woche wie ESPN."""
+    Kürzel, Moves als Zähler (Zeit, Kürzel). f_ok/proj_ok: Die Datei meint dieselbe Woche wie ESPN.
+
+    Vertrag mit scripts/app_export.py (build_claude; tests/test_claude_stand.py liest dazu die committete Datei):
+    stand (saison, nach_woche, matchup_woche, pool_stand, pool_woche), spieler_spalten mit id, name, pos, nfl, ros_g,
+    mu_n1, proj, kader je Kürzel, free_agents, transaktionen_spalten mit datum_ms und team.
+    fremd: Die Datei zeigt eine andere Saison als ESPN (nach dem Saisonwechsel, bis W1 final ist) – dann gilt nur
+    die Kopfzeile, nichts aus der Datei wird verglichen. marken: Moves lassen sich als [App]/[NEU] markieren;
+    führt die Datei Transaktionen ohne die Spalten datum_ms und team, wäre sonst jeder Move fälschlich [NEU].
+    """
     stand = (app or {}).get("stand") or {}
-    aus = {"da": bool(app), "stand": stand, "spieler": {}, "kader": None, "tx": Counter(), "bis": None,
-           "f_ok": bool(app) and stand.get("matchup_woche") == woche,
-           "proj_ok": bool(app) and stand.get("pool_woche") == woche}
-    if not app:
+    fremd = bool(app) and saison is not None and stand.get("saison") not in (None, saison)
+    nutzbar = bool(app) and not fremd
+    aus = {"da": bool(app), "fremd": fremd, "saison": saison, "stand": stand, "spieler": {}, "kader": None,
+           "tx": Counter(), "bis": None, "marken": nutzbar,
+           "f_ok": nutzbar and stand.get("matchup_woche") == woche,
+           "proj_ok": nutzbar and stand.get("pool_woche") == woche}
+    if not nutzbar:
         return aus
     spalten = app.get("spieler_spalten") or []
     if isinstance(app.get("kader"), dict) and "id" in spalten:
@@ -259,8 +296,11 @@ def app_index(app, woche) -> dict:
         for zeile in zeilen:
             s = dict(zip(frei_spalten, zeile))
             aus["spieler"].setdefault(s["id"], s)
-    tx_spalten = app.get("transaktionen_spalten") or []
-    for zeile in app.get("transaktionen") or [] if "datum_ms" in tx_spalten else []:
+    tx_spalten, tx_zeilen = app.get("transaktionen_spalten") or [], app.get("transaktionen") or []
+    if tx_zeilen and not {"datum_ms", "team"} <= set(tx_spalten):
+        aus["marken"] = False
+        return aus
+    for zeile in tx_zeilen:
         t = dict(zip(tx_spalten, zeile))
         aus["tx"][(t["datum_ms"], t.get("team"))] += 1
     aus["bis"] = max((zeit for zeit, _ in aus["tx"] if zeit), default=None)
@@ -285,25 +325,37 @@ def lage_aus(liga: dict, scoreboard, index: dict, kona) -> dict:
         z = spielerzeile(eintrag, woche, saison, je_team, hat_sb)
         z["team"] = eintrag.get("onTeamId") or None  # zwischen Liga- und kona-Abruf geholt: dann steht hier das Team
         spieler.setdefault(z["id"], z)
-    bye = [t.get("abbreviation", "?") for t in (scoreboard.get("week") or {}).get("teamsOnBye") or []] if hat_sb else []
+    bye = [kurz(t.get("abbreviation", "?"), 5) for t in (scoreboard.get("week") or {}).get("teamsOnBye") or []] \
+        if hat_sb else []
     return {"woche": woche, "liga": liga, "teams": teams, "hat_sb": hat_sb, "spiele": spiele, "je_team": je_team,
             "bye": bye, "kader": kader, "spieler": spieler, "app": index, "kona_da": kona is not None,
-            "kz": {tid: KUERZEL.get(tid) or t.get("abbrev") or f"T{tid}" for tid, t in teams.items()}}
+            "kz": {tid: KUERZEL.get(tid) or kurz(t.get("abbrev") or f"T{tid}", 6) for tid, t in teams.items()}}
+
+
+def periode_von(liga: dict):
+    """Laufende Matchup-Periode; in den Playoffs und nach W17 muss sie nicht die Woche (scoringPeriodId) sein."""
+    return (liga.get("status") or {}).get("currentMatchupPeriod", liga.get("scoringPeriodId"))
 
 
 def paarungen(liga: dict) -> list:
     """Matchups der laufenden Matchup-Periode."""
-    periode = (liga.get("status") or {}).get("currentMatchupPeriod", liga.get("scoringPeriodId"))
+    periode = periode_von(liga)
     return [m for m in liga.get("schedule") or [] if m.get("matchupPeriodId") == periode]
+
+
+def paarung_von(liga: dict, team_id: int):
+    """Das Matchup eines Teams in der laufenden Matchup-Periode; None ohne Paarung."""
+    for m in paarungen(liga):
+        if team_id in [(m.get(seite) or {}).get("teamId") for seite in ("home", "away")]:
+            return m
+    return None
 
 
 def gegner_von(liga: dict, team_id: int):
     """Team-ID des Gegners in der laufenden Matchup-Periode; None bei Freilos oder ohne Paarung."""
-    for m in paarungen(liga):
-        ids = [(m.get(seite) or {}).get("teamId") for seite in ("home", "away")]
-        if team_id in ids:
-            return next((i for i in ids if i not in (team_id, None)), None)
-    return None
+    m = paarung_von(liga, team_id) or {}
+    ids = [(m.get(seite) or {}).get("teamId") for seite in ("home", "away")]
+    return next((i for i in ids if i not in (team_id, None)), None)
 
 
 # ---------------------------------------------------------------- Abschnitte des Textes (rein)
@@ -312,32 +364,36 @@ def kopf(jetzt: datetime, liga, index: dict, abweichung, ausfall: dict) -> list:
     """Uhrzeit (deutsche Zeit und UTC), Abweichung zur ESPN-Serverzeit, Woche, Datenstand der App und Lesehilfe."""
     zeile = f"STAND {zeit_text(jetzt, jahr=True)} ({jetzt:%H:%M} UTC, Uhr des Containers"
     if abweichung is not None:
-        zeile += f"; ESPN-Serverzeit weicht {'+' if abweichung >= 0 else ''}{zahl(abweichung, 0)} s ab"
+        sek = zahl(abweichung, 0)  # Vorzeichen am gerundeten Wert: gerundet 0 steht ohne
+        zeile += f"; ESPN-Serverzeit weicht {'' if sek == '0' or sek.startswith('-') else '+'}{sek} s ab"
     zeile += ")"
     woche = (liga or {}).get("scoringPeriodId")
     if liga:
-        periode = (liga.get("status") or {}).get("currentMatchupPeriod", woche)
+        periode = periode_von(liga)
         zeile += f" – ESPN Woche {woche}" + (f" (Matchup-Periode {periode})" if periode != woche else "")
     aus = [zeile]
     if abweichung is not None and abs(abweichung) >= 120:
         aus.append("! Die Uhr des Containers weicht stark von ESPN ab – „jetzt“ und Altersangaben mit Vorsicht lesen")
+    lesehilfe = "Alle Zeiten deutsche Zeit. Punkte, Projektion (Proj) und Siegchance: ESPN live."
+    stand = index["stand"]
     if not index["da"]:
         aus.append(f"App: claude.json nicht erreichbar ({ausfall.get('app', 'kein Abruf')}) – Datenstand der App, F, "
                    "ROS/Sp, Marken [App]/[NEU] und Kadervergleich fehlen")
-        lesehilfe = "Alle Zeiten deutsche Zeit. Punkte, Projektion (Proj) und Siegchance: ESPN live."
+    elif index["fremd"]:
+        aus.append(f"App zeigt Saison {kurz(stand.get('saison'), 10)}, ESPN Saison {index['saison']} – F, ROS/Sp, "
+                   "Marken [App]/[NEU] und Kadervergleich fehlen")
     else:
-        stand = index["stand"]
         pool = None
         try:
             pool = datetime.strptime(stand.get("pool_stand") or "", "%Y-%m-%dT%H%MZ").replace(tzinfo=timezone.utc)
-        except ValueError:
+        except (TypeError, ValueError):
             pass
         tagesstand = "ohne Tagesstand" if pool is None else \
             f"Tagesstand {zeit_text(pool)} (vor {zahl(Decimal(int((jetzt - pool).total_seconds())) / 3600, 1)} h)"
-        letzter = f"letzter Move in der App {zeit_text(aus_ms(index['bis']))}" if index["bis"] else "kein Move in der App"
+        letzter = "Moves der App nicht lesbar" if not index["marken"] else \
+            f"letzter Move in der App {zeit_text(aus_ms(index['bis']))}" if index["bis"] else "kein Move in der App"
         aus.append(f"App: gerechnet bis Woche {stand.get('nach_woche', '?')}; {tagesstand}; {letzter}")
-        lesehilfe = ("Alle Zeiten deutsche Zeit. Punkte, Projektion (Proj) und Siegchance: ESPN live. Laut App "
-                     "(Wochenstand): ROS/Sp = ROS-Projektion je Spiel")
+        lesehilfe += " Laut App (Wochenstand): ROS/Sp = ROS-Projektion je Spiel"
         if index["f_ok"]:
             lesehilfe += ", F = Positions-Matchup des Gegners (> 1 günstig)."
         else:
@@ -350,38 +406,47 @@ def nfl_zeilen(lage: dict, ausfall: dict) -> list:
     """NFL-Spiele der Woche nach Status; offene Spiele je Anstoß mit dem Zonen-Etikett dieses Anstoßes."""
     if not lage["hat_sb"]:
         return [f"NFL-Scoreboard nicht erreichbar ({ausfall.get('scoreboard', 'kein Abruf')}) – Spielstatus, Gegner "
-                "und Anstoßzeiten fehlen; gesperrt/offen je Spieler stammt aus dem ESPN-Kader (lineupLocked)"]
+                "und Anstoßzeiten fehlen; gesperrt/offen je Spieler stammt aus dem ESPN-Kader (lineupLocked). "
+                "Byes nicht erkennbar – D/ST-Projektionen können spielfreie Teams betreffen"]
     final = [s for s in lage["spiele"] if s["state"] == "post"]
     laeuft = [s for s in lage["spiele"] if s["state"] == "in"]
+    verschoben = [s for s in lage["spiele"] if s["state"] == "verschoben"]
     offen = {}
     for s in lage["spiele"]:
         if s["state"] == "pre":
             offen.setdefault(s["anstoss"], []).append(s["paarung"])
     aus = [f"NFL W{lage['woche']}: {len(final)} final, {len(laeuft)} läuft, {sum(map(len, offen.values()))} offen"
+           + (f", {len(verschoben)} verschoben" if verschoben else "")
            + (f"; Bye: {', '.join(lage['bye'])}" if lage["bye"] else "")]
     if final:
-        aus.append("  final: " + ", ".join(f"{s['paarung']} {s['stand']}" + ("" if s["fertig"] else f" ({s['detail']})")
-                                          for s in final))
+        aus.append("  final: " + ", ".join(f"{s['paarung']} {s['stand']}" for s in final))
     if laeuft:
         aus.append("  läuft: " + ", ".join(f"{s['paarung']} {s['stand']} ({s['detail']})" for s in laeuft))
     for anstoss in sorted(offen, key=lambda a: (a is None, a)):
         aus.append(f"  offen {zeit_text(anstoss)}: " + ", ".join(offen[anstoss]))
+    if verschoben:
+        aus.append("  verschoben (laut ESPN beendet ohne Ergebnis): "
+                   + ", ".join(f"{s['paarung']} ({s['detail'] or 'ohne Angabe'})" for s in verschoben))
     return aus
 
 
 def starterzahl(lage: dict, team_id) -> str:
-    """Starter eines Teams nach Spielstatus: final/läuft/offen, ohne Scoreboard gesperrt/offen."""
+    """Starter eines Teams nach Spielstatus: final/läuft/offen, dazu getrennt Bye, ohne NFL-Team und verschoben;
+    ohne Scoreboard gesperrt/offen."""
     c = Counter(z["state"] for z in lage["kader"].get(team_id, []) if z["slot"] in STARTER_SLOTS)
     if not lage["hat_sb"]:
         return f"{c['zu']}/{c['auf']}"
-    frei = c["bye"] + c["ohne"]
-    return f"{c['post']}/{c['in']}/{c['pre']}" + (f" +{frei} Bye" if frei else "")
+    zusatz = (("bye", "Bye"), ("ohne", "ohne Team"), ("verschoben", "verschoben"))
+    return f"{c['post']}/{c['in']}/{c['pre']}" + "".join(f" +{c[k]} {wort}" for k, wort in zusatz if c[k])
 
 
 def matchup_zeilen(lage: dict, mein_team: int) -> list:
     """Je Matchup beide Seiten: Punkte live, Live-Projektion, Siegwahrscheinlichkeit, Starter nach Spielstatus."""
     spalte = "Starter final/läuft/offen" if lage["hat_sb"] else "Starter gesperrt/offen"
-    aus = [f"MATCHUPS W{lage['woche']} (* = eigenes): Team (Bilanz) Punkte live | Live-Projektion | Siegchance | {spalte}"]
+    woche, periode = lage["woche"], periode_von(lage["liga"])
+    titel = f"MATCHUPS W{woche}" if periode == woche else \
+        f"MATCHUPS Matchup-Periode {periode} (Starterzahlen und Aufstellungen: ESPN Woche {woche})"
+    aus = [f"{titel} (* = eigenes): Team (Bilanz) Punkte live | Live-Projektion | Siegchance | {spalte}"]
 
     def seite(s: dict) -> str:
         tid = s.get("teamId")
@@ -399,39 +464,52 @@ def matchup_zeilen(lage: dict, mein_team: int) -> list:
         ende = f"  [Sieger {lage['kz'].get((m.get(sieger) or {}).get('teamId'), '?')}]" if sieger else \
             "  [Unentschieden]" if m.get("winner") == "TIE" else ""
         if m.get("playoffTierType") not in (None, "NONE"):  # Playoffs: ESPNs Bezeichnung der Runde, unverändert
-            ende += f"  [{m['playoffTierType']}]"
+            ende += f"  [{kurz(m['playoffTierType'], 30)}]"
         aus.append(f" {marke}" + "  –  ".join(seite(s) for s in seiten) + ("  (Freilos)" if len(seiten) == 1 else "") + ende)
     return aus if spiele else aus + ["  keine Paarung in dieser Matchup-Periode"]
+
+
+def frei_wort(z: dict) -> str:
+    """Wort für einen Spieler ohne Spiel – dasselbe in seiner Zeile und im Bank-Hinweis."""
+    return "Bye" if z["state"] == "bye" else "ohne NFL-Team"
 
 
 def spiel_text(lage: dict, z: dict) -> str:
     """Gegner und Spielstatus eines Spielers: „vs DEN So 22:25 MESZ“, „@ CLE final“, „Bye“; ohne Scoreboard gesperrt/offen."""
     if not lage["hat_sb"]:
         return "gesperrt" if z["state"] == "zu" else "offen"
-    if z["state"] in ("bye", "ohne"):
-        return "Bye" if z["state"] == "bye" else "ohne NFL-Team"
+    if z["state"] in SPIELFREI:
+        return frei_wort(z)
     spiel = lage["je_team"][z["pro"]]
     if spiel["state"] == "post":
-        return f"{spiel['gegner']} " + ("final" if spiel["fertig"] else spiel["detail"])
+        return f"{spiel['gegner']} final"
+    if spiel["state"] == "verschoben":
+        return f"{spiel['gegner']} verschoben ({spiel['detail'] or 'ohne Angabe'})"
     if spiel["state"] == "in":
         return f"{spiel['gegner']} läuft ({spiel['detail']})"
     return f"{spiel['gegner']} {zeit_text(spiel['anstoss'], datum=False)}"
 
 
 def spielerspalten(lage: dict, z: dict, kopf_text: str) -> str:
-    """Eine Zeile: Slot Spieler NFL Spiel | Punkte | Proj | F | Verletzung (F nur, wenn die App dieselbe Woche meint)."""
+    """Eine Zeile: Slot Spieler NFL Spiel | Punkte | Proj | F | Verletzung (F nur, wenn die App dieselbe Woche meint).
+
+    Ohne Spiel (Bye, ohne NFL-Team) steht bei Proj „–“: ESPN projiziert D/ST auch in ihrer Bye-Woche, die Zahl wäre
+    keine Erwartung (gezählt wird 0)."""
     f = (lage["app"]["spieler"].get(z["id"]) or {}).get("mu_n1") if lage["app"]["f_ok"] else None
-    return (f"  {kopf_text} {z['nfl']} {spiel_text(lage, z)} | {zahl(z['ist'])} | {zahl(z['proj'])}"
+    proj = None if z["state"] in SPIELFREI else z["proj"]
+    return (f"  {kopf_text} {z['nfl']} {spiel_text(lage, z)} | {zahl(z['ist'])} | {zahl(proj)}"
             + (f" | F {zahl(f, 3)}" if f is not None else "") + (f" | {z['inj']}" if z["inj"] else ""))
 
 
-def team_zeilen(lage: dict, team_id: int) -> list:
-    """Starter eines Teams und die Bank-Spieler, die auffallen (Punkte, oder mehr Projektion als ein offener Starter)."""
+def team_zeilen(lage: dict, team_id: int, ganz: bool = False) -> list:
+    """Starter eines Teams und seine Bank. ganz (eigenes Team): alle Bank- und IR-Spieler, damit Alternativen für
+    fragliche Starter im Text stehen; sonst nur die auffälligen (Punkte nach dem Anpfiff, oder mehr Projektion als
+    ein noch tauschbarer Starter im passenden Slot)."""
     team = lage["teams"].get(team_id)
     if team is None:
         return [f"Team-ID {team_id} gibt es in der Liga nicht – keine Aufstellung"]
     kader = lage["kader"][team_id]
-    aus = [f"{lage['kz'][team_id]} {team.get('name', '')} – Slot Spieler NFL Spiel | Punkte | Proj"
+    aus = [f"{lage['kz'][team_id]} {kurz(team.get('name', ''))} – Slot Spieler NFL Spiel | Punkte | Proj"
            + (" | F" if lage["app"]["f_ok"] else "")]
     starter = sorted((z for z in kader if z["slot"] in STARTER_SLOTS),
                      key=lambda z: (STARTER_SLOTS.index(z["slot"]), -(z["proj"] or 0), z["name"]))
@@ -444,38 +522,58 @@ def team_zeilen(lage: dict, team_id: int) -> list:
     def wert(z: dict):  # Projektion eines Starters, der noch getauscht werden kann; Bye und ohne Team zählen 0
         return 0 if z["state"] in ("bye", "ohne") else z["proj"] or 0
 
+    def starter_text(s: dict) -> str:  # dieselbe Zahl bzw. dasselbe Wort wie in der Zeile des Starters
+        stand = frei_wort(s) if s["state"] in SPIELFREI else \
+            zahl(wert(s)) + (" verschoben" if s["state"] == "verschoben" else "")
+        return f"{s['name']} ({SLOT[s['slot']]} {stand})"
+
     tauschbar = [z for z in starter if z["state"] in OFFEN]
-    bank = []
-    for z in sorted((z for z in kader if z["slot"] not in STARTER_SLOTS), key=lambda z: (-(z["proj"] or 0), z["name"])):
-        hinweis = None
+    reserve = sorted((z for z in kader if z["slot"] not in STARTER_SLOTS),
+                     key=lambda z: (z["slot"] == SLOT_IR, -(z["proj"] or 0), z["name"]))
+    ziel = {}  # Bankspieler-ID → schwächster tauschbarer Starter im passenden Slot mit weniger Projektion
+    for z in reserve:
         if z["slot"] == SLOT_BANK and z["state"] in ("pre", "auf") and z["proj"]:
+            if z["pos"] == "D/ST" and not lage["hat_sb"]:
+                continue  # ohne Scoreboard ist ein Bye nicht erkennbar, ESPN projiziert D/ST aber auch dann
             schwaecher = [s for s in tauschbar if s["slot"] in z["wahl"] and wert(s) < z["proj"]]
             if schwaecher:
-                s = min(schwaecher, key=wert)
-                hinweis = (f" → mehr Proj als Starter {s['name']} ({SLOT[s['slot']]} "
-                           + ("Bye" if s["state"] == "bye" else zahl(wert(s))) + ")")
-        if hinweis or (z["ist"] and z["state"] not in OFFEN):
+                ziel[z["id"]] = min(schwaecher, key=wert)
+    je_starter = Counter(s["id"] for s in ziel.values())
+    bank = []
+    for z in reserve:
+        s = ziel.get(z["id"])
+        hinweis = f" → mehr Proj als Starter {starter_text(s)}" if s and je_starter[s["id"]] <= SAMMEL_AB else ""
+        if ganz or hinweis or (z["ist"] and z["state"] not in OFFEN):
             pos = "" if z["pos"] == "D/ST" else f" {z['pos']}"
             aus_slot = SLOT.get(z["slot"], "Bank")
-            bank.append(spielerspalten(lage, z, f"{aus_slot:<4} {z['name']}{pos}") + (hinweis or ""))
-    aus.append("  Bank mit Punkten oder mit mehr Projektion als ein noch offener Starter im passenden Slot:" if bank
-               else "  Bank: nichts Auffälliges (keine Punkte, keine höhere Projektion als ein offener Starter)")
-    return aus + bank
+            bank.append(spielerspalten(lage, z, f"{aus_slot:<4} {z['name']}{pos}") + hinweis)
+    for s in starter:  # viele Bankspieler über demselben schwachen Starter: eine Zeile statt vieler fast gleicher
+        if je_starter[s["id"]] > SAMMEL_AB:
+            namen = [f"{z['name']} {zahl(z['proj'])}" for z in reserve if ziel.get(z["id"]) is s]
+            bank.append(f"  → {len(namen)} Bankspieler mit mehr Proj als Starter {starter_text(s)}: " + ", ".join(namen))
+    if ganz:
+        titel = "  Bank und IR vollständig (→ = mehr Proj als ein noch offener Starter im passenden Slot):" if bank \
+            else "  Bank und IR: leer"
+    else:
+        titel = "  Bank, nur Auffällige (Punkte, oder mehr Proj als ein noch offener Starter im passenden Slot):" if bank \
+            else "  Bank: nichts Auffälliges (keine Punkte, keine höhere Projektion als ein offener Starter)"
+    return aus + [titel] + bank
 
 
 def nenn(lage: dict, pid, team_id, abgang: bool) -> str:
     """Bewegter Spieler: Name (Position NFL; wo er heute ist; Ist oder Proj der Woche live; ROS/Sp laut App)."""
     z, a = lage["spieler"].get(pid), lage["app"]["spieler"].get(pid) or {}
     if z is None:  # steht in keinem Kader und der kona-Abruf fehlt: Name laut App, sonst nur die ID
-        teile = [f"{a.get('pos') or '?'} {a.get('nfl') or '?'}"]
-        name = a.get("name") or f"Spieler {pid}"
+        teile = [f"{kurz(a.get('pos') or '?', 5)} {kurz(a.get('nfl') or '?', 5)}"]
+        name = kurz(a.get("name") or f"Spieler {pid}")
         if lage["app"]["proj_ok"] and a.get("proj") is not None:
             teile.append(f"Proj laut App {zahl(a['proj'])}")
     else:
         name, teile = z["name"], [f"{z['pos']} {z['nfl']}"]
         if z["team"] is None:
             frist = f" bis {zeit_text(aus_ms(z['frist']))}" if z.get("frist") else ""
-            teile.append({"WAIVERS": "auf Waivers" + frist, "FREEAGENT": "frei"}.get(z.get("status"), z.get("status") or "frei"))
+            teile.append({"WAIVERS": "auf Waivers" + frist, "FREEAGENT": "frei"}.get(
+                z.get("status"), kurz(z.get("status") or "frei", 20)))
         elif abgang or z["team"] != team_id:
             teile.append(f"jetzt {lage['kz'].get(z['team'], z['team'])}")
         if z["inj"]:
@@ -501,18 +599,21 @@ def bewegung_zeilen(lage: dict, ausfall: dict) -> list:
     if spieler_ohne_kader(lage["liga"]) and not lage["kona_da"]:
         aus.append(f"  Spieler-Abruf (kona) nicht erreichbar ({ausfall.get('kona', 'kein Abruf')}) – Spieler ohne Kader "
                    "nur mit Namen laut App bzw. ID, ohne Waiver-Status")
-    rest, neu = Counter(index["tx"]), 0
+    if index["da"] and not index["fremd"] and not index["marken"]:
+        aus.append("  Marken nicht möglich – claude.json hat ein anderes Format (Transaktionen ohne datum_ms oder team)")
+    rest, neu, alt = Counter(index["tx"]), 0, 0
 
     def marke(t: dict) -> str:
-        nonlocal neu
-        if not index["da"]:
+        nonlocal neu, alt
+        if not index["marken"]:
             return ""
         schluessel = (tx_zeit(t), kz.get(t.get("teamId")))
         if rest[schluessel] > 0:
             rest[schluessel] -= 1
             return " [App]"
         if index["bis"] and (tx_zeit(t) or 0) <= index["bis"] - APP_FENSTER_MS:
-            return " [älter als das 14-Tage-Fenster der App]"
+            alt += 1
+            return f" [älter als das {APP_FENSTER_TAGE}-Tage-Fenster der App]"
         neu += 1
         return " [NEU, noch nicht in der App]"
 
@@ -527,8 +628,10 @@ def bewegung_zeilen(lage: dict, ausfall: dict) -> list:
         zeilen.append((tx_zeit(t) or 0, f"  {zeit_text(aus_ms(tx_zeit(t)))} {kz.get(t.get('teamId'), t.get('teamId'))} "
                                         f"Trade angenommen (ESPN nennt die Spieler nicht){marke(t)}"))
     aus += [text for _, text in sorted(zeilen, key=lambda paar: paar[0])]
-    if index["da"] and zeilen:
-        aus.append(f"  → {neu} Bewegung(en) neuer als die App" if neu else "  → alle Bewegungen stehen schon in der App")
+    if index["marken"] and zeilen:
+        aus.append(f"  → {neu} Bewegung(en) neuer als die App" if neu else
+                   f"  → keine Bewegung neuer als die App; {alt} älter als ihr {APP_FENSTER_TAGE}-Tage-Fenster" if alt else
+                   "  → alle Bewegungen stehen schon in der App")
 
     def gezaehlt(c: Counter) -> str:
         return ", ".join(f"{kz.get(tid, tid)} {n}" for tid, n in sorted(c.items(), key=lambda p: (-p[1], str(p[0]))))
@@ -545,11 +648,13 @@ def bewegung_zeilen(lage: dict, ausfall: dict) -> list:
 def kadervergleich_zeilen(lage: dict) -> list:
     """Kader live gegen die Kader der App je Team – zeigt auch Trades, zu denen ESPN keine Spieler nennt."""
     index, kz = lage["app"], lage["kz"]
-    if index["kader"] is None:
+    if not index["da"] or index["fremd"]:  # steht schon im Kopf
         return []
+    if index["kader"] is None:
+        return ["  Kadervergleich fehlt (claude.json ohne Kader)"]
 
     def name(pid) -> str:
-        return (lage["spieler"].get(pid) or index["spieler"].get(pid) or {}).get("name") or f"Spieler {pid}"
+        return kurz((lage["spieler"].get(pid) or index["spieler"].get(pid) or {}).get("name") or f"Spieler {pid}")
 
     abweichung = []
     for tid in sorted(lage["kader"]):
@@ -566,7 +671,7 @@ def sicher(titel: str, funktion, *args) -> list:
     try:
         return funktion(*args)
     except Exception as exc:  # z. B. ESPN benennt ein Feld um
-        return [f"{titel}: nicht auswertbar ({type(exc).__name__}: {exc}) – bitte in Claude Code melden"]
+        return [f"{titel}: nicht auswertbar ({type(exc).__name__}: {kurz(exc, 80)}) – bitte in Claude Code melden"]
 
 
 def bericht(jetzt: datetime, liga, scoreboard=None, app=None, kona=None, mein_team: int = MEIN_TEAM,
@@ -576,11 +681,14 @@ def bericht(jetzt: datetime, liga, scoreboard=None, app=None, kona=None, mein_te
     ausfall nennt je Quelle (liga, scoreboard, app, kona) den Grund; abweichung = ESPN-Serverzeit − Uhr in Sekunden.
     """
     ausfall = ausfall or {}
-    woche = liga.get("scoringPeriodId") if isinstance(liga, dict) else None
+    ist_liga = isinstance(liga, dict)
+    woche = liga.get("scoringPeriodId") if ist_liga else None
+    saison = liga.get("seasonId", SAISON) if ist_liga else None
     try:
-        index = app_index(app, woche)
+        index = app_index(app, woche, saison)
     except Exception as exc:  # claude.json in unerwarteter Form: weiter wie ohne die Datei
-        index, ausfall = app_index(None, woche), dict(ausfall, app=f"nicht lesbar, {type(exc).__name__}: {exc}")
+        index = app_index(None, woche, saison)
+        ausfall = dict(ausfall, app=f"nicht lesbar, {type(exc).__name__}: {kurz(exc, 80)}")
     aus = sicher("Kopf", kopf, jetzt, liga, index, abweichung, ausfall)
     if liga is None or liga_mangel(liga):
         grund = ausfall.get("liga") or ("kein Abruf" if liga is None else liga_mangel(liga))
@@ -589,20 +697,23 @@ def bericht(jetzt: datetime, liga, scoreboard=None, app=None, kona=None, mein_te
     try:
         lage = lage_aus(liga, scoreboard, index, kona)
     except Exception as exc:  # z. B. ESPN ändert die Form von teams oder roster
-        return "\n".join(aus + [f"ESPN-Liga: Antwort nicht auswertbar ({type(exc).__name__}: {exc}) – kein Live-Stand; "
-                                "bitte in Claude Code melden"])
+        return "\n".join(aus + [f"ESPN-Liga: Antwort nicht auswertbar ({type(exc).__name__}: {kurz(exc, 80)}) – kein "
+                                "Live-Stand; bitte in Claude Code melden"])
     if scoreboard and not lage["hat_sb"] and "scoreboard" not in ausfall:
-        ausfall = dict(ausfall, scoreboard=f"zeigt Woche {(scoreboard.get('week') or {}).get('number', '?')} "
+        ausfall = dict(ausfall, scoreboard=f"zeigt Woche {kurz((scoreboard.get('week') or {}).get('number', '?'), 5)} "
                                            f"statt {lage['woche']}")
     aus += sicher("NFL-Spiele", nfl_zeilen, lage, ausfall)
     aus += [""] + sicher("Matchups", matchup_zeilen, lage, mein_team)
+    aus += [""] + sicher(f"Aufstellung Team {mein_team}", team_zeilen, lage, mein_team, True)
     try:
         gegner = gegner_von(liga, mein_team)
+        grund = "Freilos" if paarung_von(liga, mein_team) else "keine Paarung für das Team"
     except Exception:  # der Abschnitt Matchups meldet den Formatbruch schon
-        gegner = None
-    for tid in (mein_team, gegner):
-        if tid is not None:
-            aus += [""] + sicher(f"Aufstellung Team {tid}", team_zeilen, lage, tid)
+        gegner, grund = None, None
+    if gegner is not None:
+        aus += [""] + sicher(f"Aufstellung Team {gegner}", team_zeilen, lage, gegner)
+    elif grund and mein_team in lage["teams"]:
+        aus += ["", f"{lage['kz'][mein_team]}: kein Gegner in dieser Periode ({grund})"]
     aus += [""] + sicher("Bewegungen", bewegung_zeilen, lage, ausfall) + sicher("Kadervergleich", kadervergleich_zeilen, lage)
     return "\n".join(aus)
 
@@ -649,7 +760,7 @@ def hole(name: str, urls, params=None, headers=None, versuche: int = 1) -> dict:
             satz.update(daten=daten, kb=len(antwort.content) / 1000)
             try:
                 satz["abweichung"] = (parsedate_to_datetime(antwort.headers.get("Date")) - uhr).total_seconds()
-            except (TypeError, ValueError):
+            except (TypeError, ValueError):  # kein oder ein unlesbarer Date-Header: ohne Abweichung
                 pass
             break
         except Exception as exc:  # Netz, Zeitlimit, kaputtes JSON: wird eine Textzeile im Bericht
@@ -715,14 +826,18 @@ def abrufen() -> dict:
 
 
 def main(argv=None) -> None:
-    """Abrufen, Text bauen, drucken. Endet immer normal: Jeder Fehler wird eine Textzeile, kein Traceback."""
-    start = time.perf_counter()
+    """Abrufen, Text bauen, drucken. Endet immer normal: Jeder Fehler wird eine Textzeile, kein Traceback.
+
+    Das gilt auch, wenn der Quelltext per exec(r.content) ohne eigenen Namensraum in einer Funktion läuft: Dann
+    findet main() die Namen des Skripts nicht (time, abrufen, messzeile …) – deshalb steht alles im try.
+    """
+    text, messung, start = "", [], None
     try:
-        sys.stdout.reconfigure(encoding="utf-8")
-    except Exception:  # Notebook-Ausgaben kennen reconfigure nicht
-        pass
-    messung = []
-    try:
+        start = time.perf_counter()
+        try:
+            sys.stdout.reconfigure(encoding="utf-8")
+        except Exception:  # Notebook-Ausgaben kennen reconfigure nicht
+            pass
         if requests is None:
             text = "Stand-Skript: Das Paket requests fehlt (pip install requests) – kein Stand."
         else:
@@ -732,9 +847,23 @@ def main(argv=None) -> None:
                            team_aus_args(sys.argv if argv is None else argv), roh["abweichung"], roh["ausfall"])
     except Exception as exc:
         text = f"Stand-Skript: unerwarteter Fehler ({type(exc).__name__}: {exc}) – kein Stand; bitte in Claude Code melden."
-    print(text)
-    print("\n" + messzeile(messung, time.perf_counter() - start, len(text)))
+        if isinstance(exc, NameError):  # nur ASCII: ohne Namensraum fehlt auch sys, die Ausgabe ist nicht auf UTF-8 gestellt
+            text = (f"Stand-Skript: unerwarteter Fehler (NameError: {exc}) - kein Stand. Der Quelltext lief vermutlich per "
+                    "exec ohne eigenen Namensraum in einer Funktion: Aufruf mit exec(r.content, {'__name__': '__main__'}) "
+                    "wiederholen, sonst bitte in Claude Code melden.")
+    try:
+        print(text)
+    except Exception:  # eine Ausgabe, die die Zeichen nicht darstellen kann und reconfigure nicht kennt
+        try:
+            print(ascii(text))
+        except Exception:
+            pass
+    try:
+        print("\n" + messzeile(messung, time.perf_counter() - start, len(text)))
+    except Exception:  # ohne Namensraum fehlen auch messzeile und time; der Text darüber sagt es schon
+        pass
 
 
-if __name__ == "__main__":
+# „builtins“: exec(r.content, {}) mit leerem Namensraum – __name__ kommt dann aus den Builtins; auch das soll laufen
+if __name__ in ("__main__", "builtins"):
     main()
