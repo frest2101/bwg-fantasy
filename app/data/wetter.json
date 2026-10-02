@@ -1,11 +1,11 @@
 {
-"stand":"2026-10-02T0700Z",
+"stand":"2026-10-02T0757Z",
 "woche":4,
 "einheiten":{"temp":"°C","wind":"km/h","boeen":"km/h","regen_wahrsch":"%","niederschlag":"mm","schnee":"cm"},
 "schwellen":{"wind":25,"boeen":40,"regen_wahrsch":60,"schnee":0},
 "prognose":[
 {"id":401872964,"woche":4,"kickoff":"2026-10-02T00:15Z","tbd":false,"heim":"CLE","gast":"PIT","stadion":"Huntington Bank Field","ort":"Cleveland, OH","dach":"offen","neutral":false,"temp":25.4,"wind":17.6,"boeen":45.0,"regen_wahrsch":5,"niederschlag":0.0,"schnee":0.0,"markierung":["boeen"]},
-{"id":401872965,"woche":4,"kickoff":"2026-10-04T13:30Z","tbd":false,"heim":"WSH","gast":"IND","stadion":"Tottenham Hotspur Stadium","ort":"London, England","dach":"offen","neutral":true,"temp":18.0,"wind":7.4,"boeen":17.3,"regen_wahrsch":0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
+{"id":401872965,"woche":4,"kickoff":"2026-10-04T13:30Z","tbd":false,"heim":"WSH","gast":"IND","stadion":"Tottenham Hotspur Stadium","ort":"London, England","dach":"offen","neutral":true,"temp":19.5,"wind":9.6,"boeen":21.2,"regen_wahrsch":0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
 {"id":401872966,"woche":4,"kickoff":"2026-10-04T17:00Z","tbd":false,"heim":"NYG","gast":"ARI","stadion":"MetLife Stadium","ort":"East Rutherford, NJ","dach":"offen","neutral":false,"temp":18.3,"wind":15.7,"boeen":24.5,"regen_wahrsch":36,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
 {"id":401872967,"woche":4,"kickoff":"2026-10-04T17:00Z","tbd":false,"heim":"HOU","gast":"DAL","stadion":"NRG Stadium","ort":"Houston, TX","dach":"beweglich","neutral":false,"temp":28.8,"wind":15.3,"boeen":22.3,"regen_wahrsch":66,"niederschlag":0.1,"schnee":0.0,"markierung":[]},
 {"id":401872968,"woche":4,"kickoff":"2026-10-04T17:00Z","tbd":false,"heim":"TB","gast":"GB","stadion":"Raymond James Stadium","ort":"Tampa, FL","dach":"offen","neutral":false,"temp":33.1,"wind":16.5,"boeen":20.5,"regen_wahrsch":57,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
