@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "deny": [
+      "mcp__*__notion-create-*",
+      "mcp__*__notion-update-*",
+      "mcp__*__notion-delete-*",
+      "mcp__*__notion-move-*",
+      "mcp__*__notion-duplicate-*",
+      "mcp__*__notion-upload-*",
+      "mcp__*__notion-convert-*",
+      "mcp__*__notion-spawn-*",
+      "mcp__*__notion-send-*",
+      "mcp__*__notion-stop-*",
+      "mcp__*__notion-archive-*",
+      "mcp__*__notion-trash-*",
+      "mcp__*__notion-restore-*",
+      "mcp__*__notion-add-*",
+      "mcp__*__notion-append-*",
+      "mcp__*__notion-insert-*",
+      "mcp__*__notion-set-*",
+      "mcp__*__notion-share-*",
+      "mcp__*__notion-publish-*",
+      "mcp__*__notion-edit-*",
+      "mcp__*__notion-remove-*",
+      "mcp__*__notion-rename-*",
+      "mcp__*__notion-import-*",
+      "mcp__*__notion-write-*",
+      "mcp__*__notion-comment-*",
+      "mcp__plugin_operations_notion",
+      "Read(~/fantasy-privat)",
+      "Read(~/fantasy-privat/**)",
+      "Edit(~/fantasy-privat/**)",
+      "Bash(*fantasy-privat*)",
+      "PowerShell(*fantasy-privat*)"
+    ],
+    "ask": [
+      "mcp__*__notion-*"
+    ]
+  }
+}
