@@ -261,12 +261,12 @@ def test_pf_rekorde_nachgerechnet(hist, record_id, era, wert, halter):
 
 def test_hoechstes_einzelspiel_verifiziert(hist):
     top = hist["rekorde"]["hoechstes_einzelspiel"]
-    assert top["wert"] == Decimal("313.33")
-    assert top["status"] == "verifiziert (Screenshot)"
+    assert top["wert"] == Decimal("338.43")          # seit dem nfl.com-Export belegt (2018 W2), nicht das Allzeit-Hoch
+    assert top["status"] == "verifiziert (nfl.com-Export)"
     assert top["hinweis"] == "ein höherer, unverifizierter Wert ist bekannt"
     (holder,) = top["halter"]
     assert (holder["season"], holder["week"], holder["slot"], holder["gegner_slot"], holder["sieg"]) \
-        == (2018, 12, 2, 3, True)
+        == (2018, 2, 2, 5, True)
     assert holder["team_name"] == "Hugh Jass" and holder["aera"] == "bwg"
 
 
@@ -282,6 +282,22 @@ def game(season, pts_a, pts_b, status, week=1, slot_a=1, slot_b=2):
             "slot_b": str(slot_b), "pts_a": pts_a, "pts_b": pts_b,
             "winner_slot": str(slot_a if Decimal(pts_a) > Decimal(pts_b) else slot_b), "status": status,
             "source": "Screenshot"}
+
+
+def test_rekordspiele_export_ersetzt_screenshots():
+    """Erfundene Werte: In einer Saison des Exports zählt nur dessen Endstand, auch wenn ein Screenshot dort höher
+    liegt (Stand vor einer Korrektur); in einer Saison ohne Export zählt der Screenshot."""
+    ts = [{"season": s, "slot": slot, "team_name": f"T{slot}", "aera": "bwg"} for s in (2020, 2024) for slot in (1, 2)]
+    export = [{"season": "2020", "week": "16", "round": "Final", "slot_a": "2", "slot_b": "1", "pts_a": "233.63",
+               "pts_b": "229.27", "winner_slot": "2", "herleitung": "Endplatz"}]
+    shots = [dict(export[0], pts_a="333.73", status="final", source="Screenshot"),
+             {"season": "2024", "week": "17", "round": "Final", "slot_a": "2", "slot_b": "1", "pts_a": "261.17",
+              "pts_b": "190.50", "winner_slot": "2", "status": "final", "source": "Screenshot"}]
+    got = history.record_games(export, shots, ts)
+    assert sorted((g["season"], g["pts_a"], g["source"]) for g in got) == [
+        (2020, Decimal("233.63"), "nfl.com-Export"), (2024, Decimal("261.17"), "Screenshot")]
+    top = history.top_game(got, ts)
+    assert (top["wert"], top["status"]) == (Decimal("261.17"), "verifiziert (Screenshot)")
 
 
 def test_live_und_partial_nie_rekord():
@@ -332,4 +348,4 @@ def test_export_serialisierbar_und_deterministisch(ssn, hist):
     text = json.dumps(rounded(hist), ensure_ascii=False, sort_keys=False)
     assert "Decimal" not in text
     assert json.dumps(rounded(history.compute_history(rawdata.Season(2026, 2))), ensure_ascii=False) == text
-    assert set(hist) == {"alltime", "seasons", "team_seasons", "champions", "rekorde", "spiele"}
+    assert set(hist) == {"alltime", "seasons", "team_seasons", "champions", "rekorde", "spiele", "wochen"}

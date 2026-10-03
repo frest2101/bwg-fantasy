@@ -1,6 +1,8 @@
-"""Liga-Historie 2015–2025 für die App (Baustein 4): All-Time, Saisons, PF+, Champions, abgeleitete Rekorde.
+"""Liga-Historie 2015–2025 für die App (Baustein 4): All-Time, Saisons, PF+, Champions, abgeleitete Rekorde und die
+Wochen 2018–2022 (H2H, Wochenrekorde, All-Play).
 
-Quelle ist der einmalige Notion-Export unter data/history/*.csv (ohne Manager, siehe dortige README).
+Quelle ist der einmalige Notion-Export unter data/history/*.csv (ohne Manager, siehe dortige README), für die Wochen
+2018–2022 die DSGVO-Auskunft von nfl.com (scripts/nfl_export.py).
 Schlüssel ist der Franchise-Slot 1–10 (= mTeam-ID). Punkte als ungerundete Decimal, gerundet wird erst beim Export.
 
 Ära: Alt-Scoring 2015–2017 ergibt deutlich weniger Punkte als das BWG-Scoring ab 2018; die Regular Season hatte
@@ -8,18 +10,23 @@ Schlüssel ist der Franchise-Slot 1–10 (= mTeam-ID). Punkte als ungerundete De
 PF+ (relativ zum Ligaschnitt der Saison) ist ohnehin vergleichbar.
 """
 
+import csv
 import statistics
 from decimal import Decimal
 
+import espn_fetch as ef
 import rawdata
-from zahlen import HUNDRED, ZERO, dec
+import records
+from zahlen import HALF, HUNDRED, ZERO, dec
 
 # scoring_era aus seasons.csv → kurzes Ära-Kennzeichen; ein neuer Wert muss hier bewusst eingetragen werden
 ERAS = {"alt (2015–2017)": "alt", "BWG-Scoring ab 2018": "bwg"}
 ERA_TEXT = {key: text for text, key in ERAS.items()}
 LOWEST_PF_ERAS = ("bwg",)       # „wenigste PF“ nur seit 2018 (Auftrag Session 4)
 FINAL, VERIFIED = "final", "verifiziert"
-# Frage 11 c: 338,43 liegt nicht im Repo und kommt erst mit den kuratierten Rekorden
+EXPORT_QUELLE = "nfl.com-Export"
+# 338,43 (Hugh Jass, 2018 W2) ist seit dem nfl.com-Export belegt (team_weeks.csv), aber nicht das Allzeit-Hoch: Ein
+# höherer Wert eines anderen Teams, vermutlich 2023–2025, ist bekannt und unverifiziert (Stephan 03.10.2026)
 HINWEIS_HOECHSTES_SPIEL = "ein höherer, unverifizierter Wert ist bekannt"
 
 
@@ -190,6 +197,14 @@ def games(matchups: list[dict], ts: list[dict]) -> list[dict]:
     return sorted(result, key=lambda g: (g["season"], g["week"], g["slot_a"]))
 
 
+def record_games(export: list[dict], matchups: list[dict], ts: list[dict]) -> list[dict]:
+    """Spiele für das höchste Einzelspiel: für die Saisons des nfl.com-Exports dessen Endstände (games.csv, final),
+    für alle übrigen Saisons die Screenshot-Spiele aus matchups_hist.csv – nie beide für dieselbe Saison."""
+    covered = {int(g["season"]) for g in export}
+    return games([dict(g, status=FINAL, source=EXPORT_QUELLE) for g in export]
+                 + [m for m in matchups if int(m["season"]) not in covered], ts)
+
+
 def top_game(game_list: list[dict], ts: list[dict]) -> dict | None:
     """Höchster Einzelscore aus den Spielen mit Status final; live/partial zählen nie. None ohne finales Spiel.
 
@@ -213,23 +228,166 @@ def top_game(game_list: list[dict], ts: list[dict]) -> dict | None:
             "hinweis": HINWEIS_HOECHSTES_SPIEL, "halter": holders}
 
 
+# ---------------------------------------------------------------- Wochen 2018–2022 (nfl.com-Export)
+# Quelle: DSGVO-Auskunft nfl.com, einmalig importiert mit scripts/nfl_export.py (data/history/README.md). Eigene
+# Statistik der nfl.com-Ära: nie mit den Rekorden der ESPN-Saisons ab 2026 mischen (Statistik-Neustart, Scoring seit
+# 18.09.2026 anders). In compute_history unter „wochen“; die App zeigt es noch nicht.
+
+RS, PO = "RS", "PO"
+REGULAR = "Regular Season"
+WOCHEN_REKORDE = ("hoechster_score", "niedrigster_score", "groesster_sieg", "knappstes_ergebnis", "hoechste_bank")
+TOP_N = 5
+HUGH_JASS_DATEI = "hugh_jass_2023_2025.csv"
+
+
+def read_commented(name: str) -> list[dict]:
+    """data/history/<name> mit Kopfzeilen „# …“ (Umfang der Datei) als Zeilen; die Kommentarzeilen fallen weg."""
+    with open(ef.REPO_DIR / "data" / rawdata.HISTORY_DIR / name, encoding="utf-8", newline="") as f:
+        return list(csv.DictReader(line for line in f if not line.startswith("#")))
+
+
+def _count(text: str) -> int | None:
+    return int(text) if text != "" else None
+
+
+def week_rows(rows: list[dict]) -> list[dict]:
+    """team_weeks.csv typisiert: Punkte und Bank als Decimal; All-Play und Ergebnis gibt es nur in der Regular Season
+    (in den Playoffs None)."""
+    return [{"season": int(r["season"]), "week": int(r["week"]), "phase": r["phase"], "slot": int(r["slot"]),
+             "pts": dec(r["pts"]), "bench": dec(r["bench_pts"]), "allplay_w": _count(r["allplay_w"]),
+             "allplay_l": _count(r["allplay_l"]), "allplay_t": _count(r["allplay_t"]), "result": r["result"] or None}
+            for r in rows]
+
+
+def game_sides(games: list[dict], weeks: list[dict], ts: list[dict]) -> list[dict]:
+    """Je Spiel aus games.csv zwei Team-Wochen im Format von records.py (team_id = Slot, opponent_id, pf, pa,
+    result W/L/T, bench) mit Saison, Phase, Runde und den Teamnamen der Saison.
+
+    Wochen ohne Spiel in games.csv sind kein Spiel: Byes der Divisionssieger, die Woche der Verlierer der Runde 1 vor
+    dem Spiel um Platz 5 und die Trostrunde (Format unbekannt).
+    """
+    bench = {(w["season"], w["week"], w["slot"]): w["bench"] for w in weeks}
+    names = {(t["season"], t["slot"]): t["team_name"] for t in ts}
+    sides = []
+    for g in games:
+        season, week = int(g["season"]), int(g["week"])
+        a, b = int(g["slot_a"]), int(g["slot_b"])
+        pts = {a: dec(g["pts_a"]), b: dec(g["pts_b"])}
+        for me, other in ((a, b), (b, a)):
+            result = "W" if pts[me] > pts[other] else "L" if pts[me] < pts[other] else "T"
+            sides.append({"season": season, "week": week, "phase": RS if g["round"] == REGULAR else PO,
+                          "round": g["round"], "team_id": me, "team_name": names.get((season, me)),
+                          "opponent_id": other, "opponent_name": names.get((season, other)),
+                          "pf": pts[me], "pa": pts[other], "result": result, "bench": bench[(season, week, me)]})
+    return sorted(sides, key=lambda s: (s["season"], s["week"], s["team_id"]))
+
+
+def h2h_wochen(sides: list[dict], slots: list[int]) -> dict[str, list[dict]]:
+    """H2H je Franchise-Paar a < b über alle Saisons des Exports, Regular Season und Playoffs getrennt
+    (records.h2h: spiele, w_a, l_a, t, pf_diff = Σ PF a − Σ PF b; Paare ohne Spiel mit Nullen)."""
+    return {phase: records.h2h([s for s in sides if s["phase"] == phase], team_ids=slots) for phase in (RS, PO)}
+
+
+def top(candidates: list, value, n: int = TOP_N, highest: bool = True) -> list:
+    """Die n besten Kandidaten nach value; wer mit dem n-ten gleichauf liegt, kommt mit (Reihenfolge der Eingabe
+    bei Gleichstand bleibt)."""
+    ordered = sorted(candidates, key=value, reverse=highest)
+    if len(ordered) <= n:
+        return ordered
+    cutoff = value(ordered[n - 1])
+    return [c for c in ordered if (value(c) >= cutoff if highest else value(c) <= cutoff)]
+
+
+def _side_entry(s: dict, value: Decimal) -> dict:
+    keep = ("season", "week", "round", "team_id", "team_name", "opponent_id", "opponent_name", "pf", "pa")
+    return dict({k: s[k] for k in keep}, wert=value)
+
+
+def _game_entry(s: dict) -> dict:
+    """Spiel aus Sicht des Siegers: team_ids/namen/punkte = [Sieger, Verlierer], wert = Differenz."""
+    return {"season": s["season"], "week": s["week"], "round": s["round"],
+            "team_ids": [s["team_id"], s["opponent_id"]], "namen": [s["team_name"], s["opponent_name"]],
+            "punkte": [s["pf"], s["pa"]], "wert": s["pf"] - s["pa"], "unentschieden": s["result"] == "T"}
+
+
+def wochen_rekorde(sides: list[dict], n: int = TOP_N) -> dict[str, dict[str, list[dict]]]:
+    """Wochenrekorde je Phase (RS, PO), je Rekord die n besten Einträge (Gleichstand an der Grenze kommt mit).
+
+    Nur Spiele mit Gegner (game_sides). Team-Woche: höchster und niedrigster Score, höchste Bankpunkte. Spiel aus Sicht
+    des Siegers: größter Sieg (ohne Unentschieden), knappstes Ergebnis (Unentschieden = 0 zählt mit).
+    """
+    result = {}
+    for phase in (RS, PO):
+        mine = [s for s in sides if s["phase"] == phase]
+        games = records.game_rows(mine)
+        margin = lambda s: s["pf"] - s["pa"]
+        result[phase] = {
+            "hoechster_score": [_side_entry(s, s["pf"]) for s in top(mine, lambda s: s["pf"], n)],
+            "niedrigster_score": [_side_entry(s, s["pf"]) for s in top(mine, lambda s: s["pf"], n, highest=False)],
+            "groesster_sieg": [_game_entry(s) for s in top([s for s in games if s["result"] == "W"], margin, n)],
+            "knappstes_ergebnis": [_game_entry(s) for s in top(games, margin, n, highest=False)],
+            "hoechste_bank": [_side_entry(s, s["bench"]) for s in top(mine, lambda s: s["bench"], n)],
+        }
+    return result
+
+
+def allplay_saisons(weeks: list[dict], ts: list[dict]) -> list[dict]:
+    """All-Play je Saison und Slot (nur Regular Season): Summe der Wochenvergleiche aus dem Export und
+    All-Play % = (W + 0,5·T) / (W + L + T) · 100, dazu die echte Bilanz. Sortiert nach Saison, All-Play % absteigend,
+    Slot."""
+    teams = {(t["season"], t["slot"]): t for t in ts}
+    sums = {}
+    for w in weeks:
+        if w["phase"] != RS:
+            continue
+        s = sums.setdefault((w["season"], w["slot"]), {"allplay_w": 0, "allplay_l": 0, "allplay_t": 0, "spiele": 0})
+        for k in ("allplay_w", "allplay_l", "allplay_t"):
+            s[k] += w[k]
+        s["spiele"] += 1
+    result = []
+    for (season, slot), s in sums.items():
+        t = teams[(season, slot)]
+        vergleiche = s["allplay_w"] + s["allplay_l"] + s["allplay_t"]
+        result.append(dict(s, season=season, slot=slot, team_name=t["team_name"], w=t["w"], l=t["l"],
+                           allplay_pct=(s["allplay_w"] + HALF * s["allplay_t"]) / vergleiche * HUNDRED))
+    return sorted(result, key=lambda r: (r["season"], -r["allplay_pct"], r["slot"]))
+
+
+def hugh_jass_wochen(rows: list[dict]) -> list[dict]:
+    """hugh_jass_2023_2025.csv typisiert (nur Slot 2, nur Regular Season, ohne Gegner)."""
+    return [{"season": int(r["season"]), "week": int(r["week"]), "slot": int(r["slot"]), "pf": dec(r["pts"]),
+             "pa": dec(r["pts_against"]), "result": r["result"]} for r in rows]
+
+
 # ---------------------------------------------------------------- Einstieg
 
 def compute_history(ssn: rawdata.Season) -> dict:
-    """Liga-Historie für die App: alltime, seasons, team_seasons, champions, rekorde, spiele (Decimal ungerundet).
+    """Liga-Historie für die App: alltime, seasons, team_seasons, champions, rekorde, spiele, wochen (Decimal ungerundet).
 
     rekorde = {"abgeleitet": [je Ära …], "hoechstes_einzelspiel": {…} oder None}. Keine Manager, keine Regeländerungen.
+    wochen = nfl.com-Ära 2018–2022: saisons, h2h und rekorde je Phase (RS, PO), allplay je Team-Saison, dazu
+    hugh_jass_2023_2025 (nur dieses Team, ohne Gegner).
     """
     rows = ssn.history("team_seasons")
     formats = {int(f["season"]): f for f in ssn.history("seasons")}
     ts = team_seasons(rows, formats)
     names_2026 = {t["id"]: t["name"] for t in ssn.teams()}
     game_list = games(ssn.history("matchups_hist"), ts)
+    weeks = week_rows(ssn.history("team_weeks"))
+    sides = game_sides(ssn.history("games"), weeks, ts)
     return {
         "alltime": alltime(ts, ssn.history("franchises"), names_2026),
         "seasons": seasons(list(formats.values()), ts),
         "team_seasons": ts,
         "champions": champions(ts),
-        "rekorde": {"abgeleitet": derived_records(ts), "hoechstes_einzelspiel": top_game(game_list, ts)},
+        "rekorde": {"abgeleitet": derived_records(ts), "hoechstes_einzelspiel": top_game(
+            record_games(ssn.history("games"), ssn.history("matchups_hist"), ts), ts)},
         "spiele": game_list,
+        "wochen": {
+            "saisons": sorted({w["season"] for w in weeks}),
+            "h2h": h2h_wochen(sides, sorted({w["slot"] for w in weeks})),
+            "rekorde": wochen_rekorde(sides),
+            "allplay": allplay_saisons(weeks, ts),
+            "hugh_jass_2023_2025": hugh_jass_wochen(read_commented(HUGH_JASS_DATEI)),
+        },
     }
