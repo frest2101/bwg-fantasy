@@ -197,6 +197,17 @@ def games(matchups: list[dict], ts: list[dict]) -> list[dict]:
     return sorted(result, key=lambda g: (g["season"], g["week"], g["slot_a"]))
 
 
+def kuratierte_rekorde(rows: list[dict]) -> list[dict]:
+    """rekorde.csv typisiert: die kuratierten Rekorde aus dem Notion-Ligaarchiv nach redaktioneller Durchsicht
+    (ohne Manager, ohne Chat-Quellen und Dateinamen). slots und saisons sind mit „|“ getrennt, ableitbar/verifiziert 0/1."""
+    def liste(text: str) -> list[int]:
+        return [int(x) for x in text.split("|") if x]
+    return [{"id": r["id"], "kategorie": r["kategorie"], "rekord": r["rekord"], "wert": r["wert"],
+             "details": r["details"], "quelle": r["quelle"], "ableitbar": r["ableitbar"] == "1",
+             "verifiziert": r["verifiziert"] == "1", "slots": liste(r["slots"]), "saisons": liste(r["saisons"])}
+            for r in rows]
+
+
 def record_games(export: list[dict], matchups: list[dict], ts: list[dict]) -> list[dict]:
     """Spiele für das höchste Einzelspiel: für die Saisons des nfl.com-Exports dessen Endstände (games.csv, final),
     für alle übrigen Saisons die Screenshot-Spiele aus matchups_hist.csv – nie beide für dieselbe Saison."""
@@ -364,7 +375,8 @@ def hugh_jass_wochen(rows: list[dict]) -> list[dict]:
 def compute_history(ssn: rawdata.Season) -> dict:
     """Liga-Historie für die App: alltime, seasons, team_seasons, champions, rekorde, spiele, wochen (Decimal ungerundet).
 
-    rekorde = {"abgeleitet": [je Ära …], "hoechstes_einzelspiel": {…} oder None}. Keine Manager, keine Regeländerungen.
+    rekorde = {"abgeleitet": [je Ära …], "hoechstes_einzelspiel": {…} oder None, "kuratiert": [aus rekorde.csv]}.
+    Keine Manager, keine Regeländerungen.
     wochen = nfl.com-Ära 2018–2022: saisons, h2h und rekorde je Phase (RS, PO), allplay je Team-Saison, dazu
     hugh_jass_2023_2025 (nur dieses Team, ohne Gegner).
     """
@@ -381,7 +393,8 @@ def compute_history(ssn: rawdata.Season) -> dict:
         "team_seasons": ts,
         "champions": champions(ts),
         "rekorde": {"abgeleitet": derived_records(ts), "hoechstes_einzelspiel": top_game(
-            record_games(ssn.history("games"), ssn.history("matchups_hist"), ts), ts)},
+            record_games(ssn.history("games"), ssn.history("matchups_hist"), ts), ts),
+            "kuratiert": kuratierte_rekorde(ssn.history("rekorde"))},
         "spiele": game_list,
         "wochen": {
             "saisons": sorted({w["season"] for w in weeks}),
