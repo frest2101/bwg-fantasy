@@ -144,7 +144,7 @@ function punkte(box, r, svg, wi, week) {
     U.legend(['wochenrang', 'pf', 'proj-delta']),
     svg.fig(`PF je Team – W${week}`, svg.dots({title: `PF je Team – W${week}`, fmt: v => U.num(v), tfmt: v => U.num(v, 0),
       desc: `Von ${rows[0].name} (${U.num(W(rows[0]).pf[wi])}) bis ${rows.at(-1).name} (${U.num(W(rows.at(-1)).pf[wi])}); Ligaschnitt ${U.num(wk.ligaschnitt)}, Median ${U.num(wk.median)}.`,
-      rows: rows.map(t => ({label: t.kuerzel, v: W(t).pf[wi]})), ref: wk.ligaschnitt, refLabel: 'Ø'}),
+      rows: rows.map(t => ({label: t.kuerzel, v: W(t).pf[wi]})), ref: wk.ligaschnitt, refLabel: 'Ø Liga'}),
     {heads: ['Team', 'PF', 'PA', 'Erg.'], rows: rows.map(t => [t.name, U.num(W(t).pf[wi]), U.num(W(t).pa[wi]), W(t).ergebnis[wi]])}));
     return;
   }

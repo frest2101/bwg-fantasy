@@ -259,7 +259,7 @@ function one(box, h1, P, W, rows, r, svg, rosWhy, wline, origin, kp) {
     U.tile('Pkt Saison', U.num(p.pts), spiele(p.g), 'spiele'),
     U.tile('Ø Punkte', U.val(p.avg, U.num, 'ohne Spiel'), null, 'avg'),
     U.tile('Floor / Ceiling', `${U.num(p.floor)} / ${U.num(p.ceil)}`, null, 'floor-ceil'),
-    U.tile('Schwankung', U.val(p.sd, U.num, 'unter 2 Spielen'), null, 'konstanz'),
+    U.tile('Schwan­kung', U.val(p.sd, U.num, 'unter 2 Spielen'), null, 'konstanz'),     // weiches Trennzeichen: schmale Kachel
     U.tile('Form', [U.val(p.form, U.num, 'ohne Spiel'), ' ', trendTxt(p.trend)], `Form zu Saison ${U.sgn(p.form_d)}`, 'form-sp'),
     U.tile('Starts', U.val(p.starts, v => v), `Bankpunkte ${U.num(p.bench_pts)}`, 'starts'),
     U.tile('Ist − Projektion', U.val(p.proj_d, U.sgn, 'ohne Spiel'), null, 'proj-delta-sp'),

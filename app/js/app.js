@@ -203,7 +203,7 @@ function standChip() {
   const due = nxt ? new Date(nxt + 'T08:30:00Z') : null;
   const alt = due && Date.now() > due.getTime() + 27.5 * 36e5;     // Mittwoch 12:00 UTC ohne neue Woche
   // „W4 gewertet“ (App-Konzept, Abschnitt 7); auf schmalen Handys nur „W4 ✓“, der Rest steht im aria-label
-  btn.replaceChildren(...(sw ? [`W${sw}`, h('span', {class: 'gw'}, ' gewertet'), h('span', {class: 'gk', 'aria-hidden': 'true'}, ' ✓')] : ['vor W1']));
+  btn.replaceChildren(...(sw ? [`W${sw}`, h('span', {class: 'stw'}, ' gewertet'), h('span', {class: 'stk', 'aria-hidden': 'true'}, ' ✓')] : ['vor W1']));
   btn.classList.toggle('alt', !!alt);
   btn.setAttribute('aria-label', `Datenstand: Woche ${sw} gewertet${alt ? ', Daten älter als erwartet' : ''}`);
   btn.hidden = false;

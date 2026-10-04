@@ -62,7 +62,8 @@ const TAG = new Intl.DateTimeFormat('en-CA', {timeZone: TZ, year: 'numeric', mon
 export function standTxt(x) {
   const d = x instanceof Date ? x : typeof x === 'number' ? new Date(x) : utc(x);
   if (!d || isNaN(d)) return 'Stand –';
-  const tag = TAG.format(d), heute = TAG.format(new Date()), gestern = TAG.format(new Date(Date.now() - 864e5));
+  const tag = TAG.format(d), heute = TAG.format(new Date());
+  const [y, m, t] = heute.split('-').map(Number), gestern = new Date(Date.UTC(y, m - 1, t - 1)).toISOString().slice(0, 10);
   return tag === heute ? `Stand heute ${zeit(d)} Uhr` : tag === gestern ? `Stand gestern ${zeit(d)} Uhr` : `Stand ${stamp(d)}`;
 }
 export function spanne(iso) {       // Woche Di–Mo, z. B. „08.–14.09.“
@@ -254,7 +255,8 @@ export function table(o) {
   const cols = o.cols;
   let sk = o.sort?.[0], sd = o.sort?.[1] ?? -1, limit = o.show || o.limit || 1e9;
   const heads = cols.map(c => {
-    const th = h('th', {scope: 'col', class: c.num ? 'n' : null});
+    // lange Namen (ab 13 Zeichen) dürfen zweizeilig umbrechen (CSS thead th.wr)
+    const th = h('th', {scope: 'col', class: [c.num && 'n', typeof c.l === 'string' && c.l.length > 12 && 'wr'].filter(Boolean).join(' ') || null});
     if (c.v && o.sortable !== false) th.append(h('button', {type: 'button', onclick: () => {
       if (sk === c.k) sd = -sd; else { sk = c.k; sd = c.d ?? -1; }
       o.onSort?.(sk, sd);

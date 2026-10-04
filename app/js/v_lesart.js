@@ -12,10 +12,10 @@ export function render(box, ctx, r) {
     for (const d of items) {
       const hit = !q || d.textContent.toLowerCase().includes(q);
       d.hidden = !hit; n += hit;
-      d.classList.remove('f0');
+      d.classList.remove('erst');
       if (hit && !first) first = d;
     }
-    first?.classList.add('f0');     // Trennlinien nur zwischen sichtbaren Begriffen
+    first?.classList.add('erst');   // Trennlinien nur zwischen sichtbaren Begriffen (nicht f0: Farbskala)
     gl.hidden = n === 0;            // kein leerer Rahmen ohne Treffer
     count.textContent = !q ? `${items.length} Begriffe` : n ? `${n} von ${items.length} Begriffen` : 'Kein Begriff gefunden.';
   };

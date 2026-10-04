@@ -46,8 +46,8 @@ p{margin:.4rem 0}
 .stand{min-height:44px;border:1px solid var(--bd);border-radius:22px;background:var(--ac2);padding:0 .8rem;cursor:pointer;font-size:.9rem;font-weight:600;white-space:nowrap}
 .stand.alt{background:var(--g1);border-color:var(--wa)}
 /* Datenstand „W4 gewertet“; unter 420 px „W4 ✓“ (aria-label und Datenstand-Fenster nennen den ganzen Text) */
-.stand .gk{display:none}
-@media (max-width:419px){.stand .gw{display:none}.stand .gk{display:inline}}
+.stand .stk{display:none}
+@media (max-width:419px){.stand .stw{display:none}.stand .stk{display:inline}}
 /* Live-Chip im Kopf (Link auf #spieltag, kein achter Tab); gefüllt, solange die Live-Ansicht offen ist */
 .lv{display:inline-flex;align-items:center;justify-content:center;min-width:44px;background:var(--sf);color:var(--tx);text-decoration:none;padding:0 .65rem}
 .lv[aria-current]{background:var(--ac);border-color:var(--ac);color:var(--on)}
@@ -113,8 +113,11 @@ label.chk{min-height:44px;display:inline-flex;align-items:center;gap:.5rem;curso
 label.chk input{width:22px;height:22px}
 .tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin:0 0 16px}
 .tile{background:var(--sf);border:1px solid var(--bd);border-radius:10px;padding:8px 10px;min-width:0;position:relative}
-.tile.hi .tl{padding-right:22px}
-.tile .tl button.i{position:absolute;top:0;right:0;margin:0}
+/* i-Knopf in die Ecke der Kachel (44 px Tippfläche, 20 px Kreis), damit lange Beschriftungen (seit P4 ausgeschrieben) neben
+   dem Kreis Platz haben; lange Wörter trennt der Browser nach Silben (lang="de", iPhone und Android), sonst bricht er sie um */
+.tile.hi .tl{padding-right:24px}
+.tile .tl>span{min-width:0;overflow-wrap:break-word;-webkit-hyphens:auto;hyphens:auto}
+.tile .tl button.i{position:absolute;top:-10px;right:-10px;margin:0}
 .tile .tl{min-height:2.3em;align-items:flex-start}
 .tl{font-size:.8rem;color:var(--mu);display:flex;align-items:center;justify-content:space-between;gap:4px}
 .tv{font-size:1.25rem;font-weight:700;font-variant-numeric:tabular-nums}
@@ -157,9 +160,9 @@ caption{text-align:left;font-weight:700;padding:10px 10px 6px;caption-side:top}
 th,td{padding:0 .55rem;height:44px;text-align:left;white-space:nowrap;border-bottom:1px solid var(--bd);background:var(--sf)}
 tbody tr:last-child>*{border-bottom:0}
 thead th{font-size:.8rem;color:var(--mu);font-weight:600;background:var(--sf2);height:44px}
-/* lange Spaltennamen (App-Konzept Abschnitt 7: ausgeschrieben statt Kürzel) brechen an Leerzeichen in eine zweite Zeile um,
-   statt die Tabelle zu verbreitern */
-thead th{white-space:normal;max-width:7.5rem;line-height:1.15}
+/* lange Spaltennamen (App-Konzept Abschnitt 7: ausgeschrieben statt Kürzel, ab 13 Zeichen, Klasse wr aus ui.js table) brechen
+   in eine zweite Zeile um, statt die Tabelle zu verbreitern; die Mindestbreite verhindert Umbrüche Wort für Wort */
+thead th.wr{white-space:normal;min-width:5.5rem;max-width:7.5rem;line-height:1.15}
 thead th:has(>button){padding:0}
 thead th button{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:2px;width:100%;min-width:44px;min-height:44px;padding:0 .55rem}
 thead th button:focus-visible{outline:3px solid var(--ac)}
@@ -345,7 +348,7 @@ details[open].dt>summary::before,details[open].gw>summary::before,details[open].
 .js .lesart>p{display:none}
 #glossar{margin:0;background:var(--sf);border:1px solid var(--bd);border-radius:12px;padding:4px 14px}
 #glossar>div{padding:8px 0;border-top:1px solid var(--bd);scroll-margin-top:64px}
-#glossar>div:first-child,#glossar>div.f0{border-top:0}
+#glossar>div:first-child,#glossar>div.erst{border-top:0}
 #glossar>div[data-b]::before{content:attr(data-b);display:block;font-size:.75rem;text-transform:uppercase;letter-spacing:.06em;color:var(--mu);margin:10px 0 6px}
 #glossar dt{font-weight:700;scroll-margin-top:72px}
 #glossar dd{margin:2px 0 0}

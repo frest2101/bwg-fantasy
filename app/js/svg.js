@@ -101,7 +101,7 @@ export function lines(o) {
       g.append(s('path', {d: path(sr.vals), class: 'lo'}));
       if (nX === 1) sr.vals.forEach((v, i) => ok(v) && g.append(s('circle', {cx: x(i), cy: y(v), r: 2.5, class: 'dl'})));
     }
-    if (o.avg) { g.append(s('path', {d: path(o.avg), class: 'av'})); ends.push([o.avg, o.avgLabel || 'Ø', null]); }
+    if (o.avg) { g.append(s('path', {d: path(o.avg), class: 'av'})); ends.push([o.avg, o.avgLabel || 'Ø Liga', null]); }
     for (const sr of o.series) {
       if (!sr.hi) continue;
       g.append(s('path', {d: path(sr.vals), class: 'hl'}));
@@ -243,7 +243,7 @@ export function verlauf(hid, pick) {
       x: xl, series: S.teams.map(x => ({name: x.kuerzel, vals: x.wochen.wochenrang, hi: x.team_id === sel})),
       invert: true, max: S.teams.length, yfmt: v => v + '.', H: 200})(w);
   };
-  const tab = key => () => ({heads: ['Woche', ...S.teams.map(t => t.kuerzel), ...(key === 'pf' ? ['Ligaschnitt'] : [])],
+  const tab = key => () => ({heads: ['Woche', ...S.teams.map(t => t.kuerzel), ...(key === 'pf' ? ['Ø Liga'] : [])],
     rows: weeks.map((w, i) => ['W' + w, ...S.teams.map(t => key === 'pf' ? num(t.wochen.pf[i]) : t.wochen.wochenrang[i]),
       ...(key === 'pf' ? [num(avgW[i])] : [])])});
   const f1 = fig('PF-Verlauf', d1, tab('pf'));

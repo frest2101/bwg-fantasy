@@ -25,7 +25,7 @@ export async function render(box, ctx, r) {
     t.pr?.kernsatz ? h('blockquote', {class: 'card'}, t.pr.kernsatz) : null,
     h('div', {class: 'tiles'},
       U.tile('PF/Spiel', U.num(t.pf_per_game), `PF ${U.num(t.pf)} · PA ${U.num(t.pa)}`, 'pfspiel'),
-      U.tile('All-Play %', U.pct(t.allplay_pct), `All-Play ${U.nn(t.allplay_w)}-${U.nn(t.allplay_l)}`, 'allplay'),
+      U.tile('All-Play %', U.pct(t.allplay_pct), `All-Play ${U.apwl(t.allplay_w, t.allplay_l, t.allplay_t)}`, 'allplay'),
       U.tile('Matchup-Glück', U.sgn(t.matchup_glueck), `Median-Bilanz ${t.median_w}-${t.median_l} · Spielplan ${U.sgn(t.spielplan_pkt, 0)} Pkt`, 'matchup'),
       U.tile('Eff. %', U.pct(t.efficiency), `verschenkt ${U.num(t.verschenkt)}`, 'effizienz'),
       U.tile('Form zu Saison', t.form_band == null ? U.na('ab 4 Spielen') : [U.sgn(t.form_delta), svg.mini(t.form_delta, t.form_band)],
