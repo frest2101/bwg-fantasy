@@ -11,7 +11,7 @@ export async function render(box, ctx, r) {
   U = ctx.ui; S = U.S; h = U.h;
   const t = U.team(r.sub);
   if (!t) {
-    U.ap(box, h('p', null, h('a', {href: '#tabelle'}, '← Tabelle')), h('h1', null, 'Team nicht gefunden'),
+    U.ap(box, h('p', null, h('a', {href: '#liga'}, '← Tabelle')), h('h1', null, 'Team nicht gefunden'),
       h('p', {class: 'note'}, 'Diese Team-Nummer gibt es in der Liga nicht (1–10). Der Link ist vermutlich veraltet oder vertippt.'));
     return;
   }
@@ -20,7 +20,7 @@ export async function render(box, ctx, r) {
   const sim = t.sim?.liga;
   U.ap(box, h('h1', null, t.name),
     h('p', {class: 'note'}, `${t.kuerzel} · Rang ${t.rang} gesamt · ${t.rang_division}. in ${div} · ${U.rec(t)} · Streak ${t.streak ?? '–'}`),
-    t.pr ? h('p', null, h('a', {href: '#ranking'}, 'Power Ranking'), ` ${t.pr.rang}. `, U.ok(t.pr.trend) ? U.trend(t.pr.trend) : null,
+    t.pr ? h('p', null, h('a', {href: '#staerke'}, 'Power Ranking'), ` ${t.pr.rang}. `, U.ok(t.pr.trend) ? U.trend(t.pr.trend) : null,
       ` · μ ${U.num(t.pr.mu, 1)}`, t.pr.p_quelle === 'vorjahr' ? h('span', {class: 'badge'}, 'P aus Vorjahr') : null) : null,
     t.pr?.kernsatz ? h('blockquote', {class: 'card'}, t.pr.kernsatz) : null,
     h('div', {class: 'tiles'},
@@ -53,11 +53,11 @@ export async function render(box, ctx, r) {
   U.ap(box, h('div', {class: 'tg'}, h('div', {class: 'tg-f'}, pfFig), h('div', {class: 'tg-w'}, weekList(t)), kader,
     h('div', {class: 'tg-r'}, pos, h2h(t))));
   U.ap(box, sec('Verläufe', ...svg.verlauf(t.team_id, false)), sec('Franchise-Historie', fr),
-    U.chips('Weiter zu', [['#moves?team=' + t.team_id, 'Moves dieses Teams', 'm'], ['#rekorde/h2h?team=' + t.team_id, 'H2H-Bilanz', 'h'],
+    U.chips('Weiter zu', [['#markt/moves?team=' + t.team_id, 'Moves dieses Teams', 'm'], ['#liga/duelle?team=' + t.team_id, 'Duelle', 'h'],
       ['#spieler?team=' + t.team_id + '&status=kader', 'Spielerliste des Teams', 's'],
-      ['#keeper/kader?team=' + t.team_id, 'Keeper und Kader', 'k'],
-      ['#waiver?team=' + t.team_id, `Waiver aus Sicht von ${t.kuerzel}`, 'w']], null));
-  // Kader mit dem Tagesstand (waiver.json) wie im Spieler-Tab: aktuelle Zu- und Abgänge und Verletzungen; dieselbe
+      ['#keeper/herkunft?team=' + t.team_id, 'Herkunft der Spieler', 'k'],
+      ['#markt?team=' + t.team_id, `Markt aus Sicht von ${t.kuerzel}`, 'w']], null));
+  // Kader mit dem Tagesstand (waiver.json) wie in der Spielerliste: aktuelle Zu- und Abgänge und Verletzungen; dieselbe
   // Ladung liefert das Profil (Kurzzeile und Umschalter „Profil“)
   ctx.lazy('players.json', 'Spielerdaten', kader).then(async P => {
     const W = S.man.files?.['waiver.json'] ? await ctx.load('waiver.json').catch(() => null) : null;
@@ -85,7 +85,7 @@ function weekList(t) {
   const played = x => x.i >= 0;
   const anyT = wk.allplay_t.some(v => v > 0);
   return h('div', null, U.table({cap: 'Wochenliste', cls: 'nr', rows, sortable: false, rh: 0, cols: [
-    {k: 'w', l: 'W', f: x => h('a', {href: played(x) ? '#tabelle/allplay/w' + x.week : '#spielplan/w' + x.week, class: 'tl2'}, 'W' + x.week)},
+    {k: 'w', l: 'W', f: x => h('a', {href: played(x) ? '#staerke/allplay/w' + x.week : '#liga/ergebnisse/w' + x.week, class: 'tl2'}, 'W' + x.week)},
     {k: 'o', l: 'Gegner', f: x => [x.home ? '' : '@', h('a', {href: '#team/' + x.opp, class: 'tl2', 'aria-label': `${x.home ? 'gegen' : 'bei'} ${U.team(x.opp)?.name}`}, U.kz(x.opp))]},
     {k: 'pf', l: 'PF : PA', num: 1, f: x => played(x) ? `${U.num(wk.pf[x.i])} : ${U.num(wk.pa[x.i])}` : (x.st === 'laeuft' ? 'läuft' : 'offen')},
     {k: 'e', l: 'Erg.', f: x => played(x) ? U.res(wk.ergebnis[x.i]) : x.p != null && x.st !== 'laeuft' ? U.po(x.p) : ''},

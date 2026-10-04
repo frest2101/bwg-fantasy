@@ -71,7 +71,7 @@ export function tl(tid, cls) {       // Team-Link: Name, auf dem Handy in schmal
     h('span', {class: 'tn'}, t.name), h('span', {class: 'tk', 'aria-hidden': 'true'}, t.kuerzel));
 }
 export const rec = t => `${t.w}-${t.l}` + (S.hasT ? `-${t.t}` : '');
-// Verletzung und Status je Spieler (ESPN-Kennungen → Kürzel und Langtext), gemeinsam für Spieler- und Waiver-Tab
+// Verletzung und Status je Spieler (ESPN-Kennungen → Kürzel und Langtext), gemeinsam für Spielerliste und Markt
 export const INJ = {QUESTIONABLE: ['Q', 'fraglich'], DOUBTFUL: ['D', 'zweifelhaft'], OUT: ['O', 'fällt aus'], INJURY_RESERVE: ['IR', 'Injured Reserve'],
   SUSPENSION: ['SSPD', 'gesperrt'], DAY_TO_DAY: ['DTD', 'Day-to-Day']};
 export const STAT = {ONTEAM: 'Kader', FREEAGENT: 'Free Agent', WAIVERS: 'Waivers'};
@@ -127,9 +127,33 @@ export function weekChips(path, cur) {
 // All-Play-Bilanz „6-3“, mit Gleichständen „6-2-1“ (showT erzwingt die dritte Zahl, damit eine Spalte einheitlich bleibt)
 export const apwl = (w, l, t, showT) => `${nn(w)}-${nn(l)}` + (showT || t ? `-${nn(t)}` : '');
 
-export const spGroup = cur => chips('Spieler, Faktoren, Matchup, Moves und Wetter',
-  [['#spieler', 'Spieler', 'spieler'], ['#dst', 'D/ST-Faktoren', 'dst'], ['#matchup', 'Positions-Matchup', 'matchup'], ['#moves', 'Moves', 'moves'],
-    ['#wetter', 'Wetter', 'wetter']], cur);
+// Kopf einer Ansicht: Überschrift, bei Ansichten eines Bereichs (r.B vom Router) darunter die Bereichs-Zeile mit der Frage des
+// Bereichs und die Ansichten als Chips. Spieler-, Team- und Lesart-Seite haben keinen Bereich, nur die Überschrift.
+// → h1, damit die Ansicht den Titel nach dem Laden noch ändern kann
+export function kopf(box, r, titel) {
+  const h1 = h('h1', null, titel), B = r.B;
+  add(box, [h1, B ? [h('p', {class: 'bereich'}, h('strong', null, B.l), ' – ', B.frage, ' ', B.text),
+    chips('Ansichten ' + B.l, B.chips, r.view, 'bv')] : null]);
+  return h1;
+}
+// Zweite Ebene von Woche › Matchups: Übersicht, je Position und D/ST (Offenses aus den D/ST-Faktoren)
+export const muChips = cur => chips('Matchups je Position', [['#woche/matchups', 'Übersicht', ''],
+  ...['QB', 'RB', 'WR', 'TE', 'K'].map(p => ['#woche/matchups/' + p.toLowerCase(), p, p.toLowerCase()]), ['#woche/matchups/dst', 'D/ST', 'dst']], cur, 'l2');
+// Laufende Woche nach dem Kalender: die letzte Woche des Spielplans, die (Dienstag, deutsche Zeit) schon begonnen hat; vor W1
+// die erste. Eine Woche heißt erst nach dem Wochenabruf „final“, ihr Status sagt deshalb nicht, ob sie gerade läuft.
+const ISO = new Intl.DateTimeFormat('en-CA', {timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit'});
+const heute = () => ISO.format(new Date());
+export const aktuelleWoche = () => { const t = heute(); return S.weeks.filter(w => w.start <= t).at(-1)?.week ?? S.weeks[0]?.week ?? 1; };
+// Saison läuft (Woche öffnet dann mit dem Spieltag live): W1 hat begonnen, die letzte Woche des Spielplans ist nach dem
+// Kalender noch nicht vorbei (ihr Montag) und die Playoffs sind nicht bis zur letzten Woche gewertet (manifest ›
+// datenstand.playoff_woche, wie „Saison beendet“ im Datenstand-Fenster). Der Status der Woche taugt dafür nicht:
+// Playoff-Wochen führt schedule.json nie als „final“.
+export const saisonLaeuft = () => {
+  const t = heute(), last = S.weeks.at(-1);
+  if (!last || S.weeks[0].start > t) return false;
+  const ende = new Date(Date.parse(last.start + 'T12:00:00Z') + 7 * 864e5).toISOString().slice(0, 10);
+  return t < ende && (S.man.datenstand?.playoff_woche ?? 0) < last.week;
+};
 // Farbklasse eines Faktors F um 1,00 (D/ST-Faktoren, Positions-Matchup): f1–f3 blau = günstig, g1–g3 orange = ungünstig,
 // f0 = um 1,00; die Zahl steht immer dabei. Stufe nach F in den angezeigten Stellen st (2 oder 3), gerundet mit demselben
 // Intl-Formatierer wie num() (toFixed rundet 0,985 anders als die Anzeige), gemessen in Tausendsteln: gleiche angezeigte

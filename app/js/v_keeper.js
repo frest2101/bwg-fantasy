@@ -1,10 +1,10 @@
-// Tab Keeper (lädt keeper.json): Keeper-Bilanz – woher die Punkte kommen (Keeper, Draft, Zugänge, Trades), Herkunft je
+// Bereich Keeper (lädt keeper.json): Keeper-Bilanz – woher die Punkte kommen (Keeper, Draft, Zugänge, Trades), Herkunft je
 // Kaderspieler mit Vorjahresvergleich und Marktwert, Altersprofil je Team (Stammdaten von nflverse), Marktwert je Team
 // (FantasyCalc, nur Summen, kein Spieler-Ranking), Draft 2026 inklusive Keeper mit Ertrag. Alle Zahlen aus Python
 // (scripts/keeper.py).
 let U, S, h;
 export const init = c => { U = c.ui; S = U.S; h = U.h; };
-const KEY = 'bwg-team';                  // eigenes Team wie im Waiver-Tab, nur Komfort im Browser
+const KEY = 'bwg-team';                  // eigenes Team wie unter Markt, nur Komfort im Browser
 const ARTEN = ['keeper', 'draft', 'waiver', 'free_agent', 'trade'];
 const ART = {keeper: 'Keeper', draft: 'Draft', waiver: 'Waiver', free_agent: 'Free Agent', trade: 'Trade'};
 // Gruppen der Punkte (Python: keeper.GRUPPEN) mit Anzeige und fester Farbe
@@ -36,7 +36,7 @@ export const byPlayer = K => new Map((K?.kader || []).map(r => [r.id, r]));
 export const alterTxt = r => r && U.ok(r.alter) ? `${U.num(r.alter, 1)} Jahre` + (r.rookie ? ', Rookie' : U.ok(r.nfl_jahr) ? `, ${r.nfl_jahr}. NFL-Jahr` : '') : null;
 const POS = ['QB', 'RB', 'WR', 'TE', 'K'];
 
-// ---------------------------------------------------------------- Marktwert (FantasyCalc), gemeinsam mit Waiver- und Spieler-Tab
+// ---------------------------------------------------------------- Marktwert (FantasyCalc), gemeinsam mit Markt und Spielerseite
 // Nennung laut Nutzungsbedingungen auf jeder Ansicht mit den Werten, nahe bei den Zahlen, mit Link; neutral (keine Partnerschaft)
 const extA = (href, text) => h('a', {href, target: '_blank', rel: 'noopener'}, text, h('span', {class: 'vh'}, ' (neues Fenster)'));
 export const fcQuelle = () => ['Werte: ', extA('https://fantasycalc.com', 'FantasyCalc')];
@@ -47,27 +47,25 @@ export const wertTxt = v => U.num(v, 0);
 export const wertSgn = v => U.sgn(v, 0);
 
 export async function render(box, ctx, r) {
-  const sub = ['kader', 'alter', 'wert', 'draft', 'draft-folgejahr'].includes(r.sub) ? r.sub : '';
+  const sub = r.view;      // '' Bilanz · herkunft · alter · marktwert · draft · draft-folgejahr (Router)
   // ?team=N gilt, auch 0 = Alle Teams (sonst fiele die Wahl auf dem Rückweg wieder auf das eigene Team); nur ohne
-  // Parameter nimmt die Kader-Ansicht das gespeicherte Mein Team
-  let team = r.q.has('team') ? +r.q.get('team') : sub === 'kader' ? +U.store.get(KEY) || 0 : 0;
+  // Parameter nimmt die Herkunft-Ansicht das gespeicherte Mein Team
+  let team = r.q.has('team') ? +r.q.get('team') : sub === 'herkunft' ? +U.store.get(KEY) || 0 : 0;
   if (!S.byId.has(team)) team = 0;
+  const next = S.man.season + 1;
+  U.kopf(box, r, {draft: `Draft ${S.man.season}`, 'draft-folgejahr': `Draft ${next}`, herkunft: 'Herkunft der Kaderspieler',
+    alter: 'Alter der Kader', marktwert: 'Marktwert der Kader'}[sub] || 'Keeper-Bilanz');
   if (!S.man.files?.['keeper.json']) {
-    U.ap(box, h('h1', null, 'Keeper'), h('p', {class: 'note'}, 'Noch keine Keeper-Bilanz: Sie erscheint mit dem ersten Wochenabruf nach dem Draft.'));
+    U.ap(box, h('p', {class: 'note'}, 'Noch keine Keeper-Bilanz: Sie erscheint mit dem ersten Wochenabruf nach dem Draft.'));
     return;
   }
-  const next = S.man.season + 1;
-  const views = U.chips('Ansichten Keeper', [['#keeper', 'Bilanz', ''], ['#keeper/kader', 'Kader', 'kader'], ['#keeper/alter', 'Alter', 'alter'],
-    ['#keeper/wert', 'Wert', 'wert'], ['#keeper/draft', 'Draft', 'draft'], ['#keeper/draft-folgejahr', `Draft ${next}`, 'draft-folgejahr']], sub);
-  U.ap(box, h('h1', null, {draft: `Draft ${S.man.season}`, 'draft-folgejahr': `Draft ${next}`, kader: 'Keeper und Kader',
-    alter: 'Alter der Kader', wert: 'Marktwert der Kader'}[sub] || 'Keeper'), views);
   const K = await ctx.lazy('keeper.json', 'Keeper-Bilanz', box);
   if (!r.alive()) return;
-  if (sub === 'draft') draft(box, K, team);
+  if (sub === 'draft') draft(box, K, team, r);
   else if (sub === 'draft-folgejahr') draftNext(box, K);
-  else if (sub === 'kader') kader(box, K, team);
+  else if (sub === 'herkunft') kader(box, K, team, r);
   else if (sub === 'alter') alter(box, K, await ctx.mod('svg'));
-  else if (sub === 'wert') wert(box, K, await ctx.mod('svg'));
+  else if (sub === 'marktwert') wert(box, K, await ctx.mod('svg'));
   else bilanz(box, K, await ctx.mod('svg'));
 }
 
@@ -116,7 +114,7 @@ function bilanz(box, K, svg) {
 }
 
 // ---------------------------------------------------------------- Kader: Herkunft und Vorjahresvergleich je Spieler
-function kader(box, K, team) {
+function kader(box, K, team, r) {
   const wrap = h('div');
   const all = [...K.kader].sort((a, b) => (b.avg ?? -1) - (a.avg ?? -1));
   const draw = () => {
@@ -144,12 +142,12 @@ function kader(box, K, team) {
     h('p', {class: 'note'}, standTxt(K) + '.', K.alter_stichtag ? quelle(K) : null,
       K.marktwert_stand ? [' ', fcQuelle(), ` (Stand ${U.stamp(K.marktwert_stand)}); Vergleich einzelner Spieler: `, fcRechner(), '.'] : null));
   };
-  U.ap(box, h('div', {class: 'row'}, teamSelect(team, v => { team = v; U.setQ('keeper/kader', {team}); draw(); })), wrap);
+  U.ap(box, h('div', {class: 'row'}, teamSelect(team, v => { team = v; U.setQ(r.base, {team}); draw(); })), wrap);
   draw();
 }
 
 // ---------------------------------------------------------------- Draft: alle Picks inklusive Keeper mit Ertrag
-function draft(box, K, team) {
+function draft(box, K, team, r) {
   const wrap = h('div');
   const bleib = p => p.da ? 'im Kader' : p.team_jetzt ? `bei ${U.kz(p.team_jetzt)}` : 'frei';
   const draw = () => {
@@ -171,7 +169,7 @@ function draft(box, K, team) {
         {k: 'r', l: 'Runde', num: 1, cat: 1, v: p => p.runde, d: 1, f: p => p.runde}]}),
     U.legend(['draft', 'draft-ertrag']), h('p', {class: 'note'}, `Punkte nach W${K.through_week} (final). ${standTxt(K)}.`));
   };
-  U.ap(box, h('div', {class: 'row'}, teamSelect(team, v => { team = v; U.setQ('keeper/draft', {team: team || null}); draw(); })), wrap);
+  U.ap(box, h('div', {class: 'row'}, teamSelect(team, v => { team = v; U.setQ(r.base, {team: team || null}); draw(); })), wrap);
   draw();
 }
 

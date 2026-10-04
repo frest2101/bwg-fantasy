@@ -78,8 +78,8 @@ def js_tabelle(text: str, name: str) -> dict[int, str]:
 
 
 def test_route_und_chip():
-    """#spieltag steht im Router und lädt v_spieltag.js; „#live“ bleibt die aria-live-Region. Kein achter Tab: Der
-    Zugang ist der Chip im Kopf."""
+    """#spieltag steht im Router und lädt v_spieltag.js; „#live“ bleibt die aria-live-Region. Kein eigener Tab: Der
+    Zugang ist der Chip im Kopf und die erste Ansicht im Bereich Woche (fünf Tabs, App-Konzept 04.10.2026)."""
     views = re.search(r"const VIEWS = \{(.*?)\};", read(APP_JS), re.S)
     assert views, "VIEWS in app/js/app.js nicht gefunden"
     routen = dict(re.findall(r"(\w+): '(\w+)'", views.group(1)))
@@ -92,7 +92,7 @@ def test_route_und_chip():
     kopf = html.split("<header", 1)[1].split("</header>", 1)[0]
     assert re.search(r'<a id="lv"[^>]*href="#spieltag"[^>]*aria-label="[^"]+"', kopf), "Chip „Live“ fehlt im Kopf"
     leiste = html.split('<nav class="tabs"', 1)[1].split("</nav>", 1)[0]
-    assert "#spieltag" not in leiste and leiste.count("<a ") == 7
+    assert "#spieltag" not in leiste and leiste.count("<a ") == 5
 
 
 def test_liga_und_endpunkte():
@@ -229,7 +229,8 @@ def test_tageslauf_knopf_zeigt_auf_den_workflow():
         assert teil in knopf.group(0), f"tageslaufKnopf ohne {teil}"
     assert "U.tageslaufKnopf()" in code(APP_JS), "Knopf fehlt im Datenstand-Fenster"
     view = code(VIEW)
-    kopfzeile = re.search(r"U\.ap\(box, h\('h1'[^\n]*", view)
+    # Kopf der Ansicht: Überschrift mit Bereichs-Zeile (U.kopf), direkt danach Hinweis, Aktualisieren und Tageslauf-Knopf
+    kopfzeile = re.search(r"U\.kopf\(box, r, 'Spieltag live'\);\s*U\.ap\(box, kopf,[^\n]*", view)
     assert kopfzeile and "U.tageslaufKnopf()" in kopfzeile.group(0), "Knopf steht in der Live-Ansicht immer neben „Aktualisieren“"
     for path in sorted(JS.glob("*.js")):
         if path != UI_JS:

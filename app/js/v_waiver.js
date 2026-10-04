@@ -1,10 +1,12 @@
-// Waiver (lädt waiver.json und players.json, dazu transactions.json): beste verfügbare Spieler je Position nach ROS über
-// Ersatz (Tagesstand), Bedarf je Team, Waiver-Reihenfolge, Claims der letzten 7 Tage. Zahlen kommen aus Python; hier nur
-// Anzeige, Filter und die Zusammenführung von Tagesstand (waiver.json) und Wochenstand (players.json) je Spieler-ID.
+// Bereich Markt (lädt waiver.json und players.json, dazu transactions.json) in drei Ansichten: Freie Spieler (#markt: beste
+// verfügbare Spieler je Position nach Horizont, Tagesstand), Bedarf je Team (#markt/bedarf) und Reihenfolge & Claims
+// (#markt/reihenfolge: Waiver-Reihenfolge, Claims der letzten 7 Tage). Zahlen kommen aus Python; hier nur Anzeige, Filter
+// und die Zusammenführung von Tagesstand (waiver.json) und Wochenstand (players.json) je Spieler-ID.
 // Positions-Matchup je Spieler (Feld mu) aus dem Wochenstand; Wetter-Fähnchen aus wetter.json (Prognose der laufenden Woche).
 // Horizont (Beschluss 30.09.2026): Woche N+1 (Standard), Σ N+1…N+3 oder ROS – für die Liste und den Bedarf je Team;
 // dazu „Zukunft“ (Session 9): freie Spieler nach Marktwert (FantasyCalc, waiver.json), nur für die Liste.
 let U, S, h;
+const TITEL = {'': 'Freie Spieler', bedarf: 'Bedarf je Team', reihenfolge: 'Reihenfolge & Claims'};
 const POS = ['QB', 'RB', 'WR', 'TE', 'K', 'D/ST'];
 const FREE = ['WAIVERS', 'FREEAGENT'];
 const ART = {WAIVER: 'Waiver', FREEAGENT: 'Free Agent'};
@@ -20,20 +22,22 @@ const span = W => W.horizont?.length ? `W${W.horizont[0]}` + (W.horizont.length 
 
 export async function render(box, ctx, r) {
   U = ctx.ui; S = U.S; h = U.h;
-  U.ap(box, h('h1', null, 'Waiver'));
+  const ansicht = r.view, liste = ansicht === '';
+  U.kopf(box, r, TITEL[ansicht]);
   if (!S.man.files?.['waiver.json']) {
-    U.ap(box, h('p', {class: 'warn'}, 'Noch keine Tagesdaten: Der Waiver-Tab füllt sich mit dem ersten Tageslauf (stündlich von etwa 05:00 Uhr bis Mitternacht deutscher Zeit).'),
+    U.ap(box, h('p', {class: 'warn'}, 'Noch keine Tagesdaten: Der Markt füllt sich mit dem ersten Tageslauf (stündlich von etwa 05:00 Uhr bis Mitternacht deutscher Zeit).'),
       h('p', null, h('a', {href: '#spieler?status=frei&sicht=ros'}, 'Freie Spieler nach Wochenstand')));
     return;
   }
   const [W, P] = await Promise.all([ctx.lazy('waiver.json', 'Tagesstand', box), ctx.lazy('players.json', 'Spielerdaten', box)]);
   if (!r.alive()) return;
-  // Claims und Wetter sind Zugabe: ohne sie bleibt der Tab nutzbar (ohne Wetter keine Fähnchen)
-  const [T, WX] = await Promise.all([ctx.load('transactions.json').catch(() => null),
-    S.man.files?.['wetter.json'] ? ctx.load('wetter.json').catch(() => null) : null]);
+  // Claims (nur Reihenfolge & Claims) und Wetter (nur Freie Spieler) sind Zugabe: ohne sie bleibt die Ansicht nutzbar
+  // (ohne Wetter keine Fähnchen)
+  const [T, WX] = await Promise.all([ansicht === 'reihenfolge' ? ctx.load('transactions.json').catch(() => null) : null,
+    liste && S.man.files?.['wetter.json'] ? ctx.load('wetter.json').catch(() => null) : null]);
   const wx = WX ? await ctx.mod('v_wetter').catch(() => null) : null;
-  // Horizont „Zukunft“ nur mit Marktwerten; Quelle, Format und Verweise kommen aus dem Keeper-Tab
-  const kp = W.wert_stand ? await ctx.mod('v_keeper').catch(() => null) : null;
+  // Horizont „Zukunft“ nur mit Marktwerten; Quelle, Format und Verweise kommen aus dem Keeper-Modul
+  const kp = liste && W.wert_stand ? await ctx.mod('v_keeper').catch(() => null) : null;
   if (!r.alive()) return;
   const byId = new Map(P.players.map(p => [p.id, p]));
   // Tagesstand je Spieler, Stammdaten und ROS aus dem Wochenstand; wer dort fehlt, heißt wie im Tagesstand (ohne ROS)
@@ -43,25 +47,32 @@ export async function render(box, ctx, r) {
   });
   const rowById = new Map(rows.map(x => [x.id, x]));
   const name = id => byId.get(id)?.name ?? rowById.get(id)?.name ?? T?.spieler?.[String(id)] ?? `Spieler ${id}`;
-  // Bezugsteam: #waiver?team=N gilt nur für diesen Aufruf (Link von der Team-Seite), sonst das gespeicherte Mein Team
+  // Bezugsteam: #markt?team=N gilt nur für diesen Aufruf (Link von der Team-Seite), sonst das gespeicherte Mein Team
   const qTeam = U.team(r.q.get('team')) ? +r.q.get('team') : 0;
   const me = {mine: qTeam || +U.store.get(KEY) || 0, q: qTeam};
+  let draw = () => {};
   const mineSel = h('select', {'aria-label': 'Mein Team', onchange: e => {
-    me.mine = +e.target.value; me.q = 0; U.store.set(KEY, me.mine); av.rebuild(); draw();
+    me.mine = +e.target.value; me.q = 0; U.store.set(KEY, me.mine);
+    if (!liste) U.setQ(r.base, {});       // die Liste schreibt ihre Parameter selbst (ohne team)
+    // die Sicht eines anderen Teams endet: auch die Chips der Markt-Ansichten (Router, bereich) ohne ?team=
+    for (const a of box.querySelectorAll('.chips.bv a')) a.setAttribute('href', a.getAttribute('href').split('?')[0]);
+    draw();
   }}, h('option', {value: 0}, 'Mein Team wählen'), S.teams.map(t => h('option', {value: t.team_id, selected: t.team_id === me.mine}, `${t.kuerzel} · ${t.name}`)));
   U.ap(box, h('p', {class: 'note'}, `Tagesstand ${U.stamp(W.stand)} · Projektion und Bye-Hinweis für W${W.woche}`, ' ', U.ib('tagesstand', '')),
     h('div', {class: 'row'}, h('label', null, qTeam ? 'Sicht von ' : 'Mein Team ', mineSel)));
-  const av = available(box, W, P, rows, r, wx && (nfl => wx.flagLink(wx.gameOf(WX, nfl))), me, kp);
-  const grid = h('div', {class: 'two'});
-  U.ap(box, grid);
-  let bsicht = W.bedarf_woche ? 'woche' : 'ros';
-  // Wochensicht mit fünf Spalten: Bedarf und Reihenfolge untereinander in voller Breite, ROS-Sicht nebeneinander
-  const draw = () => {
-    grid.className = bsicht === 'woche' ? 'stack' : 'two';
-    grid.replaceChildren(needs(W, P, name, me.mine, bsicht, v => { bsicht = v; draw(); }, rowById), order(W, me.mine));
-  };
+  if (liste) {
+    const av = available(box, W, P, rows, r, wx && (nfl => wx.flagLink(wx.gameOf(WX, nfl))), me, kp);
+    draw = () => av.rebuild();
+    return;
+  }
+  const wrap = h('div');
+  U.ap(box, wrap);
+  if (ansicht === 'bedarf') {
+    let bsicht = W.bedarf_woche ? 'woche' : 'ros';
+    draw = () => { wrap.replaceChildren(needs(W, P, name, me.mine, bsicht, v => { bsicht = v; draw(); }, rowById)); };
+  } else draw = () => { wrap.replaceChildren(order(W, me.mine)); };
   draw();
-  claims(box, T, name);
+  if (ansicht === 'reihenfolge') claims(box, T, name);
 }
 
 // ---------------------------------------------------------------- beste verfügbare Spieler je Position
@@ -159,7 +170,7 @@ function available(box, W, P, rows, r, wflag, me, kp) {
   const refresh = rebuild => {
     if (rebuild) build(); else tbl.upd(rowsNow());
     count.textContent = `${rowsNow().length} verfügbare Spieler`;
-    U.setQ('waiver', {team: me.q || null, pos: st.pos || null, h: st.hor !== (hasWeek ? 'woche' : 'ros') ? st.hor : null,
+    U.setQ(r.base, {team: me.q || null, pos: st.pos || null, h: st.hor !== (hasWeek ? 'woche' : 'ros') ? st.hor : null,
       sicht: st.sicht !== (narrow ? 'ros' : 'alle') ? st.sicht : null});
     ersNote.replaceChildren(); U.ap(ersNote, ersText());
   };
@@ -177,7 +188,7 @@ function available(box, W, P, rows, r, wflag, me, kp) {
   const HLABEL = {woche: `W${W.woche}`, drei: `Σ ${span(W)}`, ros: 'ROS', zukunft: 'Zukunft'};
   const horSeg = hors.length > 1 ? U.seg('Horizont', hors.map(x => [x, HLABEL[x]]), st.hor,
     v => { st.hor = v; refresh(true); }) : null;
-  U.ap(box, h('h2', null, 'Beste verfügbare Spieler'),
+  U.ap(box,
     horSeg && h('div', {class: 'row'}, horSeg, U.ib('horizont', '')),
     ersNote,
     h('div', {class: 'row'}, U.seg('Position', [['', 'Alle'], ...POS.map(p => [p, p])], st.pos, v => { st.pos = v; refresh(); })),
@@ -198,7 +209,7 @@ function available(box, W, P, rows, r, wflag, me, kp) {
 // sicht 'woche': Lücken der Woche N+1 mit Grund und freien Kandidaten, Ausfälle der ROS-Aufstellung, Byes N+2…N+3;
 // 'ros': Lücken der ROS-optimalen Aufstellung (Regular Season)
 function needs(W, P, name, mine, sicht, onSicht, rowById) {
-  const card = U.card('Bedarf je Team');
+  const card = U.card(null);            // Überschrift ist die Ansicht (Markt › Bedarf je Team)
   if (W.bedarf_woche) U.ap(card, h('div', {class: 'row'}, U.seg('Bedarf', [['woche', `W${W.woche}`], ['ros', 'ROS']], sicht, onSicht)));
   const teams = key => [...S.teams].sort((a, b) => (b.team_id === mine) - (a.team_id === mine) || a.rang - b.rang)
     .map(t => ({t, b: W[key]?.[String(t.team_id)]}));
@@ -264,7 +275,7 @@ function order(W, mine) {
 // ---------------------------------------------------------------- Claims der letzten 7 Tage
 function claims(box, T, name) {
   U.ap(box, h('h2', null, 'Claims der letzten 7 Tage'));
-  if (!T) { U.ap(box, h('p', {class: 'note'}, 'Transaktionen konnten nicht geladen werden. ', h('a', {href: '#moves'}, 'Zu den Moves'))); return; }
+  if (!T) { U.ap(box, h('p', {class: 'note'}, 'Transaktionen konnten nicht geladen werden. ', h('a', {href: '#markt/moves'}, 'Zu den Moves'))); return; }
   const since = Date.now() - DAYS7;
   const items = (T.items || []).filter(x => ART[x.type] && U.ok(x.datum) && x.datum >= since);
   const part = (x, kind) => (x.items || []).filter(i => i.type === kind);
@@ -273,12 +284,12 @@ function claims(box, T, name) {
     const txt = i.name || name(i.player_id);
     return [k ? ', ' : '', i.in_app === false ? h('span', null, txt) : h('a', {href: '#spieler/' + i.player_id}, txt)];
   }) : '–';
-  if (!items.length) { U.ap(box, h('p', {class: 'note'}, 'Keine ausgeführten Claims oder Free-Agent-Zugänge in den letzten 7 Tagen. ', h('a', {href: '#moves'}, 'Alle Moves'))); return; }
+  if (!items.length) { U.ap(box, h('p', {class: 'note'}, 'Keine ausgeführten Claims oder Free-Agent-Zugänge in den letzten 7 Tagen. ', h('a', {href: '#markt/moves'}, 'Alle Moves'))); return; }
   U.ap(box, U.table({cap: 'Ausgeführte Waiver-Claims und Free-Agent-Zugänge (neueste zuerst)', cls: 'nr', rh: 1, limit: 50, rows: items, sort: ['d', -1], cols: [
     {k: 'd', l: 'Datum', v: x => x.datum, f: x => U.stamp(x.datum)},
     {k: 't', l: 'Team', v: x => U.kz(x.team_id), d: 1, f: x => U.tl(x.team_id)},
     {k: 'a', l: 'Art', v: x => x.type, d: 1, f: x => ART[x.type] || x.type},
     {k: 'z', l: 'Zugang', f: x => pl(part(x, 'ADD'))},
     {k: 'b', l: 'Abgang', f: x => pl(part(x, 'DROP'))}]}),
-  h('p', {class: 'note'}, h('a', {href: '#moves'}, 'Alle Moves'), ' · ', h('a', {href: '#keeper/draft'}, 'Draft'), ' ', U.ib('claims', '')));
+  h('p', {class: 'note'}, h('a', {href: '#markt/moves'}, 'Alle Moves'), ' · ', h('a', {href: '#keeper/draft'}, 'Draft'), ' ', U.ib('claims', '')));
 }

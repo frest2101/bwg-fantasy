@@ -1,6 +1,7 @@
-// Tab Rekorde: Saison 2026 (RS und Playoffs getrennt), Positionen, H2H, All-Time und Champions (history.json lazy)
+// Bereich Liga: Duelle (#liga/duelle, die direkten Duelle 2026) und Rekorde (#liga/rekorde) mit zweiter Ebene Saison 2026
+// (RS und Playoffs getrennt), Positionen, All-Time und Champions (history.json lazy)
 let U, S, h;
-const SUBS = [['', 'Saison'], ['positionen', 'Positionen'], ['h2h', 'H2H'], ['alltime', 'All-Time'], ['champions', 'Champions']];
+const SUBS = [['', 'Saison'], ['positionen', 'Positionen'], ['alltime', 'All-Time'], ['champions', 'Champions']];
 const LABEL = {hoechster_score: 'Höchster Wochenscore', niedrigster_score: 'Niedrigster Wochenscore', groesster_sieg: 'Größter Sieg',
   knappstes_ergebnis: 'Knappstes Ergebnis', hoechster_verlierer: 'Höchster Verlierer-Score',
   niedrigster_sieger: 'Niedrigster Sieger-Score', laengste_siegesserie: 'Längste Siegesserie', laengste_niederlagenserie: 'Längste Niederlagenserie',
@@ -11,15 +12,20 @@ const POS = ['QB', 'RB', 'WR', 'TE', 'K', 'D/ST'], SLOTS = ['QB', 'RB', 'WR', 'T
 
 export async function render(box, ctx, r) {
   U = ctx.ui; S = U.S; h = U.h;
+  if (r.view === 'duelle') {
+    U.kopf(box, r, 'Duelle');
+    h2h(box, r);
+    return;
+  }
   const sub = SUBS.some(x => x[0] === r.sub) ? r.sub : '';
-  U.ap(box, h('h1', null, 'Rekorde – ' + SUBS.find(x => x[0] === sub)[1]),
-    U.chips('Ansichten der Rekorde', SUBS.map(([k, l]) => ['#rekorde' + (k ? '/' + k : ''), l, k]), sub));
+  U.kopf(box, r, 'Rekorde – ' + SUBS.find(x => x[0] === sub)[1]);
+  U.ap(box, U.chips('Ansichten der Rekorde', SUBS.map(([k, l]) => ['#' + r.base + (k ? '/' + k : ''), l, k]), sub, 'l2'));
   const svg = await ctx.mod('svg');
   if (sub === 'alltime' || sub === 'champions') {
     const H = await ctx.lazy('history.json', 'Historie', box);
     if (!r.alive()) return;
     (sub === 'alltime' ? alltime : champions)(box, H, r, svg);
-  } else ({'': saison, positionen, h2h})[sub](box, r, svg);
+  } else ({'': saison, positionen})[sub](box, r, svg);
 }
 
 // Rekordlisten: je Rekord eine Liste von Einträgen (Gleichstand = mehrere). Eintrag laut Export:
@@ -33,7 +39,7 @@ function recTable(cap, rec) {
   const serie = e => Array.isArray(e.weeks);
   const wk = e => {
     if (serie(e)) return (e.weeks[0] !== e.weeks.at(-1) ? `W${e.weeks[0]}–W${e.weeks.at(-1)}` : `W${e.weeks[0] ?? '–'}`) + (e.laufend ? ' (läuft)' : '');
-    return U.ok(e.week) ? h('a', {href: '#spielplan/w' + e.week}, 'W' + e.week) : '–';
+    return U.ok(e.week) ? h('a', {href: '#liga/ergebnisse/w' + e.week}, 'W' + e.week) : '–';
   };
   // lab: erste Spalte bricht auf dem Handy um, kurz: Teams als Kürzel – sonst frisst die feste Spalte die Tabelle
   return U.table({cap, cls: 'nr kurz lab', rows, sortable: false, rh: 0, cols: [
@@ -72,7 +78,7 @@ function positionen(box, r, svg) {
   let key = r.q.get('slot') === '1' ? 'nach_slot' : 'nach_position', wert = ['anteil', 'rang'].includes(r.q.get('wert')) ? r.q.get('wert') : 'pts';
   let sortK = 'rang';   // gewählte Sortierspalte bleibt beim Wechsel der Werte; Richtung nach dem Standard der Spalte
   const COL = {QB: 'o1', RB: 'o2', WR: 'o3', TE: 'o4', K: 'o5', 'D/ST': 'o6', FLEX: 'o7', OP: 'o8'};   // feste Farbe je Position
-  const q = () => U.setQ('rekorde/positionen', {slot: key === 'nach_slot' ? 1 : null, wert: wert !== 'pts' ? wert : null});
+  const q = () => U.setQ(r.base + '/positionen', {slot: key === 'nach_slot' ? 1 : null, wert: wert !== 'pts' ? wert : null});
   const wrap = h('div'), chart = h('div');
   const draw = () => {
     const keys = key === 'nach_slot' ? SLOTS : POS, P = t => t.positionen?.[key] || {};
@@ -122,8 +128,8 @@ function h2h(box, r) {
       h('thead', null, h('tr', null, h('td', null, ''), S.teams.map(t => h('th', {scope: 'col'}, h('a', {href: '#team/' + t.team_id, 'aria-label': t.name}, t.kuerzel))))),
       h('tbody', null, S.teams.map(a => {
         // Zeilenkopf wählt das Team für die Liste darüber (Spaltenköpfe bleiben Team-Links)
-        const tr = h('tr', null, h('th', {scope: 'row'}, h('a', {href: '#rekorde/h2h?team=' + a.team_id, 'aria-label': `H2H von ${a.name} anzeigen`, onclick: e => {
-          e.preventDefault(); sel = a.team_id; U.setQ('rekorde/h2h', {team: sel}); selBox.value = String(sel); draw();
+        const tr = h('tr', null, h('th', {scope: 'row'}, h('a', {href: '#' + r.base + '?team=' + a.team_id, 'aria-label': `H2H von ${a.name} anzeigen`, onclick: e => {
+          e.preventDefault(); sel = a.team_id; U.setQ(r.base, {team: sel}); selBox.value = String(sel); draw();
           list.scrollIntoView({block: 'start', behavior: 'smooth'});
         }}, a.kuerzel)),
         S.teams.map(b => {
@@ -135,7 +141,7 @@ function h2h(box, r) {
         return tr;
       })))));
   const selBox = h('select', {onchange: e => {
-    sel = +e.target.value; U.setQ('rekorde/h2h', {team: sel}); draw();
+    sel = +e.target.value; U.setQ(r.base, {team: sel}); draw();
   }}, S.teams.map(t => h('option', {value: t.team_id, selected: t.team_id === sel}, t.name)));
   U.ap(box, h('div', {class: 'row'}, h('label', null, 'Team ', selBox)),
   list, U.legend(['h2h']), h('h2', {style: 'margin-top:16px'}, 'Alle Duelle'), mx,
@@ -192,7 +198,7 @@ function alltime(box, H, r) {
         {k: 'sc', l: 'Scoring', v: t => +t.scoring_titel, f: t => t.scoring_titel ? h('span', null, '✓', h('span', {class: 'vh'}, ' ja')) : ''}]}));
   };
   U.ap(box, h('h2', {style: 'margin-top:16px'}, 'Saisontabellen'), h('div', {class: 'row'}, h('label', null, 'Saison ', h('select', {onchange: e => {
-    yr = +e.target.value; U.setQ('rekorde/alltime', {saison: yr}); draw();
+    yr = +e.target.value; U.setQ(r.base + '/alltime', {saison: yr}); draw();
   }}, seasons.map(y => h('option', {value: y, selected: y === yr}, y))))), out);
   draw();
 }

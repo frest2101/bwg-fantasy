@@ -1,4 +1,4 @@
-// Tab Ranking: Power Ranking (μ, Trend, E, Kernsätze) und Score mit Profil-Chips, sieben Reglern und Normierung.
+// Bereich Stärke: Power Ranking (μ, Trend, E, Kernsätze) und Eigener Score mit Profil-Chips, sieben Reglern und Normierung.
 // Der Browser rechnet nur Score = Σ w · norm[kind][m] / Σ w aus den fertigen Normwerten (teams.json), nie selbst normiert.
 let U, S, h;
 const GID = {pf: 'pfspiel', allplay: 'allplay', win: 'win', coaching: 'effizienz', floor: 'floor', form: 'form'};
@@ -11,10 +11,9 @@ const slug = s => s.toLowerCase().replace(/ä/g, 'ae').replace(/ö/g, 'oe').repl
 
 export async function render(box, ctx, r) {
   U = ctx.ui; S = U.S; h = U.h;
-  const score = r.sub === 'score';
-  U.ap(box, h('h1', null, score ? 'Ranking – Score' : 'Ranking – Power Ranking'),
-    U.chips('Ansichten des Rankings', [['#ranking', 'Power Ranking', ''], ['#ranking/score', 'Score', 'score']], score ? 'score' : ''),
-    S.tw <= 4 ? h('p', {class: 'warn'}, `Nach ${S.tw} Wochen sind die Unterschiede noch stark zufallsgeprägt.`) : null);
+  const score = r.view === 'score';
+  U.kopf(box, r, score ? 'Eigener Score' : 'Power Ranking');
+  U.ap(box, S.tw <= 4 ? h('p', {class: 'warn'}, `Nach ${S.tw} Wochen sind die Unterschiede noch stark zufallsgeprägt.`) : null);
   const svg = await ctx.mod('svg');
   (score ? scoreView : power)(box, r, svg);
 }
@@ -149,7 +148,7 @@ function scoreView(box, r) {
     const lead = S.teams.filter(t => rk.has(t.team_id)).sort((a, b) => rk.get(a.team_id) - rk.get(b.team_id)).slice(0, 3);
     top3.textContent = lead.length ? 'Spitze: ' + lead.map(t => `${t.kuerzel} ${U.num(sc.get(t.team_id), 1)}`).join(' · ') : '';
     const p = match(st.w);
-    U.setQ('ranking/score', {profil: slug(p), w: p === 'eigene' ? M.map(m => st.w[m.key]).join(',') : null, norm: st.norm !== 'z' ? st.norm : null});
+    U.setQ(r.base, {profil: slug(p), w: p === 'eigene' ? M.map(m => st.w[m.key]).join(',') : null, norm: st.norm !== 'z' ? st.norm : null});
     U.store.set('bwg-score', st);
   }
   const kader = M.find(m => m.key === 'kader');

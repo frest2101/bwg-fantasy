@@ -44,6 +44,7 @@ function refresh() {
     if (JSON.stringify(man) === JSON.stringify(alt)) return false;
     const basis = BASIS.some(neu) ? await Promise.all(BASIS.map(n => getJSON(dataUrl(man, n)))) : null;
     for (const n of Object.keys(cache)) if (neu(n)) delete cache[n];
+    if (neu('players.json') || neu('waiver.json')) suchListe = null;    // Suche im Kopf lädt beim nächsten Öffnen neu
     S.man = man;
     if (basis) {
       BASIS.forEach((n, i) => { cache[n] = Promise.resolve(basis[i]); });
@@ -128,7 +129,64 @@ export function nextDaily(now = new Date()) {
 }
 function header() {
   standChip();
+  suche();
   theme();
+}
+
+// ---------------------------------------------------------------- Suche im Kopf: Spieler und Teams (statt eines Spieler-Tabs)
+// Teams sofort aus teams.json; Spieler beim ersten Öffnen aus players.json und dem Tagesstand (waiver.json), zusammengeführt
+// wie in der Spielerliste – jeder Treffer hat damit eine Spielerseite. Reihenfolge: Namensanfang, dann Anfang des Vor- oder
+// Nachnamens, dann Teiltreffer; bei Gleichstand nach Besitz % (ESPN-weit).
+let suchListe = null;
+const spielerListe = () => suchListe || (suchListe = (async () => {
+  const [P, W, sp] = await Promise.all([load('players.json'),
+    S.man.files?.['waiver.json'] ? load('waiver.json').catch(() => null) : null, mod('v_spieler')]);
+  return {sp, rows: sp.merge(P, W).map(p => ({p, n: sp.norm(p.name)}))};
+})().catch(e => { suchListe = null; throw e; }));
+function suche() {
+  const btn = $('such');
+  btn.hidden = false;
+  btn.onclick = () => {
+    const inp = h('input', {type: 'search', placeholder: 'Spieler oder Team', 'aria-label': 'Spieler oder Team suchen', autocomplete: 'off',
+      autocapitalize: 'off', spellcheck: 'false', enterkeyhint: 'go'});
+    const out = h('ul', {class: 'such'});
+    const info = h('p', {class: 'note', role: 'status'});
+    const alle = h('a', {href: '#spieler'}, 'Alle Spieler mit Filtern');
+    let liste = null, fehler = false;
+    const eintrag = (href, name, sub, extra) => h('li', null, h('a', {href, class: 'pl'}, h('span', null, name, extra), h('span', {class: 'sub'}, sub)));
+    const zeig = () => {
+      const raw = inp.value.trim();
+      // wie die Spielerliste: ohne Groß/klein, Akzente, Apostrophe („asses“ findet Asse's Cowboys); bis v_spieler geladen ist, einfach
+      const nm = s => liste ? liste.sp.norm(s) : String(s).toLowerCase();
+      const q = nm(raw);
+      alle.setAttribute('href', '#spieler' + (raw ? '?q=' + encodeURIComponent(raw) : ''));
+      // Teams: leer alle zehn nach Tabellenplatz, sonst Treffer im Namen oder am Anfang des Kürzels
+      const teams = [...S.teams].sort((a, b) => a.rang - b.rang).filter(t => !q || nm(t.name).includes(q) || nm(t.kuerzel).startsWith(q));
+      const rang = x => x.n.startsWith(q) ? 0 : x.n.includes(' ' + q) ? 1 : 2;
+      const treffer = liste && q ? U.sortRows(liste.rows.filter(x => x.n.includes(q)), x => rang(x) * 1000 - (x.p.own ?? 0), 1).slice(0, 8) : [];
+      out.replaceChildren(...teams.map(t => eintrag('#team/' + t.team_id, t.name, `Team · ${t.kuerzel} · ${t.rang}. · ${U.rec(t)}`)),
+        ...treffer.map(({p}) => eintrag('#spieler/' + p.id, p.name, `${p.pos ?? '–'} · ${p.nfl || 'FA'} · ${p.team > 0 ? U.kz(p.team) : U.STAT[p.status] || 'frei'}`, U.inj(p.inj))));
+      info.textContent = fehler ? 'Spieler konnten nicht geladen werden – nur Teams.' : !q ? 'Name eingeben, z. B. „allen“ oder „HJS“.'
+        : !liste ? 'Lade Spieler …' : teams.length + treffer.length ? '' : 'Kein Treffer.';
+    };
+    inp.addEventListener('input', zeig);
+    // Ziel ist die gerade offene Seite: kein hashchange, also schließt nicht route() das Fenster, sondern dies hier (Fokus
+    // zurück auf die Lupe); sonst schließt route() und setzt den Fokus auf die neue Überschrift
+    const offen = href => href === location.hash && (U.closePop(true), true);
+    // Enter öffnet den ersten Treffer
+    inp.addEventListener('keydown', e => {
+      const a = e.key === 'Enter' && out.querySelector('a');
+      if (a) { e.preventDefault(); if (!offen(a.getAttribute('href'))) location.hash = a.getAttribute('href'); }
+    });
+    const fuss = h('p', {class: 'note'}, alle);
+    for (const x of [out, fuss]) x.addEventListener('click', e => { const a = e.target.closest('a'); if (a && offen(a.getAttribute('href'))) e.preventDefault(); });
+    U.showPop(btn, 'Spieler und Teams', [h('div', {class: 'row srch'}, h('label', null, h('span', {class: 'vh'}, 'Suchen'), inp)), info, out, fuss]);
+    if ($('pop').hidden) return;              // zweiter Klick auf die Lupe schließt das Fenster
+    inp.focus({preventScroll: true});
+    zeig();
+    spielerListe().then(x => { liste = x; if (inp.isConnected) zeig(); })
+      .catch(e => { console.error(e); fehler = true; if (inp.isConnected) zeig(); });
+  };
 }
 // Datenstand-Chip und sein Fenster; läuft nach refresh() erneut und zeigt dann den neuen Stand
 function standChip() {
@@ -220,10 +278,85 @@ function theme() {
 }
 
 // ---------------------------------------------------------------- Router
-const VIEWS = {tabelle: 'v_tabelle', ranking: 'v_ranking', spielplan: 'v_spielplan', team: 'v_team', spieler: 'v_spieler',
-  dst: 'v_dst', matchup: 'v_matchup', wetter: 'v_wetter', moves: 'v_moves', waiver: 'v_waiver', keeper: 'v_keeper', rekorde: 'v_rekorde',
-  spieltag: 'v_spieltag', lesart: 'v_lesart'};       // spieltag = Live-Ansicht (Chip „Live“ im Kopf); „#live“ ist die aria-live-Region
-const NAV = {team: 'tabelle', dst: 'spieler', matchup: 'spieler', wetter: 'spieler', moves: 'spieler'};
+// Fünf Bereiche nach Fragen (App-Konzept 04.10.2026, Paket P1): Tab, Frage und Satz der Bereichs-Zeile unter jeder Überschrift,
+// Ansichten als Chips. Je Ansicht [Pfad im Bereich, Chip, Modul]; der Router gibt dem Modul den Chip-Pfad als r.view, den Rest
+// des Hashs (Woche w3, Position qb, zweite Ebene) als r.sub und den Pfad der Ansicht als r.base (für eigene Links und setQ).
+// Chip null: eigene Route ohne eigenen Chip (Matchups › D/ST gehört zum Chip Matchups); ein Chip als Funktion liest die Daten.
+const BEREICHE = {
+  liga: {l: 'Liga', frage: 'Wo stehen wir?', text: 'Tabelle nach Siegen, Ergebnisse, Playoff-Chancen, Duelle und Rekorde.', v: [
+    ['', 'Tabelle', 'v_tabelle'], ['division', 'Division', 'v_tabelle'], ['ergebnisse', 'Ergebnisse', 'v_spielplan'],
+    ['playoffs', 'Playoff-Chancen', 'v_tabelle'], ['duelle', 'Duelle', 'v_rekorde'], ['rekorde', 'Rekorde', 'v_rekorde']]},
+  staerke: {l: 'Stärke', frage: 'Wer ist wirklich wie gut?', text: 'Rangfolgen nach Punkten statt nach Siegen.', v: [
+    ['', 'Power Ranking', 'v_ranking'], ['allplay', 'All-Play & Glück', 'v_tabelle'], ['punkte', 'Punkte & Form', 'v_tabelle'],
+    ['coaching', 'Coaching', 'v_tabelle'], ['score', 'Eigener Score', 'v_ranking']]},
+  woche: {l: 'Woche', frage: 'Was zählt diese Woche?', text: 'Live-Punkte, Paarungen mit Siegchance, Matchups je Position und Wetter.', v: [
+    ['live', 'Spieltag live', 'v_spieltag'], ['paarungen', () => `Paarungen W${U.aktuelleWoche()}`, 'v_spielplan'],
+    ['matchups', 'Matchups', 'v_matchup'], ['matchups/dst', null, 'v_dst'], ['wetter', 'Wetter', 'v_wetter']]},
+  markt: {l: 'Markt', frage: 'Wen holen, wen abgeben?', text: 'Beste freie Spieler, Bedarf je Team, Waiver-Reihenfolge und alle Moves.', v: [
+    ['', 'Freie Spieler', 'v_waiver'], ['bedarf', 'Bedarf je Team', 'v_waiver'], ['reihenfolge', 'Reihenfolge & Claims', 'v_waiver'],
+    ['moves', 'Moves', 'v_moves']]},
+  keeper: {l: 'Keeper', frage: 'Wie ist der Kader langfristig aufgestellt?', text: 'Woher die Punkte kommen, Alter, Marktwert und Draft.', v: [
+    ['', 'Bilanz', 'v_keeper'], ['herkunft', 'Herkunft', 'v_keeper'], ['alter', 'Alter', 'v_keeper'], ['marktwert', 'Marktwert', 'v_keeper'],
+    ['draft', () => `Draft ${S.man.season}`, 'v_keeper'], ['draft-folgejahr', () => `Draft ${S.man.season + 1}`, 'v_keeper']]},
+};
+// Seiten ohne Tab: Spielerliste und -seite (Suche im Kopf), Team-Seite, Lesart. spieltag = Live-Ansicht (Chip „Live“ im Kopf
+// und erste Ansicht der Woche); „#live“ ist die aria-live-Region
+const VIEWS = {spieler: 'v_spieler', team: 'v_team', spieltag: 'v_spieltag', lesart: 'v_lesart'};
+const IN_BEREICH = {spieltag: ['woche', 'live']};
+// Alte Hashes (bis 04.10.2026) → neue Routen. Es gilt der längste passende Anfang; der Rest des Pfads (Woche, Position) und
+// die Parameter (?team=, ?seeding= …) bleiben, damit Lesezeichen, README, Aufträge und das Claude-Projekt weiter funktionieren.
+// tests/test_routen.py prüft, dass jedes Ziel eine Route ist und die App selbst keine alten Hashes mehr verlinkt.
+const ALT = {tabelle: 'liga', 'tabelle/allplay': 'staerke/allplay', 'tabelle/punkte': 'staerke/punkte', 'tabelle/coaching': 'staerke/coaching',
+  'tabelle/ausblick': 'liga/playoffs', ranking: 'staerke', spielplan: 'liga/ergebnisse', rekorde: 'liga/rekorde', 'rekorde/h2h': 'liga/duelle',
+  matchup: 'woche/matchups', dst: 'woche/matchups/dst', 'dst/offense': 'woche/matchups/dst', wetter: 'woche/wetter', 'woche/live': 'spieltag',
+  waiver: 'markt', moves: 'markt/moves', 'moves/draft': 'keeper/draft', 'keeper/kader': 'keeper/herkunft', 'keeper/wert': 'keeper/marktwert'};
+const qs = q => { const s = q.toString(); return s ? '?' + s : ''; };
+// Ziel einer Umleitung als Hash ohne „#“, sonst null
+function umleitung(r) {
+  const seg = r.path.split('/');
+  for (let n = seg.length; n > 0; n--) {
+    let neu = ALT[seg.slice(0, n).join('/')];
+    if (neu == null) continue;
+    // D/ST-Streaming „nur freie D/ST“ (Entscheidung 6: Streaming entfällt) → freie D/ST unter Markt › Freie Spieler
+    if (seg[0] === 'dst' && r.q.get('frei') === '1') return 'markt?pos=' + encodeURIComponent('D/ST');
+    if (!neu.startsWith('woche/matchups/dst')) neu = [neu, ...seg.slice(n)].join('/');
+    return neu + qs(r.q);
+  }
+  // Woche ohne Ansicht: während der Saison der Spieltag live, davor und danach die Paarungen der laufenden Woche
+  if (r.sec === 'woche' && !r.sub) return U.saisonLaeuft() ? 'spieltag' : 'woche/paarungen';
+  return null;
+}
+// Route → Modul und Bereich; null bei unbekannter Route (dann Liga) bzw. unbekannter Ansicht (dann die erste des Bereichs)
+function resolve(r) {
+  if (VIEWS[r.sec]) {
+    const [k, view] = IN_BEREICH[r.sec] || [];
+    return {mod: VIEWS[r.sec], k, view, sub: r.sub, base: r.sec};
+  }
+  const B = BEREICHE[r.sec];
+  if (!B) return null;
+  // längster Ansichtspfad, mit dem der Hash beginnt (matchups/dst vor matchups); die Ansicht '' nur ohne Unterpfad
+  let e = null;
+  for (const x of B.v) {
+    const passt = x[0] ? r.sub === x[0] || r.sub.startsWith(x[0] + '/') : !r.sub;
+    if (passt && (!e || x[0].length > e[0].length)) e = x;
+  }
+  if (!e) return {k: r.sec, fehlt: true};
+  const view = e[0].split('/')[0];
+  return {mod: e[2], k: r.sec, view, sub: r.sub.slice(view.length).replace(/^\//, ''), base: r.sec + (view ? '/' + view : '')};
+}
+const chipHref = (k, p) => k === 'woche' && p === 'live' ? '#spieltag' : '#' + k + (p ? '/' + p : '');
+// Was beim Wechsel zwischen Ansichten eines Bereichs mitgeht: die Einzelwoche zwischen All-Play, Punkte und Coaching (wie vor
+// P1 in der Tabelle) und die Sicht eines Teams (?team= von der Team-Seite) zwischen den drei Markt-Ansichten mit Tagesstand
+const MIT_WOCHE = ['allplay', 'punkte', 'coaching'], MIT_TEAM = ['', 'bedarf', 'reihenfolge'];
+// Bereich für U.kopf: Name, Frage, Satz und die Chips der Ansichten (Funktionen erst hier ausgewertet, die Daten stehen dann)
+function bereich(k, r) {
+  const B = BEREICHE[k];
+  const woche = k === 'staerke' && MIT_WOCHE.includes(r.view) && /^w\d+$/.test(r.sub) ? '/' + r.sub : '';
+  const team = k === 'markt' && MIT_TEAM.includes(r.view) && U.team(r.q.get('team')) ? '?team=' + r.q.get('team') : '';
+  const mit = p => k === 'staerke' && MIT_WOCHE.includes(p) ? woche : k === 'markt' && MIT_TEAM.includes(p) ? team : '';
+  return {k, l: B.l, frage: B.frage, text: B.text,
+    chips: B.v.filter(x => x[1]).map(([p, l]) => [chipHref(k, p) + mit(p), typeof l === 'function' ? l() : l, p])};
+}
 let seq = 0, cur = null, curHash = null;
 // Aufräumen einer Ansicht: fn läuft einmal beim nächsten Routenwechsel (auch wenn dieselbe Ansicht neu gezeichnet wird)
 const leaving = [];
@@ -247,23 +380,32 @@ function restore(y, my) {
   };
   step();
 }
-// Seiten mit eigenem Inhalt je Unterpfad (Team, Spielerdetail) beginnen oben; Wochen- und Ansichts-Chips derselben
-// Ansicht behalten die Scrollposition
-const viewKey = r => r.sec === 'team' || (r.sec === 'spieler' && r.sub) ? r.path : r.sec;
+// Seiten mit eigenem Inhalt je Unterpfad (Team, Spielerdetail) beginnen oben, ebenso jede andere Ansicht eines Bereichs;
+// Wochen-, Positions- und Unteransichts-Chips derselben Ansicht behalten die Scrollposition
+const viewKey = (r, res) => res.k ? res.k + '/' + res.view : r.sec === 'team' || (r.sec === 'spieler' && r.sub) ? r.path : r.sec;
 function parse() {
   let raw = location.hash.slice(1);
   try { raw = decodeURIComponent(raw); } catch { /* unverändert */ }
-  const [path, qs] = raw.split('?');
+  const [path, q] = raw.split('?');
   const [sec, ...rest] = path.split('/');
-  return {sec, sub: rest.join('/'), q: new URLSearchParams(qs || ''), path};
+  return {sec, sub: rest.join('/'), q: new URLSearchParams(q || ''), path};
 }
 async function route() {
   const r = parse();
-  if (!VIEWS[r.sec]) {
-    if (r.sec === 'main' && cur) return;     // Sprungmarke „Zum Inhalt“ ohne JS-Klick
-    history.replaceState(null, '', '#tabelle');
+  // alte Hashes und „#woche“ umschreiben, ohne einen Verlaufseintrag anzulegen
+  const ziel = umleitung(r);
+  if (ziel != null) {
+    history.replaceState(history.state, '', '#' + ziel);
     return route();
   }
+  const res = resolve(r);
+  if (!res || res.fehlt) {
+    if (r.sec === 'main' && cur) return;     // Sprungmarke „Zum Inhalt“ ohne JS-Klick
+    history.replaceState(null, '', '#' + (res ? res.k : 'liga'));
+    return route();
+  }
+  Object.assign(r, {view: res.view, sub: res.sub, base: res.base});
+  r.B = res.k ? bereich(res.k, r) : null;
   U.closePop(false);
   for (const fn of leaving.splice(0)) { try { fn(); } catch (e) { console.error(e); } }
   const my = ++seq;
@@ -274,13 +416,13 @@ async function route() {
   S.prevHash = curHash;
   curHash = location.hash;
   document.documentElement.dataset.route = r.sec;
-  const navSec = NAV[r.sec] || r.sec;
+  // Tab des Bereichs; Spieler, Team und Lesart gehören zu keinem Bereich
   for (const a of document.querySelectorAll('.tabs a')) {
-    if (a.dataset.s === navSec) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+    if (a.dataset.s === res.k) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
   }
-  // Live-Ansicht: kein Tab, der Chip im Kopf zeigt, dass sie offen ist
+  // Live-Ansicht: Tab Woche, dazu zeigt der Chip im Kopf, dass sie offen ist
   if (r.sec === 'spieltag') $('lv')?.setAttribute('aria-current', 'page'); else $('lv')?.removeAttribute('aria-current');
-  const key = viewKey(r), same = cur === key;
+  const key = viewKey(r, res), same = cur === key;
   cur = key;
   const box = h('div', {class: 'view'}, h('p', {class: 'loading'}, 'Lade …'));
   // gleiche Ansicht: Höhe halten, sonst verkürzt der Ladehinweis die Seite kurz und der Browser springt nach oben
@@ -290,7 +432,7 @@ async function route() {
   if (!same) scrollTo(0, 0);
   let target;
   try {
-    const m = await mod(VIEWS[r.sec]);
+    const m = await mod(res.mod);
     if (!r.alive()) return;
     box.replaceChildren();
     target = await m.render(box, ctx, r);
@@ -320,7 +462,7 @@ document.addEventListener('click', e => {
   if (t.closest?.('a.skip')) { e.preventDefault(); main.focus(); return; }
   if (t.closest?.('a[href^="#"]')) saveY();     // Position des alten Eintrags vor dem Wechsel sichern
   const p = $('pop');
-  if (!p.hidden && !p.contains(t) && !t.closest?.('#stand')) U.closePop(false);
+  if (!p.hidden && !p.contains(t) && !t.closest?.('#stand,#such')) U.closePop(false);
 });
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && !$('pop').hidden) { e.preventDefault(); U.closePop(true); }

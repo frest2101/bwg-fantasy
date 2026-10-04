@@ -30,12 +30,15 @@ p{margin:.4rem 0}
 .skip:focus{left:8px}
 /* Kopf und Navigation */
 .top{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:6px;padding:4px max(8px,env(safe-area-inset-right)) 4px max(16px,env(safe-area-inset-left));background:var(--sf);border-bottom:1px solid var(--bd);min-height:52px}
-/* Marke: Seit dem Live-Chip stehen fünf Elemente im Kopf. Das Jahr erscheint erst ab 460 px, „Fantasy“ ab 360 px; reicht
-   der Platz trotzdem nicht (breitere Systemschrift), kürzt die Marke mit „…“, statt die Knöpfe aus dem Bild zu schieben */
+/* Marke: Seit Lupe und Live-Chip stehen sechs Elemente im Kopf. Das Jahr erscheint erst ab 480 px, „Fantasy“ ab 440 px
+   (gemessen in Chromium mit dem längsten Chip „nach W14“: bei 320–439 px passt „BWG“ ganz, ab 440 „BWG Fantasy“, ab 480 das
+   Jahr); reicht der Platz trotzdem nicht (breitere Systemschrift), kürzt die Marke mit „…“, statt Knöpfe aus dem Bild zu schieben */
 .brand{font-weight:700;text-decoration:none;color:var(--tx);margin-right:auto;line-height:44px;display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .top>:not(.brand){flex:none}
-@media (max-width:459px){.brand span{display:none}}
-@media (max-width:359px){.brand b{display:none}}
+@media (max-width:479px){.brand span{display:none}}
+@media (max-width:439px){.brand b{display:none}}
+/* Lupe im Kopf (Suche nach Spielern und Teams); offen, solange ihr Fenster offen ist */
+#such[aria-expanded=true]{background:var(--ac2);border-color:var(--ac)}
 .brand b{font-weight:inherit}
 .brand span{color:var(--mu);font-weight:500;margin-left:.3em}
 .ico{min-width:44px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--bd);border-radius:22px;background:var(--sf);color:var(--tx);text-decoration:none;font-weight:700;cursor:pointer}
@@ -46,19 +49,16 @@ p{margin:.4rem 0}
 .lv[aria-current]{background:var(--ac);border-color:var(--ac);color:var(--on)}
 .lv[aria-busy]{opacity:.55}
 /* bis 399 px (iPhone 375–393): schmalere Chips, engere Abstände und 40 px breite Rundknöpfe (Höhe bleibt 44 px), damit
-   „BWG Fantasy“ mit Reserve neben vier Knöpfe passt – gemessen in Chromium (Segoe UI) mit dem längsten Chip „nach W14“:
-   bei 360, 375 und 400 px je 26–29 px frei, dazwischen mehr */
+   „BWG“ neben Lupe, Live, Datenstand, i und Hell/Dunkel passt – gemessen in Chromium (Segoe UI) mit dem längsten Chip
+   „nach W14“: bei 320 px noch 8 px Rand rechts, darüber mehr */
 @media (max-width:399px){.top{gap:4px}.ico{min-width:40px}.stand{padding:0 .6rem}.lv{padding:0 .5rem}}
 /* 360–374 px (viele Android-Geräte): dazu kleinere Schrift in Marke und Chips, schmalerer linker Rand */
 @media (max-width:374px){.top{padding-left:max(12px,env(safe-area-inset-left))}.brand{font-size:.95rem}.stand{padding:0 .5rem;font-size:.85rem}}
 .tabs{position:fixed;bottom:0;left:0;right:0;z-index:20;display:flex;background:var(--sf);border-top:1px solid var(--bd);padding:0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
 .tabs a{flex:1;min-height:56px;display:flex;align-items:center;justify-content:center;text-decoration:none;color:var(--mu);font-size:.8rem;font-weight:600;border-top:3px solid transparent}
 .tabs a[aria-current]{color:var(--ac);border-top-color:var(--ac)}
-/* sieben Tabs: bis 419 px Breite nach Textlänge statt gleich breit, sonst stößt „Spielplan“ an seine Nachbarn (bei 360 px
-   blieben 2 px Abstand); kurze Tabs behalten 44 px Tippbreite */
-@media (max-width:419px){.tabs a{flex:1 1 auto;min-width:44px;font-size:.75rem}}
-/* bis 359 px (iPhone SE 1. Gen., mini mit Anzeigezoom): nur „BWG“ im Kopf (siehe oben), Tabs ohne Querscrollen */
-@media (max-width:359px){.tabs a{font-size:.68rem}}
+/* fünf Bereiche (App-Konzept 04.10.2026): gleich breit, die längsten Namen („Keeper“, „Stärke“) passen auch bei 320 px */
+@media (max-width:359px){.tabs a{font-size:.75rem}}
 .banner{background:var(--g1);color:var(--tx);border-bottom:1px solid var(--wa);padding:.5rem max(16px,env(safe-area-inset-right)) .5rem max(16px,env(safe-area-inset-left));display:flex;gap:1rem;align-items:center;flex-wrap:wrap}
 main{display:block;padding:12px max(16px,env(safe-area-inset-right)) 24px max(16px,env(safe-area-inset-left));max-width:1240px;margin:0 auto}
 main:focus{outline:none}
@@ -85,6 +85,17 @@ html:not(.js) main .loading,html:not(.js) .tabs{display:none}
   .srch{flex-wrap:nowrap}.srch label{flex:1;min-width:0}.srch input{width:100%}.srch .seg{flex-wrap:nowrap;flex:none}.srch .seg button{padding:0 .6rem}}
 .cnt2{margin-left:auto}
 .chips+.chips{margin-top:-4px}
+/* Bereichs-Zeile unter der Überschrift (U.kopf): Name und Frage des Bereichs, darunter seine Ansichten als Chips */
+.bereich{margin:-.45rem 0 .6rem;color:var(--mu);font-size:.92rem}
+.bereich strong{color:var(--tx)}
+/* zweite Ebene innerhalb einer Ansicht (Rekorde, Matchups je Position, Wetter): leichter als die Ansichten des Bereichs */
+.chips.l2 a{background:transparent;font-weight:500;font-size:.88rem}
+.chips.l2 a[aria-current]{background:var(--ac2);border-color:var(--ac);color:var(--tx);font-weight:700}
+/* Suche im Kopf: Treffer als Liste im Fenster (Teams, dann Spieler) */
+.such{list-style:none;margin:0;padding:0;max-height:min(55vh,420px);overflow-y:auto}
+.such li+li{border-top:1px solid var(--bd)}
+.such a{display:flex;flex-direction:column;justify-content:center;min-height:44px;padding:4px 2px;text-decoration:none;color:var(--tx);font-weight:600}
+.such .sub{color:var(--mu);font-weight:400;font-size:.85rem}
 .wk a:first-child{min-width:5.4rem}
 /* Scroll-Hinweis (ui.js scrollHint): rechte Kante ausblenden, solange dort Spalten oder Chips verborgen sind; nach dem
    ersten Wischen ein Schatten an der festen Team-Spalte */
@@ -185,7 +196,6 @@ thead th.n button{flex-direction:row-reverse;justify-content:flex-start}
 .rk tr>:nth-child(2){left:2.75rem}
 tr.me>*{background:var(--ac2)}
 tr.gsp>*{color:var(--mu)}
-.stack{display:grid;gap:16px}
 .tl2{font-weight:600;text-decoration:none;color:var(--tx);display:inline-flex;min-height:44px;align-items:center}
 .tl2:hover{text-decoration:underline}
 /* Links in Tabellen, Überschriften und Absätzen: Tap-Ziel ≥ 44 px */

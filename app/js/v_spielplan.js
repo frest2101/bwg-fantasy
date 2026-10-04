@@ -1,31 +1,37 @@
-// Tab Spielplan: Wochenwahl W1–17, Kacheln, Paarungen, Wochentabelle, Top-Scorer, Saisonwochen
+// Spielplan in zwei Bereichen: Liga › Ergebnisse (#liga/ergebnisse/w3: Wochenwahl W1–17, Kacheln, Paarungen, Wochentabelle,
+// Top-Scorer, Saisonwochen) und Woche › Paarungen (#woche/paarungen: nur die laufende Woche, ohne Wochenwahl und Saisonwochen)
 let U, S, h;
 const STATUS = {final: 'final', laeuft: 'läuft', offen: 'offen'};
 
 export async function render(box, ctx, r) {
   U = ctx.ui; S = U.S; h = U.h;
+  const woche = r.view === 'paarungen', titel = woche ? 'Paarungen' : 'Ergebnisse';
   const fin = S.weeks.filter(w => w.status === 'final');
-  const def = fin.at(-1)?.week ?? S.weeks[0]?.week ?? 1;
-  const m = /^w(\d+)$/.exec(r.sub);
+  const def = woche ? U.aktuelleWoche() : fin.at(-1)?.week ?? S.weeks[0]?.week ?? 1;
+  const m = !woche && /^w(\d+)$/.exec(r.sub);
   const W = S.weeks.find(w => w.week === (m ? +m[1] : def)) || S.weeks.find(w => w.week === def);
-  if (!W) { U.ap(box, h('h1', null, 'Spielplan'), h('p', {class: 'note'}, 'Kein Spielplan vorhanden.')); return; }
+  if (!W) { U.kopf(box, r, titel); U.ap(box, h('p', {class: 'note'}, 'Kein Spielplan vorhanden.')); return; }
   const wk = W.week, end = new Date(new Date(W.start + 'T12:00:00Z').getTime() + 6 * 864e5);
-  const nav = U.chips('Woche wählen', S.weeks.map(w => ['#spielplan/w' + w.week,
-    [`W${w.week}`, h('small', null, (w.playoff ? 'PO · ' : '') + U.spanne(w.start))], w.week, w.playoff ? 'po' : null]), wk, 'wk');
-  U.ap(box, h('h1', null, `Spielplan – W${wk}`),
-    h('p', {class: 'note'}, `${W.playoff ? 'Playoffs · ' : ''}${STATUS[W.status] || W.status} · ${U.datum(W.start)} bis ${U.datum(end)}`), nav);
-  U.centerChip(nav);
+  U.kopf(box, r, `${titel} – W${wk}`);
+  U.ap(box, h('p', {class: 'note'}, `${W.playoff ? 'Playoffs · ' : ''}${STATUS[W.status] || W.status} · ${U.datum(W.start)} bis ${U.datum(end)}`,
+    woche ? [' · ', h('a', {href: '#liga/ergebnisse/w' + wk}, 'andere Wochen unter Liga › Ergebnisse')] : null));
+  if (!woche) {
+    const nav = U.chips('Woche wählen', S.weeks.map(w => ['#' + r.base + '/w' + w.week,
+      [`W${w.week}`, h('small', null, (w.playoff ? 'PO · ' : '') + U.spanne(w.start))], w.week, w.playoff ? 'po' : null]), wk, 'wk');
+    U.ap(box, nav);
+    U.centerChip(nav);
+  }
 
   const games = S.sched.games.filter(g => g.week === wk);
   const svg = await ctx.mod('svg');
   if (W.status === 'final') U.ap(box, tiles(W));
   const poTxt = wk === 15 ? 'Die Paarungen stehen nach W14 fest (6 Teams, Seeds 1–2 mit Bye). ' : `Die Paarungen stehen nach W${wk - 1} fest. `;
   U.ap(box, h('h2', null, 'Paarungen'), games.length ? h('ul', {class: 'games'}, games.map(g => U.game(g, true)))
-    : h('p', {class: 'note'}, W.playoff ? [poTxt, h('a', {href: '#tabelle/ausblick'}, 'Playoff-Chancen')] : 'Für diese Woche gibt es keine Paarungen.'));
+    : h('p', {class: 'note'}, W.playoff ? [poTxt, h('a', {href: '#liga/playoffs'}, 'Playoff-Chancen')] : 'Für diese Woche gibt es keine Paarungen.'));
   const wi = S.meta.weeks.indexOf(wk);
   if (W.status === 'final' && wi >= 0) U.ap(box, weekTable(wi, wk), h('div', {style: 'margin-top:16px'}, topScorer(W)));
   else if (W.status !== 'final') U.ap(box, h('p', {class: 'note'}, 'Wochentabelle und Top-Scorer erscheinen, sobald die Woche final ist.'));
-  U.ap(box, seasonWeeks(fin, svg, wk));
+  if (!woche) U.ap(box, seasonWeeks(fin, svg, wk));
 }
 
 function tiles(W) {
@@ -42,8 +48,8 @@ function tiles(W) {
 function weekTable(i, wk) {
   const w = t => t.wochen, anyT = S.teams.some(t => w(t).allplay_t[i] > 0);
   const val = (k, f) => ({v: t => w(t)[k][i], f: t => U.val(w(t)[k][i], f, 'kein Spiel')});
-  return h('div', null, h('p', {class: 'note'}, 'Diese Woche in der Tabelle: ', h('a', {href: '#tabelle/allplay/w' + wk}, 'All-Play'), ' · ',
-    h('a', {href: '#tabelle/punkte/w' + wk}, 'Punkte'), ' · ', h('a', {href: '#tabelle/coaching/w' + wk}, 'Coaching')),
+  return h('div', null, h('p', {class: 'note'}, 'Diese Woche unter Stärke: ', h('a', {href: '#staerke/allplay/w' + wk}, 'All-Play'), ' · ',
+    h('a', {href: '#staerke/punkte/w' + wk}, 'Punkte'), ' · ', h('a', {href: '#staerke/coaching/w' + wk}, 'Coaching')),
   U.table({cap: `Wochentabelle W${wk}`, cls: 'rk', rows: S.teams, sort: ['wr', 1], cols: [
     {k: 'wr', l: '#', v: t => w(t).wochenrang[i], d: 1, f: t => w(t).wochenrang[i]},
     {k: 'team', l: 'Team', v: t => t.name.toLowerCase(), d: 1, f: t => U.tl(t.team_id)},
@@ -82,7 +88,7 @@ function seasonWeeks(fin, svg, cur) {
   const who = x => x ? h('span', null, U.num(x.pf), ' ', h('a', {href: '#team/' + x.team_id, class: 'tl2', 'aria-label': U.team(x.team_id)?.name}, U.kz(x.team_id))) : '–';
   // gewählte Woche hervorgehoben; „Top-Team“ entfällt, es ist per Definition das Team mit dem Wochenhoch
   const tbl = U.table({cap: 'Saisonwochen', cls: 'nr', rows: fin, sort: ['w', 1], rc: w => w.week === cur ? 'me' : null, cols: [
-    {k: 'w', l: 'Woche', v: w => w.week, d: 1, f: w => h('a', {href: '#spielplan/w' + w.week, class: 'tl2'}, 'W' + w.week)},
+    {k: 'w', l: 'Woche', v: w => w.week, d: 1, f: w => h('a', {href: '#liga/ergebnisse/w' + w.week, class: 'tl2'}, 'W' + w.week)},
     {k: 'ls', l: 'Ligaschnitt', num: 1, v: w => w.ligaschnitt, f: w => U.num(w.ligaschnitt)},
     {k: 'hi', l: 'Hoch', num: 1, v: w => w.high?.pf, f: w => who(w.high)},
     {k: 'lo', l: 'Tief', num: 1, v: w => w.low?.pf, f: w => who(w.low)},

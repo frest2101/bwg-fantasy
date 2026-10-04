@@ -1,19 +1,17 @@
-// Moves (lädt transactions.json): ausgeführte Moves und angenommene Trades, Aufstellungswechsel je Team.
-// Der Draft steht im Keeper-Tab (#keeper/draft, keeper.json); alte Links #moves/draft führen dorthin.
+// Markt › Moves (#markt/moves, lädt transactions.json): ausgeführte Moves und angenommene Trades, Aufstellungswechsel je Team.
+// Der Draft steht unter Keeper › Draft (#keeper/draft, keeper.json); alte Links #moves/draft leitet der Router dorthin.
 let U, S, h;
 const ART = {WAIVER: 'Waiver', FREEAGENT: 'Free Agent', ROSTER: 'Drop', TRADE_ACCEPT: 'Trade', DRAFT: 'Draft'};
 
 export async function render(box, ctx, r) {
   U = ctx.ui; S = U.S; h = U.h;
   let team = S.byId.has(+r.q.get('team')) ? +r.q.get('team') : 0;
-  if (r.sub === 'draft') {
-    history.replaceState(null, '', '#keeper/draft' + (team ? '?team=' + team : ''));
-    return ctx.route();
-  }
-  const views = U.chips('Ansichten Moves', [['#moves', 'Transaktionen', ''], ['#keeper/draft', 'Draft', 'draft']], '');
-  const viewLinks = () => views.querySelectorAll('a').forEach((a, i) => a.setAttribute('href', (i ? '#keeper/draft' : '#moves') + (team ? '?team=' + team : '')));
+  // Verweis auf den Draft mit dem gewählten Team
+  const draftLink = h('a', null, `Keeper › Draft ${S.man.season}`);
+  const viewLinks = () => draftLink.setAttribute('href', '#keeper/draft' + (team ? '?team=' + team : ''));
   viewLinks();
-  U.ap(box, h('h1', null, 'Moves'), U.spGroup('moves'), views);
+  U.kopf(box, r, 'Moves');
+  U.ap(box, h('p', {class: 'note'}, 'Draft und Keeper stehen unter ', draftLink, '.'));
   const T = await ctx.lazy('transactions.json', 'Transaktionen', box);
   if (!r.alive()) return;
   const name = id => T.spieler?.[String(id)] ?? `Spieler ${id}`;
@@ -42,7 +40,7 @@ export async function render(box, ctx, r) {
   };
   U.ap(box, h('div', {class: 'row'}, h('label', null, 'Team ', h('select', {onchange: e => {
     team = +e.target.value;
-    U.setQ('moves', {team: team || null});
+    U.setQ(r.base, {team: team || null});
     viewLinks();
     draw();
   }}, h('option', {value: 0}, 'Alle Teams'), S.teams.map(t => h('option', {value: t.team_id, selected: t.team_id === team}, t.name))))),
