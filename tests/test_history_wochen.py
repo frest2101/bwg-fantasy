@@ -273,6 +273,8 @@ ERLAUBTE_SPALTEN = {
                        "result"},
     "games.csv": {"season", "week", "round", "slot_a", "slot_b", "pts_a", "pts_b", "winner_slot", "herleitung"},
     "hugh_jass_2023_2025.csv": {"season", "week", "slot", "pts", "pts_against", "result"},
+    "rekorde.csv": {"id", "kategorie", "rekord", "wert", "details", "quelle", "ableitbar", "verifiziert", "slots",
+                    "saisons"},
 }
 LANGE_ZAHL = re.compile(r"(?<![\d.])\d{6,}(?![\d.])")    # Nutzer-, Team-, Liga- oder Spieler-IDs; Punkte haben ≤ 4 Stellen
 HASH = re.compile(r"\b[0-9a-fA-F]{16,}\b")                # z. B. die 32-stelligen Nutzer-Hashes von nfl.com
