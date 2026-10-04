@@ -1,4 +1,4 @@
-// Spieltag live (#spieltag, #spieltag/<team_id>): holt beim Öffnen und auf „Aktualisieren“ den laufenden Spieltag direkt
+// Spieltag live (#spieltag, #spieltag/<team_id>; erste Ansicht im Bereich Woche): holt beim Öffnen und auf „Aktualisieren“ den laufenden Spieltag direkt
 // bei ESPN (nur lesend, ohne Zugangsdaten) und zeigt Matchups, Aufstellungen und Bewegungen – nach den Regeln des
 // Stand-Skripts scripts/claude_stand.py, aber nur, was die öffentliche App zeigt (keine gescheiterten Claims, keine
 // Trade-Vorschläge). Gerechnet wird in live_core.js (reine Funktionen); hier nur Abruf und Anzeige.
@@ -9,7 +9,7 @@
 // Kein Dauerabruf: Je Abruf werden rund 1,1 MB übertragen (4,5 MB entpackt). Die einzigen Zeitgeber hier brechen ab
 // (Zeitlimit, Nachlauf), keiner startet einen Abruf – tests/test_live_ansicht.py wacht darüber.
 let U, S, h, C;
-const KEY = 'bwg-team';                      // Mein Team wie im Waiver-Tab, nur Komfort im Browser
+const KEY = 'bwg-team';                      // Mein Team wie unter Markt, nur Komfort im Browser
 const LIMIT_LIGA = 30000, LIMIT = 15000;     // Zeitlimit je Abruf in ms (Liga: große Antwort)
 const FRISCH = 120000;                       // so lange gilt der letzte Abruf beim Zurückkommen (z. B. von einer Spielerseite)
 const NACHLAUF = 3000;                       // so lange läuft ein Abruf weiter, auf den niemand mehr wartet (kurz weg und zurück)
@@ -175,7 +175,8 @@ export async function render(box, ctx, r) {
   const meldung = h('div');                        // Fehlerzeile über dem letzten guten Stand
   const body = h('div');
   const btn = h('button', {type: 'button', class: 'btn', onclick: () => laden(true, btn)}, 'Aktualisieren');
-  U.ap(box, h('h1', null, 'Spieltag live'), kopf, h('div', {class: 'row'}, btn, U.tageslaufKnopf(), status), meldung, body);
+  U.kopf(box, r, 'Spieltag live');
+  U.ap(box, kopf, h('div', {class: 'row'}, btn, U.tageslaufKnopf(), status), meldung, body);
   // frisch: letzter Abruf höchstens zwei Minuten alt und zum geladenen Datenstand der App gerechnet
   const frisch = () => merk && merk.man === S.man && Date.now() - merk.t < FRISCH;
   let wartet = null;        // los() des Abrufs, auf den diese Ansicht gerade wartet
@@ -388,9 +389,9 @@ function teamBox(a, E, tid) {
       s.spieler.map(x => `${x.name} ${pkt(x.proj)}`).join(', '))));
 }
 
-// Bewegungen der Woche wie im Moves-Tab (ausgeführte Moves, angenommene Trades ohne Spieler, Aufstellungswechsel je
+// Bewegungen der Woche wie unter Markt › Moves (ausgeführte Moves, angenommene Trades ohne Spieler, Aufstellungswechsel je
 // Team gezählt) – keine gescheiterten Claims, keine Trade-Vorschläge. „neu“ = steht noch nicht in transactions.json.
-// Anders als im Moves-Tab stehen Zugang (+) und Abgang (−) in einer Spalte und die Art unter der Zeit: So ist jede
+// Anders als unter Markt › Moves stehen Zugang (+) und Abgang (−) in einer Spalte und die Art unter der Zeit: So ist jede
 // Bewegung auf dem Handy ohne Wischen lesbar (drei statt fünf Spalten).
 function bewegungen(E) {
   const b = E.bewegungen;
@@ -412,7 +413,7 @@ function bewegungen(E) {
     ' ', U.ib('neu-tagesstand', '')));
   } else U.ap(sec, h('p', {class: 'note'}, 'Keine Zu- oder Abgänge seit dem Wochenwechsel.'));
   U.ap(sec, b.lineup.length ? h('p', {class: 'note'}, `Aufstellungswechsel je Team (nur gezählt, zusammen ${b.lineupSumme}): ${gez(b.lineup)} `, U.ib('aufstellungswechsel', '')) : null,
-    h('p', {class: 'note'}, h('a', {href: '#moves'}, 'Alle Moves der Saison (Tagesstand)')));
+    h('p', {class: 'note'}, h('a', {href: '#markt/moves'}, 'Alle Moves der Saison (Tagesstand)')));
   return sec;
 }
 

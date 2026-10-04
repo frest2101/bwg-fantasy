@@ -1,6 +1,7 @@
-// Tab Spieler (lädt players.json, dazu waiver.json als Tagesstand): Liste mit Filtern in 50er-Blöcken, Detail #spieler/<id>
-// mit Formkurve, ROS, Positions-Matchup (Feld mu, Wetterzeile aus wetter.json), Marktwert (FantasyCalc, aus waiver.json) und
-// News-Kasten (nur Datum der letzten ESPN-Meldung und Verweise, nie Text).
+// Spieler (lädt players.json, dazu waiver.json als Tagesstand; kein Tab, Einstieg über die Suche im Kopf): Liste mit Filtern
+// in 50er-Blöcken (#spieler), Detail #spieler/<id> mit Formkurve, ROS, Positions-Matchup (Feld mu, Wetterzeile aus
+// wetter.json), Marktwert (FantasyCalc, aus waiver.json) und News-Kasten (nur Datum der letzten ESPN-Meldung und Verweise,
+// nie Text).
 let U, S, h;
 const POS = ['QB', 'RB', 'WR', 'TE', 'K', 'D/ST'];
 // Tagesstand je Spieler (waiver.json, stündlich) überlagert diese Wochenwerte: Team, Status, Verletzung, Besitz
@@ -18,14 +19,14 @@ const spiele = n => `${n ?? 0} ${n === 1 ? 'Spiel' : 'Spiele'}`;
 // nach der letzten Woche (ROS nach W17, Stufe 4) gibt es keine Restwoche mehr – kein „ab Wochenabruf“, kein Ersatzniveau
 const seasonEnd = P => P.ros_nach_woche != null && P.ros_nach_woche >= (S.weeks.at(-1)?.week ?? 17);
 // Rückweg-Ziele für den Link oben im Spielerdetail
-const BACK = {spieler: 'Spielerliste', team: 'Team', moves: 'Moves', spielplan: 'Spielplan', waiver: 'Waiver', dst: 'D/ST-Faktoren',
-  tabelle: 'Tabelle', rekorde: 'Rekorde', ranking: 'Ranking', keeper: 'Keeper', spieltag: 'Spieltag live'};
+const BACK = {spieler: 'Spielerliste', team: 'Team', liga: 'Liga', staerke: 'Stärke', woche: 'Woche', markt: 'Markt', keeper: 'Keeper',
+  spieltag: 'Spieltag live'};
 
 export async function render(box, ctx, r) {
   U = ctx.ui; S = U.S; h = U.h;
   const detail = r.sub && r.sub !== '';
   const h1 = h('h1', null, 'Spieler');
-  U.ap(box, h1, detail ? null : U.spGroup('spieler'));
+  U.ap(box, h1);
   const P = await ctx.lazy('players.json', 'Spielerdaten', box);
   if (!r.alive()) return;
   // Tagesstand ist Zugabe: ohne waiver.json (vor dem ersten Tageslauf, Ladefehler) gilt der Wochenstand
@@ -249,10 +250,10 @@ function one(box, h1, P, W, rows, r, svg, rosWhy, wline, origin, kp) {
   U.ap(box, h('p', null, `${p.pos ?? '–'} · ${nflTxt(p)} · `, p.team > 0 ? U.tl(p.team) : U.STAT[p.status] || 'frei',
     p.inj && U.INJ[p.inj] ? h('span', {class: 'badge'}, U.INJ[p.inj][1]) : null,
     U.ok(p.bye) ? ` · Bye W${p.bye}` : null,
-    p.pos === 'D/ST' ? [' · ', h('a', {href: '#dst'}, 'D/ST-Faktoren')] : null), stand(W),
+    p.pos === 'D/ST' ? [' · ', h('a', {href: '#woche/matchups/dst'}, 'Matchups D/ST')] : null), stand(W),
   p.team > 0 && origin?.(p) ? h('p', {class: 'note'}, 'Herkunft: ', h('strong', null, origin(p)[0]), ' · ',
     origin(p)[1] ? [origin(p)[1], ' ', U.ib('alter', ''), ' · '] : null,   // i-Text nennt Stichtag, Quelle und Lizenz
-    h('a', {href: '#keeper/kader?team=' + p.team}, 'Keeper und Kader'), ' ', U.ib('herkunft', '')) : null,
+    h('a', {href: '#keeper/herkunft?team=' + p.team}, 'Keeper › Herkunft'), ' ', U.ib('herkunft', '')) : null,
   h('div', {class: 'tiles'},
     U.tile('Pkt Saison', U.num(p.pts), spiele(p.g), 'spiele'),
     U.tile('Ø', U.val(p.avg, U.num, 'ohne Spiel'), null, 'avg'),
@@ -311,8 +312,8 @@ function matchup(box, p, P, wl) {
       U.tile('Rest bis W14', cell(m.rest, 'keine Regular-Season-Woche mehr'), null, dst ? 'rest' : 'mu-rest'),
       U.tile('SoS W15–17', cell(m.sos_po, 'kein Playoff-Spiel'), null, dst ? 'sos' : 'mu-sos')),
     !m ? null : h('p', {class: 'note'}, ...(dst
-      ? ['F der gegnerischen Offense aus den D/ST-Faktoren, über 1,00 = günstig für die D/ST. ', h('a', {href: '#dst'}, 'D/ST-Faktoren')]
+      ? ['F der gegnerischen Offense aus den D/ST-Faktoren, über 1,00 = günstig für die D/ST. ', h('a', {href: '#woche/matchups/dst'}, 'Matchups D/ST')]
       : ['Position gegen Defense, kein Einzelduell: F über 1,00 heißt, Spieler der Position holen gegen diese Defense mehr Punkte als im Schnitt. ',
-        h('a', {href: '#matchup/' + String(p.pos).toLowerCase()}, `Alle Defenses gegen ${p.pos}`)])),
-    wl ? h('p', null, wl, ' · ', h('a', {href: '#wetter'}, 'Wetter aller Spiele')) : null);
+        h('a', {href: '#woche/matchups/' + String(p.pos).toLowerCase()}, `Alle Defenses gegen ${p.pos}`)])),
+    wl ? h('p', null, wl, ' · ', h('a', {href: '#woche/wetter'}, 'Wetter aller Spiele')) : null);
 }

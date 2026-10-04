@@ -335,7 +335,7 @@ Nichts an den Daten oder am Rechenwerk ändert sich; `app/data` und `docs/app_da
 
 | Paket | Inhalt | Aufwand | Berührt |
 |---|---|---|---|
-| **P1 Menü und Routen** | Fünf Tabs, Kopf mit Suche und Mein Team, Bereichs-Zeile unter jeder Überschrift, Router mit Weiterleitungen alt → neu (`#tabelle/allplay` → `#staerke/allplay`, `#waiver` → `#markt`, `#dst` → `#woche/matchups/dst` …), damit alle Links in README, CLAUDE.md, `docs/` und im Claude-Projekt weiter gehen | mittel | `index.html`, `app.js`, alle `v_*.js` (h1, Chips), `style.css`; README, CLAUDE.md, `docs/app_daten.md` (Routen) |
+| **P1 Menü und Routen** ✓ 04.10.2026 | Fünf Tabs, Kopf mit Suche und Mein Team, Bereichs-Zeile unter jeder Überschrift, Router mit Weiterleitungen alt → neu (`#tabelle/allplay` → `#staerke/allplay`, `#waiver` → `#markt`, `#dst` → `#woche/matchups/dst` …), damit alle Links in README, CLAUDE.md, `docs/` und im Claude-Projekt weiter gehen | mittel | `index.html`, `app.js`, alle `v_*.js` (h1, Chips), `style.css`; README, CLAUDE.md, `docs/app_daten.md` (Routen) |
 | **P2 Startseite** | `v_start.js` mit den fünf Karten, Mein Team, Wochenstatus; Logo führt dorthin | mittel | neu `v_start.js`, `app.js`, `ui.js` (Mein Team im Kopf) |
 | **P3 Umzüge und Zusammenlegung** | Matchups aus `v_dst.js` und `v_matchup.js` zu einer Ansicht; Moves und Wetter unter Markt bzw. Woche; Spielplan als Ergebnisse (Liga) und Paarungen (Woche); H2H als Duelle | mittel bis groß | `v_dst.js`, `v_matchup.js`, `v_spielplan.js`, `v_rekorde.js`, `v_waiver.js` (Bedarf-Sichten), `v_moves.js` |
 | **P4 Benennung und Erklärungen** | Spaltenköpfe nach Abschnitt 7, Glossar nach Abschnitt 10 (IDs bleiben), Bereichs-Zeilen | mittel (viele kleine Stellen) | alle `v_*.js`, `index.html` (Glossar), `ui.js` (Legende) |
@@ -377,3 +377,18 @@ Risiken und Nebenwirkungen:
 9. Lesart → **Erklärungen**: ja.
 10. Reihenfolge der Pakete: **P1, P4, P2, P3, P5, P6**.
 11. Beginn: erst dieses Dokument mit den Antworten nach `main`, der Umbau startet in einer neuen Session mit Paket P1.
+
+## 14. Umsetzung
+
+### P1 Menü und Routen ✓ 04.10.2026
+
+- **Routen:** Liga `#liga` (Tabelle) · `/division` · `/ergebnisse/wN` · `/playoffs` · `/duelle` · `/rekorde` (zweite Ebene `/positionen`, `/alltime`, `/champions`); Stärke `#staerke` (Power Ranking) · `/allplay` · `/punkte` · `/coaching` (je auch `/wN`) · `/score`; Woche `#spieltag` (bleibt die Route der Live-Ansicht) · `#woche/paarungen` · `/matchups` (`/qb` … `/k`, `/dst`) · `/wetter` (`/ist`); Markt `#markt` (Freie Spieler) · `/bedarf` · `/reihenfolge` · `/moves`; Keeper `#keeper` (Bilanz) · `/herkunft` · `/alter` · `/marktwert` · `/draft` · `/draft-folgejahr`. Ohne Tab: `#spieler`, `#spieler/<id>`, `#team/<id>`, `#lesart`.
+- **Router:** `BEREICHE` in `app/js/app.js` (Tab, Frage, Satz, Ansichten mit Modul), `U.kopf()` in `ui.js` schreibt Überschrift, Bereichs-Zeile und Chips. `ALT` leitet alle alten Hashes dauerhaft um, Wochen, Positionen und Parameter bleiben (`#tabelle/allplay/w3` → `#staerke/allplay/w3`, `#waiver?team=5` → `#markt?team=5`, `#rekorde/h2h?team=4` → `#liga/duelle?team=4`, `#keeper/kader` → `#keeper/herkunft` …). Wächter `tests/test_routen.py`: Tabs = Bereiche, jedes Modul vorhanden, jede alte Route mit gültigem Ziel ohne Kette, kein Link in der App auf eine alte Route.
+- **Suche im Kopf:** Lupe öffnet ein Fenster mit Teams (sofort) und Spielern (players.json und Tagesstand beim ersten Öffnen, wie die Spielerliste zusammengeführt); Enter öffnet den ersten Treffer, „Alle Spieler mit Filtern“ führt zur Spielerliste mit dem Suchbegriff.
+- **Entscheidungen beim Bauen:**
+  - Woche öffnet während der Saison (W1 begonnen, letzte Woche nicht final) mit dem Spieltag live, sonst mit den Paarungen; der Tipp auf „Woche“ holt dann wie „Live“ den Spieltag bei ESPN.
+  - Woche › Paarungen zeigt nur die laufende Woche nach Kalender (letzte begonnene Woche), ohne Wochenwahl und Saisonwochen; die Wochenwahl bleibt unter Liga › Ergebnisse.
+  - Markt ist in drei Ansichten geteilt (Freie Spieler, Bedarf je Team, Reihenfolge & Claims), damit jeder Chip eine eigene Seite hat.
+  - D/ST › Streaming ist entfernt (Entscheidung 6); `#dst` führt zu Matchups › D/ST, `#dst?frei=1` zu Markt › Freie Spieler › D/ST.
+  - „Fantasy“ in der Marke erst ab 440 px, das Jahr ab 480 px (mit Lupe sechs Elemente im Kopf, gemessen bis 320 px mit „nach W14“).
+- **Nicht in P1:** Mein Team im Kopf und Hervorhebung überall (mit P2), Spaltennamen, Glossar und „Lesart → Erklärungen“ (P4), inhaltliches Zusammenlegen der Matchups, Duelle-Benennung innerhalb der Ansicht (P3/P4). Kommentare in `scripts/*.py` nennen noch „Waiver-Tab“ (ohne Wirkung auf Ausgabe und Daten, P4). `app/js/live_core.js` ist unverändert (gleiche Regeln wie `claude_stand.py`, keine Gegenprobe nötig).

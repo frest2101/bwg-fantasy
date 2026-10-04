@@ -1,6 +1,7 @@
-// Positions-Matchup (lädt matchup.json): Faktor F je NFL-Defense und Position (QB, RB, WR, TE, K) mit derselben Formel wie
-// die D/ST-Faktoren – wie viele Punkte Spieler der Position gegen diese Defense holen, relativ zum Ligaschnitt. Position gegen
-// Defense, kein Einzelduell. Farbzellen wie im D/ST-Tab: blau = günstig für die Position (F > 1), orange = ungünstig.
+// Woche › Matchups (#woche/matchups, je Position #woche/matchups/qb … /k; lädt matchup.json): Faktor F je NFL-Defense und
+// Position (QB, RB, WR, TE, K) mit derselben Formel wie die D/ST-Faktoren – wie viele Punkte Spieler der Position gegen diese
+// Defense holen, relativ zum Ligaschnitt. Position gegen Defense, kein Einzelduell. D/ST (#woche/matchups/dst) zeigt v_dst.js.
+// Farbzellen wie bei D/ST: blau = günstig für die Position (F > 1), orange = ungünstig.
 // Schwacher Hinweis (Analyse 30.09.2026): Z je Position hält sich von Jahr zu Jahr kaum, deshalb keine Auslöser-Fähnchen.
 let U, S, h;
 const POS = ['QB', 'RB', 'WR', 'TE', 'K'];
@@ -9,8 +10,8 @@ const fz = (v, st) => 'fz' + (U.ok(v) ? ' ' + U.fcls(v, st) : '');   // st = ang
 export async function render(box, ctx, r) {
   U = ctx.ui; S = U.S; h = U.h;
   const pos = POS.find(p => p.toLowerCase() === r.sub) || '';
-  U.ap(box, h('h1', null, pos ? `Positions-Matchup – ${pos}` : 'Positions-Matchup'), U.spGroup('matchup'),
-    U.chips('Ansichten Positions-Matchup', [['#matchup', 'Übersicht', ''], ...POS.map(p => ['#matchup/' + p.toLowerCase(), p, p])], pos));
+  U.kopf(box, r, `Matchups – ${pos || 'Übersicht'}`);
+  U.ap(box, U.muChips(pos.toLowerCase()));
   if (!S.man.files?.['matchup.json']) {
     U.ap(box, h('p', {class: 'warn'}, 'Noch keine Matchup-Daten: Die Seite füllt sich mit dem nächsten Wochenabruf.'));
     return;

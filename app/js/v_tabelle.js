@@ -1,28 +1,24 @@
-// Tab Tabelle: Gesamt, Division, All-Play, Punkte, Coaching, Ausblick (Seeding-Schalter).
-// All-Play, Punkte und Coaching gibt es auch je Einzelwoche (#tabelle/allplay/w3): Wochen-Chips unter den Ansichten,
+// Ansichten der Bereiche Liga (Tabelle, Division, Playoff-Chancen) und Stärke (All-Play & Glück, Punkte & Form, Coaching).
+// All-Play, Punkte und Coaching gibt es auch je Einzelwoche (#staerke/allplay/w3): Wochen-Chips unter den Ansichten,
 // gleich viele Spalten wie die Saisonsicht, Werte aus teams.json › wochen (Python rechnet, die App zeigt nur an).
-const SUBS = [['', 'Gesamt'], ['division', 'Division'], ['allplay', 'All-Play'], ['punkte', 'Punkte'], ['coaching', 'Coaching'], ['ausblick', 'Ausblick']];
+const TITEL = {'': 'Tabelle', division: 'Division', playoffs: 'Playoff-Chancen', allplay: 'All-Play & Glück', punkte: 'Punkte & Form', coaching: 'Coaching'};
 const WEEKLY = ['allplay', 'punkte', 'coaching'];
 let U, S, h;
 
 export async function render(box, ctx, r) {
   U = ctx.ui; S = U.S; h = U.h;
-  const [s0, w0] = r.sub.split('/');
-  const sub = SUBS.some(x => x[0] === s0) ? s0 : '';
-  const label = SUBS.find(x => x[0] === sub)[1];
+  const sub = r.view;
   // Wochensicht nur für gerechnete Wochen (meta.weeks); alles andere fällt still auf die Saisonsicht
-  const m = WEEKLY.includes(sub) && /^w(\d+)$/.exec(w0 || '');
+  const m = WEEKLY.includes(sub) && /^w(\d+)$/.exec(r.sub || '');
   const week = m && S.meta.weeks.includes(+m[1]) ? +m[1] : 0;
   const wi = week ? S.meta.weeks.indexOf(week) : -1;
-  const path = k => '#tabelle' + (k ? '/' + k : '') + (week && WEEKLY.includes(k) ? '/w' + week : '');
-  U.ap(box, h('h1', null, (sub ? 'Tabelle – ' + label : 'Tabelle') + (week ? ` · W${week}` : '')),
-    week ? h('p', {class: 'note'}, `Einzelwoche W${week}: `,
-      h('a', {href: '#spielplan/w' + week}, 'Paarungen und Top-Scorer'), U.ib('wochensicht', ''))
-      : h('p', {class: 'note'}, `nach W${S.tw} · Regular Season W1–14`, U.ib('nach-wn', '')),
-    U.chips('Ansichten der Tabelle', SUBS.map(([k, l]) => [path(k), l, k]), sub));
-  if (WEEKLY.includes(sub)) U.centerChip(U.ap(box, U.weekChips('tabelle/' + sub, week)).lastChild);
-  const svg = ['allplay', 'punkte', 'coaching', 'ausblick'].includes(sub) ? await ctx.mod('svg') : null;
-  ({gesamt, division, allplay, punkte, coaching, ausblick})[sub || 'gesamt'](box, r, svg, wi, week);
+  U.kopf(box, r, TITEL[sub] + (week ? ` · W${week}` : ''));
+  U.ap(box, week ? h('p', {class: 'note'}, `Einzelwoche W${week}: `,
+    h('a', {href: '#liga/ergebnisse/w' + week}, 'Paarungen und Top-Scorer'), U.ib('wochensicht', ''))
+    : h('p', {class: 'note'}, `nach W${S.tw} · Regular Season W1–14`, U.ib('nach-wn', '')));
+  if (WEEKLY.includes(sub)) U.centerChip(U.ap(box, U.weekChips(r.base, week)).lastChild);
+  const svg = ['allplay', 'punkte', 'coaching', 'playoffs'].includes(sub) ? await ctx.mod('svg') : null;
+  ({'': gesamt, division, allplay, punkte, coaching, playoffs: ausblick})[sub](box, r, svg, wi, week);
 }
 
 // Spalten, die mehrere Ansichten nutzen
@@ -59,10 +55,10 @@ function gesamt(box) {
     c.n('diff', 'Diff', U.sgn), c.pct('efficiency', 'Eff. %'), c.streak()]});
   const last = S.weeks.filter(w => w.status === 'final').at(-1);
   const strip = last ? h('section', {'aria-labelledby': 'wk-h'},
-    h('h2', {id: 'wk-h'}, h('a', {href: '#spielplan/w' + last.week}, `W${last.week} kompakt`), h('span', {class: 'note'}, ' · ' + U.spanne(last.start))),
+    h('h2', {id: 'wk-h'}, h('a', {href: '#liga/ergebnisse/w' + last.week}, `W${last.week} kompakt`), h('span', {class: 'note'}, ' · ' + U.spanne(last.start))),
     U.scrollHint(h('ul', {class: 'strip', role: 'list'}, S.sched.games.filter(g => g.week === last.week).map(g => U.game(g, false))))) : null;
   const top = [...S.teams].filter(t => t.pr).sort((a, b) => a.pr.rang - b.pr.rang).slice(0, 5);
-  const pr = top.length ? h('div', {class: 'blk'}, U.table({cap: h('a', {href: '#ranking'}, 'Power Ranking – Top 5'), cls: 'rk', rows: top, sortable: false, cols: [
+  const pr = top.length ? h('div', {class: 'blk'}, U.table({cap: h('a', {href: '#staerke'}, 'Power Ranking – Top 5'), cls: 'rk', rows: top, sortable: false, cols: [
     {k: 'r', l: '#', f: t => t.pr.rang}, c.team(), {k: 'mu', l: 'μ', num: 1, f: t => U.num(t.pr.mu, 1)},
     {k: 'tr', l: 'Trend', num: 1, f: t => U.trend(t.pr.trend, 'noch kein Vorwochenvergleich')}]})) : null;
   U.ap(box, h('div', {class: 'two g'},
@@ -119,7 +115,7 @@ function allplay(box, r, svg, wi, week) {
     c.pct('allplay_pct', 'AP %'), c.wl(), {k: 'mb', l: 'Median-Bilanz', num: 1, v: t => t.median_w, f: t => `${t.median_w}-${t.median_l}`},
     {k: 'mg', l: 'Matchup-Glück', num: 1, v: t => t.matchup_glueck, f: t => U.ok(t.matchup_glueck) ? h('span', {class: t.matchup_glueck > 0 ? 'W' : t.matchup_glueck < 0 ? 'L' : 'na'}, U.sgn(t.matchup_glueck)) : '–'},
     c.n('spielplan_pkt', 'Spielplan Pkt', U.sgn)],
-  note: h('span', null, 'Matchup-Glück je Woche mit Begründung: oben eine Woche wählen, z. B. ', h('a', {href: '#tabelle/allplay/w' + S.tw}, `W${S.tw}`), '.')}),
+  note: h('span', null, 'Matchup-Glück je Woche mit Begründung: oben eine Woche wählen, z. B. ', h('a', {href: '#staerke/allplay/w' + S.tw}, `W${S.tw}`), '.')}),
   U.legend(['rang', 'ap-wl', 'allplay', 'median-bilanz', 'matchup', 'spielplan-pkt']));
   const rows = U.sortRows(S.teams, t => t.matchup_glueck, -1);
   const most = rows[0], least = rows.at(-1);
@@ -203,7 +199,7 @@ function ausblick(box, r, svg) {
   const wrap = h('div');
   const chart = h('div');
   const draw = () => {
-    wrap.replaceChildren(U.table({cap: `Ausblick – Playoff-Simulation (${seeding === 'espn' ? 'ESPN: Top 6 gesamt' : 'Liga: Top 3 je Division'})`,
+    wrap.replaceChildren(U.table({cap: `Playoff-Chancen laut Simulation (${seeding === 'espn' ? 'ESPN: Top 6 gesamt' : 'Liga: Top 3 je Division'})`,
       cls: 'rk', rows: S.teams, sort: ['po', -1], cols: cols()}));
     if (!has) return;
     const rows = U.sortRows(S.teams, t => t.sim?.[seeding]?.playoff, -1);
@@ -218,7 +214,7 @@ function ausblick(box, r, svg) {
   U.ap(box, h('div', {class: 'row'}, h('span', {class: 'note'}, 'Seeding'),
     U.seg('Seeding der Simulation', [['liga', 'Liga'], ['espn', 'ESPN']], seeding, v => {
       seeding = v;
-      U.setQ('tabelle/ausblick', {seeding: v === 'espn' ? 'espn' : null});
+      U.setQ(r.base, {seeding: v === 'espn' ? 'espn' : null});
       draw();
     }), U.ib('seeding', '')),
   has ? null : h('p', {class: 'warn'}, 'Die Playoff-Simulation liegt noch nicht vor.'),

@@ -1,7 +1,7 @@
 // Wetter (lädt wetter.json): Prognose der laufenden NFL-Woche und Ist der gespielten Spiele, je Spiel Anstoß in deutscher
 // Zeit, Stadion, Dach und die Werte über die Anstoßstunde und drei Stunden danach (Open-Meteo, Modellwerte). Die Markierung
-// ⚑ rechnet Python (wetter.markierung); hier nur Anzeige, Sortierung und Filter. Fähnchen im Waiver-Tab und Wetterzeile der
-// Spielerseite nutzen die Helfer unten (ctx.mod('v_wetter')).
+// ⚑ rechnet Python (wetter.markierung); hier nur Anzeige, Sortierung und Filter. Fähnchen unter Markt › Freie Spieler und
+// Wetterzeile der Spielerseite nutzen die Helfer unten (ctx.mod('v_wetter')).
 let U, S, h;
 export const init = c => { U = c.ui; S = U.S; h = U.h; };
 // Anzeige wie die Markierung in Python: Temperatur, Wind, Böen und Regen ganzzahlig, Niederschlag und Schnee eine Stelle
@@ -16,7 +16,7 @@ const kick = g => tbd(g) ? 'Anstoß offen' : U.stamp(g.kickoff);
 // angepfiffenes Spiel ist sie keine Entscheidungshilfe mehr (kein Fähnchen, Spielerzeile ohne Prognosewerte)
 export const played = g => !tbd(g) && (U.utc(g.kickoff)?.getTime() ?? Infinity) <= Date.now();
 
-// ---------------------------------------------------------------- Helfer für Waiver-Tab und Spielerseite
+// ---------------------------------------------------------------- Helfer für Markt › Freie Spieler und Spielerseite
 // Spiel eines NFL-Teams in der Prognose (laufende Woche); ohne Spiel (Bye, kein NFL-Team) null
 export const gameOf = (W, nfl) => nfl ? (W?.prognose || []).find(g => g.heim === nfl || g.gast === nfl) || null : null;
 // Text der markierten Werte, z. B. „Wetter W4: Wind 30 km/h, Böen 54 km/h“; null ohne Markierung (auch Dach, Anstoß offen)
@@ -24,10 +24,10 @@ export function flagText(g) {
   const m = g ? marks(g) : [];
   return m.length ? `Wetter W${g.woche}: ` + m.map(k => `${LAB[k] || k} ${FMT[k] ? unit(g, k) : ''}`.trim()).join(', ') : null;
 }
-// Fähnchen ⚑ als eigener Link nach #wetter (Waiver-Tab, neben dem Spielerlink); nur vor dem Anstoß
+// Fähnchen ⚑ als eigener Link nach #woche/wetter (Markt › Freie Spieler, neben dem Spielerlink); nur vor dem Anstoß
 export function flagLink(g) {
   const t = g && !played(g) ? flagText(g) : null;
-  return t ? h('a', {href: '#wetter', class: 'wf flag', title: t}, h('span', {'aria-hidden': 'true'}, '⚑'), h('span', {class: 'vh'}, t)) : null;
+  return t ? h('a', {href: '#woche/wetter', class: 'wf flag', title: t}, h('span', {'aria-hidden': 'true'}, '⚑'), h('span', {class: 'vh'}, t)) : null;
 }
 // Zeile der Spielerseite: „Spiel W4: PIT @ CLE, Fr 02.10. 02:15 Uhr, 24 °C, Wind 19 km/h (Böen 54 ⚑), Regen 25 %“;
 // Dachspiele „…, Dach“ ohne Werte, offener Anstoß „…, Anstoß offen“, nach dem Anstoß „…, gespielt“ (Werte unter „Ist“)
@@ -44,11 +44,11 @@ export function line(g) {
   return out;
 }
 
-// ---------------------------------------------------------------- Ansicht #wetter, #wetter/ist
+// ---------------------------------------------------------------- Ansicht Woche › Wetter: #woche/wetter, #woche/wetter/ist
 export async function render(box, ctx, r) {
   init(ctx);
   const ist = r.sub === 'ist';
-  U.ap(box, h('h1', null, ist ? 'Wetter – Ist' : 'Wetter – Prognose'), U.spGroup('wetter'));
+  U.kopf(box, r, ist ? 'Wetter – Ist' : 'Wetter – Prognose');
   if (!S.man.files?.['wetter.json']) {
     U.ap(box, h('p', {class: 'warn'}, 'Noch keine Wetterdaten: Die Seite füllt sich mit dem ersten Tageslauf (stündlich von etwa 05:00 Uhr bis Mitternacht deutscher Zeit).'));
     return;
@@ -58,7 +58,7 @@ export async function render(box, ctx, r) {
   U.ap(box, slot);
   const W = await ctx.lazy('wetter.json', 'Wetterdaten', box);
   if (!r.alive()) return;
-  slot.replaceWith(U.chips('Ansichten Wetter', [['#wetter', U.ok(W.woche) ? `Prognose W${W.woche}` : 'Prognose', ''], ['#wetter/ist', 'Ist', 'ist']], ist ? 'ist' : ''));
+  slot.replaceWith(U.chips('Ansichten Wetter', [['#woche/wetter', U.ok(W.woche) ? `Prognose W${W.woche}` : 'Prognose', ''], ['#woche/wetter/ist', 'Ist', 'ist']], ist ? 'ist' : '', 'l2'));
   const s = W.schwellen;
   U.ap(box, h('p', {class: 'note'}, `Stand ${U.stamp(W.stand)} · Modellwerte von Open-Meteo, kein Stationsmesswert; Werte über Anstoßstunde und drei Stunden danach`,
     s ? `; Markierung ⚑ ab Wind ≥ ${U.num(s.wind, 0)} km/h, Böen ≥ ${U.num(s.boeen, 0)} km/h, Regen ≥ ${U.num(s.regen_wahrsch, 0)} %, Schnee > ${U.num(s.schnee, 0)} (Faustregel)` : '',
@@ -70,7 +70,7 @@ function games(box, W, ist) {
   const rows = (ist ? W.ist : W.prognose) || [];
   if (!rows.length) {
     U.ap(box, h('p', {class: 'note'}, ist ? 'Noch kein gespieltes Spiel.' : 'Keine offenen Spiele mehr: Die Saison ist gespielt, alle Spiele stehen unter „Ist“. ',
-      ist ? null : h('a', {href: '#wetter/ist'}, 'Zu „Ist“')));
+      ist ? null : h('a', {href: '#woche/wetter/ist'}, 'Zu „Ist“')));
     return;
   }
   const t0 = g => tbd(g) ? null : U.utc(g.kickoff)?.getTime() ?? null;
