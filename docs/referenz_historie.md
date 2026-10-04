@@ -40,7 +40,7 @@ Grundlage für `tests/test_history.py` (die Abschnitte zum nfl.com-Export am End
 | Letzte | 11 |
 
 ## Endstände Screenshot-Spiele 2018–2022 (nfl.com-Export)
-Grundlage für `tests/test_history_wochen.py`: Die Screenshot-Spiele aus `data/history/matchups_hist.csv` mit dem Endstand laut DSGVO-Export (Auftrag 03.10.2026). 2018 W16, 2020 W15 und 2020 W16 stehen im Archiv als Zwischenstand bzw. vor einer Stat-Korrektur (233,73 → 233,63 am 31.12.2020).
+Grundlage für `tests/test_history_wochen.py`: Die Screenshot-Spiele aus `data/history/matchups_hist.csv` mit dem Endstand laut DSGVO-Export (Auftrag 03.10.2026). 2018 W16, 2020 W15 und 2020 W16 standen im Archiv zuerst als Zwischenstand bzw. vor einer Stat-Korrektur (233,73 → 233,63 am 31.12.2020); seit 04.10.2026 führen Notion und `matchups_hist.csv` die Endstände.
 | Saison | Woche | Runde | Slot A | Slot B | Pkt A | Pkt B |
 |---|---|---|---|---|---|---|
 | 2018 | 12 | Regular Season | 2 | 3 | 313,33 | 230,40 |

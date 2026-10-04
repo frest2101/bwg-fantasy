@@ -274,7 +274,8 @@ def test_spiele_status(hist):
     assert len(hist["spiele"]) == 8
     for g in hist["spiele"]:
         assert g["rekordfaehig"] == (g["status"] == "final")
-    assert {g["status"] for g in hist["spiele"] if not g["rekordfaehig"]} == {"live", "partial"}
+    # seit 04.10.2026 führt Notion alle acht Screenshot-Spiele mit Endstand (2018–2022 laut nfl.com-Export)
+    assert all(g["status"] == "final" for g in hist["spiele"])
 
 
 def game(season, pts_a, pts_b, status, week=1, slot_a=1, slot_b=2):
