@@ -39,11 +39,11 @@ export async function render(box, ctx, r) {
     const jeTeam = S.teams.filter(t => !team || t.team_id === team)
       .map(t => ({tid: t.team_id, zu: t.moves ?? null, n: aw ? aw[String(t.team_id)] ?? 0 : null}));
     wrap.replaceChildren(); U.ap(wrap, tbl, U.legend(['transaktionen']),
-      h('div', {class: 'card', style: 'margin-top:16px'}, U.table({cap: 'Moves je Team', cls: 'nr', rc: U.meRc, rows: jeTeam, sort: ['zu', -1], cols: [
+      h('div', {class: 'card', style: 'margin-top:16px'}, U.table({cap: 'Moves je Team', cls: 'nr kurz', rc: U.meRc, rows: jeTeam, sort: ['zu', -1], cols: [
         {k: 't', l: 'Team', v: x => U.kz(x.tid), d: 1, f: x => U.tl(x.tid)},
         {k: 'zu', l: 'Zugänge (ESPN)', num: 1, v: x => x.zu, f: x => U.val(x.zu, v => v, 'kein Zähler von ESPN')},
-        {k: 'n', l: 'Aufstellungswechsel', num: 1, v: x => x.n, f: x => U.val(x.n, v => v, 'kein Archiv der Aufstellungswechsel')}], rh: 0,
-        note: `Zugänge: Zähler des Teams laut ESPN, Stand nach W${S.tw}.`}), U.legend(['moves', 'aufstellungswechsel'])));
+        {k: 'n', l: 'Aufstellungs­wechsel', num: 1, v: x => x.n, f: x => U.val(x.n, v => v, 'kein Archiv der Aufstellungswechsel')}], rh: 0,
+        note: 'Zugänge: Zähler des Teams laut ESPN, Stand des Wochenabrufs.'}), U.legend(['moves', 'aufstellungswechsel'])));
   };
   U.ap(box, h('div', {class: 'row'}, h('label', null, 'Team ', h('select', {onchange: e => {
     team = +e.target.value;

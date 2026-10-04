@@ -28,10 +28,12 @@ export async function render(box, ctx, r) {
   // Formel steht im i-Fenster „Faktor (Position)“ bzw. „Faktor (D/ST)“; hier nur Stand, Einordnung und Ligaschnitt, damit die
   // Tabelle auf dem Handy früh beginnt
   const ls = dst ? D.ligaschnitt || {} : pos ? M.ligaschnitt?.[pos] || {} : null;
-  U.ap(box, h('p', {class: 'note'}, `nach W${tw} · Position gegen NFL-Team, kein Einzelduell · schwacher Hinweis, die Unterschiede sind klein`,
+  // „schwacher Hinweis“ gilt laut Rechenregel nur für QB bis K (Z je Position hält sich von Jahr zu Jahr kaum, D/ST deutlich besser)
+  const schwach = dst ? '' : pos ? ' · schwacher Hinweis, die Unterschiede sind klein' : ' · QB bis K: schwacher Hinweis, die Unterschiede sind klein';
+  U.ap(box, h('p', {class: 'note'}, `nach W${tw} · Position gegen NFL-Team, kein Einzelduell${schwach}`,
     ls ? [` · Ligaschnitt ${dst ? 'D/ST' : pos} je Spiel 2025 `, U.val(ls['2025'], U.num, 'Vorjahr noch nicht geladen'), ' · 2026 ',
       U.val(ls['2026'], U.num, 'noch kein Spiel')] : '', ' ', U.ib(dst ? 'f' : 'positions-matchup', '')),
-  !dst && M?.vorjahr_quelle === 'ligamittel' ? h('p', {class: 'warn'}, 'Vorjahr noch nicht geladen – bis zum nächsten Wochenabruf gilt für 2025 das Ligamittel (Verhältnis 1,00).') : null,
+  !dst && M?.vorjahr_quelle === 'ligamittel' ? h('p', {class: 'warn'}, 'Vorjahr für QB bis K noch nicht geladen – bis zum nächsten Wochenabruf gilt dort für 2025 das Ligamittel (Verhältnis 1,00).') : null,
   h('ul', {class: 'leg', 'aria-label': 'Farben: Faktor für die Position'}, FARBEN.map(([c, t]) => h('li', null, h('span', {class: 'fz fzs ' + c, 'aria-hidden': 'true'}), t))));
   if (dst) offense(box, D);
   else if (pos) position(box, M, pos);
