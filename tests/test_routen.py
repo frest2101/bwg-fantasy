@@ -153,3 +153,16 @@ def test_einfach_ausfuehrlich():
     assert 'id="g-spalten"' in INDEX.read_text(encoding="utf-8")
     for modul in ("v_waiver", "v_spieler"):
         assert not re.search(r"U\.seg\('Spalten'", code(JS / f"{modul}.js")), f"{modul}.js: alte Spalten-Sicht"
+
+
+def test_team_seite_nach_bereichen():
+    """Die Team-Seite gliedert sich in die fünf Bereiche des Menüs, in derselben Reihenfolge (Paket P6), mit Name und Frage
+    aus BEREICHE; die Spielerseite hat die Abschnitte Woche, Saison, Rest der Saison, Markt, Keeper."""
+    team = code(JS / "v_team.js")
+    assert "ctx.bereiche()" in team
+    stellen = [team.find(f"sec('{k}'") for k in TABS]
+    assert all(i >= 0 for i in stellen) and stellen == sorted(stellen), "Abschnitte der Team-Seite in der Reihenfolge der Tabs"
+    spieler = code(JS / "v_spieler.js")
+    reihe = [spieler.find(x) for x in ("woche(box, p", "h('h2', null, `Saison ${", "h('h2', null, 'Rest der Saison')", "h('h2', null, 'Markt')",
+                                       "h('h2', null, 'Keeper')", "U.ap(box, newsBox(p, W))")]
+    assert all(i >= 0 for i in reihe) and reihe == sorted(reihe), "Abschnitte der Spielerseite"

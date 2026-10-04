@@ -177,9 +177,18 @@ button.i::before{font:italic 700 .75rem/1 Georgia,serif}
 .skz b{font-size:1.5rem;font-variant-numeric:tabular-nums;line-height:1.2}
 .skz span{color:var(--mu);font-size:.85rem}
 .sk .i,.sk button{position:relative;z-index:1}
-/* Teamseite: Diagramm, Wochenliste, Kader, Positionen/H2H (ab 900 px als Raster) */
-.tg{display:grid;gap:16px;margin:0 0 16px}
-.tg>*{min-width:0}
+/* Team-Seite (Paket P6): die fünf Bereiche als aufklappbare Abschnitte mit der Frage des Bereichs; PF je Woche und Positionen ab
+   900 px nebeneinander */
+details.tsec{background:var(--sf);border:1px solid var(--bd);border-radius:12px;padding:0 12px}
+details.tsec>summary{gap:0 .6rem;flex-wrap:wrap}
+details.tsec>summary>h2{margin:0;font-size:inherit}
+.tsq{color:var(--mu);font-size:.9rem;font-weight:600}
+.tsb{padding:0 0 12px;min-width:0}
+.tsb h3{margin:.8rem 0 .3rem}
+.tli{margin:.2rem 0 .6rem;padding-left:1.2rem}
+.tli li{margin:.25rem 0}
+.tg2{display:grid;gap:16px;margin:0 0 16px}
+.tg2>*{min-width:0}
 /* Tabellen */
 .tw{overflow-x:auto;border:1px solid var(--bd);border-radius:10px;background:var(--sf);max-width:100%}
 /* Scroll-Container als Bezugsrahmen: sonst ragen .vh-Texte weit rechts stehender Zellen aus der Seite (waagerechter Seiten-Scroll) */
@@ -408,8 +417,7 @@ main{padding:16px 24px 32px}
 .two>.side .seg{flex-wrap:wrap;overflow:visible}
 .two.sc2{grid-template-columns:minmax(0,1fr) 21rem}
 .ksl{columns:2;column-gap:24px}.ksl li{break-inside:avoid}
-.tg{grid-template-columns:minmax(0,3fr) minmax(0,2fr);grid-template-rows:auto auto auto 1fr;align-items:start}
-.tg-w{grid-column:1/-1;grid-row:1}.tg-f{grid-column:2;grid-row:2}.tg-k{grid-column:1;grid-row:2/span 3}.tg-r{grid-column:2;grid-row:3}
+.tg2{grid-template-columns:minmax(0,3fr) minmax(0,2fr);align-items:start}
 .tw caption{max-width:none}
 h1{font-size:1.7rem}
 #glossar>div{scroll-margin-top:112px}
