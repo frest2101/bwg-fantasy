@@ -73,7 +73,7 @@ Aus Sicht eines Ligamitglieds (nicht nur Stephans) beantwortet die App sieben Fr
 | **A. Was zählt diese Woche?** Wer spielt gegen wen, Siegchance, Ausfälle, Byes, Wetter, günstige Matchups, Live-Punkte | Spielplan, Live, Wetter, Positions-Matchup, D/ST, Waiver › Bedarf Woche, Spielerseite | sonntags und davor |
 | **B. Wen hole ich, wen gebe ich ab?** Beste freie Spieler, Lücken im Kader, Waiver-Reihenfolge, Fristen, was andere geholt haben | Waiver, Moves, Spieler › Besitz | Dienstag bis Mittwoch |
 | **C. Wo stehen wir?** Tabelle, Division, Ergebnisse, Playoff-Chancen | Tabelle › Gesamt, Division, Ausblick; Spielplan | nach jeder Woche |
-| **D. Wer ist wirklich wie gut?** Stärke jenseits von Siegen: All-Play, Punkte, Glück, Aufstellungsqualität, Power Ranking, eigener Score | Tabelle › All-Play, Punkte, Coaching; Ranking | nach jeder Woche, Diskussionsstoff |
+| **D. Wer ist wirklich wie gut?** Stärke jenseits von Siegen: All-Play, Punkte, Glück, Coaching-Effizienz, Power Ranking, eigener Score | Tabelle › All-Play, Punkte, Coaching; Ranking | nach jeder Woche, Diskussionsstoff |
 | **E. Wie ist mein Kader langfristig aufgestellt?** Keeper, Herkunft, Alter, Marktwert, Draft-Kosten, Draft-Position nächstes Jahr | Keeper | selten, intensiv im Winter |
 | **F. Wer ist dieser Spieler, was ist dieses Team?** Nachschlagen | Spieler, Team-Seite | jederzeit, aus allen anderen Fragen heraus |
 | **G. Was war früher?** Rekorde, Duelle, Historie, Champions | Rekorde | selten |
@@ -92,7 +92,7 @@ Tabs:    Liga | Stärke | Woche | Markt | Keeper
 
 Start (Logo)   Diese Woche · Mein Team · fünf Karten mit je einem Satz und einer Zahl · Datenstand
 Liga           Tabelle · Division · Ergebnisse · Playoff-Chancen · Duelle · Rekorde
-Stärke         Power Ranking · All-Play & Glück · Punkte & Form · Aufstellung · Eigener Score
+Stärke         Power Ranking · All-Play & Glück · Punkte & Form · Coaching · Eigener Score
 Woche          Spieltag live · Paarungen Wn · Matchups · Wetter
 Markt          Freie Spieler · Bedarf je Team · Reihenfolge & Claims · Moves
 Keeper         Bilanz · Herkunft · Alter · Marktwert · Draft 2026 · Draft 2027
@@ -111,7 +111,7 @@ Jeder Bereich bekommt unter der Überschrift eine Zeile, die seine Frage nennt, 
 | Rekorde › Saison, Positionen, All-Time, Champions | Liga › Rekorde | zweite Ebene: 2026 · Positionen · Historie 2015–2025 · Champions; Platz für die Wochen 2018–2022 |
 | Tabelle › All-Play | Stärke › All-Play & Glück | mit Wochensicht wie heute |
 | Tabelle › Punkte | Stärke › Punkte & Form | mit Wochensicht |
-| Tabelle › Coaching | Stärke › Aufstellung | „Coaching“ klingt nach Trainer; gemeint ist die Aufstellungsqualität |
+| Tabelle › Coaching | Stärke › Coaching | Name bleibt (Entscheidung Stephan 04.10.2026), nur der Umzug in den Bereich Stärke |
 | Ranking › Power Ranking | Stärke › Power Ranking | erste Ansicht des Bereichs, mit Kernsätzen |
 | Ranking › Score | Stärke › Eigener Score | Regler und Profile; klar als „selbst gewichten“ ausgewiesen |
 | Live (Chip) | Woche › Spieltag live | erste Ansicht von Woche, solange die Woche läuft; der Chip im Kopf kann bleiben, muss aber nicht |
@@ -178,7 +178,7 @@ Das ist kein Persönliches im Sinne der Repo-Regel: Es ist eine Anzeige-Einstell
 1. **Kein Formelzeichen im Spaltenkopf.** μ, σ, E, P, Z, r, F, Δ, Σ nur in „Ausführlich“ und im Glossar. Im Kopf steht das Wort: Stärke, Projektion, zugelassen, Faktor.
 2. **Keine Kürzel, die es nur hier gibt.** AP %, Eff. %, PO %, ü., Pot., Proj. werden ausgeschrieben oder durch ein Wort ersetzt. Fantasy-Standardkürzel bleiben: PF, PA, W-L-T, QB … D/ST, FA, IR, Bye, ROS nur dort, wo kein Platz ist, sonst „Rest der Saison“.
 3. **Prozent heißt nach dem, was es misst.** „Playoff %“ statt „PO %“, „All-Play %“ statt „AP %“, „Division %“ statt „Div %“.
-4. **Eine Kennzahl, ein Name.** Wo heute Coaching, Coaching-Effizienz, Eff. %, Effizienz und Liga-Effizienz stehen, steht überall „Aufstellung %“ bzw. „Aufstellungsqualität“. Wo Ausblick, Playoff-Simulation, Playoff-% und PO % stehen, steht „Playoff-Chancen“ (Ansicht) und „Playoff %“ (Spalte).
+4. **Eine Kennzahl, ein Name.** Wo heute Coaching, Coaching-Effizienz, Eff. %, Effizienz und Liga-Effizienz stehen, heißt die Ansicht „Coaching“, die Spalte und Kachel „Eff. %“ und das Glossar „Coaching-Effizienz“ (Entscheidung Stephan: Begriffe bleiben). Wo Ausblick, Playoff-Simulation, Playoff-% und PO % stehen, steht „Playoff-Chancen“ (Ansicht) und „Playoff %“ (Spalte).
 5. **Richtung sichtbar.** Spalten, bei denen klein gut ist (Konstanz, Alter bereinigt, Verschenkt), zeigen das im Namen oder in der ersten Erklärungszeile: „Schwankung (klein = gleichmäßig)“.
 6. **Zeitbezug im Namen.** „Rest der Saison“ statt ROS, „nächste Woche W5“ statt Wn, „Stand heute 09:12“ statt „Tagesstand“, „nach Woche 4“ statt „Wochenstand“.
 7. **Jeder Spaltenkopf ist erklärbar.** Die Legende „Erklärungen:“ unter der Tabelle bleibt, zusätzlich öffnet ein langer Druck oder ein ⓘ im Kopf die Erklärung (die i-Knöpfe `data-g` gibt es schon).
@@ -193,7 +193,6 @@ Das ist kein Persönliches im Sinne der Repo-Regel: Es ist eine Anzeige-Einstell
 | Spielplan | Liga › Ergebnisse und Woche › Paarungen |
 | Rekorde | Liga › Rekorde |
 | Ausblick | Playoff-Chancen |
-| Coaching | Aufstellung |
 | All-Play | All-Play & Glück |
 | Punkte | Punkte & Form |
 | Score | Eigener Score |
@@ -218,8 +217,8 @@ Das ist kein Persönliches im Sinne der Repo-Regel: Es ist eine Anzeige-Einstell
 |---|---|---|---|
 | Liga › Tabelle | PO % | Playoff % | Kürzel |
 | | AP % | All-Play % | Kürzel |
-| | Eff. % | Aufstellung % | Kürzel, Begriff |
-| | Streak | Serie | Deutsch, Spalte ist sonst Englisch unter Deutsch |
+| | Eff. % | bleibt (Entscheidung Stephan) | |
+| | Streak | bleibt (Entscheidung Stephan) | |
 | Liga › Playoff-Chancen | Div/Bye % | Division % | Bye steckt in der Liga-Regel schon drin, Erklärung sagt es |
 | | Restsiege | Erwartete Siege Rest | „Restsiege“ liest sich wie eine Anzahl |
 | | ESPN PO % | ESPN Playoff % | |
@@ -231,8 +230,8 @@ Das ist kein Persönliches im Sinne der Repo-Regel: Es ist eine Anzeige-Einstell
 | | Vorwoche | Rang Vorwoche | |
 | Stärke › Punkte & Form | Form Δ | Form zu Saison | Δ |
 | | Proj.-Δ | Ist − Projektion | Kürzel, Richtung |
-| | Floor | Schwächste Woche | englisch, Fachwort nur für Insider |
-| Stärke › Aufstellung | Optimal | Beste Aufstellung | |
+| | Floor | bleibt (Entscheidung Stephan) | |
+| Stärke › Coaching | Optimal | Beste Aufstellung | |
 | | Bank | Bankpunkte | |
 | | Kader-Pot. | Beste Aufstellung Ø | Kürzel |
 | | Kader-Proj. | Projektion Kader | Kürzel |
@@ -246,15 +245,15 @@ Das ist kein Persönliches im Sinne der Repo-Regel: Es ist eine Anzeige-Einstell
 | | Rest bis W14 | Rest Regular Season | |
 | Spieler | Ø | Ø Punkte | |
 | | Konstanz | Schwankung | Richtung |
-| | Floor, Ceiling | Tief, Hoch | wie Spielplan-Kacheln |
+| | Floor, Ceiling | bleiben (Entscheidung Stephan) | |
 | | Bank-Pkt | Bankpunkte | |
 | | ROS, ROS/Sp., ROS PO | Rest Saison, Rest je Spiel, Rest Playoffs | Kürzel |
-| | ROS ü. Ersatz | Plus zu Ersatz | Kürzel, Begriff |
+| | ROS ü. Ersatz | Vorteil Rest Saison | Kürzel, Begriff |
 | | ROS-Rang | Rang Rest Saison | |
 | | Δ Tag | Besitz Δ heute | Bezug |
 | | gestartet % | aufgestellt % | ESPN-Begriff eingedeutscht |
 | Markt › Freie Spieler | Proj. W5 | Projektion W5 | |
-| | W5 ü. Ersatz | Plus W5 | Kürzel; Erklärung „Projektion minus bester freier Ersatz“ |
+| | W5 ü. Ersatz | Vorteil W5 | Kürzel; Erklärung „Projektion minus bester freier Ersatz“ |
 | | Σ nächste 3 | Nächste 3 | |
 | | Für HJS | Gewinn für HJS | sagt, was die Zahl ist |
 | | Wert-Rang | Marktwert-Rang | |
@@ -277,7 +276,7 @@ Das ist kein Persönliches im Sinne der Repo-Regel: Es ist eine Anzeige-Einstell
 | | Letzter | Letzter Platz | |
 | | Div/Pl. | Division / Platz | |
 | Team-Seite | Form Δ | Form zu Saison | |
-| | Effizienz | Aufstellung % | |
+| | Effizienz | Eff. % wie in den Tabellen | ein Name für eine Kennzahl |
 | | AP | All-Play | |
 | | W-Rang | Wochenrang | |
 
@@ -289,12 +288,12 @@ Ein Schalter im Kopf oder auf der Startseite (Browser-Speicher), Standard „Ein
 
 | Tabelle | Einfach | nur Ausführlich |
 |---|---|---|
-| Liga › Tabelle | #, Team, W-L, PF, PA, Playoff % | Diff, All-Play %, Aufstellung %, Serie |
+| Liga › Tabelle | #, Team, W-L, PF, PA, Playoff % | Diff, All-Play %, Eff. %, Streak |
 | Stärke › Power Ranking | #, Team, Trend, Stärke | Erwartete All-Play %, All-Play % bisher, W-L, Projektion, Rang Vorwoche |
 | Stärke › All-Play & Glück | Pl., Team, All-Play W-L, All-Play %, Matchup-Glück | W-L, Median-Bilanz, Spielplan Pkt |
-| Stärke › Aufstellung | Pl., Team, Aufstellung %, Verschenkt | Verschenkt Ø, max, Beste Aufstellung, Bankpunkte, Beste Aufstellung Ø, Projektion Kader |
+| Stärke › Coaching | Pl., Team, Eff. %, Verschenkt | Verschenkt Ø, max, Beste Aufstellung, Bankpunkte, Beste Aufstellung Ø, Projektion Kader |
 | Woche › Matchups | Defense, Faktor, Rang, Bye | zur Vorwoche, Zugelassen 2025/2026, Verhältnis |
-| Markt › Freie Spieler | Spieler, Projektion W5, Plus W5, Gegner W5, Bye, Verletzung | Nächste 3, Rest Saison, Besitz, Frist, Marktwert-Rang (heute die drei Spaltensichten) |
+| Markt › Freie Spieler | Spieler, Projektion W5, Vorteil W5, Gegner W5, Bye, Verletzung | Nächste 3, Rest Saison, Besitz, Frist, Marktwert-Rang (heute die drei Spaltensichten) |
 | Spieler | Spieler, Ø Punkte, Form, Rest je Spiel | heute die Sichten Saison / ROS / Besitz |
 | Keeper › Marktwert | Team, Wert Top 12, Spieler ab Linie | zum Schnitt, über Keeper-Linie, Ø Alter, mit Wert |
 
@@ -305,12 +304,12 @@ Die heutigen „Spalten“-Segmente im Waiver- und Spieler-Tab werden dadurch zu
 Die Team-Seite ist heute ein langer Stapel (Kacheln, PF je Woche, Wochenliste, Kader, Positionen, H2H, Verläufe, Franchise, „Weiter zu“). Vorschlag: dieselben fünf Abschnitte wie das Menü, in derselben Reihenfolge, als aufklappbare Karten (auf dem Desktop offen):
 
 1. **Liga** – Rang, W-L, Playoff %, nächstes Spiel mit Siegchance, Wochenliste, Duelle.
-2. **Stärke** – Power Ranking mit Kernsatz, All-Play, Matchup-Glück, Aufstellung %, PF je Woche, Verläufe.
+2. **Stärke** – Power Ranking mit Kernsatz, All-Play, Matchup-Glück, Eff. %, PF je Woche, Verläufe.
 3. **Woche** – Lücken für W5, Ausfälle und fraglich, Byes, Wetter der eigenen Spieler (aus `waiver.json › bedarf_woche` und `wetter.json`; heute nur im Waiver-Tab).
 4. **Markt** – Bedarf Rest der Saison, Stärken und Schwächen, Tiefe je Position, die drei besten Kandidaten je Lücke, Moves des Teams.
 5. **Keeper** – Kader mit Herkunft, Alter, Marktwert; Draft-Picks 2026 mit Ertrag; erwarteter Pick 2027.
 
-Dann weiß jemand, der die Team-Seite kennt, auch das Menü – und umgekehrt. Die Spielerseite genauso in Kurzform: Kopf (Position, Team, Status, Verletzung), Woche (Gegner, Faktor, Wetter, Projektion), Saison (Formkurve, Ø, Hoch, Tief), Rest der Saison, Markt (Besitz, Frist, Plus zu Ersatz), Keeper (Herkunft, Alter, Marktwert), Verweise.
+Dann weiß jemand, der die Team-Seite kennt, auch das Menü – und umgekehrt. Die Spielerseite genauso in Kurzform: Kopf (Position, Team, Status, Verletzung), Woche (Gegner, Faktor, Wetter, Projektion), Saison (Formkurve, Ø, Hoch, Tief), Rest der Saison, Markt (Besitz, Frist, Vorteil), Keeper (Herkunft, Alter, Marktwert), Verweise.
 
 ## 10. Erklärungen (heute Lesart)
 
@@ -352,7 +351,7 @@ Risiken und Nebenwirkungen:
 - **Öffentlichkeit.** Mein Team ist eine Browser-Einstellung, keine Veröffentlichung; `check_public.py` bleibt wie es ist.
 - **Gewohnheit.** Stephan kennt die heutige Struktur auswendig; die ersten zwei Wochen nach dem Umbau wird er suchen. Die Weiterleitungen und die Bereichs-Zeilen fangen das ab.
 
-## 13. Entscheidungen, die ich brauche
+## 13. Entscheidungen (Fragen 04.10.2026, Antworten Stephan im Chat derselben Session)
 
 1. **Fünf Bereiche nach Fragen** (Liga, Stärke, Woche, Markt, Keeper) – ja, oder lieber die Alternative mit sechs Tabs und „Spieler“?
 2. **Namen:** Stärke oder Ranking? Markt oder Waiver? Woche oder Spieltag?
@@ -361,6 +360,20 @@ Risiken und Nebenwirkungen:
 5. **Mein Team überall** (Browser-Speicher, Hervorhebung in allen Tabellen) – ja?
 6. **Matchups zusammenlegen** und D/ST › Streaming aufgeben – ja?
 7. **Einfach / Ausführlich** mit Standard Einfach – ja? Oder Standard Ausführlich für dich und Einfach als Wahl?
-8. **Spaltennamen** aus Abschnitt 7 – freigeben, ändern oder einzelne streichen? Insbesondere: Aufstellung % für Coaching-Effizienz, Serie für Streak, Schwankung für Konstanz, Tief/Hoch für Floor/Ceiling, Plus zu Ersatz für „ü. Ersatz“.
+8. **Spaltennamen** aus Abschnitt 7 – freigeben, ändern oder einzelne streichen? Insbesondere: Aufstellung % für Coaching-Effizienz, Serie für Streak, Schwankung für Konstanz, Tief/Hoch für Floor/Ceiling, ein neuer Name für „ü. Ersatz“.
 9. **Lesart → Erklärungen** – ja?
 10. **Reihenfolge der Pakete** – wie vorgeschlagen (P1, P4, P2, P3, P5, P6), oder anders?
+
+### Antworten Stephan (04.10.2026)
+
+1. Fünf Bereiche nach Fragen: **ja** – Liga · Stärke · Woche · Markt · Keeper.
+2. Namen: **Stärke**, **Markt**, **Woche**.
+3. Spieler-Suche im Kopf (Lupe, Spieler und Teams) statt Tab: **ja**.
+4. Startseite mit fünf Karten und Mein Team, die App öffnet damit, das Logo führt dorthin: **ja**.
+5. Mein Team einmal im Kopf wählen, gilt überall: **ja** (Browser-Speicher, kein Login).
+6. D/ST-Faktoren und Positions-Matchup zu einer Ansicht „Matchups“ zusammenlegen, D/ST › Streaming entfällt: **ja**.
+7. Schalter Einfach / Ausführlich, Standard **Einfach**: **ja**.
+8. Spaltennamen: freigegeben sind die unstrittigen Umbenennungen aus Abschnitt 7 (Playoff % statt PO %, All-Play % statt AP %, Stärke statt μ, Projektion statt P, Faktor statt F, ausgeschriebene ROS- und Proj.-Kürzel usw.) und **Schwankung statt Konstanz**. **Nicht** freigegeben: Aufstellung % (Eff. % und die Ansicht „Coaching“ bleiben), Serie (Streak bleibt), Tief/Hoch (Floor und Ceiling bleiben). „ü. Ersatz“ heißt künftig **Vorteil** („Vorteil W5“, „Vorteil Rest Saison“). Die Tabellen in Abschnitt 7 und 8 sind entsprechend angepasst.
+9. Lesart → **Erklärungen**: ja.
+10. Reihenfolge der Pakete: **P1, P4, P2, P3, P5, P6**.
+11. Beginn: erst dieses Dokument mit den Antworten nach `main`, der Umbau startet in einer neuen Session mit Paket P1.
