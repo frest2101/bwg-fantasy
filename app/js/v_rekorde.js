@@ -244,7 +244,7 @@ function kuratiert(box, K) {
   if (!K.length) return;
   const kats = [...KAT, ...new Set(K.map(k => k.kategorie).filter(k => !KAT.includes(k)))];
   const beleg = k => [k.verifiziert ? 'verifiziert' : 'unverifiziert',
-    k.ableitbar ? 'aus den Daten der Liga-Historie nachgerechnet' : 'nicht aus den Daten nachrechenbar'].join(', ');
+    k.ableitbar ? 'aus den Daten der Liga-Historie ableitbar' : 'nicht aus den Daten ableitbar'].join(', ');
   U.ap(box, U.card(null, h('h2', null, 'Rekorde aus dem Ligaarchiv ', U.ib('ligaarchiv', '')),
     h('p', {class: 'note'}, 'Von Hand gepflegte Rekorde der Ligageschichte 2015–2025, Teamnamen der jeweiligen Saison. Antippen für Details und Quelle.'),
     kats.map(kat => {
@@ -264,18 +264,30 @@ function wochen(box, H, r) {
   const W = H.wochen || {}, saisons = W.saisons || [];
   if (!saisons.length) { U.ap(box, h('p', {class: 'note'}, 'Keine Wochen 2018–2022 vorhanden.')); return; }
   const names = new Map((H.team_seasons || []).map(t => [t.season + '/' + t.slot, t.team_name]));
+  const schnitt = new Map((W.schnitt || []).map(x => [x.season + '/' + x.week, x.ligaschnitt]));
+  const path = r.base + '/wochen';
   const st = {
     nm: (yr, slot) => names.get(yr + '/' + slot) || U.team(slot)?.name || 'Slot ' + slot,
+    schnitt: (yr, wk) => schnitt.get(yr + '/' + wk),
     teil: TEILE.some(x => x[0] === r.q.get('teil')) ? r.q.get('teil') : '',
     phase: r.q.get('phase') === 'PO' ? 'PO' : 'RS',
     yr: saisons.includes(+r.q.get('saison')) ? +r.q.get('saison') : saisons.at(-1),
     wk: +r.q.get('woche') || 0,
     sel: S.byId.has(+r.q.get('team')) ? +r.q.get('team') : U.meinTeam() || S.teams[0]?.team_id,
   };
-  // teilbarer Link: nur die Parameter des gewählten Teils
-  st.q = () => U.setQ(r.base + '/wochen', {teil: st.teil || null,
-    saison: st.teil === '' || st.teil === 'allplay' ? st.yr : null, woche: st.teil === '' ? st.wk || null : null,
-    phase: (st.teil === 'rekorde' || st.teil === 'duelle') && st.phase === 'PO' ? 'PO' : null, team: st.teil === 'duelle' ? st.sel : null});
+  // teilbarer Link: nur die Parameter des gewählten Teils; over = abweichende Werte für einen Link (Woche, Team)
+  st.params = (over = {}) => {
+    const x = {...st, ...over};
+    return {teil: x.teil || null, saison: x.teil === '' || x.teil === 'allplay' ? x.yr : null, woche: x.teil === '' ? x.wk || null : null,
+      phase: (x.teil === 'rekorde' || x.teil === 'duelle') && x.phase === 'PO' ? 'PO' : null, team: x.teil === 'duelle' ? x.sel : null};
+  };
+  st.q = () => U.setQ(path, st.params());
+  st.href = over => {
+    const q = new URLSearchParams();
+    for (const [k, v] of Object.entries(st.params(over))) if (v != null) q.set(k, v);
+    const s = q.toString();
+    return '#' + path + (s ? '?' + s : '');
+  };
   const out = h('div');
   const draw = () => {
     out.replaceChildren();
@@ -291,27 +303,38 @@ const seasonSeg = (st, saisons, on) => U.seg('Saison', saisons.map(y => [String(
 const platzVon = (v, alle) => 1 + alle.filter(x => x > v).length;   // 1 + Zahl der besseren Werte, Gleichstand teilt den besseren Platz
 
 // Spielwochen: Saison und Woche wählen; Kacheln und Wochentabelle nur in der Regular Season (in den Playoffs spielen nicht
-// alle Teams gegeneinander), Paarungen mit Runde und Herleitung, Teams ohne Spiel im Export, Saisonwochen im Überblick
+// alle Teams gegeneinander), Paarungen mit Runde und Herleitung, Teams ohne Spiel im Export, Saisonwochen im Überblick.
+// Die Umschalter bleiben beim Wählen stehen (Fokus für Tastatur und Screenreader); die Wochenleiste entsteht je Saison neu.
 function spielwochen(out, W, st, saisons) {
-  const box = h('div'), segBox = h('div');
-  const draw = () => {
-    const yr = st.yr, nm = slot => st.nm(yr, slot), mein = U.meinTeam();
+  const box = h('div'), wkBox = h('div');
+  let wseg = null, cur = null;
+  const center = () => {        // gewählte Woche in die Mitte der waagerecht scrollenden Leiste (Handy), wie U.centerChip
+    const b = wseg?.querySelector('[aria-pressed="true"]');
+    if (b) wseg.scrollLeft += b.getBoundingClientRect().left - wseg.getBoundingClientRect().left - (wseg.clientWidth - b.offsetWidth) / 2;
+  };
+  const pick = w => { st.wk = w; st.q(); wseg.set(String(w)); center(); draw(); };
+  const season = () => {
+    const yr = st.yr;
     const games = (W.spiele || []).filter(g => g.season === yr), free = (W.ohne_gegner || []).filter(g => g.season === yr);
     const weeks = [...new Set([...games.map(g => g.week), ...free.map(g => g.week)])].sort((a, b) => a - b);
     const po = new Set([...games.filter(g => g.round !== RS_RUNDE).map(g => g.week), ...free.filter(g => g.phase === 'PO').map(g => g.week)]);
-    if (!weeks.includes(st.wk)) {           // Woche fehlt in der Saison (W17 gab es erst ab 2021): erste Woche, Link nachziehen
+    if (!weeks.includes(st.wk)) {   // Woche fehlt in der Saison: hinter dem Ende die letzte (Finale W17 → W16 bis 2020), sonst W1
       const hatte = st.wk;
-      st.wk = weeks[0];
+      st.wk = hatte > weeks.at(-1) ? weeks.at(-1) : weeks[0];
       if (hatte) st.q();
     }
-    const wk = st.wk, gs = games.filter(g => g.week === wk), fr = free.filter(g => g.week === wk);
+    wseg = U.seg('Woche', weeks.map(w => [String(w), po.has(w) ? [`W${w} `, h('span', {'aria-hidden': 'true'}, 'PO'), h('span', {class: 'vh'}, 'Playoffs')] : `W${w}`]),
+      String(st.wk), v => pick(+v), 'tight');
+    wkBox.replaceChildren(wseg);
+    center();
+    cur = {yr, games, free, weeks, po};
+    draw();
+  };
+  const draw = () => {
+    const {yr, games, free, weeks, po} = cur, wk = st.wk, nm = slot => st.nm(yr, slot), mein = U.meinTeam();
+    const gs = games.filter(g => g.week === wk), fr = free.filter(g => g.week === wk);
     const sides = gs.flatMap(g => [[g.slot_a, g.pts_a, g.bench_a, g.slot_b], [g.slot_b, g.pts_b, g.bench_b, g.slot_a]].map(([slot, pf, bench, opp]) =>
       ({slot, pf, bench, opp, team_id: slot, res: g.winner_slot == null ? 'T' : g.winner_slot === slot ? 'W' : 'L'})));
-    const wseg = U.seg('Woche', weeks.map(w => [String(w), po.has(w) ? `W${w} PO` : `W${w}`]), String(wk), v => { st.wk = +v; st.q(); draw(); }, 'tight');
-    segBox.replaceChildren(h('div', {class: 'row gap'}, seasonSeg(st, saisons, draw)), wseg);
-    // gewählte Woche in die Mitte der waagerecht scrollenden Leiste (Handy), wie U.centerChip bei den Wochen-Chips
-    const b = wseg.querySelector('[aria-pressed="true"]');
-    if (b) wseg.scrollLeft += b.getBoundingClientRect().left - wseg.getBoundingClientRect().left - (wseg.clientWidth - b.offsetWidth) / 2;
     const side = (g, slot, pts) => {
       const res = g.winner_slot == null ? 'T' : g.winner_slot === slot ? 'W' : 'L';
       return h('div', {class: 'gl' + (res === 'W' ? ' win' : '')}, h('span', {class: 'res'}, U.res(res)), h('span', {class: 'tl2'}, nm(slot)), h('span', {class: 'pts'}, U.num(pts)));
@@ -327,15 +350,15 @@ function spielwochen(out, W, st, saisons) {
       const best = (k, hoch) => sides.reduce((a, s) => (hoch ? s[k] > a[k] : s[k] < a[k]) ? s : a);
       const hi = best('pf', true), lo = best('pf', false), bk = best('bench', true);
       kids.push(h('div', {class: 'tiles'}, U.tile('Wochenbestwert', U.num(hi.pf), nm(hi.slot)),
-        U.tile('Ligaschnitt', U.num(pfs.reduce((a, x) => a + x, 0) / pfs.length), null),
+        U.tile('Ligaschnitt', U.val(st.schnitt(yr, wk), U.num), null),
         U.tile('Tiefstwert', U.num(lo.pf), nm(lo.slot)), U.tile('Meiste Bankpunkte', U.num(bk.bench), nm(bk.slot))));
     }
     kids.push(h('h2', null, `Paarungen ${yr} W${wk}` + (po.has(wk) ? ' (Playoffs)' : '')), liste);
-    if (fr.length) kids.push(U.table({cap: 'Ohne Spiel im Export (Bye oder Trostrunde)', cls: 'nr', rh: 0, rows: fr, sort: ['pf', -1], cols: [
+    if (fr.length) kids.push(U.table({cap: 'Ohne Spiel im Export', cls: 'nr', rh: 0, rows: fr, sort: ['pf', -1], cols: [
       {k: 't', l: 'Team', v: x => nm(x.slot).toLowerCase(), d: 1, f: x => nm(x.slot)},
       {k: 'pf', l: 'PF', num: 1, v: x => x.pts, f: x => U.num(x.pts)},
       {k: 'bk', l: 'Bankpunkte', num: 1, v: x => x.bench, f: x => U.num(x.bench)}],
-    note: 'Punkte ohne Gegner zählen für keinen Rekord; die Trostrunde ist nicht abgeleitet.'}));
+    note: 'Bye, Woche der Verlierer der Runde 1 vor dem Spiel um Platz 5 oder Trostrunde (nicht abgeleitet); Punkte ohne Gegner zählen für keinen Rekord.'}));
     if (rs) {
       const apw = s => pfs.filter(x => x < s.pf).length, apl = s => pfs.filter(x => x > s.pf).length, apt = s => pfs.filter(x => x === s.pf).length - 1;
       const anyT = sides.some(s => apt(s) > 0);
@@ -347,31 +370,29 @@ function spielwochen(out, W, st, saisons) {
         {k: 'o', l: 'Gegner', x: 1, v: s => nm(s.opp).toLowerCase(), d: 1, f: s => nm(s.opp)},
         {k: 'bk', l: 'Bankpunkte', num: 1, v: s => s.bench, f: s => U.num(s.bench)},
         {k: 'ap', l: anyT ? 'All-Play W-L-T' : 'All-Play W-L', num: 1, x: 1, v: apw, f: s => U.apwl(apw(s), apl(s), apt(s), anyT)}]}),
-      U.legend(['wochenrang', 'bank', 'ap-wl']));
+      U.legend(['bank', 'ap-wl']));
     }
-    kids.push(saisonWochen(yr, weeks, po, games, nm, wk, w => {
-      st.wk = w; st.q(); draw(); segBox.scrollIntoView({block: 'start', behavior: 'smooth'});
-    }));
+    kids.push(saisonWochen(st, weeks, po, games, nm, w => { pick(w); wkBox.scrollIntoView({block: 'start', behavior: 'smooth'}); }));
     box.replaceChildren(...kids.filter(Boolean));
   };
-  U.ap(out, segBox, box);
-  draw();
+  U.ap(out, h('div', {class: 'row gap'}, seasonSeg(st, saisons, season)), wkBox, box);
+  season();
 }
 
 // Saisonwochen der Regular Season: Ligaschnitt, Hoch und Tief je Woche; die gewählte Woche hervorgehoben, Woche antippen wählt sie
-function saisonWochen(yr, weeks, po, games, nm, cur, pick) {
-  const rows = weeks.filter(w => !po.has(w)).map(w => {
+function saisonWochen(st, weeks, po, games, nm, pick) {
+  const yr = st.yr, rows = weeks.filter(w => !po.has(w)).map(w => {
     const s = games.filter(g => g.week === w).flatMap(g => [[g.slot_a, g.pts_a], [g.slot_b, g.pts_b]]);
     if (!s.length) return null;
     const hi = s.reduce((a, x) => x[1] > a[1] ? x : a), lo = s.reduce((a, x) => x[1] < a[1] ? x : a);
-    return {w, schnitt: s.reduce((a, x) => a + x[1], 0) / s.length, hi, lo};
+    return {w, schnitt: st.schnitt(yr, w), hi, lo};
   }).filter(Boolean);
   if (!rows.length) return null;
   const who = x => h('span', null, U.num(x[1]), h('span', {class: 'sub'}, nm(x[0])));
-  return U.table({cap: `Saisonwochen ${yr} (Regular Season)`, cls: 'nr', rh: 0, rows, sort: ['w', 1], rc: x => x.w === cur ? 'me' : null, cols: [
-    {k: 'w', l: 'Woche', v: x => x.w, d: 1, f: x => h('a', {href: `#liga/rekorde/wochen?saison=${yr}&woche=${x.w}`, class: 'tl2',
+  return U.table({cap: `Saisonwochen ${yr} (Regular Season)`, cls: 'nr', rh: 0, rows, sort: ['w', 1], rc: x => x.w === st.wk ? 'me' : null, cols: [
+    {k: 'w', l: 'Woche', v: x => x.w, d: 1, f: x => h('a', {href: st.href({wk: x.w}), class: 'tl2', 'aria-current': x.w === st.wk ? 'true' : null,
       onclick: e => { e.preventDefault(); pick(x.w); }}, 'W' + x.w)},
-    {k: 's', l: 'Ligaschnitt', num: 1, v: x => x.schnitt, f: x => U.num(x.schnitt)},
+    {k: 's', l: 'Ligaschnitt', num: 1, v: x => x.schnitt, f: x => U.val(x.schnitt, U.num)},
     {k: 'hi', l: 'Hoch', num: 1, v: x => x.hi[1], f: x => who(x.hi)},
     {k: 'lo', l: 'Tief', num: 1, v: x => x.lo[1], f: x => who(x.lo)}]});
 }
@@ -399,7 +420,7 @@ function wRekorde(out, W, st) {
     }).filter(Boolean));
   };
   U.ap(out, U.seg('Phase', PHASE, st.phase, v => { st.phase = v; st.q(); draw(); }), box,
-    h('p', {class: 'note'}, 'Nur Spiele mit bekanntem Gegner; Playoffs mit Spiel um Platz 3 und 5, ohne Byes und Trostrunde.'), U.legend(['rs-po', 'bank']));
+    h('p', {class: 'note'}, 'Nur Spiele mit bekanntem Gegner; Playoffs mit Spiel um Platz 3 und 5, ohne Byes und Trostrunde.'), U.legend(['bank']));
   draw();
 }
 
@@ -427,7 +448,7 @@ function wDuelle(out, W, st) {
       h('table', {class: 'mx'}, h('caption', null, `Alle Duelle 2018–2022, ${ph()} (Zeile gegen Spalte, W-L)`),
         h('thead', null, h('tr', null, h('td', null, ''), S.teams.map(t => h('th', {scope: 'col'}, h('a', {href: '#team/' + t.team_id, 'aria-label': t.name}, t.kuerzel))))),
         h('tbody', null, S.teams.map(a => h('tr', {class: a.team_id === st.sel ? 'me' : null},
-          h('th', {scope: 'row'}, h('a', {href: '#liga/rekorde/wochen?teil=duelle&team=' + a.team_id, 'aria-label': `Duelle von ${a.name} anzeigen`, onclick: e => {
+          h('th', {scope: 'row'}, h('a', {href: st.href({sel: a.team_id}), 'aria-label': `Duelle von ${a.name} anzeigen`, onclick: e => {
             e.preventDefault(); st.sel = a.team_id; st.q(); selBox.value = String(st.sel); draw();
             list.scrollIntoView({block: 'start', behavior: 'smooth'});
           }}, a.kuerzel)),

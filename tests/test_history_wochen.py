@@ -16,6 +16,7 @@ import check_public
 import espn_fetch as ef
 import history
 import rawdata
+import zahlen
 
 HISTORY = ef.REPO_DIR / "data" / "history"
 REFERENZ = ef.REPO_DIR / "docs" / "referenz_historie.md"
@@ -329,7 +330,18 @@ def wochen():
 
 def test_wochen_in_compute_history(wochen):
     """Ein Einstieg (Stephan 03.10.2026): die Wochen stehen in compute_history unter „wochen“."""
-    assert set(wochen) == {"saisons", "spiele", "ohne_gegner", "h2h", "rekorde", "allplay", "hugh_jass_2023_2025"}
+    assert set(wochen) == {"saisons", "spiele", "ohne_gegner", "schnitt", "h2h", "rekorde", "allplay", "hugh_jass_2023_2025"}
+
+
+def test_ligaschnitt_je_woche(wochen):
+    """Ligaschnitt je RS-Woche in Decimal (Gegenprüfung 04.10.2026: im Browser gemittelt wich er in 3 von 67 Wochen um
+    0,01 ab, z. B. 2019 W7 183,315 → 183,31 statt 183,32)."""
+    schnitt = {(s["season"], s["week"]): s["ligaschnitt"] for s in wochen["schnitt"]}
+    assert len(schnitt) == sum(RS_GAMES[s] for s in SAISONS)
+    for (season, week), wert in schnitt.items():
+        pts = [PTS[k] for k in PTS if k[:2] == (season, week)]
+        assert len(pts) == 10 and wert == sum(pts) / 10
+    assert zahlen.round_to(schnitt[(2019, 7)]) == Decimal("183.32")
 
 
 def test_spiele_fuer_die_wochenansicht(wochen):

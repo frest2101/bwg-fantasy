@@ -12,6 +12,7 @@ PF+ (relativ zum Ligaschnitt der Saison) ist ohnehin vergleichbar.
 
 import csv
 import statistics
+from collections import defaultdict
 from decimal import Decimal
 
 import espn_fetch as ef
@@ -387,6 +388,15 @@ def wochen_ohne_gegner(games: list[dict], weeks: list[dict]) -> list[dict]:
              "bench": w["bench"]} for w in weeks if (w["season"], w["week"], w["slot"]) not in played]
 
 
+def wochen_schnitt(weeks: list[dict]) -> list[dict]:
+    """Ligaschnitt je Woche der Regular Season (Ø Punkte aller Teams, ungerundet; die App rundet nicht selbst)."""
+    pts = defaultdict(list)
+    for w in weeks:
+        if w["phase"] == RS:
+            pts[(w["season"], w["week"])].append(w["pts"])
+    return [{"season": s, "week": wk, "ligaschnitt": sum(p, ZERO) / len(p)} for (s, wk), p in sorted(pts.items())]
+
+
 def hugh_jass_wochen(rows: list[dict]) -> list[dict]:
     """hugh_jass_2023_2025.csv typisiert (nur Slot 2, nur Regular Season, ohne Gegner)."""
     return [{"season": int(r["season"]), "week": int(r["week"]), "slot": int(r["slot"]), "pf": dec(r["pts"]),
@@ -400,7 +410,8 @@ def compute_history(ssn: rawdata.Season) -> dict:
 
     rekorde = {"abgeleitet": [je Ära …], "hoechstes_einzelspiel": {…} oder None, "kuratiert": [aus rekorde.csv]}.
     Keine Manager, keine Regeländerungen.
-    wochen = nfl.com-Ära 2018–2022: saisons, spiele (Paarungen je Woche) und ohne_gegner (Playoff-Wochen ohne Spiel),
+    wochen = nfl.com-Ära 2018–2022: saisons, spiele (Paarungen je Woche), ohne_gegner (Playoff-Wochen ohne Spiel) und
+    schnitt (Ligaschnitt je RS-Woche),
     h2h und rekorde je Phase (RS, PO), allplay je Team-Saison, dazu hugh_jass_2023_2025 (nur dieses Team, ohne Gegner).
     """
     rows = ssn.history("team_seasons")
@@ -424,6 +435,7 @@ def compute_history(ssn: rawdata.Season) -> dict:
             "saisons": sorted({w["season"] for w in weeks}),
             "spiele": wochen_spiele(game_rows, weeks),
             "ohne_gegner": wochen_ohne_gegner(game_rows, weeks),
+            "schnitt": wochen_schnitt(weeks),
             "h2h": h2h_wochen(sides, sorted({w["slot"] for w in weeks})),
             "rekorde": wochen_rekorde(sides),
             "allplay": allplay_saisons(weeks, ts),
