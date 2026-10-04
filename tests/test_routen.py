@@ -163,5 +163,6 @@ def test_team_seite_nach_bereichen():
     stellen = [team.find(f"sec('{k}'") for k in TABS]
     assert all(i >= 0 for i in stellen) and stellen == sorted(stellen), "Abschnitte der Team-Seite in der Reihenfolge der Tabs"
     spieler = code(JS / "v_spieler.js")
-    reihe = [spieler.find(x) for x in ("woche(box", "`Saison ${", "'Rest der Saison'", "'Markt'", "'Keeper'", "newsBox(p, W))")]
+    reihe = [spieler.find(x) for x in ("woche(box, p", "h('h2', null, `Saison ${", "h('h2', null, 'Rest der Saison')", "h('h2', null, 'Markt')",
+                                       "h('h2', null, 'Keeper')", "U.ap(box, newsBox(p, W))")]
     assert all(i >= 0 for i in reihe) and reihe == sorted(reihe), "Abschnitte der Spielerseite"
