@@ -56,6 +56,15 @@ export const zeit = x => TF.format(toDate(x));
 // „JJJJ-MM-TTThh:mmZ“ → Date; stamp: Date, Epoch-ms oder eine solche Zeit → „Di 29.09. 23:51 Uhr“ (deutsche Zeit)
 export const utc = s => typeof s === 'string' && /^\d{4}-\d\d-\d\dT\d\d:?\d\dZ$/.test(s) ? new Date(s.replace(/T(\d\d):?(\d\d)Z$/, 'T$1:$2:00Z')) : null;
 export const stamp = x => { const d = x instanceof Date ? x : typeof x === 'number' ? new Date(x) : utc(x); return d && !isNaN(d) ? `${datum(d)} ${zeit(d)} Uhr` : '–'; };
+// Stand des Tageslaufs (App-Konzept 04.10.2026, Grundsatz 6): „Stand heute 09:12 Uhr“, am Vortag „Stand gestern 23:51 Uhr“,
+// sonst „Stand Di 29.09. 23:51 Uhr“ – Tage nach deutscher Zeit; x wie bei stamp(); ohne Zeit „Stand –“
+const TAG = new Intl.DateTimeFormat('en-CA', {timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit'});
+export function standTxt(x) {
+  const d = x instanceof Date ? x : typeof x === 'number' ? new Date(x) : utc(x);
+  if (!d || isNaN(d)) return 'Stand –';
+  const tag = TAG.format(d), heute = TAG.format(new Date()), gestern = TAG.format(new Date(Date.now() - 864e5));
+  return tag === heute ? `Stand heute ${zeit(d)} Uhr` : tag === gestern ? `Stand gestern ${zeit(d)} Uhr` : `Stand ${stamp(d)}`;
+}
 export function spanne(iso) {       // Woche Di–Mo, z. B. „08.–14.09.“
   const a = parts(iso), b = parts(new Date(toDate(iso).getTime() + 6 * 864e5));
   return a.month === b.month ? `${a.day}.–${b.day}.${b.month}.` : `${a.day}.${a.month}.–${b.day}.${b.month}.`;
@@ -121,14 +130,14 @@ export function centerChip(nav) {
 // Wochenwahl „Saison · W1 · W2 …“ über die gerechneten Wochen (meta.weeks): Links auf path bzw. path/wN
 export function weekChips(path, cur) {
   const start = n => S.weeks.find(w => w.week === n)?.start;
-  return chips('Woche wählen', [['#' + path, ['Saison', h('small', null, `nach W${S.tw}`)], 0],
+  return chips('Woche wählen', [['#' + path, ['Saison', h('small', null, `bis W${S.tw}`)], 0],
     ...(S.meta.weeks || []).map(w => ['#' + path + '/w' + w, ['W' + w, h('small', null, start(w) ? spanne(start(w)) : '')], w])], cur, 'wk');
 }
 // All-Play-Bilanz „6-3“, mit Gleichständen „6-2-1“ (showT erzwingt die dritte Zahl, damit eine Spalte einheitlich bleibt)
 export const apwl = (w, l, t, showT) => `${nn(w)}-${nn(l)}` + (showT || t ? `-${nn(t)}` : '');
 
 // Kopf einer Ansicht: Überschrift, bei Ansichten eines Bereichs (r.B vom Router) darunter die Bereichs-Zeile mit der Frage des
-// Bereichs und die Ansichten als Chips. Spieler-, Team- und Lesart-Seite haben keinen Bereich, nur die Überschrift.
+// Bereichs und die Ansichten als Chips. Spieler-, Team- und Erklärungen-Seite haben keinen Bereich, nur die Überschrift.
 // → h1, damit die Ansicht den Titel nach dem Laden noch ändern kann
 export function kopf(box, r, titel) {
   const h1 = h('h1', null, titel), B = r.B;
@@ -229,7 +238,7 @@ export function infoPop(btn) {        // i-Knopf: Begriff und Erklärung aus dem
   showPop(btn, dt ? dt.textContent : btn.dataset.g, [
     h('p', null, dt ? dt.nextElementSibling.textContent : 'Keine Erklärung gefunden.'),
     btn.dataset.x ? h('p', {class: 'warn'}, btn.dataset.x) : null,
-    h('p', null, h('a', {href: '#lesart/' + btn.dataset.g}, 'In der Lesart ansehen')),
+    h('p', null, h('a', {href: '#erklaerungen/' + btn.dataset.g}, 'In den Erklärungen ansehen')),
   ]);
 }
 

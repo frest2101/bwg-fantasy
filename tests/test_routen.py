@@ -18,11 +18,12 @@ APP_JS = JS / "app.js"
 INDEX = APP / "index.html"
 # die fünf Bereiche in der Reihenfolge der Tabs
 TABS = ["liga", "staerke", "woche", "markt", "keeper"]
-# Routen der App bis 03.10.2026 (sieben Tabs und Ansichten ohne Tab): Jede lebt als Umleitung weiter, damit Lesezeichen,
+# Routen der App bis 04.10.2026 (sieben Tabs, Ansichten ohne Tab, Lesart): Jede lebt als Umleitung weiter, damit Lesezeichen,
 # README, Aufträge und die Anweisung des Claude-Projekts nicht ins Leere führen
 ALTE_ROUTEN = {"tabelle", "tabelle/allplay", "tabelle/punkte", "tabelle/coaching", "tabelle/ausblick", "ranking",
                "spielplan", "rekorde", "rekorde/h2h", "matchup", "dst", "dst/offense", "wetter", "waiver", "moves",
-               "moves/draft", "keeper/kader", "keeper/wert"}
+               "moves/draft", "keeper/kader", "keeper/wert",
+               "lesart"}                          # seit Paket P4 (04.10.2026) „Erklärungen“, #erklaerungen
 # Elemente, die per „#…“ angesprochen werden, aber keine Routen sind (Sprungmarke, Knöpfe im Kopf)
 KEINE_ROUTE = {"main", "stand", "such"}
 

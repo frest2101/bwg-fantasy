@@ -5,7 +5,7 @@ const SUBS = [['', 'Saison'], ['positionen', 'Positionen'], ['alltime', 'All-Tim
 const LABEL = {hoechster_score: 'Höchster Wochenscore', niedrigster_score: 'Niedrigster Wochenscore', groesster_sieg: 'Größter Sieg',
   knappstes_ergebnis: 'Knappstes Ergebnis', hoechster_verlierer: 'Höchster Verlierer-Score',
   niedrigster_sieger: 'Niedrigster Sieger-Score', laengste_siegesserie: 'Längste Siegesserie', laengste_niederlagenserie: 'Längste Niederlagenserie',
-  hoechste_bank: 'Meiste Bank-Punkte', meiste_verschenkt: 'Meiste verschenkte Punkte', bester_spieler: 'Bester Einzelspieler',
+  hoechste_bank: 'Meiste Bankpunkte', meiste_verschenkt: 'Meiste verschenkte Punkte', bester_spieler: 'Bester Einzelspieler',
   beste_bilanz: 'Beste Bilanz', meiste_pf: 'Meiste PF je Spiel', beste_pf_plus: 'Beste PF+', wenigste_pf: 'Wenigste PF je Spiel'};
 const AERA = {alt: 'Alt-Scoring 2015–17', bwg: 'BWG-Scoring ab 2018'};
 const POS = ['QB', 'RB', 'WR', 'TE', 'K', 'D/ST'], SLOTS = ['QB', 'RB', 'WR', 'TE', 'FLEX', 'OP', 'D/ST', 'K'];
@@ -117,18 +117,18 @@ function h2h(box, r) {
   const draw = () => {
     const rows = S.teams.filter(t => t.team_id !== sel).map(t => ({t, x: rec(sel, t.team_id)}));
     for (const [tid, tr] of mxRows) tr.classList.toggle('me', tid === sel);
-    list.replaceChildren(U.table({cap: `H2H 2026: ${U.team(sel)?.name}`, cls: 'nr kurz', rh: 0, rows, sort: ['d', -1], cols: [
+    list.replaceChildren(U.table({cap: `Duelle 2026: ${U.team(sel)?.name}`, cls: 'nr kurz', rh: 0, rows, sort: ['d', -1], cols: [
       {k: 'o', l: 'Gegner', v: x => x.t.name.toLowerCase(), d: 1, f: x => U.tl(x.t.team_id)},
       {k: 'n', l: 'Spiele', num: 1, v: x => x.x?.n ?? null, f: x => x.x ? x.x.n : U.na('noch kein Duell')},
       {k: 'b', l: 'Bilanz', v: x => x.x ? x.x.w - x.x.l : null, f: x => x.x ? txt(x.x) : '–'},
       {k: 'd', l: 'PF-Diff', num: 1, v: x => x.x?.d ?? null, f: x => x.x ? U.sgn(x.x.d) : '–'}]}));
   };
-  const mx = U.scrollHint(h('div', {class: 'tw', role: 'region', tabindex: '0', 'aria-label': 'H2H-Matrix'},
-    h('table', {class: 'mx'}, h('caption', null, 'H2H-Matrix 2026 (Zeile gegen Spalte, W-L)'),
+  const mx = U.scrollHint(h('div', {class: 'tw', role: 'region', tabindex: '0', 'aria-label': 'Matrix aller Duelle'},
+    h('table', {class: 'mx'}, h('caption', null, 'Alle Duelle 2026 (Zeile gegen Spalte, W-L)'),
       h('thead', null, h('tr', null, h('td', null, ''), S.teams.map(t => h('th', {scope: 'col'}, h('a', {href: '#team/' + t.team_id, 'aria-label': t.name}, t.kuerzel))))),
       h('tbody', null, S.teams.map(a => {
         // Zeilenkopf wählt das Team für die Liste darüber (Spaltenköpfe bleiben Team-Links)
-        const tr = h('tr', null, h('th', {scope: 'row'}, h('a', {href: '#' + r.base + '?team=' + a.team_id, 'aria-label': `H2H von ${a.name} anzeigen`, onclick: e => {
+        const tr = h('tr', null, h('th', {scope: 'row'}, h('a', {href: '#' + r.base + '?team=' + a.team_id, 'aria-label': `Duelle von ${a.name} anzeigen`, onclick: e => {
           e.preventDefault(); sel = a.team_id; U.setQ(r.base, {team: sel}); selBox.value = String(sel); draw();
           list.scrollIntoView({block: 'start', behavior: 'smooth'});
         }}, a.kuerzel)),
@@ -154,17 +154,17 @@ function alltime(box, H, r) {
   U.ap(box, U.table({cap: h('span', null, 'All-Time 2015–2025', h('span', {class: 'sub'}, 'Bilanz und PF: Regular Season')), cls: 'nr kurz lab', rh: 0, rows: A, sort: ['ti', -1], cols: [
     {k: 'n', l: 'Franchise', v: a => a.name_2026.toLowerCase(), d: 1, f: a => [U.team(a.slot) ? U.tl(a.slot) : a.name_2026,
       a.namenskette !== a.name_2026 ? h('span', {class: 'sub'}, a.namenskette) : null]},
-    {k: 's', l: 'S', num: 1, v: a => a.saisons, f: a => a.saisons},
+    {k: 's', l: 'Saisons', num: 1, v: a => a.saisons, f: a => a.saisons},
     {k: 'wl', l: 'W-L', num: 1, v: a => a.w, f: a => `${a.w}-${a.l}`},
     {k: 'wp', l: 'W %', num: 1, v: a => a.w_pct, f: a => U.pct(a.w_pct)},
     {k: 'pf', l: 'PF', num: 1, v: a => a.pf, f: a => U.num(a.pf)},
     {k: 'pp', l: 'Ø PF+', num: 1, v: a => a.pf_plus_avg, f: a => U.num(a.pf_plus_avg, 1)},
     {k: 'ti', l: 'Titel', num: 1, v: a => a.titel, f: a => a.titel},
     {k: 'fi', l: 'Finals', num: 1, v: a => a.finals, f: a => a.finals},
-    {k: 'po', l: 'PO', num: 1, v: a => a.playoffs, f: a => a.playoffs},
-    {k: 'dv', l: 'Div.-Titel', num: 1, v: a => a.divisionssiege, f: a => a.divisionssiege},
-    {k: 'sc', l: 'Scoring', num: 1, v: a => a.scoring_titel, f: a => a.scoring_titel},
-    {k: 'le', l: 'Letzter', num: 1, v: a => a.letzte, f: a => a.letzte},
+    {k: 'po', l: 'Playoffs', num: 1, v: a => a.playoffs, f: a => a.playoffs},
+    {k: 'dv', l: 'Divisionstitel', num: 1, v: a => a.divisionssiege, f: a => a.divisionssiege},
+    {k: 'sc', l: 'Scoring-Titel', num: 1, v: a => a.scoring_titel, f: a => a.scoring_titel},
+    {k: 'le', l: 'Letzter Platz', num: 1, v: a => a.letzte, f: a => a.letzte},
     {k: 'pl', l: 'Ø Platz', num: 1, v: a => a.platz_avg, d: 1, f: a => U.num(a.platz_avg, 1)}]}),
   U.legend(['saisons', 'wpct-alltime', 'pfplus', 'pfplus-avg', 'titel-finals', 'playoffs-alltime', 'div-titel', 'scoring-titel', 'letzter', 'endplatz', 'aera']));
   const R = H.rekorde || {};
@@ -186,16 +186,16 @@ function alltime(box, H, r) {
   const draw = () => {
     const f = (H.seasons || []).find(s => s.season === yr) || {};
     const rows = (H.team_seasons || []).filter(t => t.season === yr);
-    out.replaceChildren(h('p', {class: 'note'}, [f.platform, f.teams && `${f.teams} Teams`, f.rs_games && `${f.rs_games} RS-Spiele`, f.scoring_era, f.qb_format, f.playoff_format].filter(Boolean).join(' · ')),
+    out.replaceChildren(h('p', {class: 'note'}, [f.platform, f.teams && `${f.teams} Teams`, f.rs_games && `${f.rs_games} Spiele Regular Season`, f.scoring_era, f.qb_format, f.playoff_format].filter(Boolean).join(' · ')),
       U.table({cap: `Saison ${yr}`, cls: 'rk', rows, sort: ['p', 1], cols: [
         {k: 'p', l: '#', v: t => t.final_rank, d: 1, f: t => t.final_rank},
         {k: 'n', l: 'Team', v: t => t.team_name.toLowerCase(), d: 1, f: t => t.team_name},
-        {k: 'dv', l: 'Div/Pl.', num: 1, v: t => t.division * 10 + t.div_rank, d: 1, f: t => `${t.division}/${t.div_rank}.`},
+        {k: 'dv', l: 'Division / Platz', num: 1, v: t => t.division * 10 + t.div_rank, d: 1, f: t => `${t.division}/${t.div_rank}.`},
         {k: 'wl', l: 'W-L', num: 1, v: t => t.w_pct, f: t => `${t.w}-${t.l}`},
         {k: 'pf', l: 'PF', num: 1, v: t => t.pf, f: t => U.num(t.pf)},
         {k: 'pp', l: 'PF+', num: 1, v: t => t.pf_plus, f: t => U.num(t.pf_plus, 1)},
-        {k: 'po', l: 'PO', v: t => +t.playoffs, f: t => t.playoffs ? h('span', null, '✓', h('span', {class: 'vh'}, ' ja')) : ''},
-        {k: 'sc', l: 'Scoring', v: t => +t.scoring_titel, f: t => t.scoring_titel ? h('span', null, '✓', h('span', {class: 'vh'}, ' ja')) : ''}]}));
+        {k: 'po', l: 'Playoffs', v: t => +t.playoffs, f: t => t.playoffs ? h('span', null, '✓', h('span', {class: 'vh'}, ' ja')) : ''},
+        {k: 'sc', l: 'Scoring-Titel', v: t => +t.scoring_titel, f: t => t.scoring_titel ? h('span', null, '✓', h('span', {class: 'vh'}, ' ja')) : ''}]}));
   };
   U.ap(box, h('h2', {style: 'margin-top:16px'}, 'Saisontabellen'), h('div', {class: 'row'}, h('label', null, 'Saison ', h('select', {onchange: e => {
     yr = +e.target.value; U.setQ(r.base + '/alltime', {saison: yr}); draw();
@@ -212,7 +212,7 @@ function champions(box, H) {
     {k: 'pf', l: 'PF', num: 1, v: c => c.pf, f: c => U.num(c.pf)},
     {k: 'pp', l: 'PF+', num: 1, v: c => c.pf_plus, f: c => U.num(c.pf_plus, 1)},
     {k: 'sc', l: 'Scoring-Titel', v: c => +c.scoring_titel, f: c => c.scoring_titel ? h('span', null, '✓', h('span', {class: 'vh'}, ' ja')) : ''},
-    {k: 'a', l: 'Ära', v: c => c.aera, d: 1, f: c => [AERA[c.aera] || c.scoring_era, c.rs_games ? h('span', {class: 'sub'}, `${c.rs_games} RS-Spiele`) : null]}]}),
+    {k: 'a', l: 'Ära', v: c => c.aera, d: 1, f: c => [AERA[c.aera] || c.scoring_era, c.rs_games ? h('span', {class: 'sub'}, `${c.rs_games} Spiele Regular Season`) : null]}]}),
   U.legend(['pfplus', 'scoring-titel', 'aera']));
   const n = {};
   for (const c of C) n[c.slot] = (n[c.slot] || 0) + 1;

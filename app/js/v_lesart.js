@@ -1,4 +1,5 @@
-// Lesart: das Glossar steht als <dl id="glossar"> in index.html (ohne JS lesbar); hier nur Suche und Sprungmarken.
+// Erklärungen (#erklaerungen, bis P4 „Lesart“): das Glossar steht als <dl id="glossar"> in index.html (ohne JS lesbar),
+// gegliedert nach den Bereichen der App; hier nur Suche und Sprungmarken.
 export function render(box, ctx, r) {
   const {h} = ctx.ui;
   const gl = document.getElementById('glossar');
@@ -18,11 +19,11 @@ export function render(box, ctx, r) {
     gl.hidden = n === 0;            // kein leerer Rahmen ohne Treffer
     count.textContent = !q ? `${items.length} Begriffe` : n ? `${n} von ${items.length} Begriffen` : 'Kein Begriff gefunden.';
   };
-  box.append(h('h1', null, 'Lesart'),
+  box.append(h('h1', null, 'Erklärungen'),
     h('p', null, 'Kurzfassung aller Begriffe der App. Verbindlich sind die Rechenregeln im Repo. Fehlende Werte stehen als „–“, alle Projektionen sind ESPN-Schätzungen.'),
     h('div', {class: 'row'}, h('label', null, 'Begriff suchen ', h('input', {type: 'search', oninput: e => filter(e.target.value)}))),
     count,
-    h('nav', {class: 'chips', 'aria-label': 'Bereiche der Lesart'}, areas.map(d => h('a', {href: '#lesart/' + d.querySelector('dt').id.slice(2)}, d.dataset.b))));
+    h('nav', {class: 'chips', 'aria-label': 'Abschnitte der Erklärungen'}, areas.map(d => h('a', {href: '#erklaerungen/' + d.querySelector('dt').id.slice(2)}, d.dataset.b))));
   filter('');
   for (const d of items) d.classList.remove('hit');
   const t = r.sub && document.getElementById('g-' + r.sub);

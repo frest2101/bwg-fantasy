@@ -250,7 +250,7 @@ def test_glossar_eintraege():
     knoepfe |= set(re.findall(r"'([\w-]+)'", legende.group(1)))
     assert knoepfe and knoepfe <= ids, f"i-Knopf ohne Glossareintrag: {sorted(knoepfe - ids)}"
     assert set(GLOSSAR) <= knoepfe
-    assert "#lesart/tageslauf-starten" in code(APP_JS)
+    assert "#erklaerungen/tageslauf-starten" in code(APP_JS)
 
     def eintrag(gid: str) -> str:
         return re.search(rf'<dt id="g-{gid}">.*?</dt><dd>(.*?)</dd>', html, re.S).group(1)

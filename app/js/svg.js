@@ -243,7 +243,7 @@ export function verlauf(hid, pick) {
       x: xl, series: S.teams.map(x => ({name: x.kuerzel, vals: x.wochen.wochenrang, hi: x.team_id === sel})),
       invert: true, max: S.teams.length, yfmt: v => v + '.', H: 200})(w);
   };
-  const tab = key => () => ({heads: ['Woche', ...S.teams.map(t => t.kuerzel), ...(key === 'pf' ? ['Ø'] : [])],
+  const tab = key => () => ({heads: ['Woche', ...S.teams.map(t => t.kuerzel), ...(key === 'pf' ? ['Ligaschnitt'] : [])],
     rows: weeks.map((w, i) => ['W' + w, ...S.teams.map(t => key === 'pf' ? num(t.wochen.pf[i]) : t.wochen.wochenrang[i]),
       ...(key === 'pf' ? [num(avgW[i])] : [])])});
   const f1 = fig('PF-Verlauf', d1, tab('pf'));

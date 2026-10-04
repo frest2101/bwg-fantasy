@@ -1,11 +1,13 @@
-// Bereich Stärke: Power Ranking (μ, Trend, E, Kernsätze) und Eigener Score mit Profil-Chips, sieben Reglern und Normierung.
+// Bereich Stärke: Power Ranking (Stärke μ, Trend, Erwartete All-Play % E, Kernsätze) und Eigener Score mit Profil-Chips,
+// sieben Reglern und Normierung. Formelzeichen nur hier im Code und im Glossar, nie im Spaltenkopf (App-Konzept 04.10.2026).
 // Der Browser rechnet nur Score = Σ w · norm[kind][m] / Σ w aus den fertigen Normwerten (teams.json), nie selbst normiert.
 let U, S, h;
 const GID = {pf: 'pfspiel', allplay: 'allplay', win: 'win', coaching: 'effizienz', floor: 'floor', form: 'form'};
-// Kurzformen wie im Rest der App (Tabellenkopf und Regler); der volle Name steht im title
+// Kurzformen wie im Rest der App (Tabellenkopf und Regler); der volle Name steht im title. Kader heißt hier kurz
+// „Kader“, gleich ob Beste Aufstellung Ø oder Projektion Kader zählt (die Zeile unter der Tabelle nennt die Quelle)
 const SHORT = m => ({pf: 'PF/Spiel', allplay: 'All-Play', win: 'Win', coaching: 'Coaching', floor: 'Floor', form: 'Form',
-  kader: /pot/i.test(m.label) ? 'Kader-Pot.' : 'Kader-Proj.'})[m.key] || m.label;
-// Standard (z, Profil Stärke) steht in der Lesart; ohne „(Standard)“ passen die Chips auf dem Handy in eine Zeile
+  kader: 'Kader'})[m.key] || m.label;
+// Standard (z, Profil Stärke) steht in den Erklärungen; ohne „(Standard)“ passen die Chips auf dem Handy in eine Zeile
 const NORMS = [['z', 'z-Wert'], ['minmax', 'Min–Max'], ['rank', 'Rangpunkte']];
 const slug = s => s.toLowerCase().replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue');
 
@@ -23,19 +25,19 @@ function power(box, r, svg) {
   if (!rows.length) { U.ap(box, h('p', {class: 'note'}, 'Das Power Ranking folgt.')); return; }
   const vorjahr = rows.some(t => t.pr.p_quelle === 'vorjahr');
   const n = S.tw;
-  U.ap(box, vorjahr ? h('p', {class: 'warn'}, h('strong', null, 'P aus Vorjahr: '),
-    'Die Kader-Projektion liegt noch nicht vor, P kommt aus der Vorjahresleistung. ', U.ib('p', '')) : null,
+  U.ap(box, vorjahr ? h('p', {class: 'warn'}, h('strong', null, 'Projektion Kader aus dem Vorjahr: '),
+    'Die Projektion des Kaders liegt noch nicht vor, bis dahin zählt die Vorjahresleistung. ', U.ib('p', '')) : null,
   U.table({cap: `Power Ranking nach W${n}`, cls: 'rk', rows, sort: ['r', 1], cols: [
     {k: 'r', l: '#', v: t => t.pr.rang, d: 1, f: t => t.pr.rang},
-    {k: 'team', l: 'Team', v: t => t.name.toLowerCase(), d: 1, f: t => [U.tl(t.team_id), t.pr.p_quelle === 'vorjahr' ? h('span', {class: 'badge', title: 'P aus Vorjahr'}, 'P VJ') : null]},
+    {k: 'team', l: 'Team', v: t => t.name.toLowerCase(), d: 1, f: t => [U.tl(t.team_id), t.pr.p_quelle === 'vorjahr' ? h('span', {class: 'badge', title: 'Projektion Kader aus dem Vorjahr'}, 'Vorjahr') : null]},
     {k: 'tr', l: 'Trend', num: 1, v: t => t.pr.trend, f: t => U.trend(t.pr.trend, 'noch kein Vorwochenvergleich')},
-    {k: 'mu', l: 'μ', num: 1, v: t => t.pr.mu, f: t => [U.num(t.pr.mu, 1), h('span', {class: 'sub'}, '± ' + U.num(t.pr.se, 1))]},
-    {k: 'e', l: 'E %', num: 1, v: t => t.pr.e, f: t => U.pct(U.ok(t.pr.e) ? t.pr.e * 100 : null)},
-    {k: 'ap', l: 'AP % Ist', num: 1, v: t => t.allplay_pct, f: t => U.pct(t.allplay_pct)},
+    {k: 'mu', l: 'Stärke', num: 1, v: t => t.pr.mu, f: t => [U.num(t.pr.mu, 1), h('span', {class: 'sub'}, '± ' + U.num(t.pr.se, 1))]},
+    {k: 'e', l: 'Erwartete All-Play %', num: 1, v: t => t.pr.e, f: t => U.pct(U.ok(t.pr.e) ? t.pr.e * 100 : null)},
+    {k: 'ap', l: 'All-Play % bisher', num: 1, v: t => t.allplay_pct, f: t => U.pct(t.allplay_pct)},
     {k: 'wl', l: S.hasT ? 'W-L-T' : 'W-L', v: t => -t.rang, f: U.rec},
-    {k: 'p', l: 'P', num: 1, v: t => t.pr.p, f: t => U.val(t.pr.p, v => U.num(v, 1))},
-    {k: 'vw', l: 'Vorwoche', num: 1, v: t => t.pr.rang_vorwoche, d: 1, f: t => U.val(t.pr.rang_vorwoche, v => v + '.', 'noch kein Vorwochenvergleich')}]}),
-  U.legend(['mu', 'p', 'e', 'pr-rang', 'trend', 'kernsatz']));
+    {k: 'p', l: 'Projektion Kader', num: 1, v: t => t.pr.p, f: t => U.val(t.pr.p, v => U.num(v, 1))},
+    {k: 'vw', l: 'Rang Vorwoche', num: 1, v: t => t.pr.rang_vorwoche, d: 1, f: t => U.val(t.pr.rang_vorwoche, v => v + '.', 'noch kein Vorwochenvergleich')}]}),
+  U.legend(['mu', 'kader-proj', 'e', 'pr-rang', 'trend', 'kernsatz']));
   // Kernsätze als Liste (auf dem Handy lesbar); ohne Freigabe „folgt“
   const sorted = U.sortRows(rows, t => t.pr.rang, 1);
   const any = rows.some(t => t.pr.kernsatz);
@@ -43,10 +45,10 @@ function power(box, r, svg) {
     ? h('ol', {class: 'ksl'}, sorted.map(t => h('li', null, h('strong', null, U.tl(t.team_id)), ' ',
       t.pr.kernsatz ? h('p', {class: 'ks'}, t.pr.kernsatz) : h('span', {class: 'na'}, 'folgt'))))
     : h('p', {class: 'note'}, 'Die Kernsätze folgen nach Freigabe.')));
-  U.ap(box, svg.fig('Stärke μ mit Unsicherheit', svg.dots({title: 'Stärke μ je Team mit ± σ/√(n+6)', fmt: v => U.num(v, 1),
-    desc: `${sorted[0].name} vorn mit μ ${U.num(sorted[0].pr.mu, 1)}, ${sorted.at(-1).name} hinten mit ${U.num(sorted.at(-1).pr.mu, 1)}; die Striche zeigen die Unsicherheit.`,
+  U.ap(box, svg.fig('Stärke mit Unsicherheit', svg.dots({title: 'Stärke je Team mit Unsicherheit', fmt: v => U.num(v, 1),
+    desc: `${sorted[0].name} vorn mit Stärke ${U.num(sorted[0].pr.mu, 1)}, ${sorted.at(-1).name} hinten mit ${U.num(sorted.at(-1).pr.mu, 1)}; die Striche zeigen die Unsicherheit.`,
     rows: sorted.map(t => ({label: t.kuerzel, v: t.pr.mu, lo: t.pr.mu - t.pr.se, hi: t.pr.mu + t.pr.se}))}),
-  {heads: ['Team', 'μ', '±', 'E %', 'Rang'], rows: sorted.map(t => [t.name, U.num(t.pr.mu, 1), U.num(t.pr.se, 1), U.pct(U.ok(t.pr.e) ? t.pr.e * 100 : null), t.pr.rang])}));
+  {heads: ['Team', 'Stärke', '±', 'Erwartete All-Play %', 'Rang'], rows: sorted.map(t => [t.name, U.num(t.pr.mu, 1), U.num(t.pr.se, 1), U.pct(U.ok(t.pr.e) ? t.pr.e * 100 : null), t.pr.rang])}));
 }
 
 function scoreView(box, r) {
@@ -82,7 +84,7 @@ function scoreView(box, r) {
     rk = new Map(order.map((t, i) => [t.team_id, i + 1]));
   };
   const bar = v => {
-    if (!U.ok(v)) return U.na('Σ Gewichte = 0');
+    if (!U.ok(v)) return U.na('Summe der Gewichte = 0');
     const p = st.norm === 'z' ? (v - 20) / 60 * 100 : st.norm === 'rank' ? (v - 1) / 9 * 100 : v;
     return h('span', {class: 'pb', style: `--p:${Math.max(0, Math.min(100, p)).toFixed(1)}%`}, U.num(v, 1));
   };
@@ -137,8 +139,8 @@ function scoreView(box, r) {
       ins[m.key].setAttribute('aria-valuetext', `${st.w[m.key]} Punkte, ${a} Prozent`);
     }
     const pb = M.filter(m => ['pf', 'allplay', 'floor', 'form', 'kader'].includes(m.key)).reduce((a, m) => a + st.w[m.key], 0);
-    block.textContent = sw ? `Σ Gewichte ${sw} · davon Punkte-Block (PF, All-Play, Floor, Form, Kader) ${Math.round(pb / sw * 100)}${U.NB}%`
-      : 'Σ Gewichte = 0: kein Score („–“). Mindestens einen Regler hochziehen.';
+    block.textContent = sw ? `Summe der Gewichte ${sw} · davon Punkte-Block (PF, All-Play, Floor, Form, Kader) ${Math.round(pb / sw * 100)}${U.NB}%`
+      : 'Summe der Gewichte = 0: kein Score („–“). Mindestens einen Regler hochziehen.';
     profSeg.set(slug(match(st.w)));
     update();
   }
@@ -151,7 +153,8 @@ function scoreView(box, r) {
     U.setQ(r.base, {profil: slug(p), w: p === 'eigene' ? M.map(m => st.w[m.key]).join(',') : null, norm: st.norm !== 'z' ? st.norm : null});
     U.store.set('bwg-score', st);
   }
-  const kader = M.find(m => m.key === 'kader');
+  // Name der Kader-Kennzahl wie Spaltenkopf und Glossar (das label aus teams.json trägt noch den alten Namen)
+  const kader = M.some(m => m.key === 'kader') ? (S.meta.kader_quelle === 'projektion' ? 'Projektion Kader' : 'Beste Aufstellung Ø') : '–';
   // Bedienung im DOM zuerst (Handy: über der Tabelle), ab 900 px rechts daneben
   U.ap(box, h('div', {class: 'two sc2'},
     h('div', {class: 'side'},
@@ -159,7 +162,7 @@ function scoreView(box, r) {
       h('div', {class: 'row'}, h('span', {class: 'note'}, 'Normierung'), normSeg),
       panel),
     h('div', {class: 'm1'}, tbl, h('div', {class: 'row'}, rawSeg),
-      h('p', {class: 'note'}, `Kennzahl Kader: ${kader?.label || '–'}`, U.ib(gid('kader'), ''),
+      h('p', {class: 'note'}, `Kennzahl Kader: ${kader}`, U.ib(gid('kader'), ''),
         ` Anzeige bei z: 50 + 10 · Score; 50 = Ligaschnitt. Standard: Profil ${std}, z-Wert.`),
       U.legend(['score', 'kennzahlen', 'z', 'minmax', 'rangpunkte', 'profile']))));
   sync(false);

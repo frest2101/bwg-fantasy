@@ -1,9 +1,9 @@
 // Spieltag live (#spieltag, #spieltag/<team_id>; erste Ansicht im Bereich Woche): holt beim Öffnen und auf „Aktualisieren“ den laufenden Spieltag direkt
-// bei ESPN (nur lesend, ohne Zugangsdaten) und zeigt Matchups, Aufstellungen und Bewegungen – nach den Regeln des
+// bei ESPN (nur lesend, ohne Zugangsdaten) und zeigt Paarungen, Aufstellungen und Bewegungen – nach den Regeln des
 // Stand-Skripts scripts/claude_stand.py, aber nur, was die öffentliche App zeigt (keine gescheiterten Claims, keine
 // Trade-Vorschläge). Gerechnet wird in live_core.js (reine Funktionen); hier nur Abruf und Anzeige.
 // Kein Teil des Datenvertrags (docs/app_daten.md): Die Ansicht liest ESPN im Browser, nichts davon wird gespeichert.
-// Aus den App-Daten kommen Teamnamen, Kürzel, Spielerseiten, der Tagesstand der Kader (waiver.json) und die bekannten
+// Aus den App-Daten kommen Teamnamen, Kürzel, Spielerseiten, der Stand der Kader laut Tageslauf (waiver.json) und die bekannten
 // Transaktionen (transactions.json) für das Kennzeichen „neu“; jeder Abruf holt vorher den Datenstand der App neu
 // (ctx.refresh), damit nach einem Tageslauf „Aktualisieren“ genügt.
 // Kein Dauerabruf: Je Abruf werden rund 1,1 MB übertragen (4,5 MB entpackt). Die einzigen Zeitgeber hier brechen ab
@@ -59,7 +59,7 @@ async function abrufen(saison, bekannt, signal) {
     // Nach dem Saisonende gibt ESPN eine vergangene Saison nicht mehr ohne Anmeldung heraus (Liga-Vorjahre: 404)
     if ([401, 403, 404].includes(lg.reason.status)) {
       throw fehler('saison', `ESPN antwortet für die Saison ${saison} mit HTTP ${lg.reason.status} – nach dem Saisonende ist das zu erwarten, `
-        + 'dann stellt ESPN die Liga auf die neue Saison um; Tabelle und Rekorde der App zeigen den Endstand');
+        + 'dann stellt ESPN die Liga auf die neue Saison um; Liga › Tabelle und Rekorde der App zeigen den Endstand');
     }
     throw lg.reason;
   }
@@ -87,7 +87,7 @@ async function abrufen(saison, bekannt, signal) {
 }
 
 // Auszug der App-Daten für live_core: Namen je Spieler (players.json, waiver.json, transactions.json), Kader laut
-// Tagesstand, bekannte Transaktionen; dazu die Spieler mit eigener Seite in der App (wie merge() in v_spieler.js)
+// Stand der App (Tageslauf), bekannte Transaktionen; dazu die Spieler mit eigener Seite in der App (wie merge() in v_spieler.js)
 function appAuszug(P, W, T) {
   const spieler = {}, seiten = new Set();
   for (const [id, name] of Object.entries(T?.spieler || {})) if (name) spieler[id] = {name};
@@ -241,7 +241,7 @@ export async function render(box, ctx, r) {
     meldung.replaceChildren(h('div', {class: 'err blk', role: 'alert'},
       h('p', null, h('strong', null, `${U.zeit(Date.now())} Uhr: `), TITEL[e.art] || 'Die Live-Ansicht konnte den Abruf nicht verarbeiten.'),
       h('p', {class: 'note'}, `Grund: ${e.art ? e.message : 'unerwarteter Fehler (Einzelheiten in der Konsole des Browsers)'}. `,
-        alt ? `Darunter steht weiter der Stand von ${wann(alt.t)}.` : 'Die übrigen Seiten der App zeigen weiter den Tagesstand.'),
+        alt ? `Darunter steht weiter der Stand von ${wann(alt.t)}.` : 'Die übrigen Seiten der App zeigen weiter den Stand des letzten Tageslaufs.'),
       nochmal));
     if (alt && !gezeigt) { try { zeichne(); } catch (x) { console.error(x); } }
     if (!gezeigt) kopf.replaceChildren('Live von ESPN – der Abruf ist gescheitert.');
@@ -254,14 +254,14 @@ export async function render(box, ctx, r) {
     const ts = U.utc(tagesstand);
     kopf.replaceChildren();
     U.ap(kopf, h('strong', null, `Stand ${wann(t)}`), ` · W${E.woche} · live von ESPN `, U.ib('live', ''),
-      h('br'), 'App: ', ts ? `Tagesstand ${U.stamp(ts)} (${alter(t - ts.getTime())})` : 'noch kein Tagesstand');
+      h('br'), 'App: ', ts ? `${U.standTxt(ts)} (${alter(t - ts.getTime())})` : 'noch kein Stand des Tageslaufs');
     body.replaceChildren();
     gezeigt = true;
-    if (E.neuer) U.ap(body, h('p', {class: 'warn'}, 'Bewegungen oder Kader sind neuer als der Tagesstand der App. „Tageslauf starten“ holt sie nach; '
+    if (E.neuer) U.ap(body, h('p', {class: 'warn'}, 'Bewegungen oder Kader sind neuer als der Stand der App. „Tageslauf starten“ holt sie nach; '
       + 'etwa 2 Minuten später genügt hier „Aktualisieren“. ', U.ib('tageslauf-starten', '')));
     if (E.ruhe) {
       U.ap(body, h('p', {class: 'warn'}, E.ruhe === 'nach'
-        ? 'Die Saison ist bei ESPN beendet – es läuft kein Spieltag mehr. Tabelle und Rekorde der App zeigen den Endstand.'
+        ? 'Die Saison ist bei ESPN beendet – es läuft kein Spieltag mehr. Liga › Tabelle und Rekorde der App zeigen den Endstand.'
         : 'ESPN meldet für die laufende Woche keine Paarung – zurzeit läuft kein Spieltag.'));
     } else {
       const auf = h('section', {class: 'blk'}, h('h2', null, 'Aufstellung'));
@@ -330,15 +330,15 @@ function starterTxt(s, hatSb) {
     .filter(([k]) => s[k]).map(([k, w]) => ` +${s[k]} ${w}`).join('');
 }
 
-// Matchups: je Paarung beide Teams mit Punkten live, Live-Projektion, Siegchance (ESPN) und Starterzahlen
+// Paarungen: je Paarung beide Teams mit Punkten live, Live-Projektion, Siegchance (ESPN) und Starterzahlen
 function matchups(E, mine) {
   const ms = E.matchups;
-  if (ms.fehler) return abschnittFehler('Matchups', ms);
+  if (ms.fehler) return abschnittFehler('Paarungen', ms);
   const side = (m, s) => {
     const ich = s.teamId === mine;
     return h('div', {class: 'gl' + (m.sieger === s.teamId ? ' win' : '')},
       h('div', {class: 'lvt'}, teamLink(s.teamId, E),
-        h('span', {class: 'sub'}, `${s.w}-${s.l}` + (s.t ? `-${s.t}` : '') + ` · Proj. ${pkt(s.proj)} · Siegchance${U.NB}${U.ok(s.chance) ? U.num(C.runden(s.chance, 0, 2), 0) + U.NB + '%' : '–'}`),
+        h('span', {class: 'sub'}, `${s.w}-${s.l}` + (s.t ? `-${s.t}` : '') + ` · Projektion ${pkt(s.proj)} · Siegchance${U.NB}${U.ok(s.chance) ? U.num(C.runden(s.chance, 0, 2), 0) + U.NB + '%' : '–'}`),
         ich ? h('span', {class: 'sub lvi'}, 'Mein Team') : null),
       h('span', {class: 'pts'}, pkt(s.punkte)));
   };
@@ -346,8 +346,8 @@ function matchups(E, mine) {
     m.seiten.map(s => `${s.kz} ${starterTxt(s.starter, E.hatSb)}`).join(' · '),
     m.freilos ? ' · Freilos' : '', m.unentschieden ? ' · Unentschieden' : m.sieger != null ? ` · Sieger ${kzTxt(m.sieger, E)}` : '',
     m.runde ? ` · ${m.runde}` : ''];
-  return h('section', {class: 'blk'}, h('h2', null, `Matchups W${E.woche}`),
-    E.periode !== E.woche ? h('p', {class: 'note'}, `Matchup-Periode ${E.periode}; Starterzahlen und Aufstellungen gelten für die ESPN-Woche ${E.woche}.`) : null,
+  return h('section', {class: 'blk'}, h('h2', null, `Paarungen W${E.woche}`),
+    E.periode !== E.woche ? h('p', {class: 'note'}, `Paarungsperiode ${E.periode}; Starterzahlen und Aufstellungen gelten für die ESPN-Woche ${E.woche}.`) : null,
     h('ul', {class: 'games lvm'}, ms.map(m => h('li', {class: 'game' + (m.seiten.some(s => s.teamId === mine) ? ' mine' : '')},
       m.seiten.map(s => side(m, s)), h('div', {class: 'gm'}, meta(m))))),
     h('p', {class: 'note'}, 'Punkte laufender Spiele sind Zwischenstände; Projektion und Siegchance stammen von ESPN. ', U.ib('live-siegchance', '')));
@@ -376,16 +376,16 @@ function teamBox(a, E, tid) {
     {k: 's', l: 'Slot', f: z => z.slot},
     {k: 'n', l: 'Spieler', f: z => h(seite(z.id) ? 'a' : 'span', {href: seite(z.id) ? '#spieler/' + z.id : null, class: 'pl'},
       h('span', null, z.name, verl(z)), h('span', {class: 'sub'}, `${z.pos} · ${z.nfl} · ${spielTxt(z, E.hatSb)}`),
-      z.hinweis ? h('span', {class: 'sub'}, `→ mehr Proj. als ${zielTxt(z.hinweis)}`) : null)},
+      z.hinweis ? h('span', {class: 'sub'}, `→ mehr Projektion als ${zielTxt(z.hinweis)}`) : null)},
     {k: 'i', l: 'Pkt', num: 1, f: z => U.ok(z.ist) ? pkt(z.ist) : U.na(z.state === 'unklar' ? 'Spielstatus unklar' : C.OFFEN.includes(z.state) ? 'noch nicht gespielt' : 'kein Wert von ESPN')},
-    {k: 'p', l: 'Proj.', num: 1, f: z => U.ok(z.proj) ? pkt(z.proj) : U.na(C.SPIELFREI.includes(z.state) ? 'spielfrei: keine Projektion' : 'keine ESPN-Projektion')}];
+    {k: 'p', l: 'Projektion', num: 1, f: z => U.ok(z.proj) ? pkt(z.proj) : U.na(C.SPIELFREI.includes(z.state) ? 'spielfrei: keine Projektion' : 'keine ESPN-Projektion')}];
   const g = a.gegner != null ? kzTxt(a.gegner, E) : null;
   return h('div', {class: 'blk'}, h('h3', null, teamLink(a.id, E), g ? h('small', {class: 'note'}, ` gegen ${g}`) : null),
     U.table({cap: `Starter ${a.kz}`, cls: 'nr lvz', rh: 1, sortable: false, rows: a.starter, cols}),
     a.besetzt < a.soll ? h('p', {class: 'warn'}, `Nur ${a.besetzt} von ${a.soll} Starter-Slots besetzt.`) : null,
     a.reserve.length ? U.table({cap: `Bank und IR ${a.kz}`, cls: 'nr lvz', rh: 1, sortable: false, rows: a.reserve, cols})
       : h('p', {class: 'note'}, 'Bank und IR: leer.'),
-    a.sammel.map(s => h('p', {class: 'note'}, `→ ${s.spieler.length} Bankspieler mit mehr Proj. als Starter ${zielTxt(s.starter)}: `,
+    a.sammel.map(s => h('p', {class: 'note'}, `→ ${s.spieler.length} Bankspieler mit mehr Projektion als Starter ${zielTxt(s.starter)}: `,
       s.spieler.map(x => `${x.name} ${pkt(x.proj)}`).join(', '))));
 }
 
@@ -404,29 +404,29 @@ function bewegungen(E) {
     U.ap(sec, U.table({cap: 'Zu- und Abgänge seit dem Wochenwechsel (neueste zuerst)', cls: 'nr kurz lvw', rh: 1, rows: b.zeilen, sort: ['d', -1],
       rc: x => x.neu ? 'me' : null, cols: [
         {k: 'd', l: 'Zeit', v: x => x.zeit, f: x => [U.ok(x.zeit) ? `${U.datum(x.zeit)} ${U.zeit(x.zeit)}` : '–',
-          h('span', {class: 'sub'}, ART[x.typ] || 'Bewegung', x.neu ? h('span', {class: 'badge'}, 'neu', h('span', {class: 'vh'}, ' seit Tagesstand')) : null)]},
+          h('span', {class: 'sub'}, ART[x.typ] || 'Bewegung', x.neu ? h('span', {class: 'badge'}, 'neu', h('span', {class: 'vh'}, ' seit Stand der App')) : null)]},
         {k: 't', l: 'Team', v: x => kzTxt(x.teamId, E), d: 1, f: x => teamLink(x.teamId, E)},
         {k: 'z', l: `Zugang (+) / Abgang (${U.MINUS})`, cls: 'lvc', f: x => x.typ === 'TRADE_ACCEPT' ? h('span', {class: 'note'}, 'Trade ohne Spieler (ESPN)')
           : h('div', {class: 'lvs'}, x.zu.map(p => pl(p, '+', 'Zugang')), x.ab.map(p => pl(p, U.MINUS, 'Abgang')))}]}),
     h('p', {class: 'note'}, !b.marken ? 'Die Transaktionen der App sind nicht geladen – „neu“ lässt sich nicht bestimmen.'
-      : b.neu ? `${b.neu} ${b.neu === 1 ? 'Bewegung ist' : 'Bewegungen sind'} neu seit dem Tagesstand.` : 'Alle Bewegungen stehen schon in der App.',
+      : b.neu ? `${b.neu} ${b.neu === 1 ? 'Bewegung ist' : 'Bewegungen sind'} neu seit dem Stand der App.` : 'Alle Bewegungen stehen schon in der App.',
     ' ', U.ib('neu-tagesstand', '')));
   } else U.ap(sec, h('p', {class: 'note'}, 'Keine Zu- oder Abgänge seit dem Wochenwechsel.'));
   U.ap(sec, b.lineup.length ? h('p', {class: 'note'}, `Aufstellungswechsel je Team (nur gezählt, zusammen ${b.lineupSumme}): ${gez(b.lineup)} `, U.ib('aufstellungswechsel', '')) : null,
-    h('p', {class: 'note'}, h('a', {href: '#markt/moves'}, 'Alle Moves der Saison (Tagesstand)')));
+    h('p', {class: 'note'}, h('a', {href: '#markt/moves'}, 'Alle Moves der Saison (Stand der App)')));
   return sec;
 }
 
-// Kader live gegen den Tagesstand (waiver.json): je Team die Abweichungen
+// Kader live gegen den Stand der App (waiver.json): je Team die Abweichungen
 function kader(E, ausfall) {
   const k = E.kader;
   if (k.fehler) return abschnittFehler('Kadervergleich', k);
-  const sec = h('section', {class: 'blk'}, h('h2', null, 'Kader live gegen Tagesstand'));
+  const sec = h('section', {class: 'blk'}, h('h2', null, 'Kader live gegen Stand der App'));
   const pl = (list, vz) => list.map(x => [' ', vz, merk.seiten.has(x.id) ? h('a', {href: '#spieler/' + x.id}, x.name) : x.name]);
-  if (!k.moeglich) U.ap(sec, h('p', {class: 'note'}, 'Kein Vergleich: Der Tagesstand der App ist nicht geladen.'));
-  else if (!k.abweichungen.length) U.ap(sec, h('p', null, `Kader live = Tagesstand (alle ${k.teams} Teams).`));
+  if (!k.moeglich) U.ap(sec, h('p', {class: 'note'}, 'Kein Vergleich: Der Stand der App ist nicht geladen.'));
+  else if (!k.abweichungen.length) U.ap(sec, h('p', null, `Kader live = Stand der App (alle ${k.teams} Teams).`));
   else U.ap(sec, h('ul', {class: 'lvk'}, k.abweichungen.map(x => h('li', null, teamLink(x.teamId, E), ':', pl(x.plus, '+'), pl(x.minus, U.MINUS)))),
-    h('p', {class: 'note'}, '+ steht live im Kader, aber noch nicht im Tagesstand; − steht im Tagesstand, live nicht mehr.'));
+    h('p', {class: 'note'}, '+ steht live im Kader, aber noch nicht in der App; − steht in der App, live nicht mehr.'));
   if (ausfall.kona) U.ap(sec, h('p', {class: 'note'}, `Spielernamen ohne Kader teils nur als Nummer (Nachabruf bei ESPN gescheitert: ${ausfall.kona}).`));
   return sec;
 }
