@@ -21,6 +21,8 @@ export async function render(box, ctx, r) {
   ({'': gesamt, division, allplay, punkte, coaching, playoffs: ausblick})[sub](box, r, svg, wi, week);
 }
 
+// Spalte nur für „Ausführlich“ (App-Konzept Abschnitt 8, Paket P5; ui.js table)
+const X = col => ({...col, x: 1});
 // Spalten, die mehrere Ansichten nutzen
 const c = {
   // „#“ nur, wo nach dem Tabellenplatz sortiert ist; sonst „Pl.“, damit die Folge 2, 1, 3 … nicht wie ein Sortierfehler wirkt
@@ -51,8 +53,8 @@ function streakVal(s) {
 
 function gesamt(box) {
   const tbl = U.table({cap: `Tabelle nach W${S.tw}`, cls: 'rk', rc: U.meRc, rows: S.teams, sort: ['rang', 1], cols: [
-    c.rang(), c.team(), c.wl(), c.n('pf', 'PF'), c.po('liga'), c.pct('allplay_pct', 'All-Play %'), c.n('pa', 'PA'),
-    c.n('diff', 'Diff', U.sgn), c.pct('efficiency', 'Eff. %'), c.streak()]});
+    c.rang(), c.team(), c.wl(), c.n('pf', 'PF'), c.po('liga'), X(c.pct('allplay_pct', 'All-Play %')), c.n('pa', 'PA'),
+    X(c.n('diff', 'Diff', U.sgn)), X(c.pct('efficiency', 'Eff. %')), X(c.streak())]});
   const last = S.weeks.filter(w => w.status === 'final').at(-1);
   const strip = last ? h('section', {'aria-labelledby': 'wk-h'},
     h('h2', {id: 'wk-h'}, h('a', {href: '#liga/ergebnisse/w' + last.week}, `W${last.week} kompakt`), h('span', {class: 'note'}, ' · ' + U.spanne(last.start))),
@@ -72,7 +74,7 @@ function division(box) {
     U.ap(box, h('div', {class: 'blk'}, U.table({cap: `${name} nach W${S.tw}`, cls: 'rk', rc: U.meRc, rows, sort: ['rd', 1], cols: [
       {k: 'rd', l: '#', v: t => t.rang_division, d: 1, f: t => t.rang_division}, c.team(), c.wl(), c.n('pf', 'PF'),
       c.po('liga'), {k: 'dv', l: 'Division %', num: 1, v: t => U.sp(t.sim?.liga?.division), f: t => U.pbar(U.sp(t.sim?.liga?.division))},
-      c.pct('allplay_pct', 'All-Play %'), c.n('pa', 'PA'), c.streak(), {k: 'rg', l: 'Tabelle', num: 1, v: t => t.rang, d: 1, f: t => t.rang + '.'}]})));
+      X(c.pct('allplay_pct', 'All-Play %')), X(c.n('pa', 'PA')), X(c.streak()), X({k: 'rg', l: 'Tabelle', num: 1, v: t => t.rang, d: 1, f: t => t.rang + '.'})]})));
   }
   U.ap(box, U.legend(['rang-div', 'wlt', 'pf', 'playoff', 'div-pct', 'allplay', 'streak']));
 }
@@ -97,10 +99,10 @@ function allplay(box, r, svg, wi, week) {
     U.ap(box, U.table({cap: `All-Play und Matchup-Glück – W${week}`, cls: 'rk', rc: U.meRc, rows: S.teams, sort: ['ap', -1], cols: [
       c.wr(wi), c.team(),
       {k: 'ap', l: anyT ? 'All-Play W-L-T' : 'All-Play W-L', num: 1, v: t => W(t).allplay_pct[wi], f: t => U.apwl(W(t).allplay_w[wi], W(t).allplay_l[wi], W(t).allplay_t[wi], anyT)},
-      c.wk('allplay_pct', 'All-Play %', wi, U.pct), c.erg(wi), c.gegner(wi),
-      {k: 'md', l: 'zum Median', num: 1, v: t => W(t).median_abstand[wi], f: t => U.val(W(t).median_abstand[wi], v => U.sgn(v, 1), 'kein Spiel')},
+      c.wk('allplay_pct', 'All-Play %', wi, U.pct), c.erg(wi), X(c.gegner(wi)),
+      X({k: 'md', l: 'zum Median', num: 1, v: t => W(t).median_abstand[wi], f: t => U.val(W(t).median_abstand[wi], v => U.sgn(v, 1), 'kein Spiel')}),
       {k: 'mg', l: 'Matchup-Glück', num: 1, v: mg, f: t => mgCell(mg(t), W(t).median_abstand[wi], W(t).gegner_abstand[wi], W(t).ergebnis[wi])},
-      c.wk('gegner_pkt', 'Spielplan Pkt', wi, U.sgn)],
+      X(c.wk('gegner_pkt', 'Spielplan Pkt', wi, U.sgn))],
     note: 'Gegner: Kürzel und dessen Wochenrang. Spielplan Pkt = Ligaschnitt − Punkte des Gegners (+ = leichter Gegner).'}),
     U.legend(['wochenrang', 'ap-wl', 'allplay', 'median', 'matchup-woche', 'spielplan-pkt']),
     svg.fig(`Matchup-Glück W${week}`, svg.hbars({title: `Matchup-Glück je Team – W${week}`, fmt: v => U.sgn(v),
@@ -112,9 +114,9 @@ function allplay(box, r, svg, wi, week) {
   const anyT = S.teams.some(t => t.allplay_t > 0);
   U.ap(box, U.table({cap: `All-Play und Matchup-Glück nach W${S.tw}`, cls: 'rk', rc: U.meRc, rows: S.teams, sort: ['allplay_pct', -1], cols: [
     c.rang('Pl.'), c.team(), {k: 'apwl', l: anyT ? 'All-Play W-L-T' : 'All-Play W-L', num: 1, v: t => t.allplay_pct, f: t => U.apwl(t.allplay_w, t.allplay_l, t.allplay_t, anyT)},
-    c.pct('allplay_pct', 'All-Play %'), c.wl(), {k: 'mb', l: 'Median-Bilanz', num: 1, v: t => t.median_w, f: t => `${t.median_w}-${t.median_l}`},
+    c.pct('allplay_pct', 'All-Play %'), X(c.wl()), X({k: 'mb', l: 'Median-Bilanz', num: 1, v: t => t.median_w, f: t => `${t.median_w}-${t.median_l}`}),
     {k: 'mg', l: 'Matchup-Glück', num: 1, v: t => t.matchup_glueck, f: t => U.ok(t.matchup_glueck) ? h('span', {class: t.matchup_glueck > 0 ? 'W' : t.matchup_glueck < 0 ? 'L' : 'na'}, U.sgn(t.matchup_glueck)) : '–'},
-    c.n('spielplan_pkt', 'Spielplan Pkt', U.sgn)],
+    X(c.n('spielplan_pkt', 'Spielplan Pkt', U.sgn))],
   note: h('span', null, 'Matchup-Glück je Woche mit Begründung: oben eine Woche wählen, z. B. ', h('a', {href: '#staerke/allplay/w' + S.tw}, `W${S.tw}`), '.')}),
   U.legend(['rang', 'ap-wl', 'allplay', 'median-bilanz', 'matchup', 'spielplan-pkt']));
   const rows = U.sortRows(S.teams, t => t.matchup_glueck, -1);
@@ -140,7 +142,7 @@ function punkte(box, r, svg, wi, week) {
     const rows = U.sortRows(S.teams, t => W(t).pf[wi], -1);
     U.ap(box, U.table({cap: `Punkte – W${week}`, cls: 'rk', rc: U.meRc, rows: S.teams, sort: ['pf', -1], cols: [
       c.wr(wi), c.team(), c.wk('pf', 'PF', wi), c.wk('pa', 'PA', wi), c.erg(wi), c.gegner(wi),
-      c.wk('projektion', 'Projektion', wi), c.wk('projektions_delta', 'Ist − Projektion', wi, U.sgn)],
+      X(c.wk('projektion', 'Projektion', wi)), X(c.wk('projektions_delta', 'Ist − Projektion', wi, U.sgn))],
     note: 'Gegner: Kürzel und dessen Wochenrang.'}),
     U.legend(['wochenrang', 'pf', 'proj-delta']),
     svg.fig(`PF je Team – W${week}`, svg.dots({title: `PF je Team – W${week}`, fmt: v => U.num(v), tfmt: v => U.num(v, 0),
@@ -152,9 +154,9 @@ function punkte(box, r, svg, wi, week) {
   const band = t => t.form_band == null ? U.na('ab 4 Spielen')
     : h('span', null, U.sgn(t.form_delta), h('span', {class: 'vh'}, ` (Band ±${U.num(t.form_band)})`), svg.mini(t.form_delta, t.form_band));
   U.ap(box, U.table({cap: `Punkte nach W${S.tw}`, cls: 'rk', rc: U.meRc, rows: S.teams, sort: ['pf', -1], cols: [
-    c.rang('Pl.'), c.team(), c.n('pf', 'PF'), c.n('pf_per_game', 'PF/Spiel'), c.n('pa_per_game', 'PA/Spiel'), c.n('floor', 'Floor'),
+    c.rang('Pl.'), c.team(), c.n('pf', 'PF'), c.n('pf_per_game', 'PF/Spiel'), X(c.n('pa_per_game', 'PA/Spiel')), X(c.n('floor', 'Floor')),
     c.n('form', 'Form'), {k: 'fd', l: 'Form zu Saison', num: 1, v: t => t.form_band == null ? null : t.form_delta, f: band},
-    c.n('projektions_delta', 'Ist − Projektion', U.sgn)]}),
+    X(c.n('projektions_delta', 'Ist − Projektion', U.sgn))]}),
   U.legend(['rang', 'pfspiel', 'floor', 'form', 'form-delta', 'proj-delta']),
   ...svg.verlauf(U.meinTeam() || S.teams[0].team_id, true));      // hervorgehoben: Mein Team, ohne Wahl das erste Team
 }
@@ -170,16 +172,16 @@ function coaching(box, r, svg, wi, week) {
     const rows = U.sortRows(S.teams, eff, -1);
     U.ap(box, U.table({cap: `Coaching – W${week}`, cls: 'rk', rc: U.meRc, rows: S.teams, sort: ['efficiency', -1], cols: [
       c.wr(wi), c.team(), c.wk('efficiency', 'Eff. %', wi, U.pct), c.wk('verschenkt', 'Verschenkt', wi), c.wk('optimal', 'Beste Aufstellung', wi),
-      c.wk('pf', 'PF', wi), c.wk('bank', 'Bankpunkte', wi), c.erg(wi)]}),
+      c.wk('pf', 'PF', wi), X(c.wk('bank', 'Bankpunkte', wi)), X(c.erg(wi))]}),
     U.legend(['wochenrang', 'eff-woche', 'verschenkt', 'optimal', 'bank']),
     effChart(`Coaching-Effizienz W${week}`, rows, eff, S.weeks.find(x => x.week === week)?.effizienz_liga,
       {heads: ['Team', 'Eff. %', 'Verschenkt', 'Beste Aufstellung'], rows: rows.map(t => [t.name, U.pct(eff(t)), U.num(W(t).verschenkt[wi]), U.num(W(t).optimal[wi])])}));
     return;
   }
   U.ap(box, U.table({cap: `Coaching nach W${S.tw}`, cls: 'rk', rc: U.meRc, rows: S.teams, sort: ['efficiency', -1], cols: [
-    c.rang('Pl.'), c.team(), c.pct('efficiency', 'Eff. %'), c.n('verschenkt', 'Verschenkt'), c.n('verschenkt_avg', 'Verschenkt Ø'),
-    c.n('verschenkt_max', 'Verschenkt max'), c.n('optimal', 'Beste Aufstellung'), c.n('bench', 'Bankpunkte'), c.n('kader_potenzial', 'Beste Aufstellung Ø'),
-    proj ? c.n('kader_projektion', 'Projektion Kader') : null].filter(Boolean)}),
+    c.rang('Pl.'), c.team(), c.pct('efficiency', 'Eff. %'), c.n('verschenkt', 'Verschenkt'), X(c.n('verschenkt_avg', 'Verschenkt Ø')),
+    X(c.n('verschenkt_max', 'Verschenkt max')), X(c.n('optimal', 'Beste Aufstellung')), X(c.n('bench', 'Bankpunkte')), X(c.n('kader_potenzial', 'Beste Aufstellung Ø')),
+    proj ? X(c.n('kader_projektion', 'Projektion Kader')) : null].filter(Boolean)}),
   U.legend(['rang', 'effizienz', 'verschenkt', 'optimal', 'bank', 'kader-pot', ...(proj ? ['kader-proj'] : [])]));
   const rows = U.sortRows(S.teams, t => t.efficiency, -1);
   U.ap(box, effChart('Coaching-Effizienz', rows, t => t.efficiency, S.meta.effizienz_liga,
@@ -194,9 +196,9 @@ function ausblick(box, r, svg) {
   // Waiver-Prio und Moves stehen nicht mehr hier (App-Konzept 04.10.2026: gehören in den Markt)
   const cols = () => [c.rang('Pl.'), c.team(), c.wl(), c.po(seeding),
     {k: 'dv', l: 'Division %', num: 1, v: t => U.sp(t.sim?.[seeding]?.division), f: t => U.po(U.sp(t.sim?.[seeding]?.division))},
-    seeding === 'espn' ? {k: 'by', l: 'Bye %', num: 1, v: t => U.sp(t.sim?.[seeding]?.bye), f: t => U.po(U.sp(t.sim?.[seeding]?.bye))} : null,
+    seeding === 'espn' ? X({k: 'by', l: 'Bye %', num: 1, v: t => U.sp(t.sim?.[seeding]?.bye), f: t => U.po(U.sp(t.sim?.[seeding]?.bye))}) : null,
     {k: 'rs', l: 'Erwartete Restsiege', num: 1, v: t => t.sim?.[seeding]?.restsiege, f: t => U.val(t.sim?.[seeding]?.restsiege, v => U.num(v, 1), 'Simulation folgt')},
-    espn ? {k: 'es', l: 'ESPN Playoff %', num: 1, v: t => U.sp(t.espn_sim?.playoff), f: t => U.po(U.sp(t.espn_sim?.playoff))} : null].filter(Boolean);
+    espn ? X({k: 'es', l: 'ESPN Playoff %', num: 1, v: t => U.sp(t.espn_sim?.playoff), f: t => U.po(U.sp(t.espn_sim?.playoff))}) : null].filter(Boolean);
   const wrap = h('div');
   const chart = h('div');
   const draw = () => {

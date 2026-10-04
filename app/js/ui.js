@@ -111,6 +111,19 @@ export function setMeinTeam(tid) {
   store.set(TEAM_KEY, teamMem);
   D.dispatchEvent(new CustomEvent('bwg-team'));
 }
+// ---------------------------------------------------------------- Einfach / Ausführlich (App-Konzept Abschnitt 8, Paket P5)
+// Eine Einstellung für alle Tabellen: Spalten mit x (Rechenweg, Nebenwerte) stehen nur in „Ausführlich“; Standard „Einfach“.
+// Browser-Speicher 'bwg-spalten' ('einfach' | 'voll'), ohne Speicher bis zum Neuladen; der Wechsel meldet 'bwg-spalten' am
+// document, jede Tabelle mit solchen Spalten zeichnet sich dann selbst neu (Sortierung, Filter und Anzahl bleiben).
+const SP_KEY = 'bwg-spalten';
+let spMem = null;
+export const spaltenVoll = () => (store.get(SP_KEY) ?? spMem) === 'voll';
+export function setSpaltenVoll(v) {
+  spMem = v ? 'voll' : 'einfach';
+  store.set(SP_KEY, spMem);
+  D.dispatchEvent(new CustomEvent('bwg-spalten'));
+}
+
 // Zeilenklasse für Tabellen mit einer Zeile je Team (team_id, sonst tid): die eigene Zeile hervorgehoben
 export const meRc = x => { const m = meinTeam(); return m && (x?.team_id ?? x?.tid) === m ? 'me' : null; };
 
@@ -265,25 +278,36 @@ export function infoPop(btn) {        // i-Knopf: Begriff und Erklärung aus dem
 //      Texte und Spalten mit cat als Werteliste; flt: false nimmt eine Spalte heraus), filters (zusätzliche Filter ohne Spalte,
 //      z. B. {k, l, v, cat}), fstate (Objekt des Aufrufers, in dem die Auswahl über einen Neuaufbau hinweg erhalten bleibt),
 //      show (anfangs so viele Zeilen statt limit, z. B. auf dem Rückweg bis zur zuletzt geöffneten Zeile)}
+//      Spalte mit x: true steht nur in „Ausführlich“ (spaltenVoll); dann trägt die Tabelle den Schalter „Einfach · Ausführlich“.
 export function table(o) {
   const capId = id('c');
-  const cols = o.cols;
+  const alle = o.cols, hatX = alle.some(c => c.x);
+  let cols = [], heads = [];
   let sk = o.sort?.[0], sd = o.sort?.[1] ?? -1, limit = o.show || o.limit || 1e9;
-  const heads = cols.map(c => {
-    // lange Namen (ab 13 Zeichen) dürfen zweizeilig umbrechen (CSS thead th.wr)
-    const th = h('th', {scope: 'col', class: [c.num && 'n', typeof c.l === 'string' && c.l.length > 12 && 'wr'].filter(Boolean).join(' ') || null});
-    if (c.v && o.sortable !== false) th.append(h('button', {type: 'button', onclick: () => {
-      if (sk === c.k) sd = -sd; else { sk = c.k; sd = c.d ?? -1; }
-      o.onSort?.(sk, sd);
-      draw();
-    }}, c.l, h('span', {class: 'si', 'aria-hidden': 'true'})));
-    else th.append(c.l);
-    return th;
-  });
+  const thead = h('thead');
+  // Kopfzeile aus den sichtbaren Spalten; ist die Sortierspalte nicht mehr sichtbar, gilt wieder die Voreinstellung
+  function kopf() {
+    cols = alle.filter(c => !c.x || spaltenVoll());
+    if (!cols.some(c => c.k === sk)) { sk = o.sort?.[0]; sd = o.sort?.[1] ?? -1; }
+    heads = cols.map(c => {
+      // lange Namen (ab 13 Zeichen) dürfen zweizeilig umbrechen (CSS thead th.wr)
+      const th = h('th', {scope: 'col', class: [c.num && 'n', typeof c.l === 'string' && c.l.length > 12 && 'wr'].filter(Boolean).join(' ') || null});
+      if (c.v && o.sortable !== false) th.append(h('button', {type: 'button', onclick: () => {
+        if (sk === c.k) sd = -sd; else { sk = c.k; sd = c.d ?? -1; }
+        o.onSort?.(sk, sd);
+        draw();
+      }}, c.l, h('span', {class: 'si', 'aria-hidden': 'true'})));
+      else th.append(c.l);
+      return th;
+    });
+    thead.replaceChildren(h('tr', null, heads));
+  }
+  kopf();
   const tb = h('tbody'), fn = h('p', {class: 'fn', id: id('f')}), more = h('div');
-  // Filter: ein Dropdown je Spalte in einem Blatt (Handy: von unten, Desktop: Karte unter der Leiste); Auswahl als Chips über der Tabelle
+  // Filter: ein Dropdown je Spalte in einem Blatt (Handy: von unten, Desktop: Karte unter der Leiste); Auswahl als Chips über der Tabelle.
+  // Auch Spalten nur für „Ausführlich“ bleiben filterbar; ein aktiver Filter steht immer als Chip da, auch wenn die Spalte fehlt
   const flt = o.fstate || {};
-  const fdefs = o.filter ? [...(o.filters || []), ...cols.filter(c => c.v && c.flt !== false)] : [];
+  const fdefs = o.filter ? [...(o.filters || []), ...alle.filter(c => c.v && c.flt !== false)] : [];
   let fbar = null, fpan = null, fbtn = null, fchips = null, fback = null;
   const cellText = (c, r) => c.f ? h('td', null, c.f(r, 0)).textContent.trim() : String(c.v(r) ?? '');
   const isNum = c => c.num && !c.cat;
@@ -307,13 +331,18 @@ export function table(o) {
       h('span', {'aria-hidden': 'true'}, '⚲'), 'Filter', h('span', {class: 'cnt'}));
     fbar = h('div', {class: 'fbar'}, fbtn, fchips, o.aside || null);
   }
+  // Schalter „Einfach · Ausführlich“: gilt für alle Tabellen (spaltenVoll), steht an jeder Tabelle mit Spalten nur für „Ausführlich“
+  const spSeg = hatX ? seg('Spalten', [['einfach', 'Einfach'], ['voll', 'Ausführlich']], spaltenVoll() ? 'voll' : 'einfach',
+    v => setSpaltenVoll(v === 'voll'), 'tight') : null;
+  const spRow = spSeg ? h('div', {class: 'tsw'}, spSeg, ib('spalten', '')) : null;
+  if (spRow && fbar) fbar.append(spRow);
   function openPanel() {
     if (fpan) return closePanel();
     const rowsEl = fdefs.map(c => {
       const opts = options(c);
       if (!opts) return null;
       const cur = flt[c.k]?.key || '';
-      const label = typeof c.l === 'string' ? c.l : `Spalte ${cols.indexOf(c) + 1}`;
+      const label = typeof c.l === 'string' ? c.l : `Spalte ${alle.indexOf(c) + 1}`;
       const sel = h('select', {'aria-label': label, onchange: e => {
         const op = opts.find(x => x.key === e.target.value);
         if (op) flt[c.k] = {key: op.key, label: `${label} ${isNum(c) ? op.label : '· ' + op.label}`, test: op.test}; else delete flt[c.k];
@@ -342,9 +371,9 @@ export function table(o) {
     fbtn.focus({preventScroll: true});
   }
   function clearAll() { for (const k in flt) delete flt[k]; draw(); }
-  const tbl = h('table', {class: o.cls}, h('caption', {id: capId}, o.cap), h('thead', null, h('tr', null, heads)), tb);
+  const tbl = h('table', {class: o.cls}, h('caption', {id: capId}, o.cap), thead, tb);
   const wrap = scrollHint(h('div', {class: 'tw' + (o.stick ? ' stick' : ''), role: 'region', tabindex: '0', 'aria-labelledby': capId}, tbl));
-  const box = h('div', {class: 'tbox'}, fbar, wrap, fn, more);
+  const box = h('div', {class: 'tbox'}, fbar || (spRow ? h('div', {class: 'fbar'}, spRow) : null), wrap, fn, more);
   const rh = o.rh ?? 1;
   function draw() {
     let rows = o.rows;
@@ -362,7 +391,7 @@ export function table(o) {
         'aria-label': `Filter entfernen: ${flt[c.k].label}`}, flt[c.k].label, h('span', {'aria-hidden': 'true'}, ' ×'))),
       ...(act.length > 1 ? [h('button', {type: 'button', class: 'fc all', onclick: clearAll}, 'Alle löschen')] : []));
     }
-    const c = cols.find(x => x.k === sk);
+    const c = alle.find(x => x.k === sk);
     if (c?.v) rows = sortRows(rows, c.v, sd);
     heads.forEach((th, i) => {
       if (cols[i].k === sk) th.setAttribute('aria-sort', sd > 0 ? 'ascending' : 'descending'); else th.removeAttribute('aria-sort');
@@ -392,6 +421,16 @@ export function table(o) {
     o.onCount?.(rows.length, o.rows.length);
   }
   box.upd = rows => { o.rows = rows; if (o.limit) limit = o.limit; draw(); };
+  // Wechsel Einfach / Ausführlich (auch an einer anderen Tabelle der Seite): neu aufbauen; eine abgehängte Tabelle meldet sich ab
+  if (hatX) {
+    const onSp = () => {
+      if (!box.isConnected) { D.removeEventListener('bwg-spalten', onSp); return; }
+      spSeg.set(spaltenVoll() ? 'voll' : 'einfach');
+      kopf();
+      draw();
+    };
+    D.addEventListener('bwg-spalten', onSp);
+  }
   draw();
   return box;
 }

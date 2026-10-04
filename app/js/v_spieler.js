@@ -88,7 +88,7 @@ function stand(W) {
 function list(box, W, all, r, rosWhy, ersatz, hasRos) {
   const q = r.q;
   const st = {pos: POS.includes(q.get('pos')) ? q.get('pos') : '', status: ['kader', 'frei'].includes(q.get('status')) ? q.get('status') : 'alle',
-    team: +q.get('team') || 0, sicht: ['ros', 'besitz'].includes(q.get('sicht')) ? q.get('sicht') : 'saison', raw: (q.get('q') || '').trim()};
+    team: +q.get('team') || 0, raw: (q.get('q') || '').trim()};
   st.text = norm(st.raw);
   for (const p of all) p._n ??= norm(p.name);
   // Spaltenfilter bleiben nur auf dem Rückweg (Zurück, „← Spielerliste“) erhalten; ein frischer Aufruf beginnt ohne
@@ -102,54 +102,51 @@ function list(box, W, all, r, rosWhy, ersatz, hasRos) {
     && (!st.team || p.team === st.team)
     && (!st.text || p._n.includes(st.text)));
   const num = (k, l, f = U.num, why) => ({k, l, num: 1, v: p => p[k], f: p => U.val(p[k], f, why)});
+  // Einfach / Ausführlich (App-Konzept Abschnitt 8, Paket P5; ersetzt die Spalten-Sichten „Saison · Rest Saison · Besitz“):
+  // Einfach Spieler, Pkt, Ø Punkte, Form, Rest je Spiel; Ausführlich dazu alle Spalten der drei früheren Sichten (x: 1)
+  const X = col => ({...col, x: 1});
   const base = [
     {k: 'name', l: 'Spieler', v: p => p.name.toLowerCase(), d: 1, flt: false, f: p => h('a', {href: '#spieler/' + p.id, class: 'pl'},
       h('span', null, p.name, U.inj(p.inj)), h('span', {class: 'sub'}, `${p.pos ?? '–'} · ${nflTxt(p)}` + (p.team > 0 ? ' · ' + U.kz(p.team) : '')))},
-    num('avg', 'Ø Punkte', U.num, 'ohne Spiel'),
+    num('pts', 'Pkt'), num('avg', 'Ø Punkte', U.num, 'ohne Spiel'),
     {k: 'form', l: 'Form', num: 1, v: p => p.form, f: p => [U.val(p.form, U.num, 'ohne Spiel'), ' ', trendTxt(p.trend)]},
     num('ros_g', 'Rest je Spiel', U.num, rosWhy)];
-  const extra = {
-    saison: [num('pts', 'Pkt'), num('g', 'Spiele', v => v), num('floor', 'Floor', U.num, 'ohne Spiel'), num('ceil', 'Ceiling', U.num, 'ohne Spiel'),
-      {...num('sd', 'Schwankung', U.num, 'unter 2 Spielen'), d: 1}, num('starts', 'Starts', v => v), num('bench_pts', 'Bankpunkte'),
-      num('proj_d', 'Ist − Projektion', U.sgn, 'ohne Spiel'), {k: 'spark', l: 'Formkurve', f: p => h('span', {class: 'sp', 'aria-hidden': 'true'}, p.spark || '')}],
-    ros: [num('ros', 'Rest Saison', U.num, rosWhy), num('rest_g', 'Restspiele', v => v, rosWhy), num('ros_po', 'Rest Playoffs', U.num, rosWhy),
-      {...num('ros_rang', 'Rang Rest je Spiel', v => v + '.', rosWhy), d: 1}, {k: 'ros_ue', l: 'Vorteil Rest Saison', num: 1, v: p => p.ros_ue, f: p => U.val(p.ros_ue, U.sgn, ueWhy(p))},
-      {k: 'bye', l: 'Bye', num: 1, cat: 1, v: p => p.bye, d: 1, f: p => U.val(p.bye, v => 'W' + v, 'kein NFL-Team')}],
-    besitz: [num('own', 'Besitz %', v => U.pct(v)),
-      ...(W ? [num('own_d', 'seit gestern', v => U.sgn(v, 2), 'keine Tagesdaten'), num('started', 'aufgestellt %', v => U.pct(v), 'keine Tagesdaten')] : []),
-      {k: 'inj', l: 'Verletzung', v: p => U.INJ[p.inj] ? p.inj : null, d: 1, f: p => U.INJ[p.inj]?.[1] || (p.inj === 'ACTIVE' ? 'aktiv' : '–')},
-      {k: 'team', l: 'Team', v: p => U.kz(p.team), d: 1, f: p => p.team > 0 ? U.tl(p.team) : (U.STAT[p.status] || 'frei')}]};
-  const sortKey = {saison: 'pts', ros: 'ros_g', besitz: 'own'};
+  const extra = [
+    num('g', 'Spiele', v => v), num('floor', 'Floor', U.num, 'ohne Spiel'), num('ceil', 'Ceiling', U.num, 'ohne Spiel'),
+    {...num('sd', 'Schwankung', U.num, 'unter 2 Spielen'), d: 1}, num('starts', 'Starts', v => v), num('bench_pts', 'Bankpunkte'),
+    num('proj_d', 'Ist − Projektion', U.sgn, 'ohne Spiel'), {k: 'spark', l: 'Formkurve', f: p => h('span', {class: 'sp', 'aria-hidden': 'true'}, p.spark || '')},
+    num('ros', 'Rest Saison', U.num, rosWhy), num('rest_g', 'Restspiele', v => v, rosWhy), num('ros_po', 'Rest Playoffs', U.num, rosWhy),
+    {...num('ros_rang', 'Rang Rest je Spiel', v => v + '.', rosWhy), d: 1}, {k: 'ros_ue', l: 'Vorteil Rest Saison', num: 1, v: p => p.ros_ue, f: p => U.val(p.ros_ue, U.sgn, ueWhy(p))},
+    {k: 'bye', l: 'Bye', num: 1, cat: 1, v: p => p.bye, d: 1, f: p => U.val(p.bye, v => 'W' + v, 'kein NFL-Team')},
+    num('own', 'Besitz %', v => U.pct(v)),
+    ...(W ? [num('own_d', 'seit gestern', v => U.sgn(v, 2), 'keine Tagesdaten'), num('started', 'aufgestellt %', v => U.pct(v), 'keine Tagesdaten')] : []),
+    {k: 'inj', l: 'Verletzung', v: p => U.INJ[p.inj] ? p.inj : null, d: 1, f: p => U.INJ[p.inj]?.[1] || (p.inj === 'ACTIVE' ? 'aktiv' : '–')},
+    {k: 'team', l: 'Team', v: p => U.kz(p.team), d: 1, f: p => p.team > 0 ? U.tl(p.team) : (U.STAT[p.status] || 'frei')}].map(X);
+  const sortKey = 'pts';
   const filters = [{k: 'nfl', l: 'NFL-Team', v: nflTxt, d: 1, cat: 1, f: nflTxt}];
-  // Sortierspalte der Sicht direkt hinter den Namen: auf dem Handy sonst erst nach Wischen sichtbar
-  const colsFor = sicht => {
-    const all = [...base, ...extra[sicht]], key = sortKey[sicht];
-    return [all[0], all.find(c => c.k === key), ...all.slice(1).filter(c => c.k !== key)];
-  };
-  const LEG = {saison: ['spiele', 'floor-ceil', 'konstanz', 'starts', 'proj-delta-sp'], ros: ['ros', 'restspiele', 'ros-po', 'ros-rang', 'ros-ue', 'ersatz', 'projektionen'],
-    besitz: [W ? 'besitz-trend' : 'besitz']};
+  const cols = [...base, ...extra];
+  const LEG = ['spiele', 'floor-ceil', 'konstanz', 'starts', 'proj-delta-sp', 'ros', 'restspiele', 'ros-po', 'ros-rang', 'ros-ue', 'ersatz', 'projektionen',
+    W ? 'besitz-trend' : 'besitz'];
   const setCount = (n, total) => { count.textContent = n < total ? `${n} von ${total} Spielern` : `${total} Spieler`; };
   let tbl, first = true;
   const build = () => {
-    const cols = colsFor(st.sicht), rs = rows();
-    // Spaltenfilter ohne Spalte in dieser Sicht fallen weg (sonst greifen sie unsichtbar beim Zurückwechseln)
-    for (const k in keptFilters) if (k !== 'nfl' && !cols.some(c => c.k === k)) delete keptFilters[k];
-    legBox.replaceChildren(U.legend(['filter', 'avg', 'form-sp', 'trendpfeil', 'ros-spiel', ...LEG[st.sicht]]));
+    const rs = rows();
+    legBox.replaceChildren(U.legend(['filter', 'avg', 'form-sp', 'trendpfeil', 'ros-spiel', ...LEG, 'spalten']));
     // Rückweg: so viele 50er-Blöcke zeigen, dass der zuletzt geöffnete Spieler dabei ist
     let show = 50;
     if (first && r.back && lastOpened != null) {
-      const sc = cols.find(c => c.k === sortKey[st.sicht]);
+      const sc = cols.find(c => c.k === sortKey);
       const i = U.sortRows(rs, sc.v, -1).findIndex(p => p.id === lastOpened);
       if (i >= 50) show = Math.ceil((i + 1) / 50) * 50;
     }
     first = false;
-    tbl = U.table({cap: 'Spielerliste', cls: 'nr', rh: 0, rows: rs, sort: [sortKey[st.sicht], -1], limit: 50, show, filter: true, filters,
+    tbl = U.table({cap: 'Spielerliste', cls: 'nr', rh: 0, rows: rs, sort: [sortKey, -1], limit: 50, show, filter: true, filters,
       fstate: keptFilters, cols, aside: count, onCount: setCount});
     slotBox.replaceChildren(tbl);
   };
   const refresh = (rebuild) => {
     if (rebuild) build(); else tbl.upd(rows());
-    U.setQ('spieler', {pos: st.pos || null, status: st.status !== 'alle' ? st.status : null, team: st.team || null, sicht: st.sicht !== 'saison' ? st.sicht : null, q: st.raw || null});
+    U.setQ('spieler', {pos: st.pos || null, status: st.status !== 'alle' ? st.status : null, team: st.team || null, q: st.raw || null});
   };
   let timer;
   U.ap(box, stand(W),
@@ -161,8 +158,7 @@ function list(box, W, all, r, rosWhy, ersatz, hasRos) {
       h('input', {type: 'search', placeholder: 'Suchen', value: st.raw || null, oninput: e => {
         clearTimeout(timer);
         timer = setTimeout(() => { st.raw = e.target.value.trim(); st.text = norm(st.raw); refresh(); }, 150);
-      }})),
-    U.seg('Spalten', [['saison', 'Saison'], ['ros', 'Rest Saison'], ['besitz', 'Besitz']], st.sicht, v => { st.sicht = v; refresh(true); })),
+      }}))),
     slotBox, legBox);
   refresh(true);
 }
