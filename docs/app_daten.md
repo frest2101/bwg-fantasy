@@ -69,7 +69,7 @@ Die App lädt `data/manifest.json?t=<jetzt>` und danach jede Datei mit `?v=<v>`.
   - `mu` (Positions-Matchup, Wochenstand wie ROS; die App verknüpft über `id`): `{n1: {week, opp, f, rang}, naechste3, rest, sos_po}` – `n1` = Gegner in Woche `mu_woche` (`opp` NFL-Kürzel der Defense, `f` ihr F für die Position des Spielers, `rang` 1 = günstigstes Matchup; bei Bye alle drei `null`; `n1` selbst `null` ohne Woche N+1), `naechste3` = Ø F der Gegner in N+1…N+3, `rest` = N+1…14, `sos_po` = W15–17 (eine Woche ohne Spiel fällt heraus, `null` ohne Spiel), F mit 3 Stellen. QB, RB, WR, TE und K aus `matchup.json`; D/ST aus `dst.json` (F und Rang der gegnerischen Offense, gleiche Richtung: > 1 günstig). `mu` ist `null` ohne NFL-Team.
   - `fp`: FantasyPros-Adresse ohne `.php` (Verweis `fantasypros.com/nfl/players/<fp>.php`), aus dem Abgleich des Namens mit der Positions-Sitemap (`scripts/fantasypros.py`, dazu die Handtabelle `HAND` für Spitznamen); `null` = keine eindeutige Zuordnung oder nicht in der Sitemap (die App verlinkt dann eine Seitensuche), bei D/ST immer `null` (Tabelle der App). Fehlt, solange der Wochenabruf keinen Sitemap-Auszug `data/raw/<saison>/fantasypros/sitemap.json` geholt hat.
 
-## `dst.json` (lazy, Woche › Matchups › D/ST `#woche/matchups/dst`)
+## `dst.json` (lazy, Woche › Matchups › D/ST `#woche/matchups/dst` und Spalte D/ST der Übersicht `#woche/matchups`)
 - **Kopf:** `ligaschnitt {"2025", "2026"}`, `formel`, `through_week`.
 - **`teams`:** Liste je NFL-Team:
   - Offense-Werte: `id, abbrev, bye, z25, z26, n, r25, r26`
@@ -77,7 +77,7 @@ Die App lädt `data/manifest.json?t=<jetzt>` und danach jede Datei mit `?v=<v>`.
   - Sicht der D/ST: `naechste3, rest, sos_po, besitzer, status`
   - `naechste`: die Gegner der Wochen N+1…N+3 als `[{week, opp, f}]`, Bye ohne `opp`
 
-## `matchup.json` (lazy, Woche › Matchups `#woche/matchups`, dazu Spielerseite und Markt › Freie Spieler)
+## `matchup.json` (lazy, Woche › Matchups `#woche/matchups` und `/qb` … `/k`, dazu Spielerseite und Markt › Freie Spieler)
 Position gegen Defense, kein Einzelduell: wie viele Punkte jede NFL-Defense den Spielern einer Position zulässt (`scripts/matchup.py`, Formel wie D/ST).
 - **Kopf:**
   - `through_week`, `saison`, `vorjahr`, `positionen` (`["QB", "RB", "WR", "TE", "K"]`), `formel`

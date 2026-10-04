@@ -343,7 +343,8 @@ function theme() {
 // Fünf Bereiche nach Fragen (App-Konzept 04.10.2026, Paket P1): Tab, Frage und Satz der Bereichs-Zeile unter jeder Überschrift,
 // Ansichten als Chips. Je Ansicht [Pfad im Bereich, Chip, Modul]; der Router gibt dem Modul den Chip-Pfad als r.view, den Rest
 // des Hashs (Woche w3, Position qb, zweite Ebene) als r.sub und den Pfad der Ansicht als r.base (für eigene Links und setQ).
-// Chip null: eigene Route ohne eigenen Chip (Matchups › D/ST gehört zum Chip Matchups); ein Chip als Funktion liest die Daten.
+// Chip null: eigene Route ohne eigenen Chip (bis P3 Matchups › D/ST, seit P3 Teil der Ansicht Matchups); ein Chip als Funktion liest
+// die Daten.
 const BEREICHE = {
   liga: {l: 'Liga', frage: 'Wo stehen wir?', text: 'Tabelle nach Siegen, Ergebnisse, Playoff-Chancen, Duelle und Rekorde.', v: [
     ['', 'Tabelle', 'v_tabelle'], ['division', 'Division', 'v_tabelle'], ['ergebnisse', 'Ergebnisse', 'v_spielplan'],
@@ -353,7 +354,7 @@ const BEREICHE = {
     ['coaching', 'Coaching', 'v_tabelle'], ['score', 'Eigener Score', 'v_ranking']]},
   woche: {l: 'Woche', frage: 'Was zählt diese Woche?', text: 'Live-Punkte, Paarungen mit Siegchance, Matchups je Position und Wetter.', v: [
     ['live', 'Spieltag live', 'v_spieltag'], ['paarungen', () => `Paarungen W${U.aktuelleWoche()}`, 'v_spielplan'],
-    ['matchups', 'Matchups', 'v_matchup'], ['matchups/dst', null, 'v_dst'], ['wetter', 'Wetter', 'v_wetter']]},
+    ['matchups', 'Matchups', 'v_matchup'], ['wetter', 'Wetter', 'v_wetter']]},
   markt: {l: 'Markt', frage: 'Wen holen, wen abgeben?', text: 'Beste freie Spieler, Bedarf je Team, Waiver-Reihenfolge und alle Moves.', v: [
     ['', 'Freie Spieler', 'v_waiver'], ['bedarf', 'Bedarf je Team', 'v_waiver'], ['reihenfolge', 'Reihenfolge & Claims', 'v_waiver'],
     ['moves', 'Moves', 'v_moves']]},
@@ -399,7 +400,7 @@ function resolve(r) {
   }
   const B = BEREICHE[r.sec];
   if (!B) return null;
-  // längster Ansichtspfad, mit dem der Hash beginnt (matchups/dst vor matchups); die Ansicht '' nur ohne Unterpfad
+  // längster Ansichtspfad, mit dem der Hash beginnt (ein Pfad wie a/b vor a); die Ansicht '' nur ohne Unterpfad
   let e = null;
   for (const x of B.v) {
     const passt = x[0] ? r.sub === x[0] || r.sub.startsWith(x[0] + '/') : !r.sub;

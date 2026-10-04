@@ -1,5 +1,6 @@
 // Spielplan in zwei Bereichen: Liga › Ergebnisse (#liga/ergebnisse/w3: Wochenwahl W1–17, Kacheln, Paarungen, Wochentabelle,
-// Top-Scorer, Saisonwochen) und Woche › Paarungen (#woche/paarungen: nur die laufende Woche, ohne Wochenwahl und Saisonwochen)
+// Top-Scorer, Saisonwochen) und Woche › Paarungen (#woche/paarungen: seit Paket P3 nur die Spiele der laufenden Woche mit
+// Siegchance – ohne Wochenwahl, Kacheln, Wochentabelle, Top-Scorer und Saisonwochen; die stehen unter Liga › Ergebnisse)
 let U, S, h;
 const STATUS = {final: 'final', laeuft: 'läuft', offen: 'offen'};
 
@@ -14,7 +15,7 @@ export async function render(box, ctx, r) {
   const wk = W.week, end = new Date(new Date(W.start + 'T12:00:00Z').getTime() + 6 * 864e5);
   U.kopf(box, r, `${titel} – W${wk}`);
   U.ap(box, h('p', {class: 'note'}, `${W.playoff ? 'Playoffs · ' : ''}${STATUS[W.status] || W.status} · ${U.datum(W.start)} bis ${U.datum(end)}`,
-    woche ? [' · ', h('a', {href: '#liga/ergebnisse/w' + wk}, 'andere Wochen unter Liga › Ergebnisse')] : null));
+    woche ? [' · ', h('a', {href: '#liga/ergebnisse/w' + wk}, 'Ergebnisse und andere Wochen unter Liga › Ergebnisse')] : null));
   if (!woche) {
     const nav = U.chips('Woche wählen', S.weeks.map(w => ['#' + r.base + '/w' + w.week,
       [`W${w.week}`, h('small', null, (w.playoff ? 'PO · ' : '') + U.spanne(w.start))], w.week, w.playoff ? 'po' : null]), wk, 'wk');
@@ -25,15 +26,22 @@ export async function render(box, ctx, r) {
   // Woche › Paarungen: das Spiel von Mein Team zuerst (markiert ist es in beiden Ansichten, U.game)
   const mine = g => g.home === U.meinTeam() || g.away === U.meinTeam();
   const games = S.sched.games.filter(g => g.week === wk).sort((a, b) => woche && U.meinTeam() ? mine(b) - mine(a) : 0);
+  const poTxt = wk === 15 ? 'Die Paarungen stehen nach W14 fest (6 Teams, Seeds 1–2 mit Bye). ' : `Die Paarungen stehen nach W${wk - 1} fest. `;
+  const liste = games.length ? h('ul', {class: 'games'}, games.map(g => U.game(g, true)))
+    : h('p', {class: 'note'}, W.playoff ? [poTxt, h('a', {href: '#liga/playoffs'}, 'Playoff-Chancen')] : 'Für diese Woche gibt es keine Paarungen.');
+  if (woche) {
+    // die Überschrift nennt schon „Paarungen – Wn“; darunter nur die Spiele und der Weg zu den Punkten live
+    U.ap(box, liste, U.saisonLaeuft() ? h('p', {class: 'note'}, 'Punkte live unter ', h('a', {href: '#spieltag'}, 'Spieltag live'),
+      '; die Siegchance rechnet die App vor der Woche aus der Stärke beider Teams. ', U.ib('siegchance', '')) : null);
+    return;
+  }
   const svg = await ctx.mod('svg');
   if (W.status === 'final') U.ap(box, tiles(W));
-  const poTxt = wk === 15 ? 'Die Paarungen stehen nach W14 fest (6 Teams, Seeds 1–2 mit Bye). ' : `Die Paarungen stehen nach W${wk - 1} fest. `;
-  U.ap(box, h('h2', null, 'Paarungen'), games.length ? h('ul', {class: 'games'}, games.map(g => U.game(g, true)))
-    : h('p', {class: 'note'}, W.playoff ? [poTxt, h('a', {href: '#liga/playoffs'}, 'Playoff-Chancen')] : 'Für diese Woche gibt es keine Paarungen.'));
+  U.ap(box, h('h2', null, 'Paarungen'), liste);
   const wi = S.meta.weeks.indexOf(wk);
   if (W.status === 'final' && wi >= 0) U.ap(box, weekTable(wi, wk), h('div', {style: 'margin-top:16px'}, topScorer(W)));
   else if (W.status !== 'final') U.ap(box, h('p', {class: 'note'}, 'Wochentabelle und Top-Scorer erscheinen, sobald die Woche final ist.'));
-  if (!woche) U.ap(box, seasonWeeks(fin, svg, wk));
+  U.ap(box, seasonWeeks(fin, svg, wk));
 }
 
 function tiles(W) {
