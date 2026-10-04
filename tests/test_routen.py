@@ -116,6 +116,10 @@ def test_app_verlinkt_nur_neue_routen():
                 continue
             if not gueltig(pfad.rstrip("/")):
                 falsch.append(f"{datei.name}: #{pfad}")
+        # Pfade ohne „#“: setQ schreibt die Adresse der offenen Ansicht, weekChips baut Wochen-Links (sonst r.base)
+        for pfad in re.findall(r"""\b(?:setQ|weekChips)\(\s*['"`]([\w/-]*)""", code(datei)):
+            if not gueltig(pfad.rstrip("/")):
+                falsch.append(f"{datei.name}: setQ/weekChips {pfad}")
     for pfad in re.findall(r'href="#([^"?]*)', INDEX.read_text(encoding="utf-8")):
         if pfad not in KEINE_ROUTE and not gueltig(pfad):
             falsch.append(f"index.html: #{pfad}")

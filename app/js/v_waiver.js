@@ -54,6 +54,8 @@ export async function render(box, ctx, r) {
   const mineSel = h('select', {'aria-label': 'Mein Team', onchange: e => {
     me.mine = +e.target.value; me.q = 0; U.store.set(KEY, me.mine);
     if (!liste) U.setQ(r.base, {});       // die Liste schreibt ihre Parameter selbst (ohne team)
+    // die Sicht eines anderen Teams endet: auch die Chips der Markt-Ansichten (Router, bereich) ohne ?team=
+    for (const a of box.querySelectorAll('.chips.bv a')) a.setAttribute('href', a.getAttribute('href').split('?')[0]);
     draw();
   }}, h('option', {value: 0}, 'Mein Team wählen'), S.teams.map(t => h('option', {value: t.team_id, selected: t.team_id === me.mine}, `${t.kuerzel} · ${t.name}`)));
   U.ap(box, h('p', {class: 'note'}, `Tagesstand ${U.stamp(W.stand)} · Projektion und Bye-Hinweis für W${W.woche}`, ' ', U.ib('tagesstand', '')),

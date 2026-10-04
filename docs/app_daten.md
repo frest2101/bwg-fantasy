@@ -77,7 +77,7 @@ Die App lädt `data/manifest.json?t=<jetzt>` und danach jede Datei mit `?v=<v>`.
   - Sicht der D/ST: `naechste3, rest, sos_po, besitzer, status`
   - `naechste`: die Gegner der Wochen N+1…N+3 als `[{week, opp, f}]`, Bye ohne `opp`
 
-## `matchup.json` (lazy, Positions-Matchup)
+## `matchup.json` (lazy, Woche › Matchups `#woche/matchups`, dazu Spielerseite und Markt › Freie Spieler)
 Position gegen Defense, kein Einzelduell: wie viele Punkte jede NFL-Defense den Spielern einer Position zulässt (`scripts/matchup.py`, Formel wie D/ST).
 - **Kopf:**
   - `through_week`, `saison`, `vorjahr`, `positionen` (`["QB", "RB", "WR", "TE", "K"]`), `formel`

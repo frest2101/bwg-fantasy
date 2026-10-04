@@ -152,7 +152,7 @@ function suche() {
     const out = h('ul', {class: 'such'});
     const info = h('p', {class: 'note', role: 'status'});
     const alle = h('a', {href: '#spieler'}, 'Alle Spieler mit Filtern');
-    let liste = null;
+    let liste = null, fehler = false;
     const eintrag = (href, name, sub, extra) => h('li', null, h('a', {href, class: 'pl'}, h('span', null, name, extra), h('span', {class: 'sub'}, sub)));
     const zeig = () => {
       const raw = inp.value.trim();
@@ -166,24 +166,26 @@ function suche() {
       const treffer = liste && q ? U.sortRows(liste.rows.filter(x => x.n.includes(q)), x => rang(x) * 1000 - (x.p.own ?? 0), 1).slice(0, 8) : [];
       out.replaceChildren(...teams.map(t => eintrag('#team/' + t.team_id, t.name, `Team · ${t.kuerzel} · ${t.rang}. · ${U.rec(t)}`)),
         ...treffer.map(({p}) => eintrag('#spieler/' + p.id, p.name, `${p.pos ?? '–'} · ${p.nfl || 'FA'} · ${p.team > 0 ? U.kz(p.team) : U.STAT[p.status] || 'frei'}`, U.inj(p.inj))));
-      info.textContent = !q ? 'Name eingeben, z. B. „allen“ oder „HJS“.' : !liste ? 'Lade Spieler …'
-        : teams.length + treffer.length ? '' : 'Kein Treffer.';
+      info.textContent = fehler ? 'Spieler konnten nicht geladen werden – nur Teams.' : !q ? 'Name eingeben, z. B. „allen“ oder „HJS“.'
+        : !liste ? 'Lade Spieler …' : teams.length + treffer.length ? '' : 'Kein Treffer.';
     };
     inp.addEventListener('input', zeig);
+    // Ziel ist die gerade offene Seite: kein hashchange, also schließt nicht route() das Fenster, sondern dies hier (Fokus
+    // zurück auf die Lupe); sonst schließt route() und setzt den Fokus auf die neue Überschrift
+    const offen = href => href === location.hash && (U.closePop(true), true);
     // Enter öffnet den ersten Treffer
     inp.addEventListener('keydown', e => {
       const a = e.key === 'Enter' && out.querySelector('a');
-      if (a) { e.preventDefault(); location.hash = a.getAttribute('href'); }
+      if (a) { e.preventDefault(); if (!offen(a.getAttribute('href'))) location.hash = a.getAttribute('href'); }
     });
-    // Treffer auf die gerade offene Seite: kein hashchange, das Fenster schließt trotzdem
-    out.addEventListener('click', e => { if (e.target.closest('a')) U.closePop(false); });
-    U.showPop(btn, 'Spieler und Teams', [h('div', {class: 'row srch'}, h('label', null, h('span', {class: 'vh'}, 'Suchen'), inp)), info, out,
-      h('p', {class: 'note'}, alle)]);
+    const fuss = h('p', {class: 'note'}, alle);
+    for (const x of [out, fuss]) x.addEventListener('click', e => { const a = e.target.closest('a'); if (a && offen(a.getAttribute('href'))) e.preventDefault(); });
+    U.showPop(btn, 'Spieler und Teams', [h('div', {class: 'row srch'}, h('label', null, h('span', {class: 'vh'}, 'Suchen'), inp)), info, out, fuss]);
     if ($('pop').hidden) return;              // zweiter Klick auf die Lupe schließt das Fenster
     inp.focus({preventScroll: true});
     zeig();
     spielerListe().then(x => { liste = x; if (inp.isConnected) zeig(); })
-      .catch(e => { console.error(e); info.textContent = 'Spieler konnten nicht geladen werden – nur Teams.'; });
+      .catch(e => { console.error(e); fehler = true; if (inp.isConnected) zeig(); });
   };
 }
 // Datenstand-Chip und sein Fenster; läuft nach refresh() erneut und zeigt dann den neuen Stand
@@ -343,11 +345,17 @@ function resolve(r) {
   return {mod: e[2], k: r.sec, view, sub: r.sub.slice(view.length).replace(/^\//, ''), base: r.sec + (view ? '/' + view : '')};
 }
 const chipHref = (k, p) => k === 'woche' && p === 'live' ? '#spieltag' : '#' + k + (p ? '/' + p : '');
+// Was beim Wechsel zwischen Ansichten eines Bereichs mitgeht: die Einzelwoche zwischen All-Play, Punkte und Coaching (wie vor
+// P1 in der Tabelle) und die Sicht eines Teams (?team= von der Team-Seite) zwischen den drei Markt-Ansichten mit Tagesstand
+const MIT_WOCHE = ['allplay', 'punkte', 'coaching'], MIT_TEAM = ['', 'bedarf', 'reihenfolge'];
 // Bereich für U.kopf: Name, Frage, Satz und die Chips der Ansichten (Funktionen erst hier ausgewertet, die Daten stehen dann)
-function bereich(k) {
+function bereich(k, r) {
   const B = BEREICHE[k];
+  const woche = k === 'staerke' && MIT_WOCHE.includes(r.view) && /^w\d+$/.test(r.sub) ? '/' + r.sub : '';
+  const team = k === 'markt' && MIT_TEAM.includes(r.view) && U.team(r.q.get('team')) ? '?team=' + r.q.get('team') : '';
+  const mit = p => k === 'staerke' && MIT_WOCHE.includes(p) ? woche : k === 'markt' && MIT_TEAM.includes(p) ? team : '';
   return {k, l: B.l, frage: B.frage, text: B.text,
-    chips: B.v.filter(x => x[1]).map(([p, l]) => [chipHref(k, p), typeof l === 'function' ? l() : l, p])};
+    chips: B.v.filter(x => x[1]).map(([p, l]) => [chipHref(k, p) + mit(p), typeof l === 'function' ? l() : l, p])};
 }
 let seq = 0, cur = null, curHash = null;
 // Aufräumen einer Ansicht: fn läuft einmal beim nächsten Routenwechsel (auch wenn dieselbe Ansicht neu gezeichnet wird)
@@ -396,7 +404,8 @@ async function route() {
     history.replaceState(null, '', '#' + (res ? res.k : 'liga'));
     return route();
   }
-  Object.assign(r, {view: res.view, sub: res.sub, base: res.base, B: res.k ? bereich(res.k) : null});
+  Object.assign(r, {view: res.view, sub: res.sub, base: res.base});
+  r.B = res.k ? bereich(res.k, r) : null;
   U.closePop(false);
   for (const fn of leaving.splice(0)) { try { fn(); } catch (e) { console.error(e); } }
   const my = ++seq;

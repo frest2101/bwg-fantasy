@@ -143,9 +143,17 @@ export const muChips = cur => chips('Matchups je Position', [['#woche/matchups',
 // die erste. Eine Woche heißt erst nach dem Wochenabruf „final“, ihr Status sagt deshalb nicht, ob sie gerade läuft.
 const ISO = new Intl.DateTimeFormat('en-CA', {timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit'});
 const heute = () => ISO.format(new Date());
-export const aktuelleWoche = () => S.weeks.filter(w => w.start <= heute()).at(-1)?.week ?? S.weeks[0]?.week ?? 1;
-// Saison läuft: W1 hat begonnen und die letzte Woche ist noch nicht final (Woche öffnet dann mit dem Spieltag live)
-export const saisonLaeuft = () => !!S.weeks.length && S.weeks[0].start <= heute() && S.weeks.at(-1).status !== 'final';
+export const aktuelleWoche = () => { const t = heute(); return S.weeks.filter(w => w.start <= t).at(-1)?.week ?? S.weeks[0]?.week ?? 1; };
+// Saison läuft (Woche öffnet dann mit dem Spieltag live): W1 hat begonnen, die letzte Woche des Spielplans ist nach dem
+// Kalender noch nicht vorbei (ihr Montag) und die Playoffs sind nicht bis zur letzten Woche gewertet (manifest ›
+// datenstand.playoff_woche, wie „Saison beendet“ im Datenstand-Fenster). Der Status der Woche taugt dafür nicht:
+// Playoff-Wochen führt schedule.json nie als „final“.
+export const saisonLaeuft = () => {
+  const t = heute(), last = S.weeks.at(-1);
+  if (!last || S.weeks[0].start > t) return false;
+  const ende = new Date(Date.parse(last.start + 'T12:00:00Z') + 7 * 864e5).toISOString().slice(0, 10);
+  return t < ende && (S.man.datenstand?.playoff_woche ?? 0) < last.week;
+};
 // Farbklasse eines Faktors F um 1,00 (D/ST-Faktoren, Positions-Matchup): f1–f3 blau = günstig, g1–g3 orange = ungünstig,
 // f0 = um 1,00; die Zahl steht immer dabei. Stufe nach F in den angezeigten Stellen st (2 oder 3), gerundet mit demselben
 // Intl-Formatierer wie num() (toFixed rundet 0,985 anders als die Anzeige), gemessen in Tausendsteln: gleiche angezeigte
