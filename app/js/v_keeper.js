@@ -4,7 +4,6 @@
 // (scripts/keeper.py).
 let U, S, h;
 export const init = c => { U = c.ui; S = U.S; h = U.h; };
-const KEY = 'bwg-team';                  // eigenes Team wie unter Markt, nur Komfort im Browser
 const ARTEN = ['keeper', 'draft', 'waiver', 'free_agent', 'trade'];
 const ART = {keeper: 'Keeper', draft: 'Draft', waiver: 'Waiver', free_agent: 'Free Agent', trade: 'Trade'};
 // Gruppen der Punkte (Python: keeper.GRUPPEN) mit Anzeige und fester Farbe
@@ -49,8 +48,8 @@ export const wertSgn = v => U.sgn(v, 0);
 export async function render(box, ctx, r) {
   const sub = r.view;      // '' Bilanz · herkunft · alter · marktwert · draft · draft-folgejahr (Router)
   // ?team=N gilt, auch 0 = Alle Teams (sonst fiele die Wahl auf dem Rückweg wieder auf das eigene Team); nur ohne
-  // Parameter nimmt die Herkunft-Ansicht das gespeicherte Mein Team
-  let team = r.q.has('team') ? +r.q.get('team') : sub === 'herkunft' ? +U.store.get(KEY) || 0 : 0;
+  // Parameter nimmt die Herkunft-Ansicht Mein Team (Kopf)
+  let team = r.q.has('team') ? +r.q.get('team') : sub === 'herkunft' ? U.meinTeam() : 0;
   if (!S.byId.has(team)) team = 0;
   const next = S.man.season + 1;
   U.kopf(box, r, {draft: `Draft ${S.man.season}`, 'draft-folgejahr': `Draft ${next}`, herkunft: 'Herkunft der Kaderspieler',
@@ -86,7 +85,7 @@ function bilanz(box, K, svg) {
   const wrap = h('div'), chart = h('div');
   const draw = () => {
     const kern = key === 'kern';
-    wrap.replaceChildren(U.table({cap: `Punkte nach Herkunft (${wk}${kern ? ', ohne K und D/ST' : ''})`, cls: 'nr kurz', rh: 0, rows: K.teams, sort: srt,
+    wrap.replaceChildren(U.table({cap: `Punkte nach Herkunft (${wk}${kern ? ', ohne K und D/ST' : ''})`, cls: 'nr kurz', rh: 0, rc: U.meRc, rows: K.teams, sort: srt,
       onSort: (k, d) => { srt = [k, d]; }, cols: [
       {k: 't', l: 'Team', v: x => U.kz(x.team_id), d: 1, f: x => U.tl(x.team_id)},
       ...GRP.map(([g, l]) => ({k: g, l: l + ' %', num: 1, v: x => x[key].anteil[g], f: x => U.val(x[key].anteil[g], U.pct, 'noch keine Punkte')})),
@@ -155,7 +154,7 @@ function draft(box, K, team, r) {
   const bleib = p => p.da ? 'im Kader' : p.team_jetzt ? `bei ${U.kz(p.team_jetzt)}` : 'frei';
   const draw = () => {
     // rk + nr: Pick und Spieler bleiben beim Wischen stehen (mit den Ertragsspalten ist die Tabelle doppelt so breit wie das Handy)
-    wrap.replaceChildren(U.table({cap: `Draft ${S.man.season} (inklusive Keeper)`, cls: 'rk nr kurz', rh: 1, limit: 50, rows: K.picks.filter(p => !team || p.team_id === team),
+    wrap.replaceChildren(U.table({cap: `Draft ${S.man.season} (inklusive Keeper)`, cls: 'rk nr kurz', rh: 1, rc: U.meRc, limit: 50, rows: K.picks.filter(p => !team || p.team_id === team),
       sort: ['p', 1], filter: true, cols: [
         {k: 'p', l: 'Pick', num: 1, v: p => p.pick, d: 1, flt: false, f: p => p.pick},
         {k: 's', l: 'Spieler', v: p => (p.name || '').toLowerCase(), d: 1, flt: false,
@@ -196,7 +195,7 @@ function draftNext(box, K) {
     return;
   }
   if (fest) {
-    U.ap(box, U.table({cap: `Draft-Reihenfolge ${next}`, cls: 'nr kurz', rh: 1, sortable: false,
+    U.ap(box, U.table({cap: `Draft-Reihenfolge ${next}`, cls: 'nr kurz', rh: 1, rc: U.meRc, sortable: false,
       rows: fest.map((tid, i) => ({pick: i + 1, tid, platz: fest.length - i})), cols: [
         {k: 'p', l: 'Pick', num: 1, f: x => x.pick},
         {k: 't', l: 'Team', f: x => U.tl(x.tid)},
@@ -209,7 +208,7 @@ function draftNext(box, K) {
     U.ap(box, h('p', {class: 'note'}, 'Noch keine Endplatz-Simulation.'));
     return;
   }
-  U.ap(box, U.table({cap: `Erwartete Draft-Position ${next} laut Simulation`, cls: 'nr kurz', rh: 0, rows, sort: ['pk', 1], cols: [
+  U.ap(box, U.table({cap: `Erwartete Draft-Position ${next} laut Simulation`, cls: 'nr kurz', rh: 0, rc: U.meRc, rows, sort: ['pk', 1], cols: [
     {k: 't', l: 'Team', v: t => U.kz(t.team_id), d: 1, f: t => U.tl(t.team_id)},
     {k: 'pk', l: 'Erwarteter Pick', num: 1, d: 1, v: t => L(t).pick, f: t => U.num(L(t).pick, 1)},
     {k: 'p1', l: 'Pick 1 %', num: 1, v: t => U.sp(L(t).pick1), f: t => pct(L(t).pick1)},
@@ -249,7 +248,7 @@ function alter(box, K, svg) {
       U.tile('unter 26', L.jung, `ab 30: ${L.alt}`, 'alter'),
       U.tile('Rookies', L.rookies, `2. NFL-Jahr: ${L.zweites_jahr}`, 'alter')),
     h('p', {class: 'note'}, 'Ligaschnitt je Position: ', POS.filter(p => L.positionen[p]).map(p => `${p} ${age(L.positionen[p].alter)}`).join(' · '), '.'),
-    U.table({cap: 'Altersprofil je Team', cls: 'nr kurz', rh: 0, rows, sort: [key, 1], cols: [
+    U.table({cap: 'Altersprofil je Team', cls: 'nr kurz', rh: 0, rc: U.meRc, rows, sort: [key, 1], cols: [
       {k: 't', l: 'Team', v: t => U.kz(t.team_id), d: 1, f: t => U.tl(t.team_id)},
       // die gewichteten Werte zuerst: auf dem Handy sind nur drei bis vier Spalten ohne Wischen zu sehen
       {k: 'bereinigt_ros', l: `bereinigt (nach ${gw})`, num: 1, d: 1, v: t => P(t).bereinigt_ros, f: t => U.val(P(t).bereinigt_ros, dev, rosWhy)},
@@ -293,7 +292,7 @@ function wert(box, K, svg) {
       U.tile('Keeper-Linie', U.val(K.keeper_linie, wertTxt, `weniger als ${total} Kaderspieler mit Wert`), `Wert des ${total}. Kaderspielers`, 'keeper-linie'),
       U.tile(`Ø Wert Top ${n}`, wertTxt(L.kern), `${n} wertvollste je Team`, 'kern-wert'),
       U.tile('Ø Alter (nach Wert)', U.val(L.alter, v => U.num(v, 1), noAge), `Liga, ${L.n} Spieler mit Wert`, 'alter-wert')),
-    U.table({cap: 'Marktwert je Team', cls: 'nr kurz', rh: 0, rows, sort: ['kern', -1], cols: [
+    U.table({cap: 'Marktwert je Team', cls: 'nr kurz', rh: 0, rc: U.meRc, rows, sort: ['kern', -1], cols: [
       {k: 't', l: 'Team', v: t => U.kz(t.team_id), d: 1, f: t => U.tl(t.team_id)},
       {k: 'kern', l: `Wert Top ${n}`, num: 1, v: t => M(t).kern, f: t => wertTxt(M(t).kern)},
       {k: 'ab', l: 'zum Schnitt', num: 1, v: t => M(t).kern - L.kern, f: t => wertSgn(M(t).kern - L.kern)},

@@ -22,7 +22,9 @@ export async function render(box, ctx, r) {
     U.centerChip(nav);
   }
 
-  const games = S.sched.games.filter(g => g.week === wk);
+  // Woche › Paarungen: das Spiel von Mein Team zuerst (markiert ist es in beiden Ansichten, U.game)
+  const mine = g => g.home === U.meinTeam() || g.away === U.meinTeam();
+  const games = S.sched.games.filter(g => g.week === wk).sort((a, b) => woche && U.meinTeam() ? mine(b) - mine(a) : 0);
   const svg = await ctx.mod('svg');
   if (W.status === 'final') U.ap(box, tiles(W));
   const poTxt = wk === 15 ? 'Die Paarungen stehen nach W14 fest (6 Teams, Seeds 1–2 mit Bye). ' : `Die Paarungen stehen nach W${wk - 1} fest. `;
@@ -50,7 +52,7 @@ function weekTable(i, wk) {
   const val = (k, f) => ({v: t => w(t)[k][i], f: t => U.val(w(t)[k][i], f, 'kein Spiel')});
   return h('div', null, h('p', {class: 'note'}, 'Diese Woche unter Stärke: ', h('a', {href: '#staerke/allplay/w' + wk}, 'All-Play & Glück'), ' · ',
     h('a', {href: '#staerke/punkte/w' + wk}, 'Punkte & Form'), ' · ', h('a', {href: '#staerke/coaching/w' + wk}, 'Coaching')),
-  U.table({cap: `Wochentabelle W${wk}`, cls: 'rk', rows: S.teams, sort: ['wr', 1], cols: [
+  U.table({cap: `Wochentabelle W${wk}`, cls: 'rk', rc: U.meRc, rows: S.teams, sort: ['wr', 1], cols: [
     {k: 'wr', l: '#', v: t => w(t).wochenrang[i], d: 1, f: t => w(t).wochenrang[i]},
     {k: 'team', l: 'Team', v: t => t.name.toLowerCase(), d: 1, f: t => U.tl(t.team_id)},
     {k: 'opp', l: 'Gegner', v: t => U.kz(w(t).gegner[i]), d: 1, f: t => h('a', {href: '#team/' + w(t).gegner[i], class: 'tl2', 'aria-label': U.team(w(t).gegner[i])?.name}, U.kz(w(t).gegner[i]))},
@@ -71,7 +73,7 @@ function weekTable(i, wk) {
 function topScorer(W) {
   const rows = W.top_scorer || [];
   if (!rows.length) return h('p', {class: 'note'}, 'Keine Top-Scorer vorhanden.');
-  return h('div', null, U.table({cap: `Top-Scorer W${W.week} (alle Kader, auch Bank)`, cls: 'rk', rows, sort: ['pts', -1], cols: [
+  return h('div', null, U.table({cap: `Top-Scorer W${W.week} (alle Kader, auch Bank)`, cls: 'rk', rc: U.meRc, rows, sort: ['pts', -1], cols: [
     // # = Punkterang der Woche (fest, auch nach dem Umsortieren); Pkt direkt hinter dem Namen, auf dem Handy sonst außer Sicht
     {k: 'i', l: '#', v: p => p.rang, d: 1, f: (p, i) => p.rang ?? i + 1},
     {k: 'name', l: 'Spieler', v: p => p.name, d: 1, f: p => h('a', {href: '#spieler/' + p.player_id, class: 'tl2'}, p.name)},

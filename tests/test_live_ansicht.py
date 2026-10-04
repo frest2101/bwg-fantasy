@@ -41,9 +41,9 @@ HTML_WEGE = ("innerHTML", "outerHTML", "insertAdjacentHTML", "setHTMLUnsafe", "s
              "DOMParser", "parseFromString", "createContextualFragment", "eval(", "Function(")
 # Schreibende oder dauerhafte Verbindungen (ganze Wörter, Groß-/Kleinschreibung zählt: „post“ ist ein Spielstatus)
 SCHREIBWEGE = ("POST", "PUT", "DELETE", "PATCH", "XMLHttpRequest", "sendBeacon", "WebSocket", "EventSource")
-# Ablage im Browser: Die Rohantwort (samt Manager-Daten) wird verworfen; gelesen wird nur „Mein Team“ (U.store.get)
+# Ablage im Browser: Die Rohantwort (samt Manager-Daten) wird verworfen; gelesen wird nur „Mein Team“ (U.meinTeam())
 SPEICHER = (r"\blocalStorage\b", r"\bsessionStorage\b", r"\bindexedDB\b", r"\bcaches\s*\.", r"\.cookie\b",
-            r"\bstore\s*\.\s*set\b", r"\bBroadcastChannel\b", r"\bserviceWorker\b")
+            r"\bstore\s*\.\s*set\b", r"\bsetMeinTeam\b", r"\bBroadcastChannel\b", r"\bserviceWorker\b")
 # Umwege zu fetch oder zum Speicher über das globale Objekt bzw. nachgeladenen Code
 UMWEGE = (r"\bglobalThis\b", r"\bwindow\b", r"\bself\b", r"\bimport\s*\(", r"\bnavigator\b")
 # Dauerabruf: Zeitgeber dürfen nur abbrechen, Ereignisse nur aus Knöpfen und Auswahl kommen
@@ -79,7 +79,9 @@ def js_tabelle(text: str, name: str) -> dict[int, str]:
 
 def test_route_und_chip():
     """#spieltag steht im Router und lädt v_spieltag.js; „#live“ bleibt die aria-live-Region. Kein eigener Tab: Der
-    Zugang ist der Chip im Kopf und die erste Ansicht im Bereich Woche (fünf Tabs, App-Konzept 04.10.2026)."""
+    Zugang ist die erste Ansicht im Bereich Woche (Chip „Spieltag live“, während der Saison auch der Tab Woche; fünf Tabs,
+    App-Konzept 04.10.2026). Den Chip „Live“ im Kopf gibt es seit Paket P2 nicht mehr (dort steht Mein Team); seinen
+    Nachlade-Tipp übernimmt der Tab Woche."""
     views = re.search(r"const VIEWS = \{(.*?)\};", read(APP_JS), re.S)
     assert views, "VIEWS in app/js/app.js nicht gefunden"
     routen = dict(re.findall(r"(\w+): '(\w+)'", views.group(1)))
@@ -89,8 +91,11 @@ def test_route_und_chip():
         assert (JS / f"{modul}.js").exists(), f"Route ohne Datei: {modul}.js"
     html = read(INDEX)
     assert re.search(r'<div id="live"[^>]*aria-live="polite"', html)
-    kopf = html.split("<header", 1)[1].split("</header>", 1)[0]
-    assert re.search(r'<a id="lv"[^>]*href="#spieltag"[^>]*aria-label="[^"]+"', kopf), "Chip „Live“ fehlt im Kopf"
+    app = read(APP_JS)
+    assert "['live', 'Spieltag live', 'v_spieltag']" in app, "Spieltag live ist die erste Ansicht im Bereich Woche"
+    assert "p === 'live' ? '#spieltag'" in app, "Chip „Spieltag live“ führt auf #spieltag"
+    assert "U.saisonLaeuft() ? 'spieltag'" in app, "#woche öffnet während der Saison den Spieltag live"
+    assert """querySelector('.tabs a[data-s="woche"]')""" in code(VIEW), "Tab Woche lädt in der offenen Live-Ansicht neu"
     leiste = html.split('<nav class="tabs"', 1)[1].split("</nav>", 1)[0]
     assert "#spieltag" not in leiste and leiste.count("<a ") == 5
 
@@ -174,11 +179,14 @@ def test_kein_dauerabruf():
 
 def test_nichts_im_browser_speicher():
     """Die Live-Module legen nichts ab: kein localStorage, sessionStorage, IndexedDB, Cache, Cookie und kein
-    U.store.set – die Rohantwort von ESPN enthält Manager-Daten und wird nach dem Rechnen verworfen."""
+    U.store.set und kein U.setMeinTeam – die Rohantwort von ESPN enthält Manager-Daten und wird nach dem Rechnen verworfen;
+    Mein Team wird nur über U.meinTeam() gelesen."""
     for name, text in live().items():
         for muster in SPEICHER:
             assert not re.search(muster, text), f"{name}: {muster}"
-    assert set(re.findall(r"\bstore\s*\.\s*(\w+)", code(VIEW))) <= {"get"}, "aus dem Browser-Speicher wird nur gelesen (Mein Team)"
+    view = code(VIEW)
+    assert "U.meinTeam()" in view, "Mein Team wird über U.meinTeam() gelesen"
+    assert set(re.findall(r"\bstore\s*\.\s*(\w+)", view)) <= {"get"}, "aus dem Browser-Speicher wird nur gelesen (Mein Team)"
 
 
 def test_keine_manager_und_keine_redaktionstexte():

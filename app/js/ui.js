@@ -99,6 +99,21 @@ export const store = {
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* ohne Speicher gilt der Standard */ } },
 };
 
+// ---------------------------------------------------------------- Mein Team (App-Konzept 04.10.2026, Abschnitt 6)
+// Einmal im Kopf gewählt, gilt überall: Browser-Speicher 'bwg-team' (nur die Team-Nummer, kein Login), 0 = keins.
+// setMeinTeam meldet den Wechsel als Ereignis 'bwg-team' am document (der Kopf zeigt dann das neue Kürzel).
+// Ohne Browser-Speicher (Privatmodus, Website-Daten gesperrt) gilt die Wahl bis zum Neuladen, wie bei Hell/Dunkel.
+const TEAM_KEY = 'bwg-team';
+let teamMem = 0;
+export const meinTeam = () => { const v = +(store.get(TEAM_KEY) ?? teamMem) || 0; return S.byId?.has(v) ? v : 0; };
+export function setMeinTeam(tid) {
+  teamMem = S.byId?.has(+tid) ? +tid : 0;
+  store.set(TEAM_KEY, teamMem);
+  D.dispatchEvent(new CustomEvent('bwg-team'));
+}
+// Zeilenklasse für Tabellen mit einer Zeile je Team (team_id, sonst tid): die eigene Zeile hervorgehoben
+export const meRc = x => { const m = meinTeam(); return m && (x?.team_id ?? x?.tid) === m ? 'me' : null; };
+
 // Hash-Parameter ändern, ohne die Ansicht neu zu laden (teilbarer Link)
 export function setQ(path, params) {
   const q = new URLSearchParams();
@@ -152,7 +167,7 @@ export const muChips = cur => chips('Matchups je Position', [['#woche/matchups',
 // Laufende Woche nach dem Kalender: die letzte Woche des Spielplans, die (Dienstag, deutsche Zeit) schon begonnen hat; vor W1
 // die erste. Eine Woche heißt erst nach dem Wochenabruf „final“, ihr Status sagt deshalb nicht, ob sie gerade läuft.
 const ISO = new Intl.DateTimeFormat('en-CA', {timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit'});
-const heute = () => ISO.format(new Date());
+export const heute = () => ISO.format(new Date());          // „2026-10-04“, deutscher Kalendertag
 export const aktuelleWoche = () => { const t = heute(); return S.weeks.filter(w => w.start <= t).at(-1)?.week ?? S.weeks[0]?.week ?? 1; };
 // Saison läuft (Woche öffnet dann mit dem Spieltag live): W1 hat begonnen, die letzte Woche des Spielplans ist nach dem
 // Kalender noch nicht vorbei (ihr Montag) und die Playoffs sind nicht bis zur letzten Woche gewertet (manifest ›
@@ -443,7 +458,9 @@ export function game(g, full) {
     meta = 'Siegchance';
     info = full ? ib('siegchance', '') : null;
   } else meta = 'offen';
-  return h('li', {class: 'game'}, side(g.home, g.home_pf, chance), side(g.away, g.away_pf, chance == null ? null : 100 - chance),
+  // Spiel von Mein Team mit Randstrich (wie in Spieltag live)
+  const mine = meinTeam() && (g.home === meinTeam() || g.away === meinTeam());
+  return h('li', {class: 'game' + (mine ? ' mine' : '')}, side(g.home, g.home_pf, chance), side(g.away, g.away_pf, chance == null ? null : 100 - chance),
     h('div', {class: 'gm row'}, h('span', null, meta), info));
 }
 // Tageslauf von Hand: Die App startet nichts selbst (kein Token im Browser). Der Knopf ist ein Link im Aussehen der

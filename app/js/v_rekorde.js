@@ -86,7 +86,7 @@ function positionen(box, r, svg) {
     if (sortK !== 'rang' && sortK !== 'team' && !keys.includes(sortK)) sortK = 'rang';
     const dir = sortK === 'rang' || sortK === 'team' || wert === 'rang' ? 1 : -1;
     wrap.replaceChildren(U.table({cap: `PF nach ${key === 'nach_slot' ? 'Slot' : 'Position'} (${wert === 'pts' ? 'Punkte' : wert === 'anteil' ? 'Anteil' : 'Ligarang'})`,
-      cls: 'rk', rows: S.teams, sort: [sortK, dir], onSort: k => { sortK = k; }, cols: [
+      cls: 'rk', rc: U.meRc, rows: S.teams, sort: [sortK, dir], onSort: k => { sortK = k; }, cols: [
         {k: 'rang', l: '#', v: t => t.rang, d: 1, f: t => t.rang}, {k: 'team', l: 'Team', v: t => t.name.toLowerCase(), d: 1, f: t => U.tl(t.team_id)},
         ...keys.map(k => ({k, l: k, num: 1, d: wert === 'rang' ? 1 : -1, v: t => wert === 'anteil' ? share(P(t), k) : P(t)[k]?.[wert === 'pts' ? 'pts' : 'rang'], f: t => cell(t, k)}))]}));
     const names = keys, cls = j => COL[keys[j]];
@@ -104,7 +104,8 @@ function positionen(box, r, svg) {
 
 function h2h(box, r) {
   const E = S.sched.h2h || [];
-  let sel = S.byId.has(+r.q.get('team')) ? +r.q.get('team') : S.teams[0]?.team_id;
+  // ?team=N, sonst Mein Team, ohne Wahl das erste Team
+  let sel = S.byId.has(+r.q.get('team')) ? +r.q.get('team') : U.meinTeam() || S.teams[0]?.team_id;
   const rec = (a, b) => {
     const e = E.find(x => (x.a === a && x.b === b) || (x.a === b && x.b === a));
     if (!e || !e.spiele) return null;

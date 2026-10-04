@@ -27,7 +27,7 @@ function power(box, r, svg) {
   const n = S.tw;
   U.ap(box, vorjahr ? h('p', {class: 'warn'}, h('strong', null, 'Projektion Kader aus dem Vorjahr: '),
     'Die Projektion des Kaders liegt noch nicht vor, bis dahin zählt die Vorjahresleistung. ', U.ib('p', '')) : null,
-  U.table({cap: `Power Ranking nach W${n}`, cls: 'rk', rows, sort: ['r', 1], cols: [
+  U.table({cap: `Power Ranking nach W${n}`, cls: 'rk', rc: U.meRc, rows, sort: ['r', 1], cols: [
     {k: 'r', l: '#', v: t => t.pr.rang, d: 1, f: t => t.pr.rang},
     {k: 'team', l: 'Team', v: t => t.name.toLowerCase(), d: 1, f: t => [U.tl(t.team_id), t.pr.p_quelle === 'vorjahr' ? h('span', {class: 'badge', title: 'Projektion Kader aus dem Vorjahr'}, 'Vorjahr') : null]},
     {k: 'tr', l: 'Trend', num: 1, v: t => t.pr.trend, f: t => U.trend(t.pr.trend, 'noch kein Vorwochenvergleich')},
@@ -100,7 +100,7 @@ function scoreView(box, r) {
       f: t => raw ? U.val(t[rawVal[m.key]], v => rawTxt(m.key, v), 'ab Wochenabruf W' + (S.tw + 1)) : normTxt(t.norm[st.norm][m.key])})),
     {k: 'rg', l: 'Tabelle', num: 1, v: t => t.rang, d: 1, f: t => t.rang + '.'}];
   calc();
-  const tbl = U.table({cap: 'Score je Team', cls: 'rk sc', rows: S.teams, sort: ['score', -1], cols});
+  const tbl = U.table({cap: 'Score je Team', cls: 'rk sc', rc: U.meRc, rows: S.teams, sort: ['score', -1], cols});
 
   // Bedienung: Profile, Normierung, Regler
   const profSeg = U.seg('Profil', [...PN.map(p => [slug(p), p]), ['eigene', 'Eigene']], slug(match(st.w)), v => {
