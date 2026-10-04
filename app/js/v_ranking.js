@@ -32,11 +32,11 @@ function power(box, r, svg) {
     {k: 'team', l: 'Team', v: t => t.name.toLowerCase(), d: 1, f: t => [U.tl(t.team_id), t.pr.p_quelle === 'vorjahr' ? h('span', {class: 'badge', title: 'Projektion Kader aus dem Vorjahr'}, 'Vorjahr') : null]},
     {k: 'tr', l: 'Trend', num: 1, v: t => t.pr.trend, f: t => U.trend(t.pr.trend, 'noch kein Vorwochenvergleich')},
     {k: 'mu', l: 'Stärke', num: 1, v: t => t.pr.mu, f: t => [U.num(t.pr.mu, 1), h('span', {class: 'sub'}, '± ' + U.num(t.pr.se, 1))]},
-    {k: 'e', l: 'Erwartete All-Play %', num: 1, v: t => t.pr.e, f: t => U.pct(U.ok(t.pr.e) ? t.pr.e * 100 : null)},
-    {k: 'ap', l: 'All-Play % bisher', num: 1, v: t => t.allplay_pct, f: t => U.pct(t.allplay_pct)},
-    {k: 'wl', l: S.hasT ? 'W-L-T' : 'W-L', v: t => -t.rang, f: U.rec},
-    {k: 'p', l: 'Projektion Kader', num: 1, v: t => t.pr.p, f: t => U.val(t.pr.p, v => U.num(v, 1))},
-    {k: 'vw', l: 'Rang Vorwoche', num: 1, v: t => t.pr.rang_vorwoche, d: 1, f: t => U.val(t.pr.rang_vorwoche, v => v + '.', 'noch kein Vorwochenvergleich')}]}),
+    {k: 'e', l: 'Erwartete All-Play %', num: 1, x: 1, v: t => t.pr.e, f: t => U.pct(U.ok(t.pr.e) ? t.pr.e * 100 : null)},
+    {k: 'ap', l: 'All-Play % bisher', num: 1, x: 1, v: t => t.allplay_pct, f: t => U.pct(t.allplay_pct)},
+    {k: 'wl', l: S.hasT ? 'W-L-T' : 'W-L', x: 1, v: t => -t.rang, f: U.rec},
+    {k: 'p', l: 'Projektion Kader', num: 1, x: 1, v: t => t.pr.p, f: t => U.val(t.pr.p, v => U.num(v, 1))},
+    {k: 'vw', l: 'Rang Vorwoche', num: 1, x: 1, v: t => t.pr.rang_vorwoche, d: 1, f: t => U.val(t.pr.rang_vorwoche, v => v + '.', 'noch kein Vorwochenvergleich')}]}),
   U.legend(['mu', 'kader-proj', 'e', 'pr-rang', 'trend', 'kernsatz']));
   // Kernsätze als Liste (auf dem Handy lesbar); ohne Freigabe „folgt“
   const sorted = U.sortRows(rows, t => t.pr.rang, 1);

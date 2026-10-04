@@ -157,16 +157,16 @@ function alltime(box, H, r) {
       a.namenskette !== a.name_2026 ? h('span', {class: 'sub'}, a.namenskette) : null]},
     {k: 's', l: 'Saisons', num: 1, v: a => a.saisons, f: a => a.saisons},
     {k: 'wl', l: 'W-L', num: 1, v: a => a.w, f: a => `${a.w}-${a.l}`},
-    {k: 'wp', l: 'W %', num: 1, v: a => a.w_pct, f: a => U.pct(a.w_pct)},
-    {k: 'pf', l: 'PF', num: 1, v: a => a.pf, f: a => U.num(a.pf)},
-    {k: 'pp', l: 'Ø PF+', num: 1, v: a => a.pf_plus_avg, f: a => U.num(a.pf_plus_avg, 1)},
+    {k: 'wp', l: 'W %', num: 1, x: 1, v: a => a.w_pct, f: a => U.pct(a.w_pct)},
+    {k: 'pf', l: 'PF', num: 1, x: 1, v: a => a.pf, f: a => U.num(a.pf)},
+    {k: 'pp', l: 'Ø PF+', num: 1, x: 1, v: a => a.pf_plus_avg, f: a => U.num(a.pf_plus_avg, 1)},
     {k: 'ti', l: 'Titel', num: 1, v: a => a.titel, f: a => a.titel},
     {k: 'fi', l: 'Finals', num: 1, v: a => a.finals, f: a => a.finals},
     {k: 'po', l: 'Playoffs', num: 1, v: a => a.playoffs, f: a => a.playoffs},
-    {k: 'dv', l: 'Divisionstitel', num: 1, v: a => a.divisionssiege, f: a => a.divisionssiege},
-    {k: 'sc', l: 'Scoring-Titel', num: 1, v: a => a.scoring_titel, f: a => a.scoring_titel},
-    {k: 'le', l: 'Letzter Platz', num: 1, v: a => a.letzte, f: a => a.letzte},
-    {k: 'pl', l: 'Ø Platz', num: 1, v: a => a.platz_avg, d: 1, f: a => U.num(a.platz_avg, 1)}]}),
+    {k: 'dv', l: 'Divisionstitel', num: 1, x: 1, v: a => a.divisionssiege, f: a => a.divisionssiege},
+    {k: 'sc', l: 'Scoring-Titel', num: 1, x: 1, v: a => a.scoring_titel, f: a => a.scoring_titel},
+    {k: 'le', l: 'Letzter Platz', num: 1, x: 1, v: a => a.letzte, f: a => a.letzte},
+    {k: 'pl', l: 'Ø Platz', num: 1, x: 1, v: a => a.platz_avg, d: 1, f: a => U.num(a.platz_avg, 1)}]}),
   U.legend(['saisons', 'wpct-alltime', 'pfplus', 'pfplus-avg', 'titel-finals', 'playoffs-alltime', 'div-titel', 'scoring-titel', 'letzter', 'endplatz', 'aera']));
   const R = H.rekorde || {};
   const der = R.abgeleitet || [];
@@ -191,12 +191,12 @@ function alltime(box, H, r) {
       U.table({cap: `Saison ${yr}`, cls: 'rk', rows, sort: ['p', 1], cols: [
         {k: 'p', l: '#', v: t => t.final_rank, d: 1, f: t => t.final_rank},
         {k: 'n', l: 'Team', v: t => t.team_name.toLowerCase(), d: 1, f: t => t.team_name},
-        {k: 'dv', l: 'Division / Platz', num: 1, v: t => t.division * 10 + t.div_rank, d: 1, f: t => `${t.division}/${t.div_rank}.`},
+        {k: 'dv', l: 'Division / Platz', num: 1, x: 1, v: t => t.division * 10 + t.div_rank, d: 1, f: t => `${t.division}/${t.div_rank}.`},
         {k: 'wl', l: 'W-L', num: 1, v: t => t.w_pct, f: t => `${t.w}-${t.l}`},
         {k: 'pf', l: 'PF', num: 1, v: t => t.pf, f: t => U.num(t.pf)},
         {k: 'pp', l: 'PF+', num: 1, v: t => t.pf_plus, f: t => U.num(t.pf_plus, 1)},
         {k: 'po', l: 'Playoffs', v: t => +t.playoffs, f: t => t.playoffs ? h('span', null, '✓', h('span', {class: 'vh'}, ' ja')) : ''},
-        {k: 'sc', l: 'Scoring-Titel', v: t => +t.scoring_titel, f: t => t.scoring_titel ? h('span', null, '✓', h('span', {class: 'vh'}, ' ja')) : ''}]}));
+        {k: 'sc', l: 'Scoring-Titel', x: 1, v: t => +t.scoring_titel, f: t => t.scoring_titel ? h('span', null, '✓', h('span', {class: 'vh'}, ' ja')) : ''}]}));
   };
   U.ap(box, h('h2', {style: 'margin-top:16px'}, 'Saisontabellen'), h('div', {class: 'row'}, h('label', null, 'Saison ', h('select', {onchange: e => {
     yr = +e.target.value; U.setQ(r.base + '/alltime', {saison: yr}); draw();

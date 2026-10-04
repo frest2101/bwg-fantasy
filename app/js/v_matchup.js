@@ -68,17 +68,18 @@ function overview(box, M, D) {
 // ---------------------------------------------------------------- eine Position (QB–K): Defenses
 function position(box, M, pos) {
   const prior = M.vorjahr_quelle === 'basis';
-  const rows = (M.defenses || []).map(d => ({...(d.pos?.[pos] || {}), id: d.id, abbrev: d.abbrev}));
+  const rows = (M.defenses || []).map(d => ({...(d.pos?.[pos] || {}), id: d.id, abbrev: d.abbrev, bye: d.bye}));
   const cols = [
     {k: 'o', l: 'Defense', v: t => t.abbrev, d: 1, flt: false, f: t => h('strong', null, t.abbrev)},
     {k: 'f', l: 'Faktor', num: 1, v: t => t.f, cls: t => fz(t.f, 3), f: t => U.val(t.f, v => U.num(v, 3), 'kein Faktor')},
-    {k: 'd', l: 'zur Vorwoche', num: 1, v: t => t.delta, f: t => U.val(t.delta, v => U.sgn(v, 3), 'keine Vorwoche')},
+    {k: 'd', l: 'zur Vorwoche', num: 1, x: 1, v: t => t.delta, f: t => U.val(t.delta, v => U.sgn(v, 3), 'keine Vorwoche')},
     {k: 'r', l: 'Rang', num: 1, v: t => t.rang, d: 1, f: t => [U.val(t.rang, v => v + '.', 'kein Faktor'),
       h('span', {class: 'sub'}, U.ok(t.rang_vorwoche) ? `Vorwoche ${t.rang_vorwoche}.` : '')]},
-    {k: 'z25', l: 'Zugelassen 2025', num: 1, v: t => t.z25, f: t => U.val(t.z25, U.num, prior ? 'kein Spiel 2025' : 'Vorjahr noch nicht geladen')},
-    {k: 'z26', l: 'Zugelassen 2026 (Spiele)', num: 1, v: t => t.z26, f: t => [U.val(t.z26, U.num, 'noch kein Spiel'), ` (${t.n ?? 0})`]},
-    {k: 'r25', l: 'Verhältnis 2025', num: 1, v: t => t.r25, f: t => U.val(t.r25, v => U.num(v, 3), 'kein Wert')},
-    {k: 'r26', l: 'Verhältnis 2026', num: 1, v: t => t.r26, f: t => U.val(t.r26, v => U.num(v, 3), 'noch kein Spiel')}];
+    {k: 'bye', l: 'Bye', num: 1, cat: 1, v: t => t.bye, d: 1, f: t => U.val(t.bye, v => 'W' + v, 'kein Bye')},
+    {k: 'z25', l: 'Zugelassen 2025', num: 1, x: 1, v: t => t.z25, f: t => U.val(t.z25, U.num, prior ? 'kein Spiel 2025' : 'Vorjahr noch nicht geladen')},
+    {k: 'z26', l: 'Zugelassen 2026 (Spiele)', num: 1, x: 1, v: t => t.z26, f: t => [U.val(t.z26, U.num, 'noch kein Spiel'), ` (${t.n ?? 0})`]},
+    {k: 'r25', l: 'Verhältnis 2025', num: 1, x: 1, v: t => t.r25, f: t => U.val(t.r25, v => U.num(v, 3), 'kein Wert')},
+    {k: 'r26', l: 'Verhältnis 2026', num: 1, x: 1, v: t => t.r26, f: t => U.val(t.r26, v => U.num(v, 3), 'noch kein Spiel')}];
   U.ap(box, U.table({cap: `${pos}: Punkte gegen die Defense und Faktor`, cls: 'nr', rh: 0, rows, sort: ['f', -1], filter: true, cols}),
     U.legend(['filter', 'mu-z', 'mu-r', 'mu-f', 'delta-f', 'mu-rang']));
 }
@@ -88,14 +89,15 @@ function offense(box, D) {
   const cols = [
     {k: 'o', l: 'Offense', v: t => t.abbrev, d: 1, flt: false, f: t => h('strong', null, t.abbrev)},
     {k: 'f', l: 'Faktor', num: 1, v: t => t.f, cls: t => fz(t.f, 3), f: t => U.val(t.f, v => U.num(v, 3), 'kein Faktor')},
-    {k: 'd', l: 'zur Vorwoche', num: 1, v: t => t.delta, f: t => U.val(t.delta, v => U.sgn(v, 3), 'keine Vorwoche')},
+    {k: 'd', l: 'zur Vorwoche', num: 1, x: 1, v: t => t.delta, f: t => U.val(t.delta, v => U.sgn(v, 3), 'keine Vorwoche')},
     {k: 'r', l: 'Rang', num: 1, v: t => t.rang, d: 1, f: t => [U.val(t.rang, v => v + '.', 'kein Faktor'),
       h('span', {class: 'sub'}, U.ok(t.rang_vorwoche) ? `Vorwoche ${t.rang_vorwoche}.` : '')]},
-    {k: 'z25', l: 'Zugelassen 2025', num: 1, v: t => t.z25, f: t => U.val(t.z25, U.num, 'kein Spiel 2025')},
-    {k: 'z26', l: 'Zugelassen 2026 (Spiele)', num: 1, v: t => t.z26, f: t => [U.val(t.z26, U.num, 'noch kein Spiel'), ` (${t.n ?? 0})`]},
-    {k: 'r25', l: 'Verhältnis 2025', num: 1, v: t => t.r25, f: t => U.val(t.r25, v => U.num(v, 3), 'kein Wert')},
-    {k: 'r26', l: 'Verhältnis 2026', num: 1, v: t => t.r26, f: t => U.val(t.r26, v => U.num(v, 3), 'noch kein Spiel')},
-    {k: 'z3', l: 'Zugelassen letzte 3', num: 1, v: t => t.z_last3, f: t => U.val(t.z_last3, U.num, 'noch kein Spiel')}];
+    {k: 'bye', l: 'Bye', num: 1, cat: 1, v: t => t.bye, d: 1, f: t => U.val(t.bye, v => 'W' + v, 'kein Bye')},
+    {k: 'z25', l: 'Zugelassen 2025', num: 1, x: 1, v: t => t.z25, f: t => U.val(t.z25, U.num, 'kein Spiel 2025')},
+    {k: 'z26', l: 'Zugelassen 2026 (Spiele)', num: 1, x: 1, v: t => t.z26, f: t => [U.val(t.z26, U.num, 'noch kein Spiel'), ` (${t.n ?? 0})`]},
+    {k: 'r25', l: 'Verhältnis 2025', num: 1, x: 1, v: t => t.r25, f: t => U.val(t.r25, v => U.num(v, 3), 'kein Wert')},
+    {k: 'r26', l: 'Verhältnis 2026', num: 1, x: 1, v: t => t.r26, f: t => U.val(t.r26, v => U.num(v, 3), 'noch kein Spiel')},
+    {k: 'z3', l: 'Zugelassen letzte 3', num: 1, x: 1, v: t => t.z_last3, f: t => U.val(t.z_last3, U.num, 'noch kein Spiel')}];
   U.ap(box, U.table({cap: 'D/ST: Punkte gegen die Offense und Faktor', cls: 'nr', rh: 0, rows: D.teams || [], sort: ['f', -1], filter: true, cols}),
     U.legend(['filter', 'z-dst', 'r', 'f', 'delta-f', 'z-letzte3']),
     h('p', {class: 'note'}, 'Freie D/ST mit Gegner, Faktor und Bye: ', h('a', {href: '#markt?pos=' + encodeURIComponent('D/ST')}, 'Markt › Freie Spieler › D/ST'), '.'));

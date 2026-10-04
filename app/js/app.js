@@ -292,23 +292,37 @@ function standChip() {
       }
       neu.disabled = false;
     }}, 'Daten neu laden');
-    U.showPop(btn, 'Datenstand', [
-      alt ? h('p', {class: 'warn'}, 'Daten älter als erwartet – der Wochenabruf ist noch nicht durchgelaufen.') : null,
-      h('dl', null,
-        h('dt', null, 'Wertung'), h('dd', null, `W${ds.woche_final ?? S.tw} gewertet`),
-        po ? [h('dt', null, 'Playoffs'), h('dd', null, `W${po} gewertet`)] : null,
-        h('dt', null, 'Projektionen Rest der Saison'), h('dd', null, ds.ros_nach_woche != null ? `Stand nach W${ds.ros_nach_woche}` : `ab Wochenabruf W${sw + 1}`),
+    // Einfach (Paket P5): Wertung, Stand heute und nächster Tageslauf; Ausführlich: alle Zeilen. Der Schalter unten ist derselbe
+    // wie an den Tabellen (U.spaltenVoll) und baut nur den Inhalt neu – der Knopf bleibt im Fenster, das Fenster offen
+    const knopf = h('dd', {class: 'full'}, U.tageslaufKnopf(), neu, info);
+    const inhalt = h('div');
+    const fuellen = () => {
+      const voll = U.spaltenVoll();
+      inhalt.replaceChildren();
+      U.ap(inhalt, h('dl', null,
+        h('dt', null, 'Wertung'), h('dd', null, `W${voll ? ds.woche_final ?? S.tw : sw} gewertet`),
+        voll && po ? [h('dt', null, 'Playoffs'), h('dd', null, `W${po} gewertet`)] : null,
+        voll ? [h('dt', null, 'Projektionen Rest der Saison'), h('dd', null, ds.ros_nach_woche != null ? `Stand nach W${ds.ros_nach_woche}` : `ab Wochenabruf W${sw + 1}`)] : null,
         h('dt', null, ds.pool_stand ? 'Besitz, Verletzung, Projektion nächste Woche' : 'Besitz, Verletzung'), h('dd', null, tag),
-        h('dt', null, 'Wetter'), h('dd', null, ds.wetter_stand ? U.standTxt(ds.wetter_stand) : '–'),
-        h('dt', null, 'Letzter Move'), h('dd', null, ds.transaktionen_bis ? U.stamp(ds.transaktionen_bis) : '–'),
+        voll ? [h('dt', null, 'Wetter'), h('dd', null, ds.wetter_stand ? U.standTxt(ds.wetter_stand) : '–'),
+          h('dt', null, 'Letzter Move'), h('dd', null, ds.transaktionen_bis ? U.stamp(ds.transaktionen_bis) : '–')] : null,
         // „ab“: geplanter Slot, GitHub startet meist rund 15 min später (Glossar „Aktualisierung“)
         h('dt', null, 'Nächster Tageslauf'), h('dd', null, `ab ${U.stamp(nextDaily())}`),
         // Tageslauf von Hand: nur ein Knopf zur Workflow-Seite, kein Start aus der App (kein Token im Browser)
-        h('dd', {class: 'full'}, U.tageslaufKnopf(), neu, info),
-        h('dt', null, 'Nächster Wochenabruf'), h('dd', null, fertig ? '– (Saison beendet, erst wieder nach dem Saisonwechsel)' : U.stamp(due))),
+        knopf,
+        voll ? [h('dt', null, 'Nächster Wochenabruf'), h('dd', null, fertig ? '– (Saison beendet, erst wieder nach dem Saisonwechsel)' : U.stamp(due))] : null),
       h('p', {class: 'note'}, '„Tageslauf starten“ öffnet GitHub: dort „Run workflow“ (GitHub-Anmeldung nötig). Etwa 2 Minuten später holt „Daten neu laden“ den neuen Stand. ',
         h('a', {href: '#erklaerungen/tageslauf-starten'}, 'Mehr dazu')),
-      h('p', {class: 'note'}, 'Wertung und Projektionen rechnen nur mit abgeschlossenen Wochen; der Tageslauf frischt Besitz, Verletzung, Transaktionen und Wetter stündlich von etwa 05:00 Uhr bis Mitternacht (deutsche Zeit) auf. ', h('a', {href: '#erklaerungen/aktualisierung'}, 'Mehr zur Aktualisierung')),
+      voll ? h('p', {class: 'note'}, 'Wertung und Projektionen rechnen nur mit abgeschlossenen Wochen; der Tageslauf frischt Besitz, Verletzung, Transaktionen und Wetter stündlich von etwa 05:00 Uhr bis Mitternacht (deutsche Zeit) auf. ', h('a', {href: '#erklaerungen/aktualisierung'}, 'Mehr zur Aktualisierung')) : null);
+    };
+    fuellen();
+    const anzeige = U.seg('Anzeige', [['einfach', 'Einfach'], ['voll', 'Ausführlich']], U.spaltenVoll() ? 'voll' : 'einfach',
+      v => { U.setSpaltenVoll(v === 'voll'); fuellen(); anzeige.scrollIntoView({block: 'nearest'}); }, 'tight');
+    U.showPop(btn, 'Datenstand', [
+      alt ? h('p', {class: 'warn'}, 'Daten älter als erwartet – der Wochenabruf ist noch nicht durchgelaufen.') : null,
+      inhalt,
+      // Link statt i-Knopf: ein Erklärfenster ersetzte dieses Fenster, der Fokus ginge danach verloren
+      h('div', {class: 'row'}, h('span', {class: 'note'}, 'Anzeige'), anzeige, h('a', {href: '#erklaerungen/spalten'}, 'Mehr dazu')),
     ]);
   };
 }

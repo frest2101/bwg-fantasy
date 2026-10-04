@@ -139,3 +139,17 @@ def test_app_verlinkt_nur_neue_routen():
         if pfad not in KEINE_ROUTE and not gueltig(pfad):
             falsch.append(f"index.html: #{pfad}")
     assert not falsch, f"Links auf alte oder unbekannte Routen: {falsch}"
+
+
+def test_einfach_ausfuehrlich():
+    """Ein Schalter für alle Tabellen (Paket P5): U.table blendet Spalten mit x aus und trägt dann den Schalter, die Ansichten
+    nach Abschnitt 8 kennzeichnen ihre Spalten, die Erklärung steht im Glossar, und die alten Spalten-Sichten unter Markt
+    („Alle · Projektionen · Besitz“) und in der Spielerliste („Saison · Rest Saison · Besitz“) gibt es nicht mehr."""
+    ui = code(JS / "ui.js")
+    assert "export const spaltenVoll" in ui and "export function setSpaltenVoll" in ui
+    assert "alle.filter(c => !c.x || spaltenVoll())" in ui, "U.table blendet Spalten nur für „Ausführlich“ aus"
+    for modul in ("v_tabelle", "v_ranking", "v_spielplan", "v_matchup", "v_waiver", "v_spieler", "v_keeper", "v_rekorde"):
+        assert re.search(r"\bx: (?:1|!!\w+)|\bX\(", code(JS / f"{modul}.js")), f"{modul}.js ohne Spalten nur für „Ausführlich“"
+    assert 'id="g-spalten"' in INDEX.read_text(encoding="utf-8")
+    for modul in ("v_waiver", "v_spieler"):
+        assert not re.search(r"U\.seg\('Spalten'", code(JS / f"{modul}.js")), f"{modul}.js: alte Spalten-Sicht"

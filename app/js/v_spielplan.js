@@ -67,14 +67,14 @@ function weekTable(i, wk) {
     {k: 'pf', l: 'PF', num: 1, ...val('pf', U.num)},
     {k: 'pa', l: 'PA', num: 1, ...val('pa', U.num)},
     {k: 'e', l: 'Erg.', v: t => w(t).ergebnis[i], f: t => U.res(w(t).ergebnis[i])},
-    {k: 'ef', l: 'Eff. %', num: 1, ...val('efficiency', U.pct)},
-    {k: 'ap', l: anyT ? 'All-Play W-L-T' : 'All-Play W-L', num: 1, v: t => w(t).allplay_pct[i], f: t => U.apwl(w(t).allplay_w[i], w(t).allplay_l[i], w(t).allplay_t[i], anyT)},
-    {k: 'md', l: 'Median-Sieg', v: t => +!!w(t).median_win[i], f: t => w(t).median_win[i] ? h('span', {class: 'W'}, '✓', h('span', {class: 'vh'}, 'ja')) : h('span', {class: 'na'}, '–', h('span', {class: 'vh'}, 'nein'))},
-    {k: 'mg', l: 'Matchup-Glück', num: 1, ...val('matchup_glueck', U.sgn)},
-    {k: 'vs', l: 'Verschenkt', num: 1, ...val('verschenkt', U.num)},
-    {k: 'bk', l: 'Bankpunkte', num: 1, ...val('bank', U.num)},
-    {k: 'pd', l: 'Ist − Projektion', num: 1, ...val('projektions_delta', U.sgn)}],
-  note: 'Matchup-Glück: Sieg unter dem Wochenmedian +, Niederlage über dem Median −, sonst 0.'}),
+    {k: 'ef', l: 'Eff. %', num: 1, x: 1, ...val('efficiency', U.pct)},
+    {k: 'ap', l: anyT ? 'All-Play W-L-T' : 'All-Play W-L', num: 1, x: 1, v: t => w(t).allplay_pct[i], f: t => U.apwl(w(t).allplay_w[i], w(t).allplay_l[i], w(t).allplay_t[i], anyT)},
+    {k: 'md', l: 'Median-Sieg', x: 1, v: t => +!!w(t).median_win[i], f: t => w(t).median_win[i] ? h('span', {class: 'W'}, '✓', h('span', {class: 'vh'}, 'ja')) : h('span', {class: 'na'}, '–', h('span', {class: 'vh'}, 'nein'))},
+    {k: 'mg', l: 'Matchup-Glück', num: 1, x: 1, ...val('matchup_glueck', U.sgn)},
+    {k: 'vs', l: 'Verschenkt', num: 1, x: 1, ...val('verschenkt', U.num)},
+    {k: 'bk', l: 'Bankpunkte', num: 1, x: 1, ...val('bank', U.num)},
+    {k: 'pd', l: 'Ist − Projektion', num: 1, x: 1, ...val('projektions_delta', U.sgn)}],
+  note: () => U.spaltenVoll() ? 'Matchup-Glück: Sieg unter dem Wochenmedian +, Niederlage über dem Median −, sonst 0.' : null}),
   U.legend(['wochenrang', 'eff-woche', 'ap-wl', 'median', 'matchup-woche', 'verschenkt', 'bank', 'proj-delta']));
 }
 
@@ -89,8 +89,8 @@ function topScorer(W) {
     {k: 'sl', l: 'Slot', v: p => U.slot(p.slot), d: 1, f: p => U.bench(p.slot) ? h('strong', null, U.slot(p.slot)) : U.slot(p.slot)},
     {k: 'tm', l: 'Team', v: p => U.kz(p.team_id), d: 1, f: p => h('a', {href: '#team/' + p.team_id, class: 'tl2', 'aria-label': U.team(p.team_id)?.name}, U.kz(p.team_id))},
     {k: 'pos', l: 'Pos', v: p => p.pos, d: 1, f: p => p.pos},
-    {k: 'nfl', l: 'NFL', v: p => p.nfl, d: 1, f: p => p.nfl || 'FA'},
-    {k: 'proj', l: 'Projektion', num: 1, v: p => p.proj, f: p => U.val(p.proj, U.num, 'keine Projektion')}]}));
+    {k: 'nfl', l: 'NFL', x: 1, v: p => p.nfl, d: 1, f: p => p.nfl || 'FA'},
+    {k: 'proj', l: 'Projektion', num: 1, x: 1, v: p => p.proj, f: p => U.val(p.proj, U.num, 'keine Projektion')}]}));
 }
 
 function seasonWeeks(fin, svg, cur) {

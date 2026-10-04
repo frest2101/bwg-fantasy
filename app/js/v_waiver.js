@@ -26,7 +26,7 @@ export async function render(box, ctx, r) {
   U.kopf(box, r, TITEL[ansicht]);
   if (!S.man.files?.['waiver.json']) {
     U.ap(box, h('p', {class: 'warn'}, 'Noch keine Tagesdaten: Der Markt füllt sich mit dem ersten Tageslauf (stündlich von etwa 05:00 Uhr bis Mitternacht deutscher Zeit).'),
-      h('p', null, h('a', {href: '#spieler?status=frei&sicht=ros'}, `Freie Spieler (Stand nach W${S.tw})`)));
+      h('p', null, h('a', {href: '#spieler?status=frei'}, `Freie Spieler (Stand nach W${S.tw})`)));
     return;
   }
   const [W, P] = await Promise.all([ctx.lazy('waiver.json', 'Tagesdaten', box), ctx.lazy('players.json', 'Spielerdaten', box)]);
@@ -78,13 +78,11 @@ export async function render(box, ctx, r) {
 // ---------------------------------------------------------------- beste verfügbare Spieler je Position
 function available(box, W, P, rows, r, wflag, me, kp) {
   const q = r.q;
-  const narrow = matchMedia('(max-width:599px)').matches;
   const hasWeek = !!W.ersatz_woche, hasWert = !!kp;
   // erlaubte Horizonte: Nächste Woche und Nächste 3 Wochen nur mit Wochensicht, Langfristig (zukunft) nur mit Marktwerten
   const hors = HOR.filter(x => x === 'ros' || (x === 'zukunft' ? hasWert : hasWeek));
   const st = {pos: POS.includes(q.get('pos')) ? q.get('pos') : '', text: '',
-    hor: hors.includes(q.get('h')) ? q.get('h') : (hasWeek ? 'woche' : 'ros'),
-    sicht: ['alle', 'ros', 'besitz'].includes(q.get('sicht')) ? q.get('sicht') : (narrow ? 'ros' : 'alle')};
+    hor: hors.includes(q.get('h')) ? q.get('h') : (hasWeek ? 'woche' : 'ros')};
   const free = rows.filter(x => FREE.includes(x.status));
   // Langfristig (zukunft): nur Spieler mit Marktwert (K und D/ST haben keinen)
   const rowsNow = () => free.filter(x => (!st.pos || x.pos === st.pos) && (!st.text || x.name.toLowerCase().includes(st.text))
@@ -144,19 +142,25 @@ function available(box, W, P, rows, r, wflag, me, kp) {
   const zukunft = hasWert ? [spieler, num('wert', 'Marktwert', kp.wertTxt), num('wert_ue', 'über Keeper-Linie', kp.wertSgn, 'keine Keeper-Linie'),
     {k: 'wert_rang', l: 'Marktwert-Rang', num: 1, d: 1, v: x => x.wert_rang, f: x => [String(x.wert_rang), h('small', null, `${x.pos} ${x.wert_posrang}`)]},
     num('wert_trend', 'Trend 30 Tage', kp.wertSgn), {...num('alter', 'Alter', v => U.num(v, 1), 'nicht in den Stammdaten'), d: 1}] : [];
+  // Einfach / Ausführlich (App-Konzept Abschnitt 8, Paket P5; ersetzt die Spalten-Sichten „Alle · Projektionen · Besitz“): X = nur
+  // „Ausführlich“. Einfach je Horizont: Spieler, Gewinn für Mein Team, Vorteil, Projektion bzw. Rest je Spiel, Gegner, Bye, Verletzung;
+  // Langfristig: die Marktwert-Spalten
+  const X = col => ({...col, x: 1});
   // Nächste 3 Wochen: „Projektion W5–7“ = Summe der Projektionen N+1…N+3, „Vorteil W5–7“ = dieselbe Summe über dem Ersatzniveau
   const base = {
     woche: [spieler, projUe, proj],
     drei: [spieler, num('proj3_ue', `Vorteil ${span(W)}`, U.sgn, 'keine Projektion der Folgewochen'),
-      num('proj3', `Projektion ${span(W)}`, U.num, 'keine Projektion der Folgewochen'), proj],
-    ros: [spieler, num('ros_ue', 'Vorteil Rest Saison', U.sgn, rosWhy), proj],
+      num('proj3', `Projektion ${span(W)}`, U.num, 'keine Projektion der Folgewochen'), X(proj)],
+    ros: [spieler, num('ros_ue', 'Vorteil Rest Saison', U.sgn, rosWhy), X(proj)],
     zukunft};
   const SORT = {woche: 'proj_ue', drei: 'proj3_ue', ros: 'ros_ue', zukunft: 'wert'};
   const CAP = {woche: `Freie Spieler nach Vorteil W${W.woche}`, drei: `Freie Spieler nach Vorteil ${span(W)}`,
     ros: 'Freie Spieler nach Vorteil Rest der Saison', zukunft: 'Freie Spieler nach Marktwert'};
-  const ros = [mu, mu3, bye, verl, num('ros_g', 'Rest je Spiel', U.num, rosWhy)];
+  const rosG = num('ros_g', 'Rest je Spiel', U.num, rosWhy);
   const besitz = [num('own', 'Besitz %', v => U.pct(v)), num('own_d', 'seit gestern', v => U.sgn(v, 2)), num('started', 'aufgestellt %', v => U.pct(v))];
-  const extra = {alle: [...ros, ...besitz, frist], ros: [...ros, frist], besitz: [...besitz, frist]};
+  // Spalten hinter dem Horizont; im Horizont „Rest der Saison“ ist Rest je Spiel einfach sichtbar, unter Langfristig alles ausführlich
+  const extra = hor => hor === 'zukunft' ? [mu, mu3, bye, verl, rosG, ...besitz, frist].map(X)
+    : [mu, X(mu3), bye, verl, hor === 'ros' ? rosG : X(rosG), ...besitz.map(X), X(frist)];
   const count = h('p', {class: 'note', 'aria-live': 'polite'});
   const slot = h('div');
   const fst = {}, filters = [{k: 'nfl', l: 'NFL-Team', v: x => x.nfl, d: 1, cat: 1, f: x => x.nfl},
@@ -166,7 +170,7 @@ function available(box, W, P, rows, r, wflag, me, kp) {
     // „Gewinn für <Mein Team>“ nur in den Punkte-Horizonten; Langfristig (Marktwert) hat keinen Zugewinn
     const zug = me.mine && st.hor !== 'zukunft' ? [zugCol()] : [];
     tbl = U.table({cap: CAP[st.hor], cls: 'nr', rh: 0, rows: rowsNow(), sort: [SORT[st.hor], -1], limit: 50, filter: true,
-      filters, fstate: fst, cols: [base[st.hor][0], ...zug, ...base[st.hor].slice(1), ...extra[st.sicht]],
+      filters, fstate: fst, cols: [base[st.hor][0], ...zug, ...base[st.hor].slice(1), ...extra(st.hor)],
       rc: x => lost(x) ? 'gsp' : null,
       note: 'Frei = Waivers oder Free Agent laut Tageslauf.' + (st.hor === 'zukunft' ? ' Nur Spieler mit Marktwert (K und D/ST haben keinen).' : '')});
     slot.replaceChildren(tbl);
@@ -174,8 +178,7 @@ function available(box, W, P, rows, r, wflag, me, kp) {
   const refresh = rebuild => {
     if (rebuild) build(); else tbl.upd(rowsNow());
     count.textContent = `${rowsNow().length} freie Spieler`;
-    U.setQ(r.base, {team: me.q || null, pos: st.pos || null, h: st.hor !== (hasWeek ? 'woche' : 'ros') ? st.hor : null,
-      sicht: st.sicht !== (narrow ? 'ros' : 'alle') ? st.sicht : null});
+    U.setQ(r.base, {team: me.q || null, pos: st.pos || null, h: st.hor !== (hasWeek ? 'woche' : 'ros') ? st.hor : null});
     ersNote.replaceChildren(); U.ap(ersNote, ersText());
   };
   let timer;
@@ -201,8 +204,7 @@ function available(box, W, P, rows, r, wflag, me, kp) {
       h('input', {type: 'search', placeholder: 'Name suchen', oninput: e => {
         clearTimeout(timer);
         timer = setTimeout(() => { st.text = e.target.value.trim().toLowerCase(); refresh(); }, 150);
-      }})),
-    U.seg('Spalten', [['alle', 'Alle'], ['ros', 'Projektionen'], ['besitz', 'Besitz']], st.sicht, v => { st.sicht = v; refresh(true); })),
+      }}))),
     count, slot,
     U.legend(['verfuegbar', 'horizont', 'zugewinn', 'proj-ue', 'proj3', 'gespielt', 'ros-ue', 'ersatz', 'ros-spiel', 'proj-naechste', 'mu-n1', 'mu-naechste3', 'bye-hinweis', 'besitz-trend', 'frist',
       'wetter-markierung', ...(hasWert ? ['marktwert', 'keeper-linie', 'wert-ue', 'wert-trend'] : []), 'filter', 'projektionen']));
