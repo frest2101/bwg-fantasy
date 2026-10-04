@@ -123,6 +123,8 @@ export function setSpaltenVoll(v) {
   store.set(SP_KEY, spMem);
   D.dispatchEvent(new CustomEvent('bwg-spalten'));
 }
+// ein Empfänger für alle Tabellen: nur die im Dokument stehen, bauen sich neu (abgehängte bleiben nicht angemeldet)
+D.addEventListener('bwg-spalten', () => D.querySelectorAll('.tbox').forEach(b => b.spNeu?.()));
 
 // Zeilenklasse für Tabellen mit einer Zeile je Team (team_id, sonst tid): die eigene Zeile hervorgehoben
 export const meRc = x => { const m = meinTeam(); return m && (x?.team_id ?? x?.tid) === m ? 'me' : null; };
@@ -279,6 +281,8 @@ export function infoPop(btn) {        // i-Knopf: Begriff und Erklärung aus dem
 //      z. B. {k, l, v, cat}), fstate (Objekt des Aufrufers, in dem die Auswahl über einen Neuaufbau hinweg erhalten bleibt),
 //      show (anfangs so viele Zeilen statt limit, z. B. auf dem Rückweg bis zur zuletzt geöffneten Zeile)}
 //      Spalte mit x: true steht nur in „Ausführlich“ (spaltenVoll); dann trägt die Tabelle den Schalter „Einfach · Ausführlich“.
+//      def: feste Voreinstellung der Sortierung, wenn sort eine mitgeführte Wahl ist (Rückfall, wenn deren Spalte ausgeblendet ist);
+//      note darf eine Funktion sein (wird bei jedem Zeichnen gelesen, etwa je nach Einfach / Ausführlich).
 export function table(o) {
   const capId = id('c');
   const alle = o.cols, hatX = alle.some(c => c.x);
@@ -288,7 +292,11 @@ export function table(o) {
   // Kopfzeile aus den sichtbaren Spalten; ist die Sortierspalte nicht mehr sichtbar, gilt wieder die Voreinstellung
   function kopf() {
     cols = alle.filter(c => !c.x || spaltenVoll());
-    if (!cols.some(c => c.k === sk)) { sk = o.sort?.[0]; sd = o.sort?.[1] ?? -1; }
+    if (!cols.some(c => c.k === sk)) {
+      const d = [o.def, o.sort].find(s => s && cols.some(c => c.k === s[0]));
+      sk = d?.[0] ?? null; sd = d?.[1] ?? -1;
+      o.onSort?.(sk, sd);
+    }
     heads = cols.map(c => {
       // lange Namen (ab 13 Zeichen) dürfen zweizeilig umbrechen (CSS thead th.wr)
       const th = h('th', {scope: 'col', class: [c.num && 'n', typeof c.l === 'string' && c.l.length > 12 && 'wr'].filter(Boolean).join(' ') || null});
@@ -407,8 +415,9 @@ export function table(o) {
     const txt = [rows.length ? '' : 'Keine Einträge für diese Auswahl.', fdrop ? `Filter: ${rows.length} von ${rows.length + fdrop}.` : '',
       reasons.length ? '„–“: ' + reasons.join(' · ') : ''].filter(Boolean).join(' ');
     fn.replaceChildren(txt);
-    fn.hidden = !txt && !o.note;
-    if (o.note) fn.append(txt ? ' · ' : '', o.note);
+    const note = typeof o.note === 'function' ? o.note() : o.note;
+    fn.hidden = !txt && !note;
+    if (note) fn.append(txt ? ' · ' : '', note);
     if (fn.hidden) tbl.removeAttribute('aria-describedby'); else tbl.setAttribute('aria-describedby', fn.id);
     more.replaceChildren(rows.length > shown.length ? h('button', {type: 'button', class: 'btn more', onclick: () => {
       const n0 = limit;
@@ -421,16 +430,14 @@ export function table(o) {
     o.onCount?.(rows.length, o.rows.length);
   }
   box.upd = rows => { o.rows = rows; if (o.limit) limit = o.limit; draw(); };
-  // Wechsel Einfach / Ausführlich (auch an einer anderen Tabelle der Seite): neu aufbauen; eine abgehängte Tabelle meldet sich ab
-  if (hatX) {
-    const onSp = () => {
-      if (!box.isConnected) { D.removeEventListener('bwg-spalten', onSp); return; }
-      spSeg.set(spaltenVoll() ? 'voll' : 'einfach');
-      kopf();
-      draw();
-    };
-    D.addEventListener('bwg-spalten', onSp);
-  }
+  // Wechsel Einfach / Ausführlich (auch an einer anderen Tabelle der Seite): neu aufbauen; der Rahmen behält seine Größe, deshalb
+  // den Scroll-Hinweis (sc-more) von Hand neu messen
+  if (hatX) box.spNeu = () => {
+    spSeg.set(spaltenVoll() ? 'voll' : 'einfach');
+    kopf();
+    draw();
+    wrap.dispatchEvent(new Event('scroll'));
+  };
   draw();
   return box;
 }

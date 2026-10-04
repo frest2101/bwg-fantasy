@@ -85,7 +85,7 @@ function bilanz(box, K, svg) {
   const wrap = h('div'), chart = h('div');
   const draw = () => {
     const kern = key === 'kern';
-    wrap.replaceChildren(U.table({cap: `Punkte nach Herkunft (${wk}${kern ? ', ohne K und D/ST' : ''})`, cls: 'nr kurz', rh: 0, rc: U.meRc, rows: K.teams, sort: srt,
+    wrap.replaceChildren(U.table({cap: `Punkte nach Herkunft (${wk}${kern ? ', ohne K und D/ST' : ''})`, cls: 'nr kurz', rh: 0, rc: U.meRc, rows: K.teams, sort: srt, def: ['keeper', -1],
       onSort: (k, d) => { srt = [k, d]; }, cols: [
       {k: 't', l: 'Team', v: x => U.kz(x.team_id), d: 1, f: x => U.tl(x.team_id)},
       ...GRP.map(([g, l]) => ({k: g, l: l + ' %', num: 1, v: x => x[key].anteil[g], f: x => U.val(x[key].anteil[g], U.pct, 'noch keine Punkte')})),

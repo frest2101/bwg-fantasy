@@ -147,6 +147,7 @@ button.i::before{font:italic 700 .75rem/1 Georgia,serif}
 .pop dd.full{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;font-weight:400;margin:2px 0 6px}
 /* Schalter „Einfach · Ausführlich“ an Tabellen (Paket P5, ui.js table): in der Filterleiste rechtsbündig, ohne Filter eigene Leiste */
 .tsw{display:inline-flex;align-items:center;gap:2px;margin-left:auto}
+.fbar .cnt2 + .tsw{margin-left:0}
 /* Fenster „Mein Team“: zehn Teams in zwei Spalten, das gewählte gefüllt */
 .mtg{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:6px;margin:.5rem 0}
 .mtg .btn{justify-content:flex-start;white-space:normal;text-align:left;line-height:1.15;padding:4px .6rem;font-weight:500;font-size:.88rem}

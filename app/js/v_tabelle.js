@@ -103,7 +103,7 @@ function allplay(box, r, svg, wi, week) {
       X({k: 'md', l: 'zum Median', num: 1, v: t => W(t).median_abstand[wi], f: t => U.val(W(t).median_abstand[wi], v => U.sgn(v, 1), 'kein Spiel')}),
       {k: 'mg', l: 'Matchup-Glück', num: 1, v: mg, f: t => mgCell(mg(t), W(t).median_abstand[wi], W(t).gegner_abstand[wi], W(t).ergebnis[wi])},
       X(c.wk('gegner_pkt', 'Spielplan Pkt', wi, U.sgn))],
-    note: 'Gegner: Kürzel und dessen Wochenrang. Spielplan Pkt = Ligaschnitt − Punkte des Gegners (+ = leichter Gegner).'}),
+    note: () => U.spaltenVoll() ? 'Gegner: Kürzel und dessen Wochenrang. Spielplan Pkt = Ligaschnitt − Punkte des Gegners (+ = leichter Gegner).' : null}),
     U.legend(['wochenrang', 'ap-wl', 'allplay', 'median', 'matchup-woche', 'spielplan-pkt']),
     svg.fig(`Matchup-Glück W${week}`, svg.hbars({title: `Matchup-Glück je Team – W${week}`, fmt: v => U.sgn(v),
       desc: `Von ${rows[0].name} (${U.sgn(mg(rows[0]))}) bis ${rows.at(-1).name} (${U.sgn(mg(rows.at(-1)))}); 0 = Ergebnis passt zu den Punkten.`,

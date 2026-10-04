@@ -298,7 +298,8 @@ function standChip() {
     const inhalt = h('div');
     const fuellen = () => {
       const voll = U.spaltenVoll();
-      inhalt.replaceChildren(h('dl', null,
+      inhalt.replaceChildren();
+      U.ap(inhalt, h('dl', null,
         h('dt', null, 'Wertung'), h('dd', null, `W${voll ? ds.woche_final ?? S.tw : sw} gewertet`),
         voll && po ? [h('dt', null, 'Playoffs'), h('dd', null, `W${po} gewertet`)] : null,
         voll ? [h('dt', null, 'Projektionen Rest der Saison'), h('dd', null, ds.ros_nach_woche != null ? `Stand nach W${ds.ros_nach_woche}` : `ab Wochenabruf W${sw + 1}`)] : null,
@@ -316,11 +317,12 @@ function standChip() {
     };
     fuellen();
     const anzeige = U.seg('Anzeige', [['einfach', 'Einfach'], ['voll', 'Ausführlich']], U.spaltenVoll() ? 'voll' : 'einfach',
-      v => { U.setSpaltenVoll(v === 'voll'); fuellen(); }, 'tight');
+      v => { U.setSpaltenVoll(v === 'voll'); fuellen(); anzeige.scrollIntoView({block: 'nearest'}); }, 'tight');
     U.showPop(btn, 'Datenstand', [
       alt ? h('p', {class: 'warn'}, 'Daten älter als erwartet – der Wochenabruf ist noch nicht durchgelaufen.') : null,
       inhalt,
-      h('div', {class: 'row'}, h('span', {class: 'note'}, 'Anzeige'), anzeige, U.ib('spalten', '')),
+      // Link statt i-Knopf: ein Erklärfenster ersetzte dieses Fenster, der Fokus ginge danach verloren
+      h('div', {class: 'row'}, h('span', {class: 'note'}, 'Anzeige'), anzeige, h('a', {href: '#erklaerungen/spalten'}, 'Mehr dazu')),
     ]);
   };
 }

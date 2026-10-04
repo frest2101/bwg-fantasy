@@ -74,7 +74,7 @@ function weekTable(i, wk) {
     {k: 'vs', l: 'Verschenkt', num: 1, x: 1, ...val('verschenkt', U.num)},
     {k: 'bk', l: 'Bankpunkte', num: 1, x: 1, ...val('bank', U.num)},
     {k: 'pd', l: 'Ist − Projektion', num: 1, x: 1, ...val('projektions_delta', U.sgn)}],
-  note: 'Matchup-Glück: Sieg unter dem Wochenmedian +, Niederlage über dem Median −, sonst 0.'}),
+  note: () => U.spaltenVoll() ? 'Matchup-Glück: Sieg unter dem Wochenmedian +, Niederlage über dem Median −, sonst 0.' : null}),
   U.legend(['wochenrang', 'eff-woche', 'ap-wl', 'median', 'matchup-woche', 'verschenkt', 'bank', 'proj-delta']));
 }
 
