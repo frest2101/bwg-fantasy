@@ -1,4 +1,6 @@
-// Markt › Moves (#markt/moves, lädt transactions.json): ausgeführte Moves und angenommene Trades, Aufstellungswechsel je Team.
+// Markt › Moves (#markt/moves, lädt transactions.json): ausgeführte Moves und angenommene Trades; je Team die Zugänge laut ESPN
+// (teams.json › moves, Zähler des Teams zum Wochenabruf; bis 04.10.2026 Spalte „Moves“ unter Playoff-Chancen, Paket P3) und die
+// Aufstellungswechsel.
 // Der Draft steht unter Keeper › Draft (#keeper/draft, keeper.json); alte Links #moves/draft leitet der Router dorthin.
 let U, S, h;
 const ART = {WAIVER: 'Waiver', FREEAGENT: 'Free Agent', ROSTER: 'Drop', TRADE_ACCEPT: 'Trade', DRAFT: 'Draft'};
@@ -32,11 +34,16 @@ export async function render(box, ctx, r) {
       {k: 'z', l: 'Zugang', cls: 'wrap', f: x => typ(x) === 'TRADE_ACCEPT' && !part(x, 'ADD').length ? h('span', {class: 'note'}, 'ohne Spieler (ESPN)') : pl(part(x, 'ADD'))},
       {k: 'b', l: 'Abgang', cls: 'wrap', f: x => pl(part(x, 'DROP'))},
       {k: 'a', l: 'Art', v: x => typ(x), d: 1, f: x => ART[typ(x)] || typ(x)}].filter(Boolean)});
-    const aw = Object.entries(T.aufstellungswechsel || {}).map(([k, v]) => ({tid: +k, n: v})).filter(x => !team || x.tid === team);
+    // je Team: Zugänge laut ESPN (Wochenabruf) und Aufstellungswechsel (Archiv); ohne Eintrag im Archiv 0 Wechsel
+    const aw = T.aufstellungswechsel;
+    const jeTeam = S.teams.filter(t => !team || t.team_id === team)
+      .map(t => ({tid: t.team_id, zu: t.moves ?? null, n: aw ? aw[String(t.team_id)] ?? 0 : null}));
     wrap.replaceChildren(); U.ap(wrap, tbl, U.legend(['transaktionen']),
-      aw.length ? h('div', {class: 'card', style: 'margin-top:16px'}, U.table({cap: 'Aufstellungswechsel je Team', cls: 'nr', rows: aw, sort: ['n', -1], cols: [
+      h('div', {class: 'card', style: 'margin-top:16px'}, U.table({cap: 'Moves je Team', cls: 'nr kurz', rc: U.meRc, rows: jeTeam, sort: ['zu', -1], cols: [
         {k: 't', l: 'Team', v: x => U.kz(x.tid), d: 1, f: x => U.tl(x.tid)},
-        {k: 'n', l: 'Wechsel', num: 1, v: x => x.n, f: x => x.n}], rh: 0}), U.legend(['aufstellungswechsel'])) : null);
+        {k: 'zu', l: 'Zugänge (ESPN)', num: 1, v: x => x.zu, f: x => U.val(x.zu, v => v, 'kein Zähler von ESPN')},
+        {k: 'n', l: 'Aufstellungs­wechsel', num: 1, v: x => x.n, f: x => U.val(x.n, v => v, 'kein Archiv der Aufstellungswechsel')}], rh: 0,
+        note: 'Zugänge: Zähler des Teams laut ESPN, Stand des Wochenabrufs.'}), U.legend(['moves', 'aufstellungswechsel'])));
   };
   U.ap(box, h('div', {class: 'row'}, h('label', null, 'Team ', h('select', {onchange: e => {
     team = +e.target.value;
