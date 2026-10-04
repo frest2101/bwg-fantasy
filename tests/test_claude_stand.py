@@ -350,7 +350,7 @@ def test_kopf_vor_der_umstellung():
     assert zeilen[1] == ("App: gerechnet bis Woche 6; Tagesstand Fr 23.10. 12:45 MESZ (vor 1.3 h); "
                          "letzter Move in der App Mi 21.10. 10:16 MESZ")
     assert zeilen[2].startswith("Alle Zeiten deutsche Zeit. Punkte, Projektion (Proj) und Siegchance: ESPN live.")
-    assert zeilen[2].endswith("ROS/Sp = ROS-Projektion je Spiel, F = Positions-Matchup des Gegners (> 1 günstig).")
+    assert zeilen[2].endswith("ROS/Sp = ROS-Projektion je Spiel, F = Faktor (Position) des Gegners laut Matchups (> 1 günstig).")
     assert "nicht auswertbar" not in "\n".join(zeilen)
 
 
@@ -839,7 +839,7 @@ def test_ausfall_claude_json():
 
 def test_app_meint_eine_andere_woche():
     ausgabe = text(app=app(matchup_woche=WOCHE + 1))
-    assert "; F fehlt, die App rechnet das Positions-Matchup für Woche 8." in ausgabe
+    assert "; F fehlt, die App rechnet die Matchups für Woche 8." in ausgabe
     assert "| F" not in ausgabe and "ROS/Sp 9.88" in ausgabe
     spaet = app()
     spaet["stand"].update(pool_stand=None, pool_woche=None)
