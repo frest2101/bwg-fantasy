@@ -1,7 +1,7 @@
 {
  "season": 2026,
  "through_week": 3,
- "active_profile": "Stärke",
+ "active_profile": "Standard",
  "active_norm": "z",
  "sigma": 34.51,
  "ligafaktor": 0.97,
@@ -74,7 +74,7 @@
     }
    },
    "score": {
-    "Stärke": {
+    "Standard": {
      "minmax": 90.44,
      "rank": 9.05,
      "z": 1.202
@@ -160,7 +160,7 @@
     }
    },
    "score": {
-    "Stärke": {
+    "Standard": {
      "minmax": 95.08,
      "rank": 9.45,
      "z": 1.347
@@ -246,7 +246,7 @@
     }
    },
    "score": {
-    "Stärke": {
+    "Standard": {
      "minmax": 80.52,
      "rank": 7.9,
      "z": 0.887
@@ -332,7 +332,7 @@
     }
    },
    "score": {
-    "Stärke": {
+    "Standard": {
      "minmax": 67.98,
      "rank": 7.65,
      "z": 0.494
@@ -418,7 +418,7 @@
     }
    },
    "score": {
-    "Stärke": {
+    "Standard": {
      "minmax": 48.15,
      "rank": 4.85,
      "z": -0.125
@@ -504,7 +504,7 @@
     }
    },
    "score": {
-    "Stärke": {
+    "Standard": {
      "minmax": 44.88,
      "rank": 4.8,
      "z": -0.222
@@ -590,7 +590,7 @@
     }
    },
    "score": {
-    "Stärke": {
+    "Standard": {
      "minmax": 48.62,
      "rank": 5.05,
      "z": -0.125
@@ -676,7 +676,7 @@
     }
    },
    "score": {
-    "Stärke": {
+    "Standard": {
      "minmax": 14.63,
      "rank": 2.05,
      "z": -1.175
@@ -762,7 +762,7 @@
     }
    },
    "score": {
-    "Stärke": {
+    "Standard": {
      "minmax": 18.29,
      "rank": 2.7,
      "z": -1.079
@@ -848,7 +848,7 @@
     }
    },
    "score": {
-    "Stärke": {
+    "Standard": {
      "minmax": 13.82,
      "rank": 2.0,
      "z": -1.205

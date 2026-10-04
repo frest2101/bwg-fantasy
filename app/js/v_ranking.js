@@ -7,7 +7,7 @@ const GID = {pf: 'pfspiel', allplay: 'allplay', win: 'win', coaching: 'effizienz
 // „Kader“, gleich ob Beste Aufstellung Ø oder Projektion Kader zählt (die Zeile unter der Tabelle nennt die Quelle)
 const SHORT = m => ({pf: 'PF/Spiel', allplay: 'All-Play', win: 'Win', coaching: 'Coaching', floor: 'Floor', form: 'Form',
   kader: 'Kader'})[m.key] || m.label;
-// Standard (z, Profil Stärke) steht in den Erklärungen; ohne „(Standard)“ passen die Chips auf dem Handy in eine Zeile
+// Standard (z, Profil „Standard“, bis 04.10.2026 „Stärke“) steht in den Erklärungen; ohne „(Standard)“ passen die Chips auf dem Handy in eine Zeile
 const NORMS = [['z', 'z-Wert'], ['minmax', 'Min–Max'], ['rank', 'Rangpunkte']];
 const slug = s => s.toLowerCase().replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue');
 
@@ -58,7 +58,9 @@ function scoreView(box, r) {
   const match = w => PN.find(p => M.every(m => (P[p][m.key] || 0) === w[m.key])) || 'eigene';
   const fromQ = q => {
     if (!q.has('profil') && !q.has('w') && !q.has('norm')) return null;
-    const p = PN.find(x => slug(x) === q.get('profil') || x === q.get('profil'));
+    // alte Links ?profil=staerke: das Standardprofil hieß bis 04.10.2026 „Stärke“
+    const qp = q.get('profil') === 'staerke' ? slug(std) : q.get('profil');
+    const p = PN.find(x => slug(x) === qp || x === qp);
     const list = (q.get('w') || '').split(',');
     const w = p ? {...P[p]} : q.has('w') ? Object.fromEntries(M.map((m, i) => [m.key, list[i]])) : {...P[std]};
     return {w, norm: q.get('norm')};
@@ -163,7 +165,7 @@ function scoreView(box, r) {
       panel),
     h('div', {class: 'm1'}, tbl, h('div', {class: 'row'}, rawSeg),
       h('p', {class: 'note'}, `Kennzahl Kader: ${kader}`, U.ib(gid('kader'), ''),
-        ` Anzeige bei z: 50 + 10 · Score; 50 = Ligaschnitt. Standard: Profil ${std}, z-Wert.`),
+        ` Anzeige bei z: 50 + 10 · Score; 50 = Ligaschnitt. Voreinstellung: Profil ${std}, z-Wert.`),
       U.legend(['score', 'kennzahlen', 'z', 'minmax', 'rangpunkte', 'profile']))));
   sync(false);
 }

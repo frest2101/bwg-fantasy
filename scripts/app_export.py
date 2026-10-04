@@ -663,7 +663,7 @@ def build_claude(result: dict, teams: dict, schedule: dict, players: dict | None
         pr, sim = t.get("pr") or {}, (t.get("sim") or {}).get("liga") or {}
         tabelle.append([t["rang"], k(t["team_id"]), t["name"], f"{t['w']}-{t['l']}-{t['t']}", t["pf"],
                         t["allplay_pct"], t["matchup_glueck"], t["efficiency"], t["form"],
-                        50 + 10 * t["score_ref"]["Stärke"]["z"], t["kader_projektion"] or t["kader_potenzial"],
+                        50 + 10 * t["score_ref"]["Standard"]["z"], t["kader_projektion"] or t["kader_potenzial"],
                         pr.get("rang"), pr.get("mu"), fixed(pr.get("e"), 3), pr.get("trend"),
                         fixed(sim.get("playoff"), 4)])
     out = {"legende": "BWG Fantasy Liga (ESPN 1166555857), inoffizielle Auswertung. Punkte = ESPN appliedTotal; "

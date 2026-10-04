@@ -352,10 +352,10 @@ def test_form_band():
     assert abs(compute.form_band(Decimal(35), 10) - Decimal(35) * Decimal("0.2333333333").sqrt()) < Decimal("1e-6")
 
 
-def test_profil_staerke_und_z_standard(season):
-    assert compute.PROFILES["Stärke"] == {"pf": 30, "allplay": 25, "win": 0, "coaching": 10, "kader": 25,
-                                          "floor": 10, "form": 0}
-    order = sorted(season["teams"], key=lambda t: t["score"]["Stärke"]["z"], reverse=True)
+def test_profil_standard_und_z_standard(season):
+    assert compute.PROFILES["Standard"] == {"pf": 30, "allplay": 25, "win": 0, "coaching": 10, "kader": 25,
+                                            "floor": 10, "form": 0}
+    order = sorted(season["teams"], key=lambda t: t["score"]["Standard"]["z"], reverse=True)
     assert [t["rang_score"] for t in order] == list(range(1, 11))
     assert all(t["kader_quelle"] == "potenzial" for t in season["teams"])  # ros.json gibt es für W2 nicht
 
