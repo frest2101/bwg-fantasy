@@ -17,10 +17,10 @@ export function herkunft(r, K, lang) {
   const was = () => {
     if (!U.ok(r.pick)) return '';
     const kp = (K.picks || []).find(p => p.pick === r.pick)?.keeper;
-    return kp ? 'Keeper' : `Draft Rd ${r.runde}`;
+    return kp ? 'Keeper' : `Draft Runde ${r.runde}`;
   };
   if (r.art === 'keeper') return lang ? `Keeper ${S.man.season}` : 'Keeper';
-  if (r.art === 'draft') return lang ? `Draft ${S.man.season}, Runde ${r.runde} (Pick ${r.pick})` : `Draft Rd ${r.runde}`;
+  if (r.art === 'draft') return lang ? `Draft ${S.man.season}, Runde ${r.runde} (Pick ${r.pick})` : `Draft Runde ${r.runde}`;
   if (r.art === 'trade') {
     const vor = was();
     if (!lang) return 'Trade';
@@ -59,7 +59,8 @@ export async function render(box, ctx, r) {
     U.ap(box, h('p', {class: 'note'}, 'Noch keine Keeper-Bilanz: Sie erscheint mit dem ersten Wochenabruf nach dem Draft.'));
     return;
   }
-  const K = await ctx.lazy('keeper.json', 'Keeper-Bilanz', box);
+  // keeper.json trägt alle Keeper-Ansichten, der Ladetext nennt deshalb nicht nur die Bilanz
+  const K = await ctx.lazy('keeper.json', 'Keeper-Daten', box);
   if (!r.alive()) return;
   if (sub === 'draft') draft(box, K, team, r);
   else if (sub === 'draft-folgejahr') draftNext(box, K);
@@ -69,7 +70,8 @@ export async function render(box, ctx, r) {
   else bilanz(box, K, await ctx.mod('svg'));
 }
 
-const standTxt = K => K.stand ? `Kader: Tagesstand ${U.stamp(K.stand)}` : `Kader: Stand nach W${K.through_week}`;
+// Kaderstand: Tageslauf mit Uhrzeit („Kader: Stand heute 09:12 Uhr“), ohne Tageslauf der Wochenstand („nach W4“)
+const standTxt = K => K.stand ? `Kader: ${U.standTxt(K.stand)}` : `Kader: Stand nach W${K.through_week}`;
 const teamSelect = (team, on) => h('label', null, 'Team ', h('select', {onchange: e => on(+e.target.value)},
   h('option', {value: 0}, 'Alle Teams'), S.teams.map(t => h('option', {value: t.team_id, selected: t.team_id === team}, t.name))));
 const player = (id, name, inApp, sub, extra) => {
@@ -88,11 +90,12 @@ function bilanz(box, K, svg) {
       onSort: (k, d) => { srt = [k, d]; }, cols: [
       {k: 't', l: 'Team', v: x => U.kz(x.team_id), d: 1, f: x => U.tl(x.team_id)},
       ...GRP.map(([g, l]) => ({k: g, l: l + ' %', num: 1, v: x => x[key].anteil[g], f: x => U.val(x[key].anteil[g], U.pct, 'noch keine Punkte')})),
-      {k: 's', l: kern ? 'Pkt Kern' : 'PF', num: 1, v: x => x[key].summe, f: x => U.num(x[key].summe)},
+      {k: 's', l: kern ? 'Punkte' : 'PF', num: 1, v: x => x[key].summe, f: x => U.num(x[key].summe)},
+      // die Spalten „… im Kader“ zählen Spieler, die Anteile davor Punkte
       {k: 'kd', l: 'Keeper im Kader', num: 1, v: x => x.keeper_da, f: x => `${x.keeper_da} von ${x.keeper}`},
-      {k: 'pd', l: 'Draft im Kader', num: 1, v: x => x.picks_da, f: x => `${x.picks_da} von ${x.picks}`},
-      {k: 'zg', l: 'Zugänge', num: 1, v: x => x.kader.waiver + x.kader.free_agent, f: x => x.kader.waiver + x.kader.free_agent},
-      {k: 'tr', l: 'Trades', num: 1, v: x => x.kader.trade, f: x => x.kader.trade}]}));
+      {k: 'pd', l: 'Picks im Kader', num: 1, v: x => x.picks_da, f: x => `${x.picks_da} von ${x.picks}`},
+      {k: 'zg', l: 'Zugänge im Kader', num: 1, v: x => x.kader.waiver + x.kader.free_agent, f: x => x.kader.waiver + x.kader.free_agent},
+      {k: 'tr', l: 'Trades im Kader', num: 1, v: x => x.kader.trade, f: x => x.kader.trade}]}));
     const by = new Map(K.teams.map(t => [t.team_id, t]));
     const names = GRP.map(g => g[1]), cls = j => GRP[j][2];
     chart.replaceChildren(svg.fig('Anteile je Team', svg.stack({title: `Anteil der Punkte nach Herkunft je Team${kern ? ' (ohne K und D/ST)' : ''}`, total: 100, names, cls,
@@ -103,7 +106,7 @@ function bilanz(box, K, svg) {
   U.ap(box, h('p', null, `${K.keeper_zahl} von ${K.kader_plaetze} Kaderplätzen bleiben über den Winter. Die Bilanz zeigt, wie viel der Punkte ${wk} von diesen Keepern kam und wie viel aus dem Draft ${S.man.season} oder von späteren Zugängen. `, U.ib('keeper-bilanz', '')),
   h('div', {class: 'tiles'},
     U.tile('Keeper', U.pct(L.pf.anteil.keeper), `${U.num(L.pf.pts.keeper, 0)} von ${U.num(L.pf.summe, 0)} Pkt`, 'keeper-bilanz'),
-    U.tile('ohne K, D/ST', U.pct(L.kern.anteil.keeper), 'Keeper bei QB, RB, WR, TE', 'keeper-kern'),
+    U.tile('Keeper ohne K und D/ST', U.pct(L.kern.anteil.keeper), 'Keeper bei QB, RB, WR, TE', 'keeper-kern'),
     U.tile(`Draft ${S.man.season}`, U.pct(L.pf.anteil.draft), `${L.picks_da} von ${L.picks} Picks im Kader`, 'draft'),
     U.tile('Zugänge', U.pct(L.pf.anteil.zugang), `Trades ${U.pct(L.pf.anteil.trade)}`, 'herkunft'),
     U.tile('Keeper heute', `${L.keeper_da} von ${L.keeper}`, 'noch im Kader', 'herkunft')),
@@ -127,20 +130,20 @@ function kader(box, K, team, r) {
       ...(K.alter_stichtag ? [
         {k: 'al', l: 'Alter', num: 1, v: r => r.alter, f: r => U.val(r.alter, v => U.num(v, 1), ohneAlter(r))},
         {k: 'nj', l: 'NFL-Jahr', num: 1, d: 1, v: r => r.nfl_jahr, f: r => U.val(r.nfl_jahr, v => v, ohneAlter(r))}] : []),
-      // Marktwert (FantasyCalc): Wert, Gesamtrang mit Positionsrang, Trend 30 Tage
+      // Marktwert (FantasyCalc): Marktwert, Marktwert-Rang (Gesamtrang mit Positionsrang), Trend 30 Tage
       ...(K.marktwert_stand ? [
-        {k: 'w', l: 'Wert', num: 1, v: r => r.wert, f: r => U.val(r.wert, wertTxt, ohneWert(r))},
-        {k: 'wr', l: 'Wert-Rang', num: 1, d: 1, v: r => r.wert_rang,
+        {k: 'w', l: 'Marktwert', num: 1, v: r => r.wert, f: r => U.val(r.wert, wertTxt, ohneWert(r))},
+        {k: 'wr', l: 'Marktwert-Rang', num: 1, d: 1, v: r => r.wert_rang,
           f: r => U.ok(r.wert_rang) ? [String(r.wert_rang), h('small', null, `${r.pos} ${r.wert_posrang}`)] : U.na(ohneWert(r))},
-        {k: 'wt', l: 'Trend 30 T.', num: 1, v: r => r.wert_trend, f: r => U.val(r.wert_trend, wertSgn, ohneWert(r))}] : []),
-      {k: 'g', l: 'Sp.', num: 1, v: r => r.g, f: r => U.val(r.g, v => v, 'keine Wochendaten')},
-      {k: 'a', l: `Ø ${S.man.season}`, num: 1, v: r => r.avg, f: r => U.val(r.avg, U.num, 'ohne Spiel')},
-      {k: 'v', l: `Ø ${S.man.season - 1}`, num: 1, v: r => r.vj_avg, f: r => r.rookie ? h('span', {class: 'note'}, 'Rookie') : U.val(r.vj_avg, U.num, 'kein Vorjahreswert')},
-      {k: 'd', l: 'Δ', num: 1, v: r => r.vj_delta, f: r => U.val(r.vj_delta, U.sgn, 'kein Vergleich')},
-      {k: 'vg', l: `Sp. ${S.man.season - 1}`, num: 1, v: r => r.vj_g, f: r => U.val(r.vj_g, v => v, 'kein Vorjahreswert')}]}),
+        {k: 'wt', l: 'Trend 30 Tage', num: 1, v: r => r.wert_trend, f: r => U.val(r.wert_trend, wertSgn, ohneWert(r))}] : []),
+      {k: 'g', l: 'Spiele', num: 1, v: r => r.g, f: r => U.val(r.g, v => v, 'keine Wochendaten')},
+      {k: 'a', l: `Ø Punkte ${S.man.season}`, num: 1, v: r => r.avg, f: r => U.val(r.avg, U.num, 'ohne Spiel')},
+      {k: 'v', l: `Ø Punkte ${S.man.season - 1}`, num: 1, v: r => r.vj_avg, f: r => r.rookie ? h('span', {class: 'note'}, 'Rookie') : U.val(r.vj_avg, U.num, 'kein Vorjahreswert')},
+      {k: 'd', l: 'zum Vorjahr', num: 1, v: r => r.vj_delta, f: r => U.val(r.vj_delta, U.sgn, 'kein Vergleich')},
+      {k: 'vg', l: `Spiele ${S.man.season - 1}`, num: 1, v: r => r.vj_g, f: r => U.val(r.vj_g, v => v, 'kein Vorjahreswert')}]}),
     U.legend(['herkunft', 'vorjahr', ...(K.alter_stichtag ? ['alter'] : []), ...(K.marktwert_stand ? ['marktwert', 'wert-trend'] : [])]),
     h('p', {class: 'note'}, standTxt(K) + '.', K.alter_stichtag ? quelle(K) : null,
-      K.marktwert_stand ? [' ', fcQuelle(), ` (Stand ${U.stamp(K.marktwert_stand)}); Vergleich einzelner Spieler: `, fcRechner(), '.'] : null));
+      K.marktwert_stand ? [' ', fcQuelle(), ` (${U.standTxt(K.marktwert_stand)}); Vergleich einzelner Spieler: `, fcRechner(), '.'] : null));
   };
   U.ap(box, h('div', {class: 'row'}, teamSelect(team, v => { team = v; U.setQ(r.base, {team}); draw(); })), wrap);
   draw();
@@ -156,15 +159,16 @@ function draft(box, K, team, r) {
       sort: ['p', 1], filter: true, cols: [
         {k: 'p', l: 'Pick', num: 1, v: p => p.pick, d: 1, flt: false, f: p => p.pick},
         {k: 's', l: 'Spieler', v: p => (p.name || '').toLowerCase(), d: 1, flt: false,
-          f: p => player(p.player_id, p.name, p.in_app, p.pos, p.keeper ? h('span', {class: 'kp', title: 'Keeper'}, 'K', h('span', {class: 'vh'}, ' Keeper')) : null)},
+          // Abzeichen „Keeper“ ausgeschrieben: „K“ hieße in Fantasy Kicker (ein Keeper-Kicker trüge sonst K am Namen und als Position)
+          f: p => player(p.player_id, p.name, p.in_app, p.pos, p.keeper ? h('span', {class: 'kp'}, 'Keeper') : null)},
         {k: 't', l: 'Team', v: p => U.kz(p.team_id), d: 1, f: p => U.tl(p.team_id)},
         {k: 'b', l: 'Verbleib', v: bleib, d: 1, cat: 1, f: bleib},
         {k: 'pt', l: 'Pkt', num: 1, v: p => p.pts, f: p => U.val(p.pts, U.num, 'keine Wochendaten')},
-        {k: 'a', l: 'Ø', num: 1, v: p => p.avg, f: p => U.val(p.avg, U.num, 'ohne Spiel')},
-        {k: 'g', l: 'Sp.', num: 1, v: p => p.g, f: p => U.val(p.g, v => v, 'keine Wochendaten')},
+        {k: 'a', l: 'Ø Punkte', num: 1, v: p => p.avg, f: p => U.val(p.avg, U.num, 'ohne Spiel')},
+        {k: 'g', l: 'Spiele', num: 1, v: p => p.g, f: p => U.val(p.g, v => v, 'keine Wochendaten')},
         {k: 'st', l: 'Starts', num: 1, v: p => p.starts, f: p => p.starts},
-        {k: 'pf', l: 'PF fürs Team', num: 1, v: p => p.pf, f: p => U.num(p.pf)},
-        // Art und Runde zuletzt: die Art zeigt schon das K am Namen, beide bleiben als Filter erreichbar
+        {k: 'pf', l: 'Punkte fürs Team', num: 1, v: p => p.pf, f: p => U.num(p.pf)},
+        // Art und Runde zuletzt: die Art zeigt schon das Abzeichen „Keeper“ am Namen, beide bleiben als Filter erreichbar
         {k: 'k', l: 'Art', v: p => p.keeper ? 'Keeper' : 'Draft', d: 1, cat: 1, f: p => p.keeper ? 'Keeper' : 'Draft'},
         {k: 'r', l: 'Runde', num: 1, cat: 1, v: p => p.runde, d: 1, f: p => p.runde}]}),
     U.legend(['draft', 'draft-ertrag']), h('p', {class: 'note'}, `Punkte nach W${K.through_week} (final). ${standTxt(K)}.`));
@@ -207,11 +211,11 @@ function draftNext(box, K) {
   }
   U.ap(box, U.table({cap: `Erwartete Draft-Position ${next} laut Simulation`, cls: 'nr kurz', rh: 0, rows, sort: ['pk', 1], cols: [
     {k: 't', l: 'Team', v: t => U.kz(t.team_id), d: 1, f: t => U.tl(t.team_id)},
-    {k: 'pk', l: 'Ø Pick', num: 1, d: 1, v: t => L(t).pick, f: t => U.num(L(t).pick, 1)},
-    {k: 'p1', l: 'Pick 1', num: 1, v: t => U.sp(L(t).pick1), f: t => pct(L(t).pick1)},
-    {k: 'p3', l: 'Pick 1–3', num: 1, v: t => U.sp(L(t).pick_top3), f: t => pct(L(t).pick_top3)},
-    {k: 'me', l: 'Meister', num: 1, v: t => U.sp(L(t).endplatz[0]), f: t => pct(L(t).endplatz[0])},
-    {k: 'po', l: 'Playoffs', num: 1, v: t => U.sp(L(t).playoff), f: t => pct(L(t).playoff)}]}),
+    {k: 'pk', l: 'Erwarteter Pick', num: 1, d: 1, v: t => L(t).pick, f: t => U.num(L(t).pick, 1)},
+    {k: 'p1', l: 'Pick 1 %', num: 1, v: t => U.sp(L(t).pick1), f: t => pct(L(t).pick1)},
+    {k: 'p3', l: 'Pick 1–3 %', num: 1, v: t => U.sp(L(t).pick_top3), f: t => pct(L(t).pick_top3)},
+    {k: 'me', l: 'Meister %', num: 1, v: t => U.sp(L(t).endplatz[0]), f: t => pct(L(t).endplatz[0])},
+    {k: 'po', l: 'Playoff %', num: 1, v: t => U.sp(L(t).playoff), f: t => pct(L(t).playoff)}]}),
   U.legend(['draft-folgejahr', 'endplatz-sim', 'simulation']), note);
 }
 
@@ -230,8 +234,9 @@ function alter(box, K, svg) {
     return;
   }
   const rows = K.teams.filter(t => t.altersprofil), P = t => t.altersprofil;
-  // Gewicht: Restpunkte laut ROS; ohne ROS-Projektion (Offseason) der Marktwert (Stufe 4), ohne beides keins
-  const ros = K.alter_gewicht, rosWhy = 'keine ROS-Projektion und kein Marktwert';
+  // Gewicht: Restpunkte laut ROS; ohne ROS-Projektion (Offseason) der Marktwert (Stufe 4), ohne beides keins.
+  // gw steht in den engen Spaltenköpfen („Ø Alter (nach ROS)“), Titel und Gründe schreiben es aus
+  const ros = K.alter_gewicht, rosWhy = 'keine Projektion für den Rest der Saison und kein Marktwert';
   const byWert = ros === 'wert', gw = byWert ? 'Wert' : 'ROS';
   const age = v => U.num(v, 1), dev = v => U.sgn(v, 1);
   const by = new Map(rows.map(t => [t.team_id, t]));
@@ -243,31 +248,33 @@ function alter(box, K, svg) {
       U.tile('Ø Alter Liga', age(L.kader), `${L.n} Spieler ohne D/ST`, 'alter'),
       U.tile('unter 26', L.jung, `ab 30: ${L.alt}`, 'alter'),
       U.tile('Rookies', L.rookies, `2. NFL-Jahr: ${L.zweites_jahr}`, 'alter')),
-    h('p', {class: 'note'}, 'Liga-Schnitt je Position: ', POS.filter(p => L.positionen[p]).map(p => `${p} ${age(L.positionen[p].alter)}`).join(' · '), '.'),
+    h('p', {class: 'note'}, 'Ligaschnitt je Position: ', POS.filter(p => L.positionen[p]).map(p => `${p} ${age(L.positionen[p].alter)}`).join(' · '), '.'),
     U.table({cap: 'Altersprofil je Team', cls: 'nr kurz', rh: 0, rows, sort: [key, 1], cols: [
       {k: 't', l: 'Team', v: t => U.kz(t.team_id), d: 1, f: t => U.tl(t.team_id)},
       // die gewichteten Werte zuerst: auf dem Handy sind nur drei bis vier Spalten ohne Wischen zu sehen
-      {k: 'bereinigt_ros', l: `bereinigt ${gw}`, num: 1, d: 1, v: t => P(t).bereinigt_ros, f: t => U.val(P(t).bereinigt_ros, dev, rosWhy)},
-      {k: 'ros', l: `nach ${gw}`, num: 1, d: 1, v: t => P(t).ros, f: t => U.val(P(t).ros, age, rosWhy)},
+      {k: 'bereinigt_ros', l: `bereinigt (nach ${gw})`, num: 1, d: 1, v: t => P(t).bereinigt_ros, f: t => U.val(P(t).bereinigt_ros, dev, rosWhy)},
+      {k: 'ros', l: `Ø Alter (nach ${gw})`, num: 1, d: 1, v: t => P(t).ros, f: t => U.val(P(t).ros, age, rosWhy)},
       {k: 'bereinigt', l: 'bereinigt', num: 1, d: 1, v: t => P(t).bereinigt, f: t => dev(P(t).bereinigt)},
       {k: 'kader', l: 'Ø Alter', num: 1, d: 1, v: t => P(t).kader, f: t => age(P(t).kader)},
-      {k: 'jung', l: '< 26', num: 1, v: t => P(t).jung, f: t => P(t).jung},
-      {k: 'alt', l: '≥ 30', num: 1, v: t => P(t).alt, f: t => P(t).alt},
+      {k: 'jung', l: 'unter 26', num: 1, v: t => P(t).jung, f: t => P(t).jung},
+      {k: 'alt', l: 'ab 30', num: 1, v: t => P(t).alt, f: t => P(t).alt},
       {k: 'rk', l: 'Rookies', num: 1, v: t => P(t).rookies, f: t => P(t).rookies},
-      {k: 'zj', l: '2. Jahr', num: 1, v: t => P(t).zweites_jahr, f: t => P(t).zweites_jahr},
+      {k: 'zj', l: '2. NFL-Jahr', num: 1, v: t => P(t).zweites_jahr, f: t => P(t).zweites_jahr},
       {k: 'n', l: 'Spieler', num: 1, v: t => P(t).n, f: t => P(t).n}]}),
-    svg.fig(ros ? `Alter bereinigt, nach ${gw} gewichtet` : 'Alter bereinigt', svg.hbars({title: 'Abstand zum Liga-Schnitt der Positionen je Team, in Jahren',
-      desc: 'Balken nach links = jünger als der Schnitt, nach rechts = älter; genaue Werte in der Tabelle.', fmt: dev, rows: bars}),
+    svg.fig(ros ? `Alter bereinigt, gewichtet nach ${byWert ? 'Marktwert' : 'Projektion Rest der Saison'}` : 'Alter bereinigt',
+      svg.hbars({title: 'Abstand zum Ligaschnitt der Positionen je Team, in Jahren',
+        desc: 'Balken nach links = jünger als der Schnitt, nach rechts = älter; genaue Werte in der Tabelle.', fmt: dev, rows: bars}),
     {heads: ['Team', 'Jahre zum Schnitt'], rows: bars.map(b => [b.name, dev(b.v)])},
-    h('p', {class: 'note'}, 'Links jünger, rechts älter als der Liga-Schnitt der jeweiligen Position.')),
+    h('p', {class: 'note'}, 'Links jünger, rechts älter als der Ligaschnitt der jeweiligen Position.')),
     U.legend(['alter', byWert ? 'alter-wert' : 'alter-ros', 'alter-bereinigt']),
-    // nach Wert gewichtet: abgeleitete FantasyCalc-Werte, Nennung mit Link wie in der Ansicht Wert
+    // nach Wert gewichtet: abgeleitete FantasyCalc-Werte, Nennung mit Link wie in der Ansicht Marktwert
     h('p', {class: 'note'}, standTxt(K) + '.', quelle(K),
-      byWert ? [' Gewichtet mit dem Marktwert; ', fcQuelle(), K.marktwert_stand ? ` (Stand ${U.stamp(K.marktwert_stand)})` : '', '.'] : null));
+      byWert ? [' Gewichtet mit dem Marktwert; ', fcQuelle(), K.marktwert_stand ? ` (${U.standTxt(K.marktwert_stand)})` : '', '.'] : null));
 }
 
-// ---------------------------------------------------------------- Wert: Marktwert je Team (FantasyCalc), nur Summen
-// Keine Liste der wertvollsten Spieler je Team (Beschluss 01.10.2026): Kern-Wert, Wert über der Linie und Alter als Zahlen
+// ---------------------------------------------------------------- Marktwert je Team (FantasyCalc), nur Summen
+// Keine Liste der wertvollsten Spieler je Team (Beschluss 01.10.2026): „Wert Top n“ (Summe der n = Keeper-Zahl
+// wertvollsten, Daten: kern), Wert über der Keeper-Linie und Alter als Zahlen
 function wert(box, K, svg) {
   const L = K.liga.marktwert;
   if (!L) {
@@ -281,22 +288,22 @@ function wert(box, K, svg) {
     .sort((a, b) => b.v - a.v);
   const noLine = 'keine Keeper-Linie', noAge = 'keine Altersdaten';
   U.ap(box, h('p', null, `Was die Kader auf dem Tauschmarkt wert sind: je Team die Summe der ${n} wertvollsten Spieler – so viele bleiben über den Winter – und wie viel Wert über der Keeper-Linie liegt. Tauschpreise aus Dynasty-Ligen, keine Punktprognose; K und D/ST haben keinen Wert. `, U.ib('marktwert', '')),
-    h('p', {class: 'note'}, fcQuelle(), ` · Stand ${U.stamp(K.marktwert_stand)}`),
+    h('p', {class: 'note'}, fcQuelle(), ` · ${U.standTxt(K.marktwert_stand)}`),
     h('div', {class: 'tiles'},
       U.tile('Keeper-Linie', U.val(K.keeper_linie, wertTxt, `weniger als ${total} Kaderspieler mit Wert`), `Wert des ${total}. Kaderspielers`, 'keeper-linie'),
-      U.tile('Ø Kern-Wert', wertTxt(L.kern), `${n} wertvollste je Team`, 'kern-wert'),
-      U.tile('Alter nach Wert', U.val(L.alter, v => U.num(v, 1), noAge), `Liga, ${L.n} Spieler mit Wert`, 'alter-wert')),
+      U.tile(`Ø Wert Top ${n}`, wertTxt(L.kern), `${n} wertvollste je Team`, 'kern-wert'),
+      U.tile('Ø Alter (nach Wert)', U.val(L.alter, v => U.num(v, 1), noAge), `Liga, ${L.n} Spieler mit Wert`, 'alter-wert')),
     U.table({cap: 'Marktwert je Team', cls: 'nr kurz', rh: 0, rows, sort: ['kern', -1], cols: [
       {k: 't', l: 'Team', v: t => U.kz(t.team_id), d: 1, f: t => U.tl(t.team_id)},
-      {k: 'kern', l: 'Kern-Wert', num: 1, v: t => M(t).kern, f: t => wertTxt(M(t).kern)},
+      {k: 'kern', l: `Wert Top ${n}`, num: 1, v: t => M(t).kern, f: t => wertTxt(M(t).kern)},
       {k: 'ab', l: 'zum Schnitt', num: 1, v: t => M(t).kern - L.kern, f: t => wertSgn(M(t).kern - L.kern)},
-      {k: 'ue', l: 'ü. Linie', num: 1, v: t => M(t).ueber_linie, f: t => U.val(M(t).ueber_linie, wertTxt, noLine)},
-      {k: 'nl', l: 'ab Linie', num: 1, v: t => M(t).n_linie, f: t => U.val(M(t).n_linie, v => v, noLine)},
-      {k: 'al', l: 'Alter nach Wert', num: 1, d: 1, v: t => M(t).alter, f: t => U.val(M(t).alter, v => U.num(v, 1), noAge)},
+      {k: 'ue', l: 'über Keeper-Linie', num: 1, v: t => M(t).ueber_linie, f: t => U.val(M(t).ueber_linie, wertTxt, noLine)},
+      {k: 'nl', l: 'Spieler ab Linie', num: 1, v: t => M(t).n_linie, f: t => U.val(M(t).n_linie, v => v, noLine)},
+      {k: 'al', l: 'Ø Alter (nach Wert)', num: 1, d: 1, v: t => M(t).alter, f: t => U.val(M(t).alter, v => U.num(v, 1), noAge)},
       {k: 'n', l: 'mit Wert', num: 1, v: t => M(t).n, f: t => M(t).n}]}),
-    svg.fig('Kern-Wert zum Ligaschnitt', svg.hbars({title: `Summe der ${n} wertvollsten Spieler je Team, Abstand zum Ligaschnitt`,
+    svg.fig(`Wert Top ${n} zum Ligaschnitt`, svg.hbars({title: `Summe der ${n} wertvollsten Spieler je Team, Abstand zum Ligaschnitt`,
       desc: 'Balken nach rechts = mehr Wert als der Schnitt, nach links = weniger; genaue Werte in der Tabelle.', fmt: wertSgn, rows: bars}),
-    {heads: ['Team', 'Kern-Wert zum Schnitt'], rows: bars.map(b => [b.name, wertSgn(b.v)])},
+    {heads: ['Team', `Wert Top ${n} zum Schnitt`], rows: bars.map(b => [b.name, wertSgn(b.v)])},
     h('p', {class: 'note'}, `Ligaschnitt ${wertTxt(L.kern)}.`)),
     U.legend(['marktwert', 'keeper-linie', 'kern-wert', 'wert-ue', 'alter-wert']),
     h('p', {class: 'note'}, standTxt(K) + '. ', fcQuelle(), line ? ` · ${L.n_linie} Kaderspieler liegen auf oder über der Linie.` : '', ' Einzelne Spieler vergleichen: ', fcRechner(), '.'));

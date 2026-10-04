@@ -42,14 +42,14 @@ function tiles(W) {
     U.tile('Median', U.num(W.median), null, 'wochenmedian'),
     U.tile('Tiefstwert', U.num(W.low?.pf), who(W.low)),
     U.tile('Verschenkt', U.num(W.bank_suende?.verschenkt), who(W.bank_suende), 'bank-suende'),
-    U.tile('Liga-Effizienz', U.pct(W.effizienz_liga), null, 'eff-woche'));
+    U.tile('Eff. % Liga', U.pct(W.effizienz_liga), null, 'eff-woche'));
 }
 
 function weekTable(i, wk) {
   const w = t => t.wochen, anyT = S.teams.some(t => w(t).allplay_t[i] > 0);
   const val = (k, f) => ({v: t => w(t)[k][i], f: t => U.val(w(t)[k][i], f, 'kein Spiel')});
-  return h('div', null, h('p', {class: 'note'}, 'Diese Woche unter Stärke: ', h('a', {href: '#staerke/allplay/w' + wk}, 'All-Play'), ' · ',
-    h('a', {href: '#staerke/punkte/w' + wk}, 'Punkte'), ' · ', h('a', {href: '#staerke/coaching/w' + wk}, 'Coaching')),
+  return h('div', null, h('p', {class: 'note'}, 'Diese Woche unter Stärke: ', h('a', {href: '#staerke/allplay/w' + wk}, 'All-Play & Glück'), ' · ',
+    h('a', {href: '#staerke/punkte/w' + wk}, 'Punkte & Form'), ' · ', h('a', {href: '#staerke/coaching/w' + wk}, 'Coaching')),
   U.table({cap: `Wochentabelle W${wk}`, cls: 'rk', rows: S.teams, sort: ['wr', 1], cols: [
     {k: 'wr', l: '#', v: t => w(t).wochenrang[i], d: 1, f: t => w(t).wochenrang[i]},
     {k: 'team', l: 'Team', v: t => t.name.toLowerCase(), d: 1, f: t => U.tl(t.team_id)},
@@ -58,12 +58,12 @@ function weekTable(i, wk) {
     {k: 'pa', l: 'PA', num: 1, ...val('pa', U.num)},
     {k: 'e', l: 'Erg.', v: t => w(t).ergebnis[i], f: t => U.res(w(t).ergebnis[i])},
     {k: 'ef', l: 'Eff. %', num: 1, ...val('efficiency', U.pct)},
-    {k: 'ap', l: anyT ? 'AP W-L-T' : 'AP W-L', num: 1, v: t => w(t).allplay_pct[i], f: t => U.apwl(w(t).allplay_w[i], w(t).allplay_l[i], w(t).allplay_t[i], anyT)},
-    {k: 'md', l: 'Median', v: t => +!!w(t).median_win[i], f: t => w(t).median_win[i] ? h('span', {class: 'W'}, '✓', h('span', {class: 'vh'}, 'ja')) : h('span', {class: 'na'}, '–', h('span', {class: 'vh'}, 'nein'))},
+    {k: 'ap', l: anyT ? 'All-Play W-L-T' : 'All-Play W-L', num: 1, v: t => w(t).allplay_pct[i], f: t => U.apwl(w(t).allplay_w[i], w(t).allplay_l[i], w(t).allplay_t[i], anyT)},
+    {k: 'md', l: 'Median-Sieg', v: t => +!!w(t).median_win[i], f: t => w(t).median_win[i] ? h('span', {class: 'W'}, '✓', h('span', {class: 'vh'}, 'ja')) : h('span', {class: 'na'}, '–', h('span', {class: 'vh'}, 'nein'))},
     {k: 'mg', l: 'Matchup-Glück', num: 1, ...val('matchup_glueck', U.sgn)},
     {k: 'vs', l: 'Verschenkt', num: 1, ...val('verschenkt', U.num)},
-    {k: 'bk', l: 'Bank', num: 1, ...val('bank', U.num)},
-    {k: 'pd', l: 'Proj.-Δ', num: 1, ...val('projektions_delta', U.sgn)}],
+    {k: 'bk', l: 'Bankpunkte', num: 1, ...val('bank', U.num)},
+    {k: 'pd', l: 'Ist − Projektion', num: 1, ...val('projektions_delta', U.sgn)}],
   note: 'Matchup-Glück: Sieg unter dem Wochenmedian +, Niederlage über dem Median −, sonst 0.'}),
   U.legend(['wochenrang', 'eff-woche', 'ap-wl', 'median', 'matchup-woche', 'verschenkt', 'bank', 'proj-delta']));
 }
@@ -80,7 +80,7 @@ function topScorer(W) {
     {k: 'tm', l: 'Team', v: p => U.kz(p.team_id), d: 1, f: p => h('a', {href: '#team/' + p.team_id, class: 'tl2', 'aria-label': U.team(p.team_id)?.name}, U.kz(p.team_id))},
     {k: 'pos', l: 'Pos', v: p => p.pos, d: 1, f: p => p.pos},
     {k: 'nfl', l: 'NFL', v: p => p.nfl, d: 1, f: p => p.nfl || 'FA'},
-    {k: 'proj', l: 'Proj.', num: 1, v: p => p.proj, f: p => U.val(p.proj, U.num, 'keine Projektion')}]}));
+    {k: 'proj', l: 'Projektion', num: 1, v: p => p.proj, f: p => U.val(p.proj, U.num, 'keine Projektion')}]}));
 }
 
 function seasonWeeks(fin, svg, cur) {

@@ -30,13 +30,14 @@ p{margin:.4rem 0}
 .skip:focus{left:8px}
 /* Kopf und Navigation */
 .top{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:6px;padding:4px max(8px,env(safe-area-inset-right)) 4px max(16px,env(safe-area-inset-left));background:var(--sf);border-bottom:1px solid var(--bd);min-height:52px}
-/* Marke: Seit Lupe und Live-Chip stehen sechs Elemente im Kopf. Das Jahr erscheint erst ab 480 px, „Fantasy“ ab 440 px
-   (gemessen in Chromium mit dem längsten Chip „nach W14“: bei 320–439 px passt „BWG“ ganz, ab 440 „BWG Fantasy“, ab 480 das
-   Jahr); reicht der Platz trotzdem nicht (breitere Systemschrift), kürzt die Marke mit „…“, statt Knöpfe aus dem Bild zu schieben */
+/* Marke: Seit Lupe und Live-Chip stehen sechs Elemente im Kopf, seit P4 heißt der Datenstand „W14 gewertet“. Das Jahr
+   erscheint erst ab 530 px, „Fantasy“ ab 490 px (gemessen in Chromium mit dem längsten Chip „W14 gewertet“, unter 420 px
+   „W14 ✓“: bei 320–489 px passt „BWG“ ganz, ab 490 „BWG Fantasy“, ab 530 das Jahr); reicht der Platz trotzdem nicht
+   (breitere Systemschrift), kürzt die Marke mit „…“, statt Knöpfe aus dem Bild zu schieben */
 .brand{font-weight:700;text-decoration:none;color:var(--tx);margin-right:auto;line-height:44px;display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .top>:not(.brand){flex:none}
-@media (max-width:479px){.brand span{display:none}}
-@media (max-width:439px){.brand b{display:none}}
+@media (max-width:529px){.brand span{display:none}}
+@media (max-width:489px){.brand b{display:none}}
 /* Lupe im Kopf (Suche nach Spielern und Teams); offen, solange ihr Fenster offen ist */
 #such[aria-expanded=true]{background:var(--ac2);border-color:var(--ac)}
 .brand b{font-weight:inherit}
@@ -44,13 +45,16 @@ p{margin:.4rem 0}
 .ico{min-width:44px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--bd);border-radius:22px;background:var(--sf);color:var(--tx);text-decoration:none;font-weight:700;cursor:pointer}
 .stand{min-height:44px;border:1px solid var(--bd);border-radius:22px;background:var(--ac2);padding:0 .8rem;cursor:pointer;font-size:.9rem;font-weight:600;white-space:nowrap}
 .stand.alt{background:var(--g1);border-color:var(--wa)}
+/* Datenstand „W4 gewertet“; unter 420 px „W4 ✓“ (aria-label und Datenstand-Fenster nennen den ganzen Text) */
+.stand .stk{display:none}
+@media (max-width:419px){.stand .stw{display:none}.stand .stk{display:inline}}
 /* Live-Chip im Kopf (Link auf #spieltag, kein achter Tab); gefüllt, solange die Live-Ansicht offen ist */
 .lv{display:inline-flex;align-items:center;justify-content:center;min-width:44px;background:var(--sf);color:var(--tx);text-decoration:none;padding:0 .65rem}
 .lv[aria-current]{background:var(--ac);border-color:var(--ac);color:var(--on)}
 .lv[aria-busy]{opacity:.55}
 /* bis 399 px (iPhone 375–393): schmalere Chips, engere Abstände und 40 px breite Rundknöpfe (Höhe bleibt 44 px), damit
-   „BWG“ neben Lupe, Live, Datenstand, i und Hell/Dunkel passt – gemessen in Chromium (Segoe UI) mit dem längsten Chip
-   „nach W14“: bei 320 px noch 8 px Rand rechts, darüber mehr */
+   „BWG“ neben Lupe, Live, Datenstand, ? und Hell/Dunkel passt – gemessen in Chromium (Segoe UI) mit dem längsten Chip
+   „W14 ✓“: bei 320 px noch 8 px Rand rechts, darüber mehr */
 @media (max-width:399px){.top{gap:4px}.ico{min-width:40px}.stand{padding:0 .6rem}.lv{padding:0 .5rem}}
 /* 360–374 px (viele Android-Geräte): dazu kleinere Schrift in Marke und Chips, schmalerer linker Rand */
 @media (max-width:374px){.top{padding-left:max(12px,env(safe-area-inset-left))}.brand{font-size:.95rem}.stand{padding:0 .5rem;font-size:.85rem}}
@@ -109,8 +113,11 @@ label.chk{min-height:44px;display:inline-flex;align-items:center;gap:.5rem;curso
 label.chk input{width:22px;height:22px}
 .tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin:0 0 16px}
 .tile{background:var(--sf);border:1px solid var(--bd);border-radius:10px;padding:8px 10px;min-width:0;position:relative}
-.tile.hi .tl{padding-right:22px}
-.tile .tl button.i{position:absolute;top:0;right:0;margin:0}
+/* i-Knopf in die Ecke der Kachel (44 px Tippfläche, 20 px Kreis), damit lange Beschriftungen (seit P4 ausgeschrieben) neben
+   dem Kreis Platz haben; lange Wörter trennt der Browser nach Silben (lang="de", iPhone und Android), sonst bricht er sie um */
+.tile.hi .tl{padding-right:24px}
+.tile .tl>span{min-width:0;overflow-wrap:break-word;-webkit-hyphens:auto;hyphens:auto}
+.tile .tl button.i{position:absolute;top:-10px;right:-10px;margin:0}
 .tile .tl{min-height:2.3em;align-items:flex-start}
 .tl{font-size:.8rem;color:var(--mu);display:flex;align-items:center;justify-content:space-between;gap:4px}
 .tv{font-size:1.25rem;font-weight:700;font-variant-numeric:tabular-nums}
@@ -153,6 +160,9 @@ caption{text-align:left;font-weight:700;padding:10px 10px 6px;caption-side:top}
 th,td{padding:0 .55rem;height:44px;text-align:left;white-space:nowrap;border-bottom:1px solid var(--bd);background:var(--sf)}
 tbody tr:last-child>*{border-bottom:0}
 thead th{font-size:.8rem;color:var(--mu);font-weight:600;background:var(--sf2);height:44px}
+/* lange Spaltennamen (App-Konzept Abschnitt 7: ausgeschrieben statt Kürzel, ab 13 Zeichen, Klasse wr aus ui.js table) brechen
+   in eine zweite Zeile um, statt die Tabelle zu verbreitern; die Mindestbreite verhindert Umbrüche Wort für Wort */
+thead th.wr{white-space:normal;min-width:5.5rem;max-width:7.5rem;line-height:1.15}
 thead th:has(>button){padding:0}
 thead th button{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:2px;width:100%;min-width:44px;min-height:44px;padding:0 .55rem}
 thead th button:focus-visible{outline:3px solid var(--ac)}
@@ -330,15 +340,15 @@ details[open].dt>summary::before,details[open].gw>summary::before,details[open].
 .mx .hw{background:var(--f2)}.mx .hl{background:var(--g2)}.mx .he{background:var(--f0)}.mx .hx{background:var(--sf2);color:var(--mu)}
 .wide{display:none}
 @media (min-width:640px){.wide{display:block}}
-/* Lesart */
-.js #lesart{display:none}
-[data-route=lesart] #lesart{display:block}
+/* Erklärungen (Glossar, bis P4 „Lesart“) */
+.js #erklaerungen{display:none}
+[data-route=erklaerungen] #erklaerungen{display:block}
 .lesart{max-width:1240px;margin:0 auto;padding:0 max(16px,env(safe-area-inset-right)) 16px max(16px,env(safe-area-inset-left))}
 .js .lesart>h2{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 .js .lesart>p{display:none}
 #glossar{margin:0;background:var(--sf);border:1px solid var(--bd);border-radius:12px;padding:4px 14px}
 #glossar>div{padding:8px 0;border-top:1px solid var(--bd);scroll-margin-top:64px}
-#glossar>div:first-child,#glossar>div.f0{border-top:0}
+#glossar>div:first-child,#glossar>div.erst{border-top:0}
 #glossar>div[data-b]::before{content:attr(data-b);display:block;font-size:.75rem;text-transform:uppercase;letter-spacing:.06em;color:var(--mu);margin:10px 0 6px}
 #glossar dt{font-weight:700;scroll-margin-top:72px}
 #glossar dd{margin:2px 0 0}

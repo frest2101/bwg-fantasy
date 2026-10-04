@@ -134,7 +134,7 @@ function header() {
 }
 
 // ---------------------------------------------------------------- Suche im Kopf: Spieler und Teams (statt eines Spieler-Tabs)
-// Teams sofort aus teams.json; Spieler beim ersten Öffnen aus players.json und dem Tagesstand (waiver.json), zusammengeführt
+// Teams sofort aus teams.json; Spieler beim ersten Öffnen aus players.json und dem Stand des Tageslaufs (waiver.json), zusammengeführt
 // wie in der Spielerliste – jeder Treffer hat damit eine Spielerseite. Reihenfolge: Namensanfang, dann Anfang des Vor- oder
 // Nachnamens, dann Teiltreffer; bei Gleichstand nach Besitz % (ESPN-weit).
 let suchListe = null;
@@ -202,13 +202,14 @@ function standChip() {
   const nxt = fertig ? null : start(sw + 2);
   const due = nxt ? new Date(nxt + 'T08:30:00Z') : null;
   const alt = due && Date.now() > due.getTime() + 27.5 * 36e5;     // Mittwoch 12:00 UTC ohne neue Woche
-  btn.textContent = sw ? `nach W${sw}` : 'vor W1';
+  // „W4 gewertet“ (App-Konzept, Abschnitt 7); auf schmalen Handys nur „W4 ✓“, der Rest steht im aria-label
+  btn.replaceChildren(...(sw ? [`W${sw}`, h('span', {class: 'stw'}, ' gewertet'), h('span', {class: 'stk', 'aria-hidden': 'true'}, ' ✓')] : ['vor W1']));
   btn.classList.toggle('alt', !!alt);
-  btn.setAttribute('aria-label', `Datenstand: nach Woche ${sw}${alt ? ', Daten älter als erwartet' : ''}`);
+  btn.setAttribute('aria-label', `Datenstand: Woche ${sw} gewertet${alt ? ', Daten älter als erwartet' : ''}`);
   btn.hidden = false;
   const pool = ds.pool_woche != null ? wk(ds.pool_woche + 1)?.start : null;
-  // Tagesstand (Tageslauf): Besitz, Verletzung, Projektion der nächsten Woche und Wetter; davor nur der Wochenstand
-  const tag = ds.pool_stand ? `Tagesstand ${U.stamp(ds.pool_stand)}` : ds.pool_woche != null ? `nach W${ds.pool_woche}` + (pool ? ` (${U.datum(pool)})` : '') : '–';
+  // Stand des Tageslaufs: Besitz, Verletzung, Projektion der nächsten Woche und Wetter; davor nur der Wochenstand
+  const tag = ds.pool_stand ? U.standTxt(ds.pool_stand) : ds.pool_woche != null ? `nach W${ds.pool_woche}` + (pool ? ` (${U.datum(pool)})` : '') : '–';
   btn.onclick = () => {
     // „Daten neu laden“: holt den Datenstand ohne Neuladen der Seite (refresh). Gibt es einen neuen, wird die offene
     // Ansicht neu gezeichnet und das Fenster mit dem neuen Stand wieder geöffnet (über den dann neuen Klick-Handler).
@@ -233,11 +234,11 @@ function standChip() {
     U.showPop(btn, 'Datenstand', [
       alt ? h('p', {class: 'warn'}, 'Daten älter als erwartet – der Wochenabruf ist noch nicht durchgelaufen.') : null,
       h('dl', null,
-        h('dt', null, 'Wertung'), h('dd', null, `nach W${ds.woche_final ?? S.tw} (final)`),
-        po ? [h('dt', null, 'Playoffs'), h('dd', null, `nach W${po} (final)`)] : null,
-        h('dt', null, 'Projektionen ROS'), h('dd', null, ds.ros_nach_woche != null ? `Stand nach W${ds.ros_nach_woche}` : `ab Wochenabruf W${sw + 1}`),
+        h('dt', null, 'Wertung'), h('dd', null, `W${ds.woche_final ?? S.tw} gewertet`),
+        po ? [h('dt', null, 'Playoffs'), h('dd', null, `W${po} gewertet`)] : null,
+        h('dt', null, 'Projektionen Rest der Saison'), h('dd', null, ds.ros_nach_woche != null ? `Stand nach W${ds.ros_nach_woche}` : `ab Wochenabruf W${sw + 1}`),
         h('dt', null, ds.pool_stand ? 'Besitz, Verletzung, Projektion nächste Woche' : 'Besitz, Verletzung'), h('dd', null, tag),
-        h('dt', null, 'Wetter'), h('dd', null, ds.wetter_stand ? `Tagesstand ${U.stamp(ds.wetter_stand)}` : '–'),
+        h('dt', null, 'Wetter'), h('dd', null, ds.wetter_stand ? U.standTxt(ds.wetter_stand) : '–'),
         h('dt', null, 'Letzter Move'), h('dd', null, ds.transaktionen_bis ? U.stamp(ds.transaktionen_bis) : '–'),
         // „ab“: geplanter Slot, GitHub startet meist rund 15 min später (Glossar „Aktualisierung“)
         h('dt', null, 'Nächster Tageslauf'), h('dd', null, `ab ${U.stamp(nextDaily())}`),
@@ -245,8 +246,8 @@ function standChip() {
         h('dd', {class: 'full'}, U.tageslaufKnopf(), neu, info),
         h('dt', null, 'Nächster Wochenabruf'), h('dd', null, fertig ? '– (Saison beendet, erst wieder nach dem Saisonwechsel)' : U.stamp(due))),
       h('p', {class: 'note'}, '„Tageslauf starten“ öffnet GitHub: dort „Run workflow“ (GitHub-Anmeldung nötig). Etwa 2 Minuten später holt „Daten neu laden“ den neuen Stand. ',
-        h('a', {href: '#lesart/tageslauf-starten'}, 'Mehr dazu')),
-      h('p', {class: 'note'}, 'Wertung und Projektionen rechnen nur mit abgeschlossenen Wochen; der Tageslauf frischt Besitz, Verletzung, Transaktionen und Wetter stündlich von etwa 05:00 Uhr bis Mitternacht (deutsche Zeit) auf. ', h('a', {href: '#lesart/aktualisierung'}, 'Mehr zur Aktualisierung')),
+        h('a', {href: '#erklaerungen/tageslauf-starten'}, 'Mehr dazu')),
+      h('p', {class: 'note'}, 'Wertung und Projektionen rechnen nur mit abgeschlossenen Wochen; der Tageslauf frischt Besitz, Verletzung, Transaktionen und Wetter stündlich von etwa 05:00 Uhr bis Mitternacht (deutsche Zeit) auf. ', h('a', {href: '#erklaerungen/aktualisierung'}, 'Mehr zur Aktualisierung')),
     ]);
   };
 }
@@ -299,9 +300,9 @@ const BEREICHE = {
     ['', 'Bilanz', 'v_keeper'], ['herkunft', 'Herkunft', 'v_keeper'], ['alter', 'Alter', 'v_keeper'], ['marktwert', 'Marktwert', 'v_keeper'],
     ['draft', () => `Draft ${S.man.season}`, 'v_keeper'], ['draft-folgejahr', () => `Draft ${S.man.season + 1}`, 'v_keeper']]},
 };
-// Seiten ohne Tab: Spielerliste und -seite (Suche im Kopf), Team-Seite, Lesart. spieltag = Live-Ansicht (Chip „Live“ im Kopf
+// Seiten ohne Tab: Spielerliste und -seite (Suche im Kopf), Team-Seite, Erklärungen (Glossar). spieltag = Live-Ansicht (Chip „Live“ im Kopf
 // und erste Ansicht der Woche); „#live“ ist die aria-live-Region
-const VIEWS = {spieler: 'v_spieler', team: 'v_team', spieltag: 'v_spieltag', lesart: 'v_lesart'};
+const VIEWS = {spieler: 'v_spieler', team: 'v_team', spieltag: 'v_spieltag', erklaerungen: 'v_lesart'};
 const IN_BEREICH = {spieltag: ['woche', 'live']};
 // Alte Hashes (bis 04.10.2026) → neue Routen. Es gilt der längste passende Anfang; der Rest des Pfads (Woche, Position) und
 // die Parameter (?team=, ?seeding= …) bleiben, damit Lesezeichen, README, Aufträge und das Claude-Projekt weiter funktionieren.
@@ -309,7 +310,8 @@ const IN_BEREICH = {spieltag: ['woche', 'live']};
 const ALT = {tabelle: 'liga', 'tabelle/allplay': 'staerke/allplay', 'tabelle/punkte': 'staerke/punkte', 'tabelle/coaching': 'staerke/coaching',
   'tabelle/ausblick': 'liga/playoffs', ranking: 'staerke', spielplan: 'liga/ergebnisse', rekorde: 'liga/rekorde', 'rekorde/h2h': 'liga/duelle',
   matchup: 'woche/matchups', dst: 'woche/matchups/dst', 'dst/offense': 'woche/matchups/dst', wetter: 'woche/wetter', 'woche/live': 'spieltag',
-  waiver: 'markt', moves: 'markt/moves', 'moves/draft': 'keeper/draft', 'keeper/kader': 'keeper/herkunft', 'keeper/wert': 'keeper/marktwert'};
+  waiver: 'markt', moves: 'markt/moves', 'moves/draft': 'keeper/draft', 'keeper/kader': 'keeper/herkunft', 'keeper/wert': 'keeper/marktwert',
+  lesart: 'erklaerungen'};       // „Lesart“ heißt seit Paket P4 (04.10.2026) „Erklärungen“
 const qs = q => { const s = q.toString(); return s ? '?' + s : ''; };
 // Ziel einer Umleitung als Hash ohne „#“, sonst null
 function umleitung(r) {
@@ -346,7 +348,7 @@ function resolve(r) {
 }
 const chipHref = (k, p) => k === 'woche' && p === 'live' ? '#spieltag' : '#' + k + (p ? '/' + p : '');
 // Was beim Wechsel zwischen Ansichten eines Bereichs mitgeht: die Einzelwoche zwischen All-Play, Punkte und Coaching (wie vor
-// P1 in der Tabelle) und die Sicht eines Teams (?team= von der Team-Seite) zwischen den drei Markt-Ansichten mit Tagesstand
+// P1 in der Tabelle) und die Sicht eines Teams (?team= von der Team-Seite) zwischen den drei Markt-Ansichten mit Stand des Tageslaufs
 const MIT_WOCHE = ['allplay', 'punkte', 'coaching'], MIT_TEAM = ['', 'bedarf', 'reihenfolge'];
 // Bereich für U.kopf: Name, Frage, Satz und die Chips der Ansichten (Funktionen erst hier ausgewertet, die Daten stehen dann)
 function bereich(k, r) {
@@ -416,7 +418,7 @@ async function route() {
   S.prevHash = curHash;
   curHash = location.hash;
   document.documentElement.dataset.route = r.sec;
-  // Tab des Bereichs; Spieler, Team und Lesart gehören zu keinem Bereich
+  // Tab des Bereichs; Spieler, Team und Erklärungen gehören zu keinem Bereich
   for (const a of document.querySelectorAll('.tabs a')) {
     if (a.dataset.s === res.k) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
   }

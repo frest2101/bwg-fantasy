@@ -60,7 +60,7 @@ export async function render(box, ctx, r) {
   if (!r.alive()) return;
   slot.replaceWith(U.chips('Ansichten Wetter', [['#woche/wetter', U.ok(W.woche) ? `Prognose W${W.woche}` : 'Prognose', ''], ['#woche/wetter/ist', 'Ist', 'ist']], ist ? 'ist' : '', 'l2'));
   const s = W.schwellen;
-  U.ap(box, h('p', {class: 'note'}, `Stand ${U.stamp(W.stand)} · Modellwerte von Open-Meteo, kein Stationsmesswert; Werte über Anstoßstunde und drei Stunden danach`,
+  U.ap(box, h('p', {class: 'note'}, `${U.standTxt(W.stand)} · Modellwerte von Open-Meteo, kein Stationsmesswert; Werte über Anstoßstunde und drei Stunden danach`,
     s ? `; Markierung ⚑ ab Wind ≥ ${U.num(s.wind, 0)} km/h, Böen ≥ ${U.num(s.boeen, 0)} km/h, Regen ≥ ${U.num(s.regen_wahrsch, 0)} %, Schnee > ${U.num(s.schnee, 0)} (Faustregel)` : '',
     ist ? '. Ist ohne Regenwahrscheinlichkeit. ' : '. ', U.ib('wetter-markierung', '')));
   games(box, W, ist);

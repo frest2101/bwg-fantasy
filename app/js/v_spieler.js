@@ -1,7 +1,7 @@
 // Spieler (lädt players.json, dazu waiver.json als Tagesstand; kein Tab, Einstieg über die Suche im Kopf): Liste mit Filtern
-// in 50er-Blöcken (#spieler), Detail #spieler/<id> mit Formkurve, ROS, Positions-Matchup (Feld mu, Wetterzeile aus
-// wetter.json), Marktwert (FantasyCalc, aus waiver.json) und News-Kasten (nur Datum der letzten ESPN-Meldung und Verweise,
-// nie Text).
+// in 50er-Blöcken (#spieler), Detail #spieler/<id> mit Formkurve, Rest der Saison (ROS), Matchup je Position (Feld mu,
+// Wetterzeile aus wetter.json), Marktwert (FantasyCalc, aus waiver.json) und News-Kasten (nur Datum der letzten
+// ESPN-Meldung und Verweise, nie Text). Namen nach App-Konzept 04.10.2026 (P4).
 let U, S, h;
 const POS = ['QB', 'RB', 'WR', 'TE', 'K', 'D/ST'];
 // Tagesstand je Spieler (waiver.json, stündlich) überlagert diese Wochenwerte: Team, Status, Verletzung, Besitz
@@ -80,7 +80,7 @@ const trendTxt = t => {
     h('span', {class: 'vh'}, v === '↑' ? ' steigend' : v === '↓' ? ' fallend' : ' stabil')) : null;
 };
 function stand(W) {
-  if (W?.stand) return h('p', {class: 'note'}, `Tagesstand ${U.stamp(W.stand)}`, ' ', U.ib('tagesstand', ''));
+  if (W?.stand) return h('p', {class: 'note'}, U.standTxt(W.stand), ' ', U.ib('tagesstand', ''));
   const ds = S.man.datenstand || {}, w = S.weeks.find(x => x.week === (ds.pool_woche ?? S.tw) + 1);
   return h('p', {class: 'note'}, `Besitz und Verletzung: Stand nach W${ds.pool_woche ?? S.tw}` + (w ? ` (${U.datum(w.start)})` : ''), ' ', U.ib('besitz', ''));
 }
@@ -95,7 +95,7 @@ function list(box, W, all, r, rosWhy, ersatz, hasRos) {
   if (!r.back) keptFilters = {};
   const count = h('span', {class: 'note cnt2', 'aria-live': 'polite'});
   const slotBox = h('div'), legBox = h('div');
-  // „–“ bei ROS über Ersatz: ohne freien Spieler der Position gibt es kein Ersatzniveau (z. B. alle D/ST vergeben)
+  // „–“ bei „Vorteil Rest Saison“: ohne freien Spieler der Position gibt es kein Ersatzniveau (z. B. alle D/ST vergeben)
   const ueWhy = p => hasRos && !U.ok(ersatz[p.pos]) ? 'kein freier Spieler der Position' : rosWhy;
   const rows = () => all.filter(p => (!st.pos || p.pos === st.pos)
     && (st.status === 'alle' || (st.status === 'kader' ? p.team > 0 : !(p.team > 0)))
@@ -105,18 +105,18 @@ function list(box, W, all, r, rosWhy, ersatz, hasRos) {
   const base = [
     {k: 'name', l: 'Spieler', v: p => p.name.toLowerCase(), d: 1, flt: false, f: p => h('a', {href: '#spieler/' + p.id, class: 'pl'},
       h('span', null, p.name, U.inj(p.inj)), h('span', {class: 'sub'}, `${p.pos ?? '–'} · ${nflTxt(p)}` + (p.team > 0 ? ' · ' + U.kz(p.team) : '')))},
-    num('avg', 'Ø', U.num, 'ohne Spiel'),
+    num('avg', 'Ø Punkte', U.num, 'ohne Spiel'),
     {k: 'form', l: 'Form', num: 1, v: p => p.form, f: p => [U.val(p.form, U.num, 'ohne Spiel'), ' ', trendTxt(p.trend)]},
-    num('ros_g', 'ROS/Sp.', U.num, rosWhy)];
+    num('ros_g', 'Rest je Spiel', U.num, rosWhy)];
   const extra = {
     saison: [num('pts', 'Pkt'), num('g', 'Spiele', v => v), num('floor', 'Floor', U.num, 'ohne Spiel'), num('ceil', 'Ceiling', U.num, 'ohne Spiel'),
-      {...num('sd', 'Konstanz', U.num, 'unter 2 Spielen'), d: 1}, num('starts', 'Starts', v => v), num('bench_pts', 'Bank-Pkt'),
-      num('proj_d', 'Proj.-Δ', U.sgn, 'ohne Spiel'), {k: 'spark', l: 'Formkurve', f: p => h('span', {class: 'sp', 'aria-hidden': 'true'}, p.spark || '')}],
-    ros: [num('ros', 'ROS', U.num, rosWhy), num('rest_g', 'Restspiele', v => v, rosWhy), num('ros_po', 'ROS PO', U.num, rosWhy),
-      {...num('ros_rang', 'ROS-Rang', v => v + '.', rosWhy), d: 1}, {k: 'ros_ue', l: 'ROS ü. Ersatz', num: 1, v: p => p.ros_ue, f: p => U.val(p.ros_ue, U.sgn, ueWhy(p))},
+      {...num('sd', 'Schwankung', U.num, 'unter 2 Spielen'), d: 1}, num('starts', 'Starts', v => v), num('bench_pts', 'Bankpunkte'),
+      num('proj_d', 'Ist − Projektion', U.sgn, 'ohne Spiel'), {k: 'spark', l: 'Formkurve', f: p => h('span', {class: 'sp', 'aria-hidden': 'true'}, p.spark || '')}],
+    ros: [num('ros', 'Rest Saison', U.num, rosWhy), num('rest_g', 'Restspiele', v => v, rosWhy), num('ros_po', 'Rest Playoffs', U.num, rosWhy),
+      {...num('ros_rang', 'Rang Rest je Spiel', v => v + '.', rosWhy), d: 1}, {k: 'ros_ue', l: 'Vorteil Rest Saison', num: 1, v: p => p.ros_ue, f: p => U.val(p.ros_ue, U.sgn, ueWhy(p))},
       {k: 'bye', l: 'Bye', num: 1, cat: 1, v: p => p.bye, d: 1, f: p => U.val(p.bye, v => 'W' + v, 'kein NFL-Team')}],
     besitz: [num('own', 'Besitz %', v => U.pct(v)),
-      ...(W ? [num('own_d', 'Δ Tag', v => U.sgn(v, 2), 'keine Tagesdaten'), num('started', 'gestartet %', v => U.pct(v), 'keine Tagesdaten')] : []),
+      ...(W ? [num('own_d', 'seit gestern', v => U.sgn(v, 2), 'keine Tagesdaten'), num('started', 'aufgestellt %', v => U.pct(v), 'keine Tagesdaten')] : []),
       {k: 'inj', l: 'Verletzung', v: p => U.INJ[p.inj] ? p.inj : null, d: 1, f: p => U.INJ[p.inj]?.[1] || (p.inj === 'ACTIVE' ? 'aktiv' : '–')},
       {k: 'team', l: 'Team', v: p => U.kz(p.team), d: 1, f: p => p.team > 0 ? U.tl(p.team) : (U.STAT[p.status] || 'frei')}]};
   const sortKey = {saison: 'pts', ros: 'ros_g', besitz: 'own'};
@@ -162,7 +162,7 @@ function list(box, W, all, r, rosWhy, ersatz, hasRos) {
         clearTimeout(timer);
         timer = setTimeout(() => { st.raw = e.target.value.trim(); st.text = norm(st.raw); refresh(); }, 150);
       }})),
-    U.seg('Spalten', [['saison', 'Saison'], ['ros', 'ROS'], ['besitz', 'Besitz']], st.sicht, v => { st.sicht = v; refresh(true); })),
+    U.seg('Spalten', [['saison', 'Saison'], ['ros', 'Rest Saison'], ['besitz', 'Besitz']], st.sicht, v => { st.sicht = v; refresh(true); })),
     slotBox, legBox);
   refresh(true);
 }
@@ -218,20 +218,21 @@ function newsBox(p, W) {
   const last = !W ? U.na('keine Tagesdaten') : U.ok(p.news) ? U.stamp(p.news) : U.na('keine Meldung');
   return U.card('News', h('p', null, 'Letzte ESPN-Meldung: ', h('strong', null, last), ' ', U.ib('news', '')),
     h('div', {class: 'row'}, links(p).map(([href, text]) => h('a', {href, target: '_blank', rel: 'noopener', class: 'btn'}, text, h('span', {class: 'vh'}, ' (neues Fenster)')))),
-    h('p', {class: 'note'}, 'Nur Verweise: Die App übernimmt keine Texte. ', W?.stand ? `Tagesstand ${U.stamp(W.stand)}.` : ''));
+    h('p', {class: 'note'}, 'Nur Verweise: Die App übernimmt keine Texte. ', W?.stand ? `${U.standTxt(W.stand)}.` : ''));
 }
 
-// Marktwert (FantasyCalc, Tagesstand waiver.json): Wert, Rang, Trend und Abstand zur Keeper-Linie mit Quelle nahe bei den Zahlen
+// Marktwert (FantasyCalc, Tagesstand waiver.json): Marktwert, Marktwert-Rang, Trend und Abstand zur Keeper-Linie mit Quelle
+// nahe bei den Zahlen
 function marktwert(p, W, kp) {
   if (!kp || !W?.wert_stand) return null;
   const why = p.pos === 'K' || p.pos === 'D/ST' ? 'K und D/ST ohne Marktwert' : 'nicht bei FantasyCalc';
   if (!U.ok(p.wert)) return [h('h2', null, 'Marktwert'), h('p', {class: 'note'}, `Kein Marktwert: ${why}. `, kp.fcQuelle(), '.')];
   return [h('h2', null, 'Marktwert'), h('div', {class: 'tiles'},
-    U.tile('Wert', kp.wertTxt(p.wert), 'Dynasty, Superflex', 'marktwert'),
-    U.tile('Rang', `${p.wert_rang}.`, `${p.pos} ${p.wert_posrang}.`, 'marktwert'),
+    U.tile('Marktwert', kp.wertTxt(p.wert), 'Dynasty, Superflex', 'marktwert'),
+    U.tile('Marktwert-Rang', `${p.wert_rang}.`, `${p.pos} ${p.wert_posrang}.`, 'marktwert'),
     U.tile('Trend 30 Tage', kp.wertSgn(p.wert_trend), null, 'wert-trend'),
     U.tile('über Keeper-Linie', U.val(p.wert_ue, kp.wertSgn, 'keine Keeper-Linie'), U.ok(W.keeper_linie) ? `Linie ${kp.wertTxt(W.keeper_linie)}` : null, 'wert-ue')),
-  h('p', {class: 'note'}, kp.fcQuelle(), ` · Stand ${U.stamp(W.wert_stand)} · Tauschpreis, keine Punktprognose. Vergleich mit anderen Spielern: `, kp.fcRechner(), '.')];
+  h('p', {class: 'note'}, kp.fcQuelle(), ` · ${U.standTxt(W.wert_stand)} · Tauschpreis, keine Punktprognose. Vergleich mit anderen Spielern: `, kp.fcRechner(), '.')];
 }
 
 function one(box, h1, P, W, rows, r, svg, rosWhy, wline, origin, kp) {
@@ -256,20 +257,20 @@ function one(box, h1, P, W, rows, r, svg, rosWhy, wline, origin, kp) {
     h('a', {href: '#keeper/herkunft?team=' + p.team}, 'Keeper › Herkunft'), ' ', U.ib('herkunft', '')) : null,
   h('div', {class: 'tiles'},
     U.tile('Pkt Saison', U.num(p.pts), spiele(p.g), 'spiele'),
-    U.tile('Ø', U.val(p.avg, U.num, 'ohne Spiel'), null, 'avg'),
+    U.tile('Ø Punkte', U.val(p.avg, U.num, 'ohne Spiel'), null, 'avg'),
     U.tile('Floor / Ceiling', `${U.num(p.floor)} / ${U.num(p.ceil)}`, null, 'floor-ceil'),
-    U.tile('Konstanz', U.val(p.sd, U.num, 'unter 2 Spielen'), null, 'konstanz'),
-    U.tile('Form', [U.val(p.form, U.num, 'ohne Spiel'), ' ', trendTxt(p.trend)], `Form Δ ${U.sgn(p.form_d)}`, 'form-sp'),
-    U.tile('Starts', U.val(p.starts, v => v), `Bank-Punkte ${U.num(p.bench_pts)}`, 'starts'),
-    U.tile('Proj.-Δ', U.val(p.proj_d, U.sgn, 'ohne Spiel'), null, 'proj-delta-sp'),
-    U.tile('Besitz', U.val(p.own, v => U.pct(v)), [U.STAT[p.status] || p.status, W && U.ok(p.own_d) ? ` · Δ ${U.sgn(p.own_d, 2)}` : ''], W ? 'besitz-trend' : 'besitz'),
-    W ? U.tile(`Proj. W${W.woche}`, U.val(p.proj_n, U.num, 'noch keine ESPN-Projektion'),
+    U.tile('Schwan­kung', U.val(p.sd, U.num, 'unter 2 Spielen'), null, 'konstanz'),     // weiches Trennzeichen: schmale Kachel
+    U.tile('Form', [U.val(p.form, U.num, 'ohne Spiel'), ' ', trendTxt(p.trend)], `Form zu Saison ${U.sgn(p.form_d)}`, 'form-sp'),
+    U.tile('Starts', U.val(p.starts, v => v), `Bankpunkte ${U.num(p.bench_pts)}`, 'starts'),
+    U.tile('Ist − Projektion', U.val(p.proj_d, U.sgn, 'ohne Spiel'), null, 'proj-delta-sp'),
+    U.tile('Besitz', U.val(p.own, v => U.pct(v)), [U.STAT[p.status] || p.status, W && U.ok(p.own_d) ? ` · seit gestern ${U.sgn(p.own_d, 2)}` : ''], W ? 'besitz-trend' : 'besitz'),
+    W ? U.tile(`Projektion W${W.woche}`, U.val(p.proj_n, U.num, 'noch keine ESPN-Projektion'),
       p.status === 'WAIVERS' && U.ok(p.waiver_bis) ? `Frist ${U.stamp(p.waiver_bis)}` : null, 'proj-naechste') : null),
   newsBox(p, W), marktwert(p, W, kp));
   if (p.nur_tag) {
     U.ap(box, h('p', {class: 'warn'}, p.team > 0
-      ? 'Noch keine Wochendaten: Der Spieler steht laut Tagesstand im Kader, Saison- und ROS-Werte kommen mit dem nächsten Wochenabruf.'
-      : 'Keine Wochendaten: Saison- und ROS-Werte führt die App für Kaderspieler, Spieler mit Einsatz und die besten Free Agents; dieser Spieler steht wegen seines Marktwerts hier.'));
+      ? 'Noch keine Wochendaten: Der Spieler steht laut Tageslauf im Kader, Saisonwerte und Projektionen für den Rest der Saison kommen mit dem nächsten Wochenabruf.'
+      : 'Keine Wochendaten: Saisonwerte und Projektionen für den Rest der Saison führt die App für Kaderspieler, Spieler mit Einsatz und die besten Free Agents; dieser Spieler steht wegen seines Marktwerts hier.'));
     return;
   }
   const Wk = P.weeks || [], wk = p.wk || [];
@@ -277,43 +278,43 @@ function one(box, h1, P, W, rows, r, svg, rosWhy, wline, origin, kp) {
   if (!(p.g > 0)) U.ap(box, h('p', {class: 'note'}, 'Noch kein Spiel 2026 – die Formkurve erscheint mit dem ersten Einsatz.'));
   // kleine Werte: Achse mit einer Nachkommastelle, sonst stehen dort „0 0 1 1 1“
   else U.ap(box, svg.fig('Formkurve', svg.bars({title: `Formkurve ${p.name}`,
-    desc: `Punkte je Woche; ${spiele(p.g)}, Ø ${U.num(p.avg)}; „·“ = Bye, „–“ = nicht gespielt, Strich = Projektion.`,
+    desc: `Punkte je Woche; ${spiele(p.g)}, Ø Punkte ${U.num(p.avg)}; „·“ = Bye, „–“ = nicht gespielt, Strich = Projektion.`,
     x: Wk.map(w => 'W' + w), vals, miss: i => wk[i]?.[2] ? '·' : '–', tick: wk.map(x => x[1]),
     cls: i => wk[i]?.[4] == null || U.bench(wk[i][4]) ? 'bN' : 'bA', label: i => U.ok(wk[i]?.[0]) ? U.num(wk[i][0], 1) : null, yfmt: v => U.num(v, Number.isInteger(v) ? 0 : 1)}),
-  {heads: ['Woche', 'Pkt', 'Proj.', 'Team', 'Slot'], rows: Wk.map((w, i) => ['W' + w, wk[i]?.[2] ? 'Bye' : U.num(wk[i]?.[0]), U.num(wk[i]?.[1]),
+  {heads: ['Woche', 'Pkt', 'Projektion', 'Team', 'Slot'], rows: Wk.map((w, i) => ['W' + w, wk[i]?.[2] ? 'Bye' : U.num(wk[i]?.[0]), U.num(wk[i]?.[1]),
     wk[i]?.[3] ? U.kz(wk[i][3]) : 'frei', U.slot(wk[i]?.[4])])},
   h('p', {class: 'note'}, 'Blau = Starter, grau = Bank oder ohne Team, orange Strich = ESPN-Projektion. ', U.ib('formkurve', ''))));
-  U.ap(box, h('h2', null, 'Rest of Season'), P.ros_nach_woche == null ? h('p', {class: 'warn'}, `ROS-Werte ${rosWhy}.`) : null,
+  U.ap(box, h('h2', null, 'Rest der Saison'), P.ros_nach_woche == null ? h('p', {class: 'warn'}, `Werte für den Rest der Saison ${rosWhy}.`) : null,
     h('div', {class: 'tiles'},
-      U.tile('ROS/Spiel', U.val(p.ros_g, U.num, rosWhy), null, 'ros-spiel'),
-      U.tile('ROS', U.val(p.ros, U.num, rosWhy), U.ok(p.rest_g) ? `${p.rest_g} Restspiele` : null, 'ros'),
-      U.tile('ROS Playoffs', U.val(p.ros_po, U.num, rosWhy), null, 'ros-po'),
-      U.tile('ROS-Rang', U.val(p.ros_rang, v => `${p.pos} ${v}`, rosWhy), null, 'ros-rang'),
+      U.tile('Rest je Spiel', U.val(p.ros_g, U.num, rosWhy), null, 'ros-spiel'),
+      U.tile('Rest Saison', U.val(p.ros, U.num, rosWhy), U.ok(p.rest_g) ? `${p.rest_g} Restspiele` : null, 'ros'),
+      U.tile('Rest Playoffs', U.val(p.ros_po, U.num, rosWhy), null, 'ros-po'),
+      U.tile('Rang Rest je Spiel', U.val(p.ros_rang, v => `${p.pos} ${v}`, rosWhy), null, 'ros-rang'),
       U.tile('Ersatzniveau', U.val(ers, U.num, P.ros_nach_woche != null && !seasonEnd(P) ? 'kein freier Spieler der Position' : rosWhy), p.pos, 'ersatz'),
-      U.tile('ROS über Ersatz', U.val(p.ros_ue, U.sgn, P.ros_nach_woche != null && !seasonEnd(P) && !U.ok(ers) ? 'kein freier Spieler der Position' : rosWhy), null, 'ros-ue')),
+      U.tile('Vorteil Rest Saison', U.val(p.ros_ue, U.sgn, P.ros_nach_woche != null && !seasonEnd(P) && !U.ok(ers) ? 'kein freier Spieler der Position' : rosWhy), null, 'ros-ue')),
     h('p', {class: 'note'}, 'Alle Projektionen sind ESPN-Schätzungen. ', U.ib('projektionen', '')));
   matchup(box, p, P, wline?.(p));
 }
 
-// Positions-Matchup der nächsten Wochen (players.json mu, Wochenstand; D/ST: F der gegnerischen Offense aus den
-// D/ST-Faktoren) und die Wetterzeile des nächsten Spiels (wetter.json, Prognose der laufenden Woche)
+// Matchup je Position der nächsten Wochen (players.json mu, Wochenstand; D/ST: Faktor der gegnerischen Offense aus
+// Matchups › D/ST) und die Wetterzeile des nächsten Spiels (wetter.json, Prognose der laufenden Woche)
 function matchup(box, p, P, wl) {
   const dst = p.pos === 'D/ST', m = p.mu, n1 = m?.n1;
   const why = !('mu_woche' in P) ? 'ab dem nächsten Wochenabruf' : !p.nfl ? 'kein NFL-Team' : 'kein Matchup-Wert für diese Position';
   const n1Why = !n1 ? 'keine offene Woche' : 'Bye';
   const cell = (v, reason) => U.val(v, x => h('span', {class: 'fz ' + U.fcls(x)}, U.num(x, 2)), reason);
-  U.ap(box, h('h2', null, dst ? 'Matchup D/ST' : 'Positions-Matchup'),
+  U.ap(box, h('h2', null, dst ? 'Matchup D/ST' : p.pos ? `Matchup ${p.pos}` : 'Matchup'),
     !m ? h('p', {class: 'note'}, `Kein Matchup-Wert: ${why}.`) : h('div', {class: 'tiles'},
-      // 32 NFL-Teams: Rang 1 = höchstes F, also das günstigste Matchup
+      // 32 NFL-Teams: Rang 1 = höchster Faktor (F), also das günstigste Matchup
       U.tile(n1 ? `Gegner W${n1.week}` : 'Gegner', n1 ? n1.opp || 'Bye' : U.na(n1Why), n1?.opp ? (dst ? 'Offense' : 'Defense') : null, 'mu-n1'),
-      U.tile('Faktor F', n1?.opp ? cell(n1.f, 'kein Faktor') : U.na(n1Why), null, dst ? 'f' : 'mu-f'),
+      U.tile('Faktor', n1?.opp ? cell(n1.f, 'kein Faktor') : U.na(n1Why), null, dst ? 'f' : 'mu-f'),
       U.tile('Rang', n1?.opp ? U.val(n1.rang, v => `${v}. von 32`, 'kein Faktor') : U.na(n1Why), '1 = günstigstes Matchup', dst ? 'f' : 'mu-rang'),
-      U.tile('Ø nächste 3', cell(m.naechste3, 'kein Spiel in den nächsten 3 Wochen'), null, dst ? 'naechste3' : 'mu-naechste3'),
-      U.tile('Rest bis W14', cell(m.rest, 'keine Regular-Season-Woche mehr'), null, dst ? 'rest' : 'mu-rest'),
-      U.tile('SoS W15–17', cell(m.sos_po, 'kein Playoff-Spiel'), null, dst ? 'sos' : 'mu-sos')),
+      U.tile('Faktor nächste 3', cell(m.naechste3, 'kein Spiel in den nächsten 3 Wochen'), null, dst ? 'naechste3' : 'mu-naechste3'),
+      U.tile('Rest Regular Season', cell(m.rest, 'keine Regular-Season-Woche mehr'), null, dst ? 'rest' : 'mu-rest'),
+      U.tile('Playoffs W15–17', cell(m.sos_po, 'kein Playoff-Spiel'), null, dst ? 'sos' : 'mu-sos')),
     !m ? null : h('p', {class: 'note'}, ...(dst
-      ? ['F der gegnerischen Offense aus den D/ST-Faktoren, über 1,00 = günstig für die D/ST. ', h('a', {href: '#woche/matchups/dst'}, 'Matchups D/ST')]
-      : ['Position gegen Defense, kein Einzelduell: F über 1,00 heißt, Spieler der Position holen gegen diese Defense mehr Punkte als im Schnitt. ',
+      ? ['Faktor der gegnerischen Offense, über 1,00 = günstig für die D/ST. ', h('a', {href: '#woche/matchups/dst'}, 'Matchups D/ST')]
+      : ['Position gegen Defense, kein Einzelduell: Ein Faktor über 1,00 heißt, Spieler der Position holen gegen diese Defense mehr Punkte als im Schnitt. ',
         h('a', {href: '#woche/matchups/' + String(p.pos).toLowerCase()}, `Alle Defenses gegen ${p.pos}`)])),
     wl ? h('p', null, wl, ' · ', h('a', {href: '#woche/wetter'}, 'Wetter aller Spiele')) : null);
 }
