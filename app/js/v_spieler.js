@@ -302,7 +302,7 @@ function one(box, h1, P, W, rows, r, svg, rosWhy, wline, origin, kp) {
     U.tile('Besitz', U.val(p.own, v => U.pct(v)), [U.STAT[p.status] || p.status, W && U.ok(p.own_d) ? ` · seit gestern ${U.sgn(p.own_d, 2)}` : ''], W ? 'besitz-trend' : 'besitz'),
     p.status === 'WAIVERS' ? U.tile('Frist', U.val(p.waiver_bis, U.stamp, 'keine Frist gemeldet'), 'auf Waivers', 'frist') : null,
     // wie unter Markt › Freie Spieler: nur freie Spieler, nur vor dem Anstoß ihres Spiels der Woche (Anstoß laut waiver.json)
-    W && U.ok(p.proj_ue) && !(U.ok(W.anstoss?.[p.nfl]) && W.anstoss[p.nfl] <= Date.now())
+    W && !(p.team > 0) && U.ok(p.proj_ue) && !(U.ok(W.anstoss?.[p.nfl]) && W.anstoss[p.nfl] <= Date.now())
       ? U.tile(`Vorteil W${W.woche}`, U.sgn(p.proj_ue), 'zu den besten freien Spielern', 'proj-ue') : null,
     p.nur_tag ? null : U.tile('Vorteil Rest Saison', U.val(p.ros_ue, U.sgn, P.ros_nach_woche != null && !seasonEnd(P) && !U.ok(ers) ? 'kein freier Spieler der Position' : rosWhy), null, 'ros-ue'),
     p.nur_tag ? null : U.tile('Ersatzniveau', U.val(ers, U.num, P.ros_nach_woche != null && !seasonEnd(P) ? 'kein freier Spieler der Position' : rosWhy), `${p.pos ?? ''} Rest je Spiel`, 'ersatz')];
@@ -325,7 +325,8 @@ function one(box, h1, P, W, rows, r, svg, rosWhy, wline, origin, kp) {
 // Matchups › D/ST), Projektion der Woche (Tageslauf) und die Wetterzeile des Spiels (wetter.json, Prognose der laufenden Woche)
 function woche(box, p, P, W, wl) {
   const dst = p.pos === 'D/ST', m = p.mu, n1 = m?.n1;
-  const why = !('mu_woche' in P) ? 'ab dem nächsten Wochenabruf' : !p.nfl ? 'kein NFL-Team' : 'kein Matchup-Wert für diese Position';
+  const why = !('mu_woche' in P) ? 'ab dem nächsten Wochenabruf' : p.nur_tag ? 'der Spieler steht nicht in den Wochendaten (siehe Saison)'
+    : !p.nfl ? 'kein NFL-Team' : 'kein Matchup-Wert für diese Position';
   const n1Why = !n1 ? 'keine offene Woche' : 'Bye';
   const cell = (v, reason) => U.val(v, x => h('span', {class: 'fz ' + U.fcls(x)}, U.num(x, 2)), reason);
   const wn = W?.woche ?? n1?.week ?? P.mu_woche;

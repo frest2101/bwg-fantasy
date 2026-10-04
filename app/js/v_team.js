@@ -38,7 +38,7 @@ export async function render(box, ctx, r) {
   const wide = matchMedia('(min-width:900px)').matches;
   const B = Object.fromEntries(ctx.bereiche().map(b => [b.k, b]));
   const sec = (k, ...kids) => h('details', {class: 'sec tsec', open: wide || k === 'liga'},
-    h('summary', null, h('span', null, B[k].l), h('span', {class: 'tsq'}, B[k].frage)), h('div', {class: 'tsb'}, kids));
+    h('summary', null, h('h2', null, B[k].l), h('span', {class: 'tsq'}, B[k].frage)), h('div', {class: 'tsb'}, kids));
   const wege = links => h('p', {class: 'note'}, 'Mehr dazu: ', links.filter(Boolean).map(([href, txt], i) => [i ? ' · ' : '', h('a', {href}, txt)]));
   const warte = () => h('p', {class: 'loading'}, 'Lade …');
 
@@ -99,7 +99,7 @@ export async function render(box, ctx, r) {
     const all = sp.merge(P, W);
     const name = new Map(all.map(p => [p.id, p.name]));
     const kader = all.filter(p => p.team === id);
-    wocheTeil(woche, t, W, name, kader, WX && wx ? {WX, wx} : null);
+    wocheTeil(woche, t, W, name, new Map(all.map(p => [p.id, p.nfl])), kader, WX && wx ? {WX, wx} : null);
     marktTeil(markt, t, W, name, ctx, r);
     keeperTeil(keeper, t, P, kader, W, sp.nflTxt, kp && K, kp);
   }).catch(() => {
@@ -136,7 +136,7 @@ function weekList(t) {
   // Einfach / Ausführlich (Paket P5): Ergebnis, Wochenrang und Matchup-Glück einfach, der Rest ausführlich
   return h('div', {class: 'blk'}, U.table({cap: 'Wochenliste', cls: 'nr', rows, sortable: false, rh: 0, cols: [
     {k: 'w', l: 'W', f: x => h('a', {href: played(x) ? '#staerke/allplay/w' + x.week : '#liga/ergebnisse/w' + x.week, class: 'tl2'}, 'W' + x.week)},
-    {k: 'o', l: 'Gegner', f: x => [x.home ? '' : '@', h('a', {href: '#team/' + x.opp, class: 'tl2', 'aria-label': `${x.home ? 'gegen' : 'bei'} ${U.team(x.opp)?.name}`}, U.kz(x.opp))]},
+    {k: 'o', l: 'Gegner', f: x => x.opp == null ? 'Freilos' : [x.home ? '' : '@', h('a', {href: '#team/' + x.opp, class: 'tl2', 'aria-label': `${x.home ? 'gegen' : 'bei'} ${U.team(x.opp)?.name}`}, U.kz(x.opp))]},
     {k: 'pf', l: 'PF : PA', num: 1, f: x => played(x) ? `${U.num(wk.pf[x.i])} : ${U.num(wk.pa[x.i])}` : (x.st === 'laeuft' ? 'läuft' : 'offen')},
     {k: 'e', l: 'Erg.', f: x => played(x) ? U.res(wk.ergebnis[x.i]) : x.p != null && x.st !== 'laeuft' ? U.po(x.p) : ''},
     {k: 'wr', l: 'Wochenrang', num: 1, f: x => played(x) ? wk.wochenrang[x.i] + '.' : ''},
@@ -180,19 +180,21 @@ function positions(box, t) {
 }
 
 // ---------------------------------------------------------------- Woche: Bedarf der nächsten Woche und Wetter der eigenen Spieler
-function wocheTeil(box, t, W, name, kader, wetter) {
+function wocheTeil(box, t, W, name, nflOf, kader, wetter) {
   const B = W?.bedarf_woche?.[String(t.team_id)];
+  // Kandidaten wie unter Markt › Bedarf je Team: wessen Spiel der Woche schon angepfiffen ist, bringt in dieser Woche nichts mehr
+  const offen = ks => (ks || []).filter(k => { const ko = W?.anstoss?.[nflOf.get(k)]; return !(U.ok(ko) && ko <= Date.now()); });
   const pl = id => h('a', {href: '#spieler/' + id}, name.get(id) ?? `Spieler ${id}`);
   const liste = (items, f) => h('ul', {class: 'tli'}, items.map(x => h('li', null, f(x))));
   const teile = [];
-  if (!W) teile.push(h('p', {class: 'note'}, 'Lücken, Ausfälle und Byes der nächsten Woche erscheinen mit dem ersten Tageslauf.'));
+  if (!W) teile.push(h('p', {class: 'note'}, 'Lücken und Ausfälle der nächsten Woche und Byes der Wochen danach erscheinen mit dem ersten Tageslauf.'));
   else if (!B) teile.push(h('p', {class: 'note'}, 'Kein Bedarf für die nächste Woche (vor der ersten Projektion oder nach der Saison).'));
   else {
     teile.push(h('h3', null, `Nächste Woche (W${W.woche})`, ' ', U.ib('bedarf-woche', '')));
     const lu = B.luecken || [], au = B.ausfaelle || [], by = B.byes || [];
     teile.push(lu.length ? [h('p', null, h('strong', null, 'Lücken')), liste(lu, x => [`${x.slot}: `, x.id ? pl(x.id) : 'leer',
       x.grund ? ` (${GRUND[x.grund] || x.grund})` : U.ok(x.proj) ? ` (Projektion ${U.num(x.proj)})` : '',
-      x.kandidaten?.length ? [' → ', x.kandidaten.map((k, i) => [i ? ', ' : '', pl(k)])] : ' → kein besserer freier Spieler'])]
+      offen(x.kandidaten).length ? [' → ', offen(x.kandidaten).map((k, i) => [i ? ', ' : '', pl(k)])] : ' → kein besserer freier Spieler'])]
       : h('p', null, h('strong', null, 'Lücken: '), 'keine'));
     teile.push(au.length ? [h('p', null, h('strong', null, 'Ausfälle und fraglich')), liste(au, x => [`${x.slot}: `, pl(x.id), ` (${GRUND[x.grund] || x.grund})`])]
       : h('p', null, h('strong', null, 'Ausfälle und fraglich: '), 'keine'));
@@ -200,8 +202,9 @@ function wocheTeil(box, t, W, name, kader, wetter) {
     teile.push(wochen.length ? h('p', null, h('strong', null, 'Byes: '), wochen.map((w, i) => [i ? ' · ' : '', `W${w} `,
       by.filter(x => x.woche === w).map((x, j) => [j ? ', ' : '', pl(x.id)])])) : h('p', null, h('strong', null, 'Byes: '), 'keine in den Wochen danach'));
   }
-  // Wetter: markierte, noch nicht angepfiffene Spiele der Kaderspieler in der laufenden Woche (wetter.json, Prognose)
-  if (wetter) {
+  // Wetter: markierte, noch nicht angepfiffene Spiele der Kaderspieler in der laufenden Woche (wetter.json, Prognose); ohne
+  // Prognosewoche (nach W17, Offseason) entfällt der Teil
+  if (wetter && U.ok(wetter.WX.woche)) {
     const {WX, wx} = wetter, spiele = new Map();
     for (const p of kader) {
       const g = wx.gameOf(WX, p.nfl);
@@ -236,14 +239,14 @@ function marktTeil(box, t, W, name, ctx, r) {
   if (!S.man.files?.['transactions.json']) { moves.append(h('p', {class: 'note'}, 'Noch keine Transaktionen.')); return; }
   ctx.load('transactions.json').then(T => {
     if (!r.alive()) return;
-    const items = (T.items || []).filter(x => x.team_id === t.team_id).sort((a, b) => (b.datum ?? 0) - (a.datum ?? 0)).slice(0, 5);
+    const alle = (T.items || []).filter(x => x.team_id === t.team_id).sort((a, b) => (b.datum ?? 0) - (a.datum ?? 0)), items = alle.slice(0, 5);
     const leute = (x, art) => (x.items || []).filter(i => i.type === art)
       .map((i, k) => [k ? ', ' : '', i.in_app === false ? (i.name || T.spieler?.[String(i.player_id)] || '–') : h('a', {href: '#spieler/' + i.player_id}, i.name || T.spieler?.[String(i.player_id)] || `Spieler ${i.player_id}`)]);
     moves.replaceChildren(items.length ? h('ul', {class: 'tli'}, items.map(x => h('li', null, U.ok(x.datum) ? `${U.datum(x.datum)} ` : '',
       x.type === 'TRADE_ACCEPT' && !(x.items || []).length ? 'Trade (ohne Spieler laut ESPN)'
         : [leute(x, 'ADD').length ? ['+ ', leute(x, 'ADD')] : '', leute(x, 'ADD').length && leute(x, 'DROP').length ? ' · ' : '',
           leute(x, 'DROP').length ? ['− ', leute(x, 'DROP')] : '']))) : h('p', {class: 'note'}, 'Noch keine Moves in dieser Saison.'),
-    items.length ? h('p', {class: 'note'}, 'Die letzten fünf, neueste zuerst.') : null);
+    items.length ? h('p', {class: 'note'}, alle.length > 5 ? `Die letzten fünf von ${alle.length}, neueste zuerst.` : 'Neueste zuerst.') : null);
   }).catch(() => moves.replaceChildren(h('p', {class: 'note'}, 'Transaktionen konnten nicht geladen werden.')));
 }
 
@@ -329,7 +332,7 @@ function roster(box, t, P, rows0, W, nflTxt, K, kp) {
     {k: 'f', l: 'Form', num: 1, x: !!org, v: p => p.form, f: p => [U.val(p.form, U.num, 'ohne Spiel'), p.trend ? ' ' + p.trend : '']}].filter(Boolean)}),
   U.legend([...(org ? ['herkunft', 'alter', 'marktwert'] : []), 'ros-spiel', 'avg', 'form-sp']),
   h('p', {class: 'note'}, W?.stand ? `Kader und Verletzung: ${U.standTxt(W.stand)}. ` : `Verletzung: Stand nach W${S.man.datenstand?.pool_woche ?? S.tw}. `,
-    'Q fraglich · D zweifelhaft · O fällt aus · IR Injured Reserve · DTD Day-to-Day.'));
+    org && K.alter_stichtag ? `Alter am ${U.datum(K.alter_stichtag)} ` : null, 'Q fraglich · D zweifelhaft · O fällt aus · IR Injured Reserve · DTD Day-to-Day.'));
 }
 
 // Draft-Picks des Teams mit Ertrag (keeper.json picks): wie Keeper › Draft, nur dieses Team

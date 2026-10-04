@@ -181,6 +181,7 @@ button.i::before{font:italic 700 .75rem/1 Georgia,serif}
    900 px nebeneinander */
 details.tsec{background:var(--sf);border:1px solid var(--bd);border-radius:12px;padding:0 12px}
 details.tsec>summary{gap:0 .6rem;flex-wrap:wrap}
+details.tsec>summary>h2{margin:0;font-size:inherit}
 .tsq{color:var(--mu);font-size:.9rem;font-weight:600}
 .tsb{padding:0 0 12px;min-width:0}
 .tsb h3{margin:.8rem 0 .3rem}
