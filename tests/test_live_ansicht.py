@@ -41,9 +41,9 @@ HTML_WEGE = ("innerHTML", "outerHTML", "insertAdjacentHTML", "setHTMLUnsafe", "s
              "DOMParser", "parseFromString", "createContextualFragment", "eval(", "Function(")
 # Schreibende oder dauerhafte Verbindungen (ganze Wörter, Groß-/Kleinschreibung zählt: „post“ ist ein Spielstatus)
 SCHREIBWEGE = ("POST", "PUT", "DELETE", "PATCH", "XMLHttpRequest", "sendBeacon", "WebSocket", "EventSource")
-# Ablage im Browser: Die Rohantwort (samt Manager-Daten) wird verworfen; gelesen wird nur „Mein Team“ (U.store.get)
+# Ablage im Browser: Die Rohantwort (samt Manager-Daten) wird verworfen; gelesen wird nur „Mein Team“ (U.meinTeam())
 SPEICHER = (r"\blocalStorage\b", r"\bsessionStorage\b", r"\bindexedDB\b", r"\bcaches\s*\.", r"\.cookie\b",
-            r"\bstore\s*\.\s*set\b", r"\bBroadcastChannel\b", r"\bserviceWorker\b")
+            r"\bstore\s*\.\s*set\b", r"\bsetMeinTeam\b", r"\bBroadcastChannel\b", r"\bserviceWorker\b")
 # Umwege zu fetch oder zum Speicher über das globale Objekt bzw. nachgeladenen Code
 UMWEGE = (r"\bglobalThis\b", r"\bwindow\b", r"\bself\b", r"\bimport\s*\(", r"\bnavigator\b")
 # Dauerabruf: Zeitgeber dürfen nur abbrechen, Ereignisse nur aus Knöpfen und Auswahl kommen
@@ -179,11 +179,14 @@ def test_kein_dauerabruf():
 
 def test_nichts_im_browser_speicher():
     """Die Live-Module legen nichts ab: kein localStorage, sessionStorage, IndexedDB, Cache, Cookie und kein
-    U.store.set – die Rohantwort von ESPN enthält Manager-Daten und wird nach dem Rechnen verworfen."""
+    U.store.set und kein U.setMeinTeam – die Rohantwort von ESPN enthält Manager-Daten und wird nach dem Rechnen verworfen;
+    Mein Team wird nur über U.meinTeam() gelesen."""
     for name, text in live().items():
         for muster in SPEICHER:
             assert not re.search(muster, text), f"{name}: {muster}"
-    assert set(re.findall(r"\bstore\s*\.\s*(\w+)", code(VIEW))) <= {"get"}, "aus dem Browser-Speicher wird nur gelesen (Mein Team)"
+    view = code(VIEW)
+    assert "U.meinTeam()" in view, "Mein Team wird über U.meinTeam() gelesen"
+    assert set(re.findall(r"\bstore\s*\.\s*(\w+)", view)) <= {"get"}, "aus dem Browser-Speicher wird nur gelesen (Mein Team)"
 
 
 def test_keine_manager_und_keine_redaktionstexte():

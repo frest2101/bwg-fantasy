@@ -240,7 +240,7 @@ function one(box, h1, P, W, rows, r, svg, rosWhy, wline, origin, kp) {
   const p = rows.find(x => String(x.id) === pid);
   // Rückweg: kam man per Link aus der App, führt „← zurück“ per Verlauf dorthin (mit Filtern und Scrollposition)
   const prev = S.prevHash?.slice(1).split(/[/?]/)[0];
-  const back = !r.back && BACK[prev] && S.prevHash !== location.hash;
+  const back = S.perLink && BACK[prev] && S.prevHash !== location.hash;
   U.ap(box, h('p', null, back
     ? h('a', {href: S.prevHash, onclick: e => { e.preventDefault(); history.back(); }}, '← ' + (prev === 'team' ? 'zurück zum Team' : 'zurück: ' + BACK[prev]))
     : h('a', {href: '#spieler'}, '← Spielerliste')));

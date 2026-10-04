@@ -154,7 +154,7 @@ Keeper-Bilanz (`scripts/keeper.py`): woher die Punkte eines Teams kommen. Herkun
 
 ## Startseite (`#start`, App-Konzept Paket P2, liest nur vorhandene Felder)
 Die Startseite (`app/js/v_start.js`) rechnet nichts; sie wählt fertige Werte aus und zählt höchstens. Ändert sich eines dieser Felder, die Startseite mitprüfen:
-- **`manifest.json`:** `season`, `datenstand.playoff_woche`, `datenstand.pool_stand`.
+- **`manifest.json`:** `season`, `through_week` (über `S.tw`, ohne Wert `teams.json › meta.weeks`; „Wn gewertet“ außerhalb der Playoffs), `datenstand.playoff_woche`, `datenstand.pool_stand`.
 - **`teams.json`:** je Team `rang`, `rang_division`, `division`, `w`/`l`/`t`, `name`, `kuerzel`, `sim.liga.playoff`, `sim.liga.pick`, `sim.liga.pick1`, `pr.rang`, `pr.mu`, `pr.trend`; `meta.divisions`.
 - **`schedule.json`:** `weeks[].week`, `start`, `playoff`; `games[]` der laufenden Woche (Kalender) mit `home`, `away`, `winner`, `home_pf`, `away_pf`, `p_home`.
 - **`waiver.json`** (darf fehlen): `stand`, `woche`, `anstoss` (offene NFL-Spiele der laufenden Woche = Teams mit Anstoß nach jetzt / 2, nur wenn `woche` die Kalenderwoche ist), `reihenfolge`, `bedarf_woche.<team_id>.luecken[].slot`, `ausfaelle[].pos`/`grund`, `byes[].woche`/`pos`.

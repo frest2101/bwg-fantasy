@@ -102,10 +102,13 @@ export const store = {
 // ---------------------------------------------------------------- Mein Team (App-Konzept 04.10.2026, Abschnitt 6)
 // Einmal im Kopf gewählt, gilt überall: Browser-Speicher 'bwg-team' (nur die Team-Nummer, kein Login), 0 = keins.
 // setMeinTeam meldet den Wechsel als Ereignis 'bwg-team' am document (der Kopf zeigt dann das neue Kürzel).
+// Ohne Browser-Speicher (Privatmodus, Website-Daten gesperrt) gilt die Wahl bis zum Neuladen, wie bei Hell/Dunkel.
 const TEAM_KEY = 'bwg-team';
-export const meinTeam = () => { const v = +store.get(TEAM_KEY) || 0; return S.byId?.has(v) ? v : 0; };
+let teamMem = 0;
+export const meinTeam = () => { const v = +(store.get(TEAM_KEY) ?? teamMem) || 0; return S.byId?.has(v) ? v : 0; };
 export function setMeinTeam(tid) {
-  store.set(TEAM_KEY, S.byId?.has(+tid) ? +tid : 0);
+  teamMem = S.byId?.has(+tid) ? +tid : 0;
+  store.set(TEAM_KEY, teamMem);
   D.dispatchEvent(new CustomEvent('bwg-team'));
 }
 // Zeilenklasse für Tabellen mit einer Zeile je Team (team_id, sonst tid): die eigene Zeile hervorgehoben

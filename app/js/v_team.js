@@ -18,14 +18,15 @@ export async function render(box, ctx, r) {
   const svg = await ctx.mod('svg');
   const div = S.meta.divisions?.[t.division] ?? 'Division ' + t.division;
   const sim = t.sim?.liga;
-  // Mein Team (Kopf): Abzeichen am eigenen Team (unter der Überschrift, die den Seitentitel gibt), auf den übrigen Team-Seiten
-  // ein Knopf zum Wählen
+  // Mein Team (Kopf): auf den übrigen Team-Seiten ein Knopf zum Wählen, auf der eigenen derselbe Knopf gesperrt („Mein Team ✓“)
   const mein = t.team_id === U.meinTeam();
   U.ap(box, h('h1', null, t.name),
-    h('p', {class: 'note'}, `${t.kuerzel} · Rang ${t.rang} gesamt · ${t.rang_division}. in ${div} · ${U.rec(t)} · Streak ${t.streak ?? '–'}`,
-      mein ? h('span', {class: 'badge mtb'}, 'Mein Team') : null),
-    mein ? null : h('p', null, h('button', {type: 'button', class: 'btn', onclick: () => { U.setMeinTeam(t.team_id); ctx.say(`Mein Team: ${t.name}.`); ctx.route(); }},
-      'Als Mein Team wählen')),
+    h('p', {class: 'note'}, `${t.kuerzel} · Rang ${t.rang} gesamt · ${t.rang_division}. in ${div} · ${U.rec(t)} · Streak ${t.streak ?? '–'}`),
+    // auf der eigenen Seite ein gesperrter Knopf an derselben Stelle: Ein Doppelklick auf „Als Mein Team wählen“ trifft so nach
+    // dem Neuzeichnen nicht den Link der nächsten Zeile
+    h('p', null, mein ? h('button', {type: 'button', class: 'btn mtb', disabled: true}, 'Mein Team ✓')
+      : h('button', {type: 'button', class: 'btn', onclick: () => { U.setMeinTeam(t.team_id); ctx.route().then(() => ctx.say(`Mein Team: ${t.name}.`)); }},
+        'Als Mein Team wählen')),
     t.pr ? h('p', null, h('a', {href: '#staerke'}, 'Power Ranking'), ` ${t.pr.rang}. `, U.ok(t.pr.trend) ? U.trend(t.pr.trend) : null,
       ` · Stärke ${U.num(t.pr.mu, 1)}`, t.pr.p_quelle === 'vorjahr' ? h('span', {class: 'badge'}, 'Projektion Kader aus dem Vorjahr') : null) : null,
     t.pr?.kernsatz ? h('blockquote', {class: 'card'}, t.pr.kernsatz) : null,

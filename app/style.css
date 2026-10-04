@@ -152,7 +152,8 @@ button.i::before{font:italic 700 .75rem/1 Georgia,serif}
 /* lange Teamnamen ohne Leerzeichen („SaureGurken“) brechen bei 320 px innerhalb des Knopfs um, statt über den Rand zu ragen */
 .mtg .btn span{min-width:0;overflow-wrap:anywhere}
 .mtg .btn[aria-pressed=true]{background:var(--ac);border-color:var(--ac);color:var(--on)}
-.badge.mtb{border-color:var(--ac);color:var(--ac)}
+/* Team-Seite des eigenen Teams: gesperrter Knopf „Mein Team ✓“ als Kennzeichen, nicht blass wie ein ausgegrauter Knopf */
+.btn.mtb:disabled{opacity:1;border-style:solid;border-color:var(--ac);color:var(--ac)}
 /* Startseite (#start, Paket P2): Mein-Team-Karte mit Akzentrand, darunter die fünf Bereiche als Karten; die ganze Karte ist
    über den Link der Überschrift klickbar (Fläche per ::after, der Linktext bleibt kurz für Screenreader) */
 .mtz{border-left:4px solid var(--ac)}

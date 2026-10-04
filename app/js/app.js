@@ -59,13 +59,15 @@ function refresh() {
 }
 // Lazy-Datei mit sichtbarem Ladehinweis (aria-live); bei Fehler Hinweis mit „Erneut versuchen“
 async function lazy(name, label, box) {
+  // schon geladen oder unterwegs: nichts ansagen (sonst überschriebe „… geladen“ etwa die Ansage einer Wahl von Mein Team)
+  const neu = !cache[name];
   const p = h('p', {class: 'loading'}, `Lade ${label} …`);
   box.append(p);
-  say(`Lade ${label} …`);
+  if (neu) say(`Lade ${label} …`);
   try {
     const d = await load(name);
     p.remove();
-    say(`${label} geladen.`);
+    if (neu) say(`${label} geladen.`);
     return d;
   } catch (e) {
     p.replaceWith(U.errBox(e, () => route()));
@@ -137,6 +139,8 @@ function header() {
   $('mt').onclick = () => meinTeamPop($('mt'));
   // Wechsel aus einer Ansicht (Auswahl unter Markt): nur der Kopf zieht nach, die Ansicht zeichnet sich selbst
   document.addEventListener('bwg-team', mtChip);
+  // Wahl in einem anderen Tab (null = Speicher geleert): Kopf nachziehen, die offene Ansicht neu zeichnen
+  addEventListener('storage', e => { if (e.key === 'bwg-team' || e.key === null) { mtChip(); route(); } });
   theme();
 }
 
@@ -158,8 +162,9 @@ function mtChip() {
   const b = $('mt'), t = U.team(U.meinTeam());
   b.className = t ? 'stand mt' : 'ico mt';
   b.replaceChildren(t ? t.kuerzel : TRIKOT());
-  b.setAttribute('aria-label', t ? `Mein Team: ${t.name}` : 'Mein Team wählen');
-  b.title = t ? `Mein Team: ${t.name}` : 'Mein Team wählen';
+  // der zugängliche Name beginnt mit dem sichtbaren Kürzel (Sprachsteuerung: „HJS“ antippen)
+  b.setAttribute('aria-label', t ? `${t.kuerzel} – Mein Team: ${t.name}` : 'Mein Team wählen');
+  b.title = t ? `Mein Team: ${t.kuerzel}, ${t.name}` : 'Mein Team wählen';
   b.hidden = false;
 }
 // Fenster „Mein Team“; btn = Knopf, an dem es hängt (Kopf oder Startseite)
@@ -168,16 +173,18 @@ function meinTeamPop(btn) {
   const wahl = neu => {
     U.setMeinTeam(neu);
     U.closePop(false);
-    say(neu ? `Mein Team: ${U.team(neu).name}.` : 'Kein Team gewählt.');
-    // Hervorhebung, Startseite und Voreinstellungen der offenen Ansicht neu; danach Fokus zurück auf den auslösenden Knopf
-    // (auf der Startseite ist er neu gezeichnet, dann der Knopf im Kopf)
-    route().then(() => (btn.isConnected ? btn : $('mt')).focus({preventScroll: true}));
+    // Hervorhebung, Startseite und Voreinstellungen der offenen Ansicht neu; danach Ansage und Fokus zurück auf den auslösenden
+    // Knopf (auf der Startseite ist er neu gezeichnet, dann der Knopf im Kopf)
+    route().then(() => {
+      say(U.meinTeam() ? `Mein Team: ${U.team(U.meinTeam()).name}.` : 'Kein Team gewählt.');
+      (btn.isConnected ? btn : $('mt')).focus({preventScroll: true});
+    });
   };
   // Link auf die gerade offene Seite: kein hashchange, also schließt das Fenster hier (wie in der Suche)
   const zu = (href, text, cls) => h('a', {href, class: cls || null, onclick: e => { if (href === location.hash) { e.preventDefault(); U.closePop(true); } }}, text);
   const teams = [...S.teams].sort((a, b) => a.name.localeCompare(b.name, 'de'));
   U.showPop(btn, 'Mein Team', [
-    t ? h('p', null, zu('#team/' + tid, `${t.name}: Team-Seite`, 'btn pri'))
+    t ? h('div', {class: 'row'}, zu('#team/' + tid, `${t.name}: Team-Seite`, 'btn pri'))
       : h('p', null, 'Wähle dein Team: Die App hebt es dann in Tabellen, Diagrammen und Paarungen hervor, Markt, Herkunft und Spieltag live zeigen es zuerst.'),
     t ? h('p', {class: 'note'}, 'Zuerst gezeigt unter ', zu('#spieltag', 'Spieltag live'), ' · ', zu('#markt', 'Markt'), ' · ', zu('#keeper/herkunft', 'Herkunft')) : null,
     h('div', {class: 'mtg', role: 'group', 'aria-label': 'Team wählen'}, teams.map(x => h('button', {type: 'button', class: 'btn',
@@ -471,7 +478,9 @@ async function route() {
   // Rückweg (Zurück/Vor): der Eintrag trägt eine gesicherte Position; neue Einträge nicht
   const backY = Number.isFinite(history.state?.y) ? history.state.y : null;
   r.back = backY != null;
-  S.prevHash = curHash;
+  // Rückweg der Spielerseite: nur bei einem echten Seitenwechsel neu setzen; ein Neuzeichnen derselben Seite (Mein Team, Daten
+  // neu laden, Erneut versuchen) behält ihn. perLink: per Link gekommen, nicht über Zurück/Vor
+  if (curHash !== location.hash) { S.prevHash = curHash; S.perLink = !r.back; }
   curHash = location.hash;
   document.documentElement.dataset.route = r.sec;
   // Tab des Bereichs (Spieltag live: Woche); Startseite, Spieler, Team und Erklärungen gehören zu keinem Bereich

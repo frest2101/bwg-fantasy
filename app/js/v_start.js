@@ -51,7 +51,7 @@ function meinTeam(t, W, wk, laeuft, nfl, ctx) {
   const btn = h('button', {type: 'button', class: 'btn', 'data-pop': '', 'aria-haspopup': 'dialog', 'aria-controls': 'pop', 'aria-expanded': 'false',
     onclick: () => ctx.meinTeam(btn)}, 'ändern');
   const zeilen = [
-    [U.rec(t), `${t.rang}. der Tabelle`, `${t.rang_division}. ${div}`, U.ok(sim?.playoff) ? `Playoff ${U.po(U.sp(sim.playoff))}` : null].filter(Boolean).join(' · '),
+    [U.rec(t), `${t.rang}. der Tabelle`, `${t.rang_division}. in ${div}`, U.ok(sim?.playoff) ? `Playoff ${U.po(U.sp(sim.playoff))}` : null].filter(Boolean).join(' · '),
     spiel(t, wk, laeuft, nfl),
     bedarf(t, W),
   ];
@@ -61,10 +61,11 @@ function meinTeam(t, W, wk, laeuft, nfl, ctx) {
 }
 
 // Spiel der laufenden Woche: Ergebnis, läuft (dann Spieltag live) oder Siegchance aus schedule.json; der Teamname oben führt
-// zur Team-Seite, „Bedarf Wn“ zu Markt › Bedarf je Team
+// zur Team-Seite, „Bedarf nächste Woche“ zu Markt › Bedarf je Team
 function spiel(t, wk, laeuft, nfl) {
   const g = S.sched.games.find(x => x.week === wk && (x.home === t.team_id || x.away === t.team_id));
   if (!g) return laeuft ? `W${wk}: kein Spiel` : null;
+  if (g.home == null || g.away == null) return `W${wk}: Freilos, kein Gegner`;          // Playoff-Bye (Seed 1–2 in W15)
   const heim = g.home === t.team_id, opp = U.team(heim ? g.away : g.home);
   const gegen = ['gegen ', h('a', {href: '#team/' + opp?.team_id}, opp?.name ?? '–')];
   if (g.winner != null) {
@@ -89,7 +90,7 @@ function bedarf(t, W) {
   const teile = [luecken.length ? `Lücken ${luecken.join(', ')}` : 'keine Lücke',
     weg.length ? `fällt aus: ${weg.map(x => x.pos).join(', ')}` : null, fr.length ? `fraglich: ${fr.map(x => x.pos).join(', ')}` : null,
     ...[...byes].map(([w, p]) => `Bye W${w}: ${p.join(', ')}`)].filter(Boolean);
-  return [h('a', {href: '#markt/bedarf'}, `Bedarf W${W.woche}`), `: ${teile.join(' · ')} `, U.ib('bedarf-woche', '')];
+  return [h('a', {href: '#markt/bedarf'}, `Bedarf nächste Woche (W${W.woche})`), `: ${teile.join(' · ')} `, U.ib('bedarf-woche', '')];
 }
 
 // ---------------------------------------------------------------- fünf Karten (je Bereich: Frage, Zahl, ein Satz)
