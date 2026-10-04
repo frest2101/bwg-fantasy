@@ -329,7 +329,35 @@ def wochen():
 
 def test_wochen_in_compute_history(wochen):
     """Ein Einstieg (Stephan 03.10.2026): die Wochen stehen in compute_history unter „wochen“."""
-    assert set(wochen) == {"saisons", "h2h", "rekorde", "allplay", "hugh_jass_2023_2025"}
+    assert set(wochen) == {"saisons", "spiele", "ohne_gegner", "h2h", "rekorde", "allplay", "hugh_jass_2023_2025"}
+
+
+def test_spiele_fuer_die_wochenansicht(wochen):
+    """App-Ansicht Wochen 2018–2022 (04.10.2026): jedes Spiel aus games.csv mit beiden Seiten und Bankpunkten."""
+    spiele = wochen["spiele"]
+    assert len(spiele) == len(GAMES)
+    bench = {(int(w["season"]), int(w["week"]), int(w["slot"])): Decimal(w["bench_pts"]) for w in WEEKS}
+    by_key = {(int(g["season"]), int(g["week"]), int(g["slot_a"])): g for g in GAMES}
+    for s in spiele:
+        g = by_key[(s["season"], s["week"], s["slot_a"])]
+        assert (s["round"], s["herleitung"], s["slot_b"]) == (g["round"], g["herleitung"], int(g["slot_b"]))
+        assert (s["pts_a"], s["pts_b"]) == (Decimal(g["pts_a"]), Decimal(g["pts_b"]))
+        assert (s["bench_a"], s["bench_b"]) == (bench[(s["season"], s["week"], s["slot_a"])],
+                                                bench[(s["season"], s["week"], s["slot_b"])])
+        assert s["winner_slot"] == (int(g["winner_slot"]) if g["winner_slot"] else None)
+    assert set(spiele[0]) == {"season", "week", "round", "herleitung", "slot_a", "pts_a", "bench_a", "slot_b", "pts_b",
+                              "bench_b", "winner_slot"}
+
+
+def test_ohne_gegner_nur_playoff_wochen(wochen):
+    """Team-Wochen ohne Spiel: nur Playoffs (Bye, Trostrunde), zusammen mit den Spielen genau team_weeks.csv."""
+    frei = wochen["ohne_gegner"]
+    assert frei and all(f["phase"] == "PO" for f in frei)
+    played = {(int(g["season"]), int(g["week"]), int(g[k])) for g in GAMES for k in ("slot_a", "slot_b")}
+    keys = {(f["season"], f["week"], f["slot"]) for f in frei}
+    assert not keys & played
+    assert keys | played == {(int(w["season"]), int(w["week"]), int(w["slot"])) for w in WEEKS}
+    assert all(f["pts"] == PTS[(f["season"], f["week"], f["slot"])] for f in frei)
 
 
 def test_h2h_summen(wochen):

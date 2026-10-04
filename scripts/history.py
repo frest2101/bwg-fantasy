@@ -364,6 +364,29 @@ def allplay_saisons(weeks: list[dict], ts: list[dict]) -> list[dict]:
     return sorted(result, key=lambda r: (r["season"], -r["allplay_pct"], r["slot"]))
 
 
+def wochen_spiele(games: list[dict], weeks: list[dict]) -> list[dict]:
+    """Spiele des Exports für die Wochenansicht der App: je Spiel aus games.csv Saison, Woche, Runde, Herleitung
+    (in den Playoffs: Bracket, Screenshot, Bestätigt, Seed-Regel oder Endplatz) und beide Seiten mit Punkten und
+    Bankpunkten; winner_slot None bei Unentschieden. Teamnamen stehen in team_seasons (Saison, Slot)."""
+    bench = {(w["season"], w["week"], w["slot"]): w["bench"] for w in weeks}
+    result = []
+    for g in games:
+        season, week, a, b = int(g["season"]), int(g["week"]), int(g["slot_a"]), int(g["slot_b"])
+        result.append({"season": season, "week": week, "round": g["round"], "herleitung": g["herleitung"],
+                       "slot_a": a, "pts_a": dec(g["pts_a"]), "bench_a": bench[(season, week, a)],
+                       "slot_b": b, "pts_b": dec(g["pts_b"]), "bench_b": bench[(season, week, b)],
+                       "winner_slot": int(g["winner_slot"]) if g["winner_slot"] else None})
+    return sorted(result, key=lambda s: (s["season"], s["week"], s["slot_a"]))
+
+
+def wochen_ohne_gegner(games: list[dict], weeks: list[dict]) -> list[dict]:
+    """Team-Wochen ohne Spiel in games.csv (nur Playoff-Wochen: Bye der Divisionssieger, Woche der Verlierer der
+    Runde 1 vor dem Spiel um Platz 5, Trostrunde) mit Punkten und Bank – Punkte ohne Gegner, kein Rekord."""
+    played = {(int(g["season"]), int(g["week"]), int(g[k])) for g in games for k in ("slot_a", "slot_b")}
+    return [{"season": w["season"], "week": w["week"], "phase": w["phase"], "slot": w["slot"], "pts": w["pts"],
+             "bench": w["bench"]} for w in weeks if (w["season"], w["week"], w["slot"]) not in played]
+
+
 def hugh_jass_wochen(rows: list[dict]) -> list[dict]:
     """hugh_jass_2023_2025.csv typisiert (nur Slot 2, nur Regular Season, ohne Gegner)."""
     return [{"season": int(r["season"]), "week": int(r["week"]), "slot": int(r["slot"]), "pf": dec(r["pts"]),
@@ -377,8 +400,8 @@ def compute_history(ssn: rawdata.Season) -> dict:
 
     rekorde = {"abgeleitet": [je Ära …], "hoechstes_einzelspiel": {…} oder None, "kuratiert": [aus rekorde.csv]}.
     Keine Manager, keine Regeländerungen.
-    wochen = nfl.com-Ära 2018–2022: saisons, h2h und rekorde je Phase (RS, PO), allplay je Team-Saison, dazu
-    hugh_jass_2023_2025 (nur dieses Team, ohne Gegner).
+    wochen = nfl.com-Ära 2018–2022: saisons, spiele (Paarungen je Woche) und ohne_gegner (Playoff-Wochen ohne Spiel),
+    h2h und rekorde je Phase (RS, PO), allplay je Team-Saison, dazu hugh_jass_2023_2025 (nur dieses Team, ohne Gegner).
     """
     rows = ssn.history("team_seasons")
     formats = {int(f["season"]): f for f in ssn.history("seasons")}
@@ -386,18 +409,21 @@ def compute_history(ssn: rawdata.Season) -> dict:
     names_2026 = {t["id"]: t["name"] for t in ssn.teams()}
     game_list = games(ssn.history("matchups_hist"), ts)
     weeks = week_rows(ssn.history("team_weeks"))
-    sides = game_sides(ssn.history("games"), weeks, ts)
+    game_rows = ssn.history("games")
+    sides = game_sides(game_rows, weeks, ts)
     return {
         "alltime": alltime(ts, ssn.history("franchises"), names_2026),
         "seasons": seasons(list(formats.values()), ts),
         "team_seasons": ts,
         "champions": champions(ts),
         "rekorde": {"abgeleitet": derived_records(ts), "hoechstes_einzelspiel": top_game(
-            record_games(ssn.history("games"), ssn.history("matchups_hist"), ts), ts),
+            record_games(game_rows, ssn.history("matchups_hist"), ts), ts),
             "kuratiert": kuratierte_rekorde(ssn.history("rekorde"))},
         "spiele": game_list,
         "wochen": {
             "saisons": sorted({w["season"] for w in weeks}),
+            "spiele": wochen_spiele(game_rows, weeks),
+            "ohne_gegner": wochen_ohne_gegner(game_rows, weeks),
             "h2h": h2h_wochen(sides, sorted({w["slot"] for w in weeks})),
             "rekorde": wochen_rekorde(sides),
             "allplay": allplay_saisons(weeks, ts),
