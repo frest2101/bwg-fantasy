@@ -25,7 +25,7 @@ ALTE_ROUTEN = {"tabelle", "tabelle/allplay", "tabelle/punkte", "tabelle/coaching
                "moves/draft", "keeper/kader", "keeper/wert",
                "lesart"}                          # seit Paket P4 (04.10.2026) „Erklärungen“, #erklaerungen
 # Elemente, die per „#…“ angesprochen werden, aber keine Routen sind (Sprungmarke, Knöpfe im Kopf)
-KEINE_ROUTE = {"main", "stand", "such"}
+KEINE_ROUTE = {"main", "stand", "such", "mt"}
 
 
 def _app() -> str:
@@ -82,8 +82,22 @@ def test_tabs_sind_die_fuenf_bereiche():
     leiste = html.split('<nav class="tabs"', 1)[1].split("</nav>", 1)[0]
     assert re.findall(r'<a href="#(\w+)" data-s="(\w+)">', leiste) == [(k, k) for k in TABS]
     kopf = html.split("<header", 1)[1].split("</header>", 1)[0]
-    assert re.search(r'<a class="brand" href="#liga"', kopf), "Marke führt zur Liga (bis zur Startseite, Paket P2)"
+    assert re.search(r'<a class="brand" href="#start"', kopf), "Marke führt zur Startseite (Paket P2)"
     assert re.search(r'<button id="such"[^>]*aria-controls="pop"[^>]*aria-label="[^"]+"', kopf), "Lupe im Kopf fehlt"
+    assert re.search(r'<button id="mt"[^>]*aria-controls="pop"[^>]*aria-label="[^"]+"', kopf), "Mein Team im Kopf fehlt"
+
+
+def test_startseite():
+    """Die App öffnet mit der Startseite (Paket P2): #start ist eine Seite ohne Tab, leere und unbekannte Hashes führen dorthin,
+    und ihre Karten nehmen Frage und Namen der Bereiche aus BEREICHE (eine Quelle für Kopf und Startseite)."""
+    assert views().get("start") == "v_start"
+    app = code(APP_JS)
+    assert "history.replaceState(null, '', '#' + (res ? res.k : 'start'))" in app, "Rückfall ohne Route: Startseite"
+    assert "bereiche: () => Object.entries(BEREICHE)" in app
+    start = code(JS / "v_start.js")
+    assert "ctx.bereiche()" in start
+    # nur teams.json, schedule.json (S.teams, S.sched) und waiver.json – die Startseite lädt keine weiteren Dateien
+    assert set(re.findall(r"ctx\.(?:load|lazy)\('([\w.]+)'", start)) == {"waiver.json"}
 
 
 def test_jede_ansicht_hat_ein_modul():

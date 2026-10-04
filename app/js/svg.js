@@ -28,6 +28,9 @@ function nice(lo, hi, k = 4) {
   return {lo: a, hi: b, t};
 }
 const P = (x, y) => x.toFixed(1) + ' ' + y.toFixed(1);
+// Beschriftung einer Zeile in hbars, dots und stack: Diese drei zeigen immer Teams mit ihrem Kürzel; das Kürzel von Mein Team
+// steht hervorgehoben (Paket P2, App-Konzept Abschnitt 6: das eigene Team statt „Team 1“)
+const lbCls = label => { const t = U.team(U.meinTeam()); return t && label === t.kuerzel ? 'lb me' : 'lb'; };
 
 // Zeichnet draw(breite) in box und bei Größenänderung neu; box.redraw() nach Datenwechsel
 export function mount(box, draw) {
@@ -153,7 +156,7 @@ export function hbars(o) {
     const g = frame(w, H, o.title, o.desc);
     o.rows.forEach((r, i) => {
       const yc = T + i * rh + rh / 2, v = r.v || 0;
-      g.append(s('text', {x: 4, y: yc + 4, class: 'lb'}, r.label),
+      g.append(s('text', {x: 4, y: yc + 4, class: lbCls(r.label)}, r.label),
         s('rect', {x: Math.min(x(0), x(v)), y: yc - 8, width: Math.max(1.5, Math.abs(x(v) - x(0))), height: 16, rx: 2, class: v < 0 ? 'neg' : 'pos'}),
         s('text', {x: w - 4, y: yc + 4, 'text-anchor': 'end'}, o.fmt(r.v)));
     });
@@ -180,7 +183,7 @@ export function dots(o) {
       s('text', {x: x(o.ref), y: T - 12, 'text-anchor': 'middle', class: 'lb'}, o.refLabel));
     o.rows.forEach((r, i) => {
       const yc = T + i * rh + rh / 2;
-      g.append(s('text', {x: 4, y: yc + 4, class: 'lb'}, r.label));
+      g.append(s('text', {x: 4, y: yc + 4, class: lbCls(r.label)}, r.label));
       if (ok(r.lo) && ok(r.hi)) g.append(s('line', {x1: x(r.lo), x2: x(r.hi), y1: yc, y2: yc, class: 'wh'}));
       if (ok(r.v)) g.append(s('circle', {cx: x(r.v), cy: yc, r: 6, class: 'dt'}));
       g.append(s('text', {x: w - 4, y: yc + 4, 'text-anchor': 'end'}, o.fmt(r.v)));
@@ -198,7 +201,7 @@ export function stack(o) {
     const g = frame(w, H, o.title, o.desc);
     o.rows.forEach((r, i) => {
       const yc = T + i * rh + rh / 2;
-      g.append(s('text', {x: 4, y: yc + 4, class: 'lb'}, r.label));
+      g.append(s('text', {x: 4, y: yc + 4, class: lbCls(r.label)}, r.label));
       let acc = 0;
       r.parts.forEach((v, j) => {
         if (!ok(v) || v <= 0) return;

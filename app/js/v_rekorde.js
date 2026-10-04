@@ -104,7 +104,8 @@ function positionen(box, r, svg) {
 
 function h2h(box, r) {
   const E = S.sched.h2h || [];
-  let sel = S.byId.has(+r.q.get('team')) ? +r.q.get('team') : S.teams[0]?.team_id;
+  // ?team=N, sonst Mein Team, ohne Wahl das erste Team
+  let sel = S.byId.has(+r.q.get('team')) ? +r.q.get('team') : U.meinTeam() || S.teams[0]?.team_id;
   const rec = (a, b) => {
     const e = E.find(x => (x.a === a && x.b === b) || (x.a === b && x.b === a));
     if (!e || !e.spiele) return null;

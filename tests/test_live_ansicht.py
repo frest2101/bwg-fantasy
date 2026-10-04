@@ -79,7 +79,9 @@ def js_tabelle(text: str, name: str) -> dict[int, str]:
 
 def test_route_und_chip():
     """#spieltag steht im Router und lädt v_spieltag.js; „#live“ bleibt die aria-live-Region. Kein eigener Tab: Der
-    Zugang ist der Chip im Kopf und die erste Ansicht im Bereich Woche (fünf Tabs, App-Konzept 04.10.2026)."""
+    Zugang ist die erste Ansicht im Bereich Woche (Chip „Spieltag live“, während der Saison auch der Tab Woche; fünf Tabs,
+    App-Konzept 04.10.2026). Den Chip „Live“ im Kopf gibt es seit Paket P2 nicht mehr (dort steht Mein Team); seinen
+    Nachlade-Tipp übernimmt der Tab Woche."""
     views = re.search(r"const VIEWS = \{(.*?)\};", read(APP_JS), re.S)
     assert views, "VIEWS in app/js/app.js nicht gefunden"
     routen = dict(re.findall(r"(\w+): '(\w+)'", views.group(1)))
@@ -89,8 +91,11 @@ def test_route_und_chip():
         assert (JS / f"{modul}.js").exists(), f"Route ohne Datei: {modul}.js"
     html = read(INDEX)
     assert re.search(r'<div id="live"[^>]*aria-live="polite"', html)
-    kopf = html.split("<header", 1)[1].split("</header>", 1)[0]
-    assert re.search(r'<a id="lv"[^>]*href="#spieltag"[^>]*aria-label="[^"]+"', kopf), "Chip „Live“ fehlt im Kopf"
+    app = read(APP_JS)
+    assert "['live', 'Spieltag live', 'v_spieltag']" in app, "Spieltag live ist die erste Ansicht im Bereich Woche"
+    assert "p === 'live' ? '#spieltag'" in app, "Chip „Spieltag live“ führt auf #spieltag"
+    assert "U.saisonLaeuft() ? 'spieltag'" in app, "#woche öffnet während der Saison den Spieltag live"
+    assert """querySelector('.tabs a[data-s="woche"]')""" in code(VIEW), "Tab Woche lädt in der offenen Live-Ansicht neu"
     leiste = html.split('<nav class="tabs"', 1)[1].split("</nav>", 1)[0]
     assert "#spieltag" not in leiste and leiste.count("<a ") == 5
 

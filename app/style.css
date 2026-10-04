@@ -30,16 +30,19 @@ p{margin:.4rem 0}
 .skip:focus{left:8px}
 /* Kopf und Navigation */
 .top{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:6px;padding:4px max(8px,env(safe-area-inset-right)) 4px max(16px,env(safe-area-inset-left));background:var(--sf);border-bottom:1px solid var(--bd);min-height:52px}
-/* Marke: Seit Lupe und Live-Chip stehen sechs Elemente im Kopf, seit P4 heißt der Datenstand „W14 gewertet“. Das Jahr
-   erscheint erst ab 530 px, „Fantasy“ ab 490 px (gemessen in Chromium mit dem längsten Chip „W14 gewertet“, unter 420 px
-   „W14 ✓“: bei 320–489 px passt „BWG“ ganz, ab 490 „BWG Fantasy“, ab 530 das Jahr); reicht der Platz trotzdem nicht
-   (breitere Systemschrift), kürzt die Marke mit „…“, statt Knöpfe aus dem Bild zu schieben */
+/* Marke: Im Kopf stehen sechs Elemente (Marke, Lupe, Mein Team, Datenstand, Erklärungen, Hell/Dunkel; Mein Team ersetzt seit
+   Paket P2 den Chip „Live“), seit P4 heißt der Datenstand „W14 gewertet“. Das Jahr erscheint erst ab 530 px, „Fantasy“ ab
+   490 px (gemessen in Chromium mit dem längsten Chip „W14 gewertet“, unter 420 px „W14 ✓“, und dem breitesten Kürzel: bei
+   320–489 px passt „BWG“ ganz, ab 490 „BWG Fantasy“, ab 530 das Jahr); reicht der Platz trotzdem nicht (breitere
+   Systemschrift), kürzt die Marke mit „…“, statt Knöpfe aus dem Bild zu schieben */
 .brand{font-weight:700;text-decoration:none;color:var(--tx);margin-right:auto;line-height:44px;display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .top>:not(.brand){flex:none}
 @media (max-width:529px){.brand span{display:none}}
 @media (max-width:489px){.brand b{display:none}}
-/* Lupe im Kopf (Suche nach Spielern und Teams); offen, solange ihr Fenster offen ist */
-#such[aria-expanded=true]{background:var(--ac2);border-color:var(--ac)}
+/* Lupe und Mein Team im Kopf; hervorgehoben, solange ihr Fenster offen ist */
+#such[aria-expanded=true],#mt[aria-expanded=true]{background:var(--ac2);border-color:var(--ac)}
+/* Mein Team: Kürzel als Chip (Datenstand-Optik mit Akzentrand), ohne Wahl ein Trikot-Symbol im Rundknopf */
+.stand.mt{border-color:var(--ac);background:var(--sf);display:inline-flex;align-items:center}
 .brand b{font-weight:inherit}
 .brand span{color:var(--mu);font-weight:500;margin-left:.3em}
 .ico{min-width:44px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--bd);border-radius:22px;background:var(--sf);color:var(--tx);text-decoration:none;font-weight:700;cursor:pointer}
@@ -48,14 +51,12 @@ p{margin:.4rem 0}
 /* Datenstand „W4 gewertet“; unter 420 px „W4 ✓“ (aria-label und Datenstand-Fenster nennen den ganzen Text) */
 .stand .stk{display:none}
 @media (max-width:419px){.stand .stw{display:none}.stand .stk{display:inline}}
-/* Live-Chip im Kopf (Link auf #spieltag, kein achter Tab); gefüllt, solange die Live-Ansicht offen ist */
-.lv{display:inline-flex;align-items:center;justify-content:center;min-width:44px;background:var(--sf);color:var(--tx);text-decoration:none;padding:0 .65rem}
-.lv[aria-current]{background:var(--ac);border-color:var(--ac);color:var(--on)}
-.lv[aria-busy]{opacity:.55}
+/* Tab „Woche“ in der offenen Live-Ansicht: ein Tipp lädt neu (v_spieltag), währenddessen blasser */
+.tabs a[aria-busy]{opacity:.55}
 /* bis 399 px (iPhone 375–393): schmalere Chips, engere Abstände und 40 px breite Rundknöpfe (Höhe bleibt 44 px), damit
-   „BWG“ neben Lupe, Live, Datenstand, ? und Hell/Dunkel passt – gemessen in Chromium (Segoe UI) mit dem längsten Chip
-   „W14 ✓“: bei 320 px noch 8 px Rand rechts, darüber mehr */
-@media (max-width:399px){.top{gap:4px}.ico{min-width:40px}.stand{padding:0 .6rem}.lv{padding:0 .5rem}}
+   „BWG“ neben Lupe, Mein Team, Datenstand, ? und Hell/Dunkel passt – gemessen in Chromium (Segoe UI) mit dem längsten Chip
+   „W14 ✓“ und dem breitesten Kürzel */
+@media (max-width:399px){.top{gap:4px}.ico{min-width:40px}.stand{padding:0 .6rem}.stand.mt{padding:0 .5rem}}
 /* 360–374 px (viele Android-Geräte): dazu kleinere Schrift in Marke und Chips, schmalerer linker Rand */
 @media (max-width:374px){.top{padding-left:max(12px,env(safe-area-inset-left))}.brand{font-size:.95rem}.stand{padding:0 .5rem;font-size:.85rem}}
 .tabs{position:fixed;bottom:0;left:0;right:0;z-index:20;display:flex;background:var(--sf);border-top:1px solid var(--bd);padding:0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
@@ -144,6 +145,34 @@ button.i::before{font:italic 700 .75rem/1 Georgia,serif}
 .pop dd{margin:0;font-weight:600}
 /* Knopfzeile über beide Spalten (Datenstand: „Tageslauf starten“ direkt unter „Nächster Tageslauf“) */
 .pop dd.full{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;font-weight:400;margin:2px 0 6px}
+/* Fenster „Mein Team“: zehn Teams in zwei Spalten, das gewählte gefüllt */
+.mtg{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:6px;margin:.5rem 0}
+.mtg .btn{justify-content:flex-start;white-space:normal;text-align:left;line-height:1.15;padding:4px .6rem;font-weight:500;font-size:.88rem}
+.mtg .btn b{flex:none;min-width:2.3rem}
+/* lange Teamnamen ohne Leerzeichen („SaureGurken“) brechen bei 320 px innerhalb des Knopfs um, statt über den Rand zu ragen */
+.mtg .btn span{min-width:0;overflow-wrap:anywhere}
+.mtg .btn[aria-pressed=true]{background:var(--ac);border-color:var(--ac);color:var(--on)}
+.badge.mtb{border-color:var(--ac);color:var(--ac)}
+/* Startseite (#start, Paket P2): Mein-Team-Karte mit Akzentrand, darunter die fünf Bereiche als Karten; die ganze Karte ist
+   über den Link der Überschrift klickbar (Fläche per ::after, der Linktext bleibt kurz für Screenreader) */
+.mtz{border-left:4px solid var(--ac)}
+.mtz .mth{justify-content:space-between;margin:0}
+.mtz h2{margin:0}
+.mtz p{margin:.3rem 0}
+.sks{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;margin:0 0 16px}
+.sk{position:relative;background:var(--sf);border:1px solid var(--bd);border-radius:12px;padding:10px 12px;min-width:0}
+.sk:hover,.sk:focus-within{border-color:var(--ac)}
+.sk h2{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 .5rem;margin:0}
+.sk h2 a{text-decoration:none;min-height:0;display:inline}
+.sk h2 a::after{content:"";position:absolute;inset:0;border-radius:12px}
+.sk h2 a:focus-visible{outline:none}
+.sk:has(h2 a:focus-visible){outline:3px solid var(--ac);outline-offset:2px}
+.sk h2>span{color:var(--mu);font-size:.92rem;font-weight:600}
+.sk p{margin:.2rem 0 0;font-size:.92rem}
+.skz{display:flex;align-items:baseline;flex-wrap:wrap;gap:0 .5rem}
+.skz b{font-size:1.5rem;font-variant-numeric:tabular-nums;line-height:1.2}
+.skz span{color:var(--mu);font-size:.85rem}
+.sk .i,.sk button{position:relative;z-index:1}
 /* Teamseite: Diagramm, Wochenliste, Kader, Positionen/H2H (ab 900 px als Raster) */
 .tg{display:grid;gap:16px;margin:0 0 16px}
 .tg>*{min-width:0}
@@ -205,6 +234,10 @@ thead th.n button{flex-direction:row-reverse;justify-content:flex-start}
 .rk tr>:nth-child(2),.nr tr>:first-child{position:sticky;left:0;z-index:1;box-shadow:1px 0 0 var(--bd)}
 .rk tr>:nth-child(2){left:2.75rem}
 tr.me>*{background:var(--ac2)}
+/* eigene Zeile (Mein Team, U.meRc) bzw. gewählte Zeile: dazu ein Strich links, damit sie nicht nur an der Farbe hängt */
+tr.me>:first-child{box-shadow:inset 3px 0 0 var(--ac)}
+.nr tr.me>:first-child{box-shadow:inset 3px 0 0 var(--ac),1px 0 0 var(--bd)}
+.tw.sc-scrolled .nr tr.me>:first-child{box-shadow:inset 3px 0 0 var(--ac),2px 0 0 var(--bd),8px 0 8px -6px rgba(0,0,0,.2)}
 tr.gsp>*{color:var(--mu)}
 .tl2{font-weight:600;text-decoration:none;color:var(--tx);display:inline-flex;min-height:44px;align-items:center}
 .tl2:hover{text-decoration:underline}
@@ -291,6 +324,7 @@ td.lvc,.lvw thead th:last-child{white-space:normal;line-height:1.2}
 svg.ch{display:block;max-width:100%;height:auto;overflow:visible}
 .ch text{fill:var(--mu);font-size:11px}
 .ch .lb{fill:var(--tx);font-weight:700;font-size:12px}
+.ch .lb.me{fill:var(--ac);font-weight:800;text-decoration:underline}
 .ch .gr{stroke:var(--bd);stroke-width:1}
 .ch .z0{stroke:var(--mu);stroke-width:1}
 .ch .lo{fill:none;stroke:var(--ln);stroke-width:1.25}

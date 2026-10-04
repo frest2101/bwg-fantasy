@@ -12,7 +12,9 @@ const {h, S} = U;
 const $ = x => document.getElementById(x);
 const main = $('main'), live = $('live');
 const say = t => { live.textContent = t; };
-Object.assign(ctx, {ui: U, S, mod, load, lazy, say, refresh, onLeave, route: () => route()});
+// bereiche(): Name, Frage und Satz je Bereich für die Karten der Startseite (aus BEREICHE, eine Quelle für Kopf und Startseite)
+Object.assign(ctx, {ui: U, S, mod, load, lazy, say, refresh, onLeave, route: () => route(), meinTeam: btn => meinTeamPop(btn),
+  bereiche: () => Object.entries(BEREICHE).map(([k, B]) => ({k, l: B.l, frage: B.frage, text: B.text}))});
 
 // ---------------------------------------------------------------- Laden
 const cache = {};
@@ -49,6 +51,7 @@ function refresh() {
     if (basis) {
       BASIS.forEach((n, i) => { cache[n] = Promise.resolve(basis[i]); });
       setup(...basis);
+      mtChip();                           // Kürzel oder Name des Teams kann sich geändert haben
     }
     standChip();
     return true;
@@ -130,7 +133,58 @@ export function nextDaily(now = new Date()) {
 function header() {
   standChip();
   suche();
+  mtChip();
+  $('mt').onclick = () => meinTeamPop($('mt'));
+  // Wechsel aus einer Ansicht (Auswahl unter Markt): nur der Kopf zieht nach, die Ansicht zeichnet sich selbst
+  document.addEventListener('bwg-team', mtChip);
   theme();
+}
+
+// ---------------------------------------------------------------- Mein Team im Kopf (App-Konzept 04.10.2026, Abschnitt 6, Paket P2)
+// Knopf mit dem Kürzel des gewählten Teams (ohne Wahl ein Trikot-Symbol); das Fenster führt zur Team-Seite und wählt das Team.
+// Gespeichert wird nur die Team-Nummer im Browser (U.setMeinTeam). Der Knopf ersetzt seit P2 den Chip „Live“ im Kopf: Bei
+// 320 px blieben neben sechs Elementen nur 8 px Rand; Spieltag live öffnet während der Saison der Tab Woche.
+const TRIKOT = () => {
+  const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  s.setAttribute('viewBox', '0 0 24 24'); s.setAttribute('width', '22'); s.setAttribute('height', '22');
+  s.setAttribute('aria-hidden', 'true'); s.setAttribute('focusable', 'false');
+  const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  p.setAttribute('d', 'M9 3.5 4.5 5.5 2 10l3 1.8 1.5-1.3V20.5h11V10.5l1.5 1.3L22 10l-2.5-4.5L15 3.5c-.4 1.5-1.6 2.4-3 2.4s-2.6-.9-3-2.4Z');
+  p.setAttribute('fill', 'none'); p.setAttribute('stroke', 'currentColor'); p.setAttribute('stroke-width', '2'); p.setAttribute('stroke-linejoin', 'round');
+  s.append(p);
+  return s;
+};
+function mtChip() {
+  const b = $('mt'), t = U.team(U.meinTeam());
+  b.className = t ? 'stand mt' : 'ico mt';
+  b.replaceChildren(t ? t.kuerzel : TRIKOT());
+  b.setAttribute('aria-label', t ? `Mein Team: ${t.name}` : 'Mein Team wählen');
+  b.title = t ? `Mein Team: ${t.name}` : 'Mein Team wählen';
+  b.hidden = false;
+}
+// Fenster „Mein Team“; btn = Knopf, an dem es hängt (Kopf oder Startseite)
+function meinTeamPop(btn) {
+  const tid = U.meinTeam(), t = U.team(tid);
+  const wahl = neu => {
+    U.setMeinTeam(neu);
+    U.closePop(false);
+    say(neu ? `Mein Team: ${U.team(neu).name}.` : 'Kein Team gewählt.');
+    // Hervorhebung, Startseite und Voreinstellungen der offenen Ansicht neu; danach Fokus zurück auf den auslösenden Knopf
+    // (auf der Startseite ist er neu gezeichnet, dann der Knopf im Kopf)
+    route().then(() => (btn.isConnected ? btn : $('mt')).focus({preventScroll: true}));
+  };
+  // Link auf die gerade offene Seite: kein hashchange, also schließt das Fenster hier (wie in der Suche)
+  const zu = (href, text, cls) => h('a', {href, class: cls || null, onclick: e => { if (href === location.hash) { e.preventDefault(); U.closePop(true); } }}, text);
+  const teams = [...S.teams].sort((a, b) => a.name.localeCompare(b.name, 'de'));
+  U.showPop(btn, 'Mein Team', [
+    t ? h('p', null, zu('#team/' + tid, `${t.name}: Team-Seite`, 'btn pri'))
+      : h('p', null, 'Wähle dein Team: Die App hebt es dann in Tabellen, Diagrammen und Paarungen hervor, Markt, Herkunft und Spieltag live zeigen es zuerst.'),
+    t ? h('p', {class: 'note'}, 'Zuerst gezeigt unter ', zu('#spieltag', 'Spieltag live'), ' · ', zu('#markt', 'Markt'), ' · ', zu('#keeper/herkunft', 'Herkunft')) : null,
+    h('div', {class: 'mtg', role: 'group', 'aria-label': 'Team wählen'}, teams.map(x => h('button', {type: 'button', class: 'btn',
+      'aria-pressed': String(x.team_id === tid), onclick: () => wahl(x.team_id)}, h('b', null, x.kuerzel), h('span', null, x.name)))),
+    t ? h('p', null, h('button', {type: 'button', class: 'btn', onclick: () => wahl(0)}, 'Kein Team')) : null,
+    h('p', {class: 'note'}, 'Gespeichert wird nur die Team-Nummer in diesem Browser, kein Login. ', zu('#erklaerungen/mein-team', 'Mehr dazu')),
+  ]);
 }
 
 // ---------------------------------------------------------------- Suche im Kopf: Spieler und Teams (statt eines Spieler-Tabs)
@@ -300,9 +354,10 @@ const BEREICHE = {
     ['', 'Bilanz', 'v_keeper'], ['herkunft', 'Herkunft', 'v_keeper'], ['alter', 'Alter', 'v_keeper'], ['marktwert', 'Marktwert', 'v_keeper'],
     ['draft', () => `Draft ${S.man.season}`, 'v_keeper'], ['draft-folgejahr', () => `Draft ${S.man.season + 1}`, 'v_keeper']]},
 };
-// Seiten ohne Tab: Spielerliste und -seite (Suche im Kopf), Team-Seite, Erklärungen (Glossar). spieltag = Live-Ansicht (Chip „Live“ im Kopf
-// und erste Ansicht der Woche); „#live“ ist die aria-live-Region
-const VIEWS = {spieler: 'v_spieler', team: 'v_team', spieltag: 'v_spieltag', erklaerungen: 'v_lesart'};
+// Seiten ohne Tab: Startseite (Marke im Kopf, leerer Hash; Paket P2), Spielerliste und -seite (Suche im Kopf), Team-Seite,
+// Erklärungen (Glossar). spieltag = Live-Ansicht (erste Ansicht der Woche, während der Saison auch der Tab Woche); „#live“ ist
+// die aria-live-Region
+const VIEWS = {start: 'v_start', spieler: 'v_spieler', team: 'v_team', spieltag: 'v_spieltag', erklaerungen: 'v_lesart'};
 const IN_BEREICH = {spieltag: ['woche', 'live']};
 // Alte Hashes (bis 04.10.2026) → neue Routen. Es gilt der längste passende Anfang; der Rest des Pfads (Woche, Position) und
 // die Parameter (?team=, ?seeding= …) bleiben, damit Lesezeichen, README, Aufträge und das Claude-Projekt weiter funktionieren.
@@ -328,7 +383,8 @@ function umleitung(r) {
   if (r.sec === 'woche' && !r.sub) return U.saisonLaeuft() ? 'spieltag' : 'woche/paarungen';
   return null;
 }
-// Route → Modul und Bereich; null bei unbekannter Route (dann Liga) bzw. unbekannter Ansicht (dann die erste des Bereichs)
+// Route → Modul und Bereich; null bei leerer oder unbekannter Route (dann die Startseite) bzw. unbekannter Ansicht (dann die
+// erste des Bereichs)
 function resolve(r) {
   if (VIEWS[r.sec]) {
     const [k, view] = IN_BEREICH[r.sec] || [];
@@ -403,7 +459,7 @@ async function route() {
   const res = resolve(r);
   if (!res || res.fehlt) {
     if (r.sec === 'main' && cur) return;     // Sprungmarke „Zum Inhalt“ ohne JS-Klick
-    history.replaceState(null, '', '#' + (res ? res.k : 'liga'));
+    history.replaceState(null, '', '#' + (res ? res.k : 'start'));
     return route();
   }
   Object.assign(r, {view: res.view, sub: res.sub, base: res.base});
@@ -418,12 +474,10 @@ async function route() {
   S.prevHash = curHash;
   curHash = location.hash;
   document.documentElement.dataset.route = r.sec;
-  // Tab des Bereichs; Spieler, Team und Erklärungen gehören zu keinem Bereich
+  // Tab des Bereichs (Spieltag live: Woche); Startseite, Spieler, Team und Erklärungen gehören zu keinem Bereich
   for (const a of document.querySelectorAll('.tabs a')) {
     if (a.dataset.s === res.k) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
   }
-  // Live-Ansicht: Tab Woche, dazu zeigt der Chip im Kopf, dass sie offen ist
-  if (r.sec === 'spieltag') $('lv')?.setAttribute('aria-current', 'page'); else $('lv')?.removeAttribute('aria-current');
   const key = viewKey(r, res), same = cur === key;
   cur = key;
   const box = h('div', {class: 'view'}, h('p', {class: 'loading'}, 'Lade …'));
@@ -446,7 +500,7 @@ async function route() {
   main.removeAttribute('aria-busy');
   main.style.minHeight = '';
   const h1 = box.querySelector('h1');
-  document.title = (h1 ? h1.textContent + ' · ' : '') + 'BWG Fantasy 2026';
+  document.title = (h1 && r.sec !== 'start' ? h1.textContent + ' · ' : '') + 'BWG Fantasy 2026';
   const f = target || h1;
   if (f) {
     f.tabIndex = -1;
@@ -464,7 +518,8 @@ document.addEventListener('click', e => {
   if (t.closest?.('a.skip')) { e.preventDefault(); main.focus(); return; }
   if (t.closest?.('a[href^="#"]')) saveY();     // Position des alten Eintrags vor dem Wechsel sichern
   const p = $('pop');
-  if (!p.hidden && !p.contains(t) && !t.closest?.('#stand,#such')) U.closePop(false);
+  // Knöpfe, die selbst ein Fenster öffnen (Kopf, „Mein Team wählen“ auf der Startseite), schließen es nicht gleich wieder
+  if (!p.hidden && !p.contains(t) && !t.closest?.('#stand,#such,#mt,[data-pop]')) U.closePop(false);
 });
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && !$('pop').hidden) { e.preventDefault(); U.closePop(true); }

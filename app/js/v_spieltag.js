@@ -9,12 +9,11 @@
 // Kein Dauerabruf: Je Abruf werden rund 1,1 MB übertragen (4,5 MB entpackt). Die einzigen Zeitgeber hier brechen ab
 // (Zeitlimit, Nachlauf), keiner startet einen Abruf – tests/test_live_ansicht.py wacht darüber.
 let U, S, h, C;
-const KEY = 'bwg-team';                      // Mein Team wie unter Markt, nur Komfort im Browser
 const LIMIT_LIGA = 30000, LIMIT = 15000;     // Zeitlimit je Abruf in ms (Liga: große Antwort)
 const FRISCH = 120000;                       // so lange gilt der letzte Abruf beim Zurückkommen (z. B. von einer Spielerseite)
 const NACHLAUF = 3000;                       // so lange läuft ein Abruf weiter, auf den niemand mehr wartet (kurz weg und zurück)
 const ART = {WAIVER: 'Waiver', FREEAGENT: 'Free Agent', ROSTER: 'Drop', FUTURE_ROSTER: 'Drop', TRADE_ACCEPT: 'Trade'};
-let merk = null;      // letzter guter Abruf: {t, man (Manifest dazu), E (Ergebnis aus live_core), ausfall, seiten, tagesstand}
+let merk = null;      // letzter guter Abruf: {t, man (Manifest dazu), mine (Mein Team dazu), E (Ergebnis aus live_core), ausfall, seiten, tagesstand}
 let offen = null;     // laufender Abruf, von allen Wartenden geteilt: {p, ac, n (wartende Ansichten), aus (Timer)}
 
 // ---------------------------------------------------------------- Abruf (nur GET, nur ESPN-Lese-Endpunkte)
@@ -132,12 +131,12 @@ async function holen(ctx, mine, signal) {
     throw fehler('antwort', E.grund);
   }
   if (E.sbFehler) console.warn('NFL-Scoreboard nicht auswertbar:', E.sbFehler);
-  merk = {t: Date.now(), man, E, ausfall: roh.ausfall, seiten: app.seiten,
+  merk = {t: Date.now(), man, mine, E, ausfall: roh.ausfall, seiten: app.seiten,
     tagesstand: W?.stand ?? man.datenstand?.pool_stand ?? null};
   return merk;
 }
 
-// Ein laufender Abruf wird geteilt: Wer dazukommt („Erneut versuchen“, Zurückkommen, Mehrfachtippen, Chip „Live“),
+// Ein laufender Abruf wird geteilt: Wer dazukommt („Erneut versuchen“, Zurückkommen, Mehrfachtippen, Tab „Woche“),
 // wartet auf denselben Abruf, statt einen zweiten zu starten. los() meldet eine Ansicht ab; wartet NACHLAUF ms lang
 // niemand, wird der Abruf abgebrochen – wer nur kurz weg war, findet ihn noch laufend vor.
 function teilen(start) {
@@ -168,7 +167,7 @@ export async function render(box, ctx, r) {
   U = ctx.ui; S = U.S; h = U.h;
   C = await ctx.mod('live_core');
   if (!r.alive()) return;
-  const mine = U.team(U.store.get(KEY)) ? +U.store.get(KEY) : 0;
+  const mine = U.meinTeam();                       // Mein Team (Kopf), 0 = keins
   const st = {team: U.team(r.sub) ? +r.sub : 0};
   const kopf = h('p', {class: 'note'}, 'Live von ESPN: Der Spieltag wird jetzt geladen.');
   const status = h('span', {class: 'note'});       // sichtbarer Ladehinweis; angesagt wird über ctx.say (aria-live)
@@ -177,14 +176,15 @@ export async function render(box, ctx, r) {
   const btn = h('button', {type: 'button', class: 'btn', onclick: () => laden(true, btn)}, 'Aktualisieren');
   U.kopf(box, r, 'Spieltag live');
   U.ap(box, kopf, h('div', {class: 'row'}, btn, U.tageslaufKnopf(), status), meldung, body);
-  // frisch: letzter Abruf höchstens zwei Minuten alt und zum geladenen Datenstand der App gerechnet
-  const frisch = () => merk && merk.man === S.man && Date.now() - merk.t < FRISCH;
+  // frisch: letzter Abruf höchstens zwei Minuten alt und zum geladenen Datenstand der App und zu Mein Team gerechnet
+  const frisch = () => merk && merk.man === S.man && merk.mine === mine && Date.now() - merk.t < FRISCH;
   let wartet = null;        // los() des Abrufs, auf den diese Ansicht gerade wartet
   let nochmal = null;       // Knopf „Erneut versuchen“ in der Fehlerzeile
   let gezeigt = false;      // steht ein Stand in der Ansicht?
-  // Chip „Live“ im Kopf: In der offenen Live-Ansicht lädt ein Tipp neu wie „Aktualisieren“ (der Chip steht immer im
-  // Blick, der Knopf nur am Seitenanfang); beim Verlassen ist er wieder ein gewöhnlicher Link
-  const chip = document.getElementById('lv');
+  // Tab „Woche“: In der offenen Live-Ansicht lädt ein Tipp neu wie „Aktualisieren“ (die Tab-Leiste steht immer im Blick,
+  // der Knopf nur am Seitenanfang); beim Verlassen ist er wieder ein gewöhnlicher Link. Bis Paket P2 tat das der Chip
+  // „Live“ im Kopf, an seiner Stelle steht jetzt Mein Team
+  const chip = document.querySelector('.tabs a[data-s="woche"]');
   if (chip) chip.onclick = e => {
     if (e.ctrlKey || e.metaKey || e.shiftKey || e.button) return;
     e.preventDefault();
@@ -202,7 +202,7 @@ export async function render(box, ctx, r) {
     if (an) chip?.setAttribute('aria-busy', 'true'); else chip?.removeAttribute('aria-busy');
   };
 
-  // von = Knopf oder Chip, der den Abruf ausgelöst hat (null beim Öffnen der Ansicht)
+  // von = Knopf oder Tab „Woche“, der den Abruf ausgelöst hat (null beim Öffnen der Ansicht)
   async function laden(erzwingen, von) {
     if (wartet) return;                                  // diese Ansicht wartet schon (Mehrfachtippen)
     if (!erzwingen && frisch()) return zeichne();
@@ -246,7 +246,7 @@ export async function render(box, ctx, r) {
     if (alt && !gezeigt) { try { zeichne(); } catch (x) { console.error(x); } }
     if (!gezeigt) kopf.replaceChildren('Live von ESPN – der Abruf ist gescheitert.');
     ctx.say('Der Spieltag konnte nicht geladen werden.');
-    if (von) nochmal.focus();        // auch vom Seitenende aus (Chip „Live“): die Fehlerzeile kommt in den Blick
+    if (von) nochmal.focus();        // auch vom Seitenende aus (Tab „Woche“): die Fehlerzeile kommt in den Blick
   }
 
   function zeichne() {

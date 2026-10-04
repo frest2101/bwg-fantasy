@@ -12,7 +12,6 @@ const POS = ['QB', 'RB', 'WR', 'TE', 'K', 'D/ST'];
 const FREE = ['WAIVERS', 'FREEAGENT'];
 const ART = {WAIVER: 'Waiver', FREEAGENT: 'Free Agent'};
 const DAYS7 = 7 * 864e5;
-const KEY = 'bwg-team';                  // eigenes Team (Kürzel-Auswahl), nur Komfort im Browser
 const fz = v => 'fz' + (U.ok(v) ? ' ' + U.fcls(v) : '');   // Farbzelle um F = 1,00; ohne Wert ohne Farbe
 const HOR = ['woche', 'drei', 'ros', 'zukunft'];
 const GRUND = {BYE: 'Bye', OUT: 'fällt aus', INJURY_RESERVE: 'IR', SUSPENSION: 'gesperrt', QUESTIONABLE: 'fraglich',
@@ -48,12 +47,12 @@ export async function render(box, ctx, r) {
   });
   const rowById = new Map(rows.map(x => [x.id, x]));
   const name = id => byId.get(id)?.name ?? rowById.get(id)?.name ?? T?.spieler?.[String(id)] ?? `Spieler ${id}`;
-  // Bezugsteam: #markt?team=N gilt nur für diesen Aufruf (Link von der Team-Seite), sonst das gespeicherte Mein Team
+  // Bezugsteam: #markt?team=N gilt nur für diesen Aufruf (Link von der Team-Seite), sonst Mein Team (Kopf)
   const qTeam = U.team(r.q.get('team')) ? +r.q.get('team') : 0;
-  const me = {mine: qTeam || +U.store.get(KEY) || 0, q: qTeam};
+  const me = {mine: qTeam || U.meinTeam(), q: qTeam};
   let draw = () => {};
   const mineSel = h('select', {'aria-label': 'Mein Team', onchange: e => {
-    me.mine = +e.target.value; me.q = 0; U.store.set(KEY, me.mine);
+    me.mine = +e.target.value; me.q = 0; U.setMeinTeam(me.mine);     // gilt wie die Wahl im Kopf überall
     if (!liste) U.setQ(r.base, {});       // die Liste schreibt ihre Parameter selbst (ohne team)
     // die Sicht eines anderen Teams endet: auch die Chips der Markt-Ansichten (Router, bereich) ohne ?team=
     for (const a of box.querySelectorAll('.chips.bv a')) a.setAttribute('href', a.getAttribute('href').split('?')[0]);
