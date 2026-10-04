@@ -199,8 +199,8 @@ def test_teams_vertrag(data):
     teams = data["teams.json"]
     meta = teams["meta"]
     assert [m["key"] for m in meta["metrics"]] == list(compute.METRICS)
-    assert meta["profil_standard"] == "Stärke" and meta["norm_standard"] == "z"
-    assert meta["profiles"]["Stärke"]["kader"] == 25 and meta["kader_quelle"] == "potenzial"
+    assert meta["profil_standard"] == "Standard" and meta["norm_standard"] == "z"
+    assert meta["profiles"]["Standard"]["kader"] == 25 and meta["kader_quelle"] == "potenzial"
     assert set(meta["kuerzel"].values()) == {"ACB", "HJS", "4DS", "CRN", "TTY", "SAM", "RTZ", "GLS", "DYN", "SGK"}
     assert [t["rang"] for t in teams["teams"]] == list(range(1, 11))
     for t in teams["teams"]:

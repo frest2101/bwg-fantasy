@@ -29,14 +29,15 @@ import wetter
 from lineup import SLOT_BENCH, SLOT_IR, optimal_points  # noqa: F401 (optimal_points: öffentliche Funktion des Rechenwerks)
 from zahlen import HALF, HUNDRED, ONE, ZERO, dec, rounded  # noqa: F401 (dec: bisherige Schnittstelle)
 
-# Score-Kennzahlen (alle: höher = besser) und Gewichtungsprofile laut CLAUDE.md und Auftrag Session 4 (Frage 1)
+# Score-Kennzahlen (alle: höher = besser) und Gewichtungsprofile laut CLAUDE.md und Auftrag Session 4 (Frage 1);
+# das Standardprofil hieß bis 04.10.2026 „Stärke“ (umbenannt, weil Bereich und Spalte des Power Rankings so heißen)
 METRICS = ("pf", "allplay", "win", "coaching", "kader", "floor", "form")
 PROFILES = {
-    "Stärke":    {"pf": 30, "allplay": 25, "win": 0, "coaching": 10, "kader": 25, "floor": 10, "form": 0},
+    "Standard":  {"pf": 30, "allplay": 25, "win": 0, "coaching": 10, "kader": 25, "floor": 10, "form": 0},
     "Verdienst": {"pf": 20, "allplay": 25, "win": 10, "coaching": 30, "kader": 0, "floor": 15, "form": 0},
     "Form":      {"pf": 20, "allplay": 25, "win": 0, "coaching": 10, "kader": 10, "floor": 0, "form": 35},
 }
-ACTIVE_PROFILE, ACTIVE_NORM = "Stärke", "z"
+ACTIVE_PROFILE, ACTIVE_NORM = "Standard", "z"
 NORMS = ("minmax", "rank", "z")
 FORM_WEEKS = 3
 # Gepoolte Wochenstreuung σ: Startwert 35 mit dem Gewicht von 20 Freiheitsgraden, läuft mit der Saison aus (Frage 8)
