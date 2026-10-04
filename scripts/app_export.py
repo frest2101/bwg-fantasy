@@ -668,7 +668,7 @@ def build_claude(result: dict, teams: dict, schedule: dict, players: dict | None
                         fixed(sim.get("playoff"), 4)])
     out = {"legende": "BWG Fantasy Liga (ESPN 1166555857), inoffizielle Auswertung. Punkte = ESPN appliedTotal; "
                       "Projektionen sind ESPN-Input. Zeilen gehören zu den *_spalten; id = ESPN-Spieler-ID wie in "
-                      "waiver.json; mu_n1 = Positions-Matchup F des Gegners in matchup_woche, > 1 günstig. "
+                      "waiver.json; mu_n1 = Faktor (Position) des Gegners in matchup_woche (App: Matchups), > 1 günstig. "
                       "Definitionen: docs/app_daten.md "
                       "und CLAUDE.md (Rechenregeln) im Repo frest2101/bwg-fantasy.",
            "legende_stand": "Tagesstand (pool_stand): Zuordnung zu kader/free_agents, inj, status, proj (ESPN-Projektion "

@@ -395,9 +395,9 @@ def kopf(jetzt: datetime, liga, index: dict, abweichung, ausfall: dict) -> list:
         aus.append(f"App: gerechnet bis Woche {stand.get('nach_woche', '?')}; {tagesstand}; {letzter}")
         lesehilfe += " Laut App (Wochenstand): ROS/Sp = ROS-Projektion je Spiel"
         if index["f_ok"]:
-            lesehilfe += ", F = Positions-Matchup des Gegners (> 1 günstig)."
+            lesehilfe += ", F = Faktor (Position) des Gegners laut Matchups (> 1 günstig)."
         else:
-            lesehilfe += f"; F fehlt, die App rechnet das Positions-Matchup für Woche {stand.get('matchup_woche', '?')}."
+            lesehilfe += f"; F fehlt, die App rechnet die Matchups für Woche {stand.get('matchup_woche', '?')}."
     aus.append(lesehilfe)
     return aus
 
