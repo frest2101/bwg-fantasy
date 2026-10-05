@@ -1,5 +1,5 @@
 {
-"stand":"2026-10-04T2151Z",
+"stand":"2026-10-05T0258Z",
 "woche":4,
 "einheiten":{"temp":"°C","wind":"km/h","boeen":"km/h","regen_wahrsch":"%","niederschlag":"mm","schnee":"cm"},
 "schwellen":{"wind":25,"boeen":40,"regen_wahrsch":60,"schnee":0},
@@ -14,12 +14,12 @@
 {"id":401872971,"woche":4,"kickoff":"2026-10-04T17:00Z","tbd":false,"heim":"BUF","gast":"NE","stadion":"Highmark Stadium (Neubau 2026)","ort":"Orchard Park, NY","dach":"offen","neutral":false,"temp":20.4,"wind":18.7,"boeen":28.8,"regen_wahrsch":8,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
 {"id":401872972,"woche":4,"kickoff":"2026-10-04T17:00Z","tbd":false,"heim":"CHI","gast":"NYJ","stadion":"Soldier Field","ort":"Chicago, IL","dach":"offen","neutral":false,"temp":21.2,"wind":12.5,"boeen":24.5,"regen_wahrsch":0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
 {"id":401872973,"woche":4,"kickoff":"2026-10-04T17:00Z","tbd":false,"heim":"BAL","gast":"TEN","stadion":"M&T Bank Stadium","ort":"Baltimore, MD","dach":"offen","neutral":false,"temp":16.8,"wind":7.0,"boeen":18.4,"regen_wahrsch":9,"niederschlag":0.7,"schnee":0.0,"markierung":[]},
-{"id":401872974,"woche":4,"kickoff":"2026-10-04T20:05Z","tbd":false,"heim":"MIN","gast":"MIA","stadion":"U.S. Bank Stadium","ort":"Minneapolis, MN","dach":"fest","neutral":false,"temp":19.9,"wind":16.3,"boeen":36.0,"regen_wahrsch":0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
-{"id":401872975,"woche":4,"kickoff":"2026-10-04T20:25Z","tbd":false,"heim":"SF","gast":"DEN","stadion":"Levi's Stadium","ort":"Santa Clara, CA","dach":"offen","neutral":false,"temp":29.6,"wind":12.4,"boeen":20.5,"regen_wahrsch":1,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
-{"id":401872976,"woche":4,"kickoff":"2026-10-04T20:25Z","tbd":false,"heim":"LV","gast":"KC","stadion":"Allegiant Stadium","ort":"Las Vegas, NV","dach":"fest","neutral":false,"temp":35.4,"wind":8.0,"boeen":28.4,"regen_wahrsch":0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
-{"id":401872977,"woche":4,"kickoff":"2026-10-04T20:25Z","tbd":false,"heim":"SEA","gast":"LAC","stadion":"Lumen Field","ort":"Seattle, WA","dach":"offen","neutral":false,"temp":17.4,"wind":3.6,"boeen":10.1,"regen_wahrsch":0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
-{"id":401872978,"woche":4,"kickoff":"2026-10-05T00:20Z","tbd":false,"heim":"CAR","gast":"DET","stadion":"Bank of America Stadium","ort":"Charlotte, NC","dach":"offen","neutral":false,"temp":17.8,"wind":3.6,"boeen":7.2,"regen_wahrsch":5,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
-{"id":401872979,"woche":4,"kickoff":"2026-10-06T00:15Z","tbd":false,"heim":"NO","gast":"ATL","stadion":"Caesars Superdome","ort":"New Orleans, LA","dach":"fest","neutral":false,"temp":24.3,"wind":8.5,"boeen":36.4,"regen_wahrsch":10,"niederschlag":0.0,"schnee":0.0,"markierung":[]}
+{"id":401872974,"woche":4,"kickoff":"2026-10-04T20:05Z","tbd":false,"heim":"MIN","gast":"MIA","stadion":"U.S. Bank Stadium","ort":"Minneapolis, MN","dach":"fest","neutral":false,"temp":19.9,"wind":14.4,"boeen":32.4,"regen_wahrsch":0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
+{"id":401872975,"woche":4,"kickoff":"2026-10-04T20:25Z","tbd":false,"heim":"SF","gast":"DEN","stadion":"Levi's Stadium","ort":"Santa Clara, CA","dach":"offen","neutral":false,"temp":28.7,"wind":15.2,"boeen":27.0,"regen_wahrsch":0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
+{"id":401872976,"woche":4,"kickoff":"2026-10-04T20:25Z","tbd":false,"heim":"LV","gast":"KC","stadion":"Allegiant Stadium","ort":"Las Vegas, NV","dach":"fest","neutral":false,"temp":35.4,"wind":4.4,"boeen":19.4,"regen_wahrsch":0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
+{"id":401872977,"woche":4,"kickoff":"2026-10-04T20:25Z","tbd":false,"heim":"SEA","gast":"LAC","stadion":"Lumen Field","ort":"Seattle, WA","dach":"offen","neutral":false,"temp":18.1,"wind":4.6,"boeen":13.3,"regen_wahrsch":0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
+{"id":401872978,"woche":4,"kickoff":"2026-10-05T00:20Z","tbd":false,"heim":"CAR","gast":"DET","stadion":"Bank of America Stadium","ort":"Charlotte, NC","dach":"offen","neutral":false,"temp":18.1,"wind":2.5,"boeen":6.8,"regen_wahrsch":4,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
+{"id":401872979,"woche":4,"kickoff":"2026-10-06T00:15Z","tbd":false,"heim":"NO","gast":"ATL","stadion":"Caesars Superdome","ort":"New Orleans, LA","dach":"fest","neutral":false,"temp":24.5,"wind":7.9,"boeen":34.2,"regen_wahrsch":14,"niederschlag":0.0,"schnee":0.0,"markierung":[]}
 ],
 "ist":[
 {"id":401872656,"woche":1,"kickoff":"2026-09-10T00:20Z","tbd":false,"heim":"SEA","gast":"NE","stadion":"Lumen Field","ort":"Seattle, WA","dach":"offen","neutral":false,"temp":21.6,"wind":6.3,"boeen":14.0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
@@ -79,6 +79,10 @@
 {"id":401872970,"woche":4,"kickoff":"2026-10-04T17:00Z","tbd":false,"heim":"PHI","gast":"LAR","stadion":"Lincoln Financial Field","ort":"Philadelphia, PA","dach":"offen","neutral":false,"temp":15.6,"wind":14.4,"boeen":29.2,"niederschlag":0.4,"schnee":0.0,"markierung":[]},
 {"id":401872971,"woche":4,"kickoff":"2026-10-04T17:00Z","tbd":false,"heim":"BUF","gast":"NE","stadion":"Highmark Stadium (Neubau 2026)","ort":"Orchard Park, NY","dach":"offen","neutral":false,"temp":20.4,"wind":18.7,"boeen":28.8,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
 {"id":401872972,"woche":4,"kickoff":"2026-10-04T17:00Z","tbd":false,"heim":"CHI","gast":"NYJ","stadion":"Soldier Field","ort":"Chicago, IL","dach":"offen","neutral":false,"temp":21.2,"wind":12.5,"boeen":24.5,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
-{"id":401872973,"woche":4,"kickoff":"2026-10-04T17:00Z","tbd":false,"heim":"BAL","gast":"TEN","stadion":"M&T Bank Stadium","ort":"Baltimore, MD","dach":"offen","neutral":false,"temp":16.8,"wind":7.0,"boeen":18.4,"niederschlag":0.7,"schnee":0.0,"markierung":[]}
+{"id":401872973,"woche":4,"kickoff":"2026-10-04T17:00Z","tbd":false,"heim":"BAL","gast":"TEN","stadion":"M&T Bank Stadium","ort":"Baltimore, MD","dach":"offen","neutral":false,"temp":16.8,"wind":7.0,"boeen":18.4,"niederschlag":0.7,"schnee":0.0,"markierung":[]},
+{"id":401872974,"woche":4,"kickoff":"2026-10-04T20:05Z","tbd":false,"heim":"MIN","gast":"MIA","stadion":"U.S. Bank Stadium","ort":"Minneapolis, MN","dach":"fest","neutral":false,"temp":19.9,"wind":14.4,"boeen":32.4,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
+{"id":401872975,"woche":4,"kickoff":"2026-10-04T20:25Z","tbd":false,"heim":"SF","gast":"DEN","stadion":"Levi's Stadium","ort":"Santa Clara, CA","dach":"offen","neutral":false,"temp":28.7,"wind":15.2,"boeen":27.0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
+{"id":401872976,"woche":4,"kickoff":"2026-10-04T20:25Z","tbd":false,"heim":"LV","gast":"KC","stadion":"Allegiant Stadium","ort":"Las Vegas, NV","dach":"fest","neutral":false,"temp":35.4,"wind":4.4,"boeen":19.4,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
+{"id":401872977,"woche":4,"kickoff":"2026-10-04T20:25Z","tbd":false,"heim":"SEA","gast":"LAC","stadion":"Lumen Field","ort":"Seattle, WA","dach":"offen","neutral":false,"temp":18.1,"wind":4.6,"boeen":13.3,"niederschlag":0.0,"schnee":0.0,"markierung":[]}
 ]
 }
