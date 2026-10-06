@@ -55,5 +55,5 @@
 {"id":"7d1a0476-ee37-4f85-bde9-3d6136e51087","type":"FREEAGENT","team_id":2,"datum":1790962213847,"periode":4,"items":[{"type":"ADD","player_id":4596472,"name":"Jalon Daniels","from_team_id":0,"to_team_id":2,"in_app":true},{"type":"DROP","player_id":4596334,"name":"Keaton Mitchell","from_team_id":2,"to_team_id":0,"in_app":true}]},
 {"id":"b7dbad04-0676-496d-a979-541124d82426","type":"FREEAGENT","team_id":3,"datum":1791120461733,"periode":4,"items":[{"type":"ADD","player_id":4887558,"name":"Emanuel Wilson","from_team_id":0,"to_team_id":3,"in_app":true}]}
 ],
-"aufstellungswechsel":{"1":21,"2":20,"3":8,"4":19,"5":22,"6":5,"7":11,"8":13,"9":20,"10":32}
+"aufstellungswechsel":{"1":21,"2":20,"3":8,"4":19,"5":22,"6":5,"7":11,"8":14,"9":20,"10":34}
 }
