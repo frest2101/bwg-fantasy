@@ -88,10 +88,14 @@ function available(box, W, P, rows, r, wflag, me, kp, zw) {
   // erlaubte Horizonte: Nächste Woche und Nächste 3 Wochen nur mit Wochensicht, Langfristig (zukunft) nur mit Marktwerten
   const hors = HOR.filter(x => x === 'ros' || (x === 'zukunft' ? hasWert : hasWeek));
   const st = {pos: POS.includes(q.get('pos')) ? q.get('pos') : '', text: '',
-    hor: hors.includes(q.get('h')) ? q.get('h') : (hasWeek ? 'woche' : 'ros')};
+    hor: hors.includes(q.get('h')) ? q.get('h') : (hasWeek ? 'woche' : 'ros'),
+    // Status Frei · Alle · Kader (Stephan 06.10.2026): Alle = alle Spieler des Tagesstands, auch die in einem Kader
+    status: ['alle', 'kader'].includes(q.get('status')) ? q.get('status') : 'frei'};
   const free = rows.filter(x => FREE.includes(x.status));
+  const kader = rows.filter(x => x.team > 0);
+  const pick = () => st.status === 'frei' ? free : st.status === 'kader' ? kader : rows;
   // Langfristig (zukunft): nur Spieler mit Marktwert (K und D/ST haben keinen)
-  const rowsNow = () => free.filter(x => (!st.pos || x.pos === st.pos) && (!st.text || x.name.toLowerCase().includes(st.text))
+  const rowsNow = () => pick().filter(x => (!st.pos || x.pos === st.pos) && (!st.text || x.name.toLowerCase().includes(st.text))
     && (st.hor !== 'zukunft' || U.ok(x.wert)));
   // Spieler, die nur der Tagesstand kennt (unter der Woche geholt, frei mit Marktwert), haben keine Wochenwerte
   const inWeek = new Set(P.players.map(p => p.id));
@@ -104,7 +108,7 @@ function available(box, W, P, rows, r, wflag, me, kp, zw) {
   // Wetter-Fähnchen als eigener Link nach #wetter neben dem Spielerlink (kein Link im Link)
   const spieler = {k: 'name', l: 'Spieler', v: x => x.name.toLowerCase(), d: 1, flt: false, f: x => {
     const a = h('a', {href: '#spieler/' + x.id, class: 'pl'},
-      h('span', null, x.name, U.inj(x.inj)), h('span', {class: 'sub'}, `${x.pos ?? '–'} · ${x.nfl ?? '–'} · ${x.status === 'FREEAGENT' ? 'FA' : 'Waivers'}`
+      h('span', null, x.name, U.inj(x.inj)), h('span', {class: 'sub'}, `${x.pos ?? '–'} · ${x.nfl ?? '–'} · ${x.team > 0 ? U.kz(x.team) : x.status === 'FREEAGENT' ? 'FA' : 'Waivers'}`
         + (played(W, x) ? ` · W${W.woche} gespielt` : '')));
     const fl = wflag?.(x.nfl);
     return fl ? h('span', {class: 'plw'}, a, fl) : a;
@@ -127,7 +131,20 @@ function available(box, W, P, rows, r, wflag, me, kp, zw) {
     : x.bye === W.woche ? h('span', {class: 'dn'}, 'W' + x.bye, h('span', {class: 'vh'}, ' – nächste Woche spielfrei')) : 'W' + x.bye};
   const verl = {k: 'inj', l: 'Verletzung', v: x => U.INJ[x.inj] ? x.inj : null, d: 1, f: x => U.INJ[x.inj]?.[1] || (x.inj === 'ACTIVE' ? 'aktiv' : '–')};
   const frist = {k: 'frist', l: 'Frist', v: x => x.status === 'WAIVERS' ? x.waiver_bis : null, d: 1,
-    f: x => x.status === 'WAIVERS' ? U.val(x.waiver_bis, U.stamp, 'keine Frist gemeldet') : U.na('Free Agent, sofort')};
+    f: x => x.status === 'WAIVERS' ? U.val(x.waiver_bis, U.stamp, 'keine Frist gemeldet') : U.na(x.team > 0 ? 'im Kader' : 'Free Agent, sofort')};
+  // Ränge (06.10.2026): je Horizont der Platz innerhalb der Position über alle Spieler des Wochenpools, Kader und frei
+  // zusammen, mit dem Rang über alle Positionen klein darunter; dazu Saison (nach Punkten), Rest je Spiel und ESPNs eigener
+  // Saison-Rang in Ausführlich. why: Text oder Funktion der Zeile (Grund für „–“)
+  const rank = (k, l, kg, why) => ({k, l, num: 1, d: 1, v: x => x[k] ?? null,
+    f: x => U.val(x[k], v => U.rang(x.pos, v, x[kg]), typeof why === 'function' ? why(x) : why)});
+  const rangW = rank('rang_woche', `Rang W${W.woche}`, 'rang_woche_ges', x => played(W, x) ? 'Spiel der Woche schon angepfiffen'
+    : x.bye === W.woche ? 'Bye' : 'kein Wochenwert (Ausfall oder keine Projektion)');
+  const rang3 = rank('rang_3', `Rang ${span(W)}`, 'rang_3_ges', 'keine Projektion der Folgewochen');
+  const rangRos = rank('ros_rang', 'Rang Rest je Spiel', 'ros_rang_ges', rosWhy);
+  const rangSaison = rank('saison_rang', 'Rang Saison', 'saison_rang_ges', x => inWeek.has(x.id) ? 'ohne Spiel' : notInWeek);
+  const rangEspn = rank('espn_rang', 'ESPN-Rang', 'espn_rang_ges', x => inWeek.has(x.id) ? 'kein ESPN-Rang' : notInWeek);
+  const wertRang = {k: 'wert_rang', l: 'Marktwert-Rang', num: 1, d: 1, v: x => x.wert_rang,
+    f: x => U.val(x.wert_rang, v => h('span', {class: 'rg'}, String(v), h('small', null, `${x.pos} ${x.wert_posrang}`)), 'kein Marktwert')};
   // Spalte „Gewinn für <Kürzel>“ = Zugewinn für das Bezugsteam (waiver.json spieler[].zug, Python): brutto, netto nur, wenn
   // ein Drop etwas kostet
   const gain = x => x.zug?.[st.hor]?.[String(me.mine)] ?? null;
@@ -135,6 +152,7 @@ function available(box, W, P, rows, r, wflag, me, kp, zw) {
   const zugCol = () => ({k: 'zug', l: `Gewinn für ${U.kz(me.mine)}`, num: 1, v: x => lost(x) ? null : gain(x)?.b ?? null,
     f: x => {
       const z = gain(x);
+      if (x.team > 0) return U.na(x.team === me.mine ? 'eigener Spieler' : 'im Kader von ' + U.kz(x.team));   // Zugewinn nur für freie Spieler
       if (lost(x)) return U.na('Spiel der Woche schon angepfiffen');
       if (!z) return U.na('verbessert die beste Aufstellung nicht');
       return z.n !== z.b ? [U.sgn(z.b), h('small', null, `netto ${U.sgn(z.n)}`)] : U.sgn(z.b);
@@ -146,29 +164,32 @@ function available(box, W, P, rows, r, wflag, me, kp, zw) {
   const proj = num('proj', `Projektion W${W.woche}`, U.num, 'noch keine ESPN-Projektion');
   // Langfristig: Marktwert (FantasyCalc), Abstand zur Keeper-Linie, Gesamtrang mit Positionsrang, Trend 30 Tage, Alter
   const zukunft = hasWert ? [spieler, num('wert', 'Marktwert', kp.wertTxt), num('wert_ue', 'über Keeper-Linie', kp.wertSgn, 'keine Keeper-Linie'),
-    {k: 'wert_rang', l: 'Marktwert-Rang', num: 1, d: 1, v: x => x.wert_rang, f: x => [String(x.wert_rang), h('small', null, `${x.pos} ${x.wert_posrang}`)]},
-    num('wert_trend', 'Trend 30 Tage', kp.wertSgn), {...num('alter', 'Alter', v => U.num(v, 1), 'nicht in den Stammdaten'), d: 1}] : [];
+    wertRang, num('wert_trend', 'Trend 30 Tage', kp.wertSgn), {...num('alter', 'Alter', v => U.num(v, 1), 'nicht in den Stammdaten'), d: 1}] : [];
   // Einfach / Ausführlich (App-Konzept Abschnitt 8, Paket P5; ersetzt die Spalten-Sichten „Alle · Projektionen · Besitz“): X = nur
   // „Ausführlich“. Einfach je Horizont: Spieler, Gewinn für Mein Team, Vorteil, Projektion bzw. Rest je Spiel, Gegner, Bye, Verletzung;
   // Langfristig: die Marktwert-Spalten
   const X = col => ({...col, x: 1});
   // Nächste 3 Wochen: „Projektion W5–7“ = Summe der Projektionen N+1…N+3, „Vorteil W5–7“ = dieselbe Summe über dem Ersatzniveau
   const base = {
-    woche: [spieler, projUe, proj],
+    woche: [spieler, projUe, proj, rangW],
     drei: [spieler, num('proj3_ue', `Vorteil ${span(W)}`, U.sgn, 'keine Projektion der Folgewochen'),
-      num('proj3', `Projektion ${span(W)}`, U.num, 'keine Projektion der Folgewochen'), X(proj)],
-    ros: [spieler, num('ros_ue', 'Vorteil Rest Saison', U.sgn, rosWhy), X(proj)],
+      num('proj3', `Projektion ${span(W)}`, U.num, 'keine Projektion der Folgewochen'), rang3, X(proj)],
+    ros: [spieler, num('ros_ue', 'Vorteil Rest Saison', U.sgn, rosWhy), rangRos, X(proj)],
     zukunft};
   const SORT = {woche: 'proj_ue', drei: 'proj3_ue', ros: 'ros_ue', zukunft: 'wert'};
-  const CAP = {woche: `Freie Spieler nach Vorteil W${W.woche}`, drei: `Freie Spieler nach Vorteil ${span(W)}`,
-    ros: 'Freie Spieler nach Vorteil Rest der Saison', zukunft: 'Freie Spieler nach Marktwert'};
+  const WER = {frei: 'Freie Spieler', alle: 'Alle Spieler', kader: 'Kaderspieler'};
+  const CAP = () => ({woche: `${WER[st.status]} nach Vorteil W${W.woche}`, drei: `${WER[st.status]} nach Vorteil ${span(W)}`,
+    ros: `${WER[st.status]} nach Vorteil Rest der Saison`, zukunft: `${WER[st.status]} nach Marktwert`})[st.hor];
   const rosG = num('ros_g', 'Rest je Spiel', U.num, rosWhy);
   const besitz = [num('own', 'Besitz %', v => U.pct(v)), num('own_d', 'seit gestern', v => U.sgn(v, 2)), num('started', 'aufgestellt %', v => U.pct(v))];
   // Spalten hinter dem Horizont; im Horizont „Rest der Saison“ ist Rest je Spiel einfach sichtbar, unter Langfristig alles ausführlich.
   // Gegner und Faktor nächste 3 fehlen dienstags vor dem Wochenabruf (zw) in allen Horizonten: Sie gälten noch für die gespielte
   // Woche („Gegner W4“ neben „Projektion W5“, der Faktor zählt W4 mit)
-  const extra = hor => hor === 'zukunft' ? [...(zw ? [] : [mu, mu3]), bye, verl, rosG, ...besitz, frist].map(X)
-    : [...(zw ? [] : [mu, X(mu3)]), bye, verl, hor === 'ros' ? rosG : X(rosG), ...besitz.map(X), X(frist)];
+  // Ränge der anderen Horizonte, Saison und ESPN immer ausführlich; der Rang des eigenen Horizonts steht einfach in base
+  const raenge = hor => [...(hasWeek && hor !== 'woche' ? [rangW] : []), ...(hasWeek && hor !== 'drei' ? [rang3] : []),
+    ...(hor !== 'ros' ? [rangRos] : []), rangSaison, rangEspn, ...(hasWert && hor !== 'zukunft' ? [wertRang] : [])].map(X);
+  const extra = hor => hor === 'zukunft' ? [...(zw ? [] : [mu, mu3]), bye, verl, rosG, ...raenge(hor), ...besitz, frist].map(X)
+    : [...(zw ? [] : [mu, X(mu3)]), bye, verl, hor === 'ros' ? rosG : X(rosG), ...raenge(hor), ...besitz.map(X), X(frist)];
   const count = h('p', {class: 'note', 'aria-live': 'polite'});
   const slot = h('div');
   const fst = {}, filters = [{k: 'nfl', l: 'NFL-Team', v: x => x.nfl, d: 1, cat: 1, f: x => x.nfl},
@@ -177,16 +198,18 @@ function available(box, W, P, rows, r, wflag, me, kp, zw) {
   const build = () => {
     // „Gewinn für <Mein Team>“ nur in den Punkte-Horizonten; Langfristig (Marktwert) hat keinen Zugewinn
     const zug = me.mine && st.hor !== 'zukunft' ? [zugCol()] : [];
-    tbl = U.table({cap: CAP[st.hor], cls: 'nr', rh: 0, rows: rowsNow(), sort: [SORT[st.hor], -1], limit: 50, filter: true,
+    tbl = U.table({cap: CAP(), cls: 'nr', rh: 0, rows: rowsNow(), sort: [SORT[st.hor], -1], limit: 50, filter: true,
       filters, fstate: fst, cols: [base[st.hor][0], ...zug, ...base[st.hor].slice(1), ...extra(st.hor)],
       rc: x => lost(x) ? 'gsp' : null,
-      note: 'Frei = Waivers oder Free Agent laut Tageslauf.' + (st.hor === 'zukunft' ? ' Nur Spieler mit Marktwert (K und D/ST haben keinen).' : '')});
+      note: 'Frei = Waivers oder Free Agent laut Tageslauf.' + (st.status !== 'frei' ? ' Kaderspieler tragen ihr Team in der Unterzeile; Gewinn und Frist gibt es nur für freie Spieler.' : '')
+        + (st.hor === 'zukunft' ? ' Nur Spieler mit Marktwert (K und D/ST haben keinen).' : '') + ' Ränge zählen über alle Spieler des Wochenpools, Kader und frei zusammen.'});
     slot.replaceChildren(tbl);
   };
   const refresh = rebuild => {
     if (rebuild) build(); else tbl.upd(rowsNow());
-    count.textContent = `${rowsNow().length} freie Spieler`;
-    U.setQ(r.base, {team: me.q || null, pos: st.pos || null, h: st.hor !== (hasWeek ? 'woche' : 'ros') ? st.hor : null});
+    count.textContent = `${rowsNow().length} ${st.status === 'frei' ? 'freie Spieler' : st.status === 'kader' ? 'Kaderspieler' : 'Spieler'}`;
+    U.setQ(r.base, {team: me.q || null, pos: st.pos || null, h: st.hor !== (hasWeek ? 'woche' : 'ros') ? st.hor : null,
+      status: st.status !== 'frei' ? st.status : null});
     ersNote.replaceChildren(); U.ap(ersNote, ersText());
   };
   let timer;
@@ -208,13 +231,17 @@ function available(box, W, P, rows, r, wflag, me, kp, zw) {
     horSeg && h('div', {class: 'row'}, horSeg, U.ib('horizont', '')),
     ersNote,
     h('div', {class: 'row'}, U.seg('Position', [['', 'Alle'], ...POS.map(p => [p, p])], st.pos, v => { st.pos = v; refresh(); })),
+    // Überschrift und Zähler nennen den Status, deshalb neu bauen
+    h('div', {class: 'row'}, U.seg('Status', [['frei', 'Frei'], ['alle', 'Alle'], ['kader', 'Kader']], st.status, v => { st.status = v; refresh(true); }),
+      U.ib('markt-status', '')),
     h('div', {class: 'row'}, h('label', null, h('span', {class: 'vh'}, 'Spieler suchen'),
       h('input', {type: 'search', placeholder: 'Name suchen', oninput: e => {
         clearTimeout(timer);
         timer = setTimeout(() => { st.text = e.target.value.trim().toLowerCase(); refresh(); }, 150);
       }}))),
     count, slot,
-    U.legend(['verfuegbar', 'horizont', 'zugewinn', 'proj-ue', 'proj3', 'gespielt', 'ros-ue', 'ersatz', 'ros-spiel', 'proj-naechste',
+    U.legend(['verfuegbar', 'markt-status', 'horizont', 'zugewinn', 'proj-ue', 'proj3', 'gespielt', 'ros-ue', 'ersatz', 'ros-spiel', 'proj-naechste',
+      'rang-woche', 'rang-3', 'ros-rang', 'rang-saison', 'espn-rang',
       ...(zw ? [] : ['mu-n1', 'mu-naechste3']), 'bye-hinweis', 'besitz-trend', 'frist',
       'wetter-markierung', ...(hasWert ? ['marktwert', 'keeper-linie', 'wert-ue', 'wert-trend'] : []), 'filter', 'projektionen']));
   refresh(true);

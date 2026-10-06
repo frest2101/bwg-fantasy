@@ -9,6 +9,9 @@ const POS = ['QB', 'RB', 'WR', 'TE', 'K', 'D/ST'];
 const DAILY = ['team', 'status', 'inj', 'own'];
 // Marktwert je Spieler (waiver.json, nur bei Spielern mit Wert; täglich von FantasyCalc)
 const WERT = ['wert', 'wert_rang', 'wert_posrang', 'wert_trend', 'wert_ue'];
+// Ränge der Wochensicht (Tagesstand, waiver.json): Woche N+1 und Σ nächste 3, je Position und gesamt
+const RANG_TAG = ['rang_woche', 'rang_woche_ges', 'rang_3', 'rang_3_ges', 'proj3'];
+const span = W => W?.horizont?.length ? `W${W.horizont[0]}` + (W.horizont.length > 1 ? `–${W.horizont.at(-1)}` : '') : 'nächste 3';
 // Rückweg zur Liste: zuletzt geöffneter Spieler und die Spaltenfilter der Liste (Modul bleibt geladen, gilt bis zum Neuladen)
 let lastOpened = null, keptFilters = {};
 // Spieler ohne NFL-Team (entlassen, vereinslos) heißen „FA“ statt „null“
@@ -61,7 +64,7 @@ export function merge(P, W) {
     const d = daily.get(p.id);
     if (!d) return p;
     const out = {...p, own_d: d.own_d, started: d.started, waiver_bis: d.waiver_bis, proj_n: d.proj, proj_ue: d.proj_ue, news: d.news};
-    for (const k of [...DAILY, ...WERT]) if (d[k] !== undefined) out[k] = d[k];
+    for (const k of [...DAILY, ...WERT, ...RANG_TAG]) if (d[k] !== undefined) out[k] = d[k];
     return out;
   });
   const known = new Set(P.players.map(p => p.id));
@@ -69,7 +72,7 @@ export function merge(P, W) {
     if (known.has(d.id) || !(d.team > 0 || d.wert != null)) continue;
     const out = {id: d.id, name: d.name ?? `Spieler ${d.id}`, pos: d.pos ?? null, nfl: d.nfl ?? null, team: d.team, status: d.status, inj: d.inj,
       own: d.own, own_d: d.own_d, started: d.started, waiver_bis: d.waiver_bis, proj_n: d.proj, proj_ue: d.proj_ue, news: d.news, fp: d.fp, nur_tag: true};
-    for (const k of WERT) if (d[k] !== undefined) out[k] = d[k];
+    for (const k of [...WERT, ...RANG_TAG]) if (d[k] !== undefined) out[k] = d[k];
     rows.push(out);
   }
   return rows;
@@ -103,13 +106,19 @@ function list(box, W, all, r, rosWhy, ersatz, hasRos) {
     && (!st.team || p.team === st.team)
     && (!st.text || p._n.includes(st.text)));
   const num = (k, l, f = U.num, why) => ({k, l, num: 1, v: p => p[k], f: p => U.val(p[k], f, why)});
+  // Ränge (06.10.2026): Platz innerhalb der Position über alle Spieler des Wochenpools, Kader und frei zusammen, mit dem
+  // Rang über alle Positionen klein darunter; why: Text oder Funktion der Zeile (Grund für „–“)
+  const rank = (k, l, kg, why) => ({k, l, num: 1, d: 1, v: p => p[k] ?? null,
+    f: p => U.val(p[k], v => U.rang(p.pos, v, p[kg]), typeof why === 'function' ? why(p) : why)});
+  const tagWhy = p => p.nur_tag ? 'nicht in den Wochendaten' : !W ? 'ab dem ersten Tageslauf' : 'kein Wochenwert (Bye, Ausfall oder keine Projektion)';
   // Einfach / Ausführlich (App-Konzept Abschnitt 8, Paket P5; ersetzt die Spalten-Sichten „Saison · Rest Saison · Besitz“):
-  // Einfach Spieler, Pkt, Ø Punkte, Form, Rest je Spiel; Ausführlich dazu alle Spalten der drei früheren Sichten (x: 1)
+  // Einfach Spieler, Pkt, Rang Saison, Ø Punkte, Form, Rest je Spiel; Ausführlich dazu alle Spalten der drei früheren Sichten
+  // und die übrigen Ränge (x: 1)
   const X = col => ({...col, x: 1});
   const base = [
     {k: 'name', l: 'Spieler', v: p => p.name.toLowerCase(), d: 1, flt: false, f: p => h('a', {href: '#spieler/' + p.id, class: 'pl'},
       h('span', null, p.name, U.inj(p.inj)), h('span', {class: 'sub'}, `${p.pos ?? '–'} · ${nflTxt(p)}` + (p.team > 0 ? ' · ' + U.kz(p.team) : '')))},
-    num('pts', 'Pkt'), num('avg', 'Ø Punkte', U.num, 'ohne Spiel'),
+    num('pts', 'Pkt'), rank('saison_rang', 'Rang Saison', 'saison_rang_ges', 'ohne Spiel'), num('avg', 'Ø Punkte', U.num, 'ohne Spiel'),
     {k: 'form', l: 'Form', num: 1, v: p => p.form, f: p => [U.val(p.form, U.num, 'ohne Spiel'), ' ', trendTxt(p.trend)]},
     num('ros_g', 'Rest je Spiel', U.num, rosWhy)];
   const extra = [
@@ -117,7 +126,11 @@ function list(box, W, all, r, rosWhy, ersatz, hasRos) {
     {...num('sd', 'Schwankung', U.num, 'unter 2 Spielen'), d: 1}, num('starts', 'Starts', v => v), num('bench_pts', 'Bankpunkte'),
     num('proj_d', 'Ist − Projektion', U.sgn, 'ohne Spiel'), {k: 'spark', l: 'Formkurve', f: p => h('span', {class: 'sp', 'aria-hidden': 'true'}, p.spark || '')},
     num('ros', 'Rest Saison', U.num, rosWhy), num('rest_g', 'Restspiele', v => v, rosWhy), num('ros_po', 'Rest Playoffs', U.num, rosWhy),
-    {...num('ros_rang', 'Rang Rest je Spiel', v => v + '.', rosWhy), d: 1}, {k: 'ros_ue', l: 'Vorteil Rest Saison', num: 1, v: p => p.ros_ue, f: p => U.val(p.ros_ue, U.sgn, ueWhy(p))},
+    rank('ros_rang', 'Rang Rest je Spiel', 'ros_rang_ges', rosWhy), {k: 'ros_ue', l: 'Vorteil Rest Saison', num: 1, v: p => p.ros_ue, f: p => U.val(p.ros_ue, U.sgn, ueWhy(p))},
+    ...(W?.ersatz_woche ? [rank('rang_woche', `Rang W${W.woche}`, 'rang_woche_ges', tagWhy), rank('rang_3', `Rang ${span(W)}`, 'rang_3_ges', tagWhy)] : []),
+    rank('espn_rang', 'ESPN-Rang', 'espn_rang_ges', p => p.nur_tag ? 'nicht in den Wochendaten' : 'kein ESPN-Rang'),
+    ...(W?.wert_stand ? [{k: 'wert_rang', l: 'Marktwert-Rang', num: 1, d: 1, v: p => p.wert_rang,
+      f: p => U.val(p.wert_rang, v => h('span', {class: 'rg'}, String(v), h('small', null, `${p.pos} ${p.wert_posrang}`)), 'kein Marktwert')}] : []),
     {k: 'bye', l: 'Bye', num: 1, cat: 1, v: p => p.bye, d: 1, f: p => U.val(p.bye, v => 'W' + v, 'kein NFL-Team')},
     num('own', 'Besitz %', v => U.pct(v)),
     ...(W ? [num('own_d', 'seit gestern', v => U.sgn(v, 2), 'keine Tagesdaten'), num('started', 'aufgestellt %', v => U.pct(v), 'keine Tagesdaten')] : []),
@@ -126,7 +139,8 @@ function list(box, W, all, r, rosWhy, ersatz, hasRos) {
   const sortKey = 'pts';
   const filters = [{k: 'nfl', l: 'NFL-Team', v: nflTxt, d: 1, cat: 1, f: nflTxt}];
   const cols = [...base, ...extra];
-  const LEG = ['spiele', 'floor-ceil', 'konstanz', 'starts', 'proj-delta-sp', 'ros', 'restspiele', 'ros-po', 'ros-rang', 'ros-ue', 'ersatz', 'projektionen',
+  const LEG = ['spiele', 'rang-saison', 'floor-ceil', 'konstanz', 'starts', 'proj-delta-sp', 'ros', 'restspiele', 'ros-po', 'ros-rang', 'ros-ue', 'ersatz',
+    ...(W?.ersatz_woche ? ['rang-woche', 'rang-3'] : []), 'espn-rang', 'projektionen',
     W ? 'besitz-trend' : 'besitz'];
   const setCount = (n, total) => { count.textContent = n < total ? `${n} von ${total} Spielern` : `${total} Spieler`; };
   let tbl, first = true;
@@ -259,6 +273,8 @@ function one(box, h1, P, W, rows, r, svg, rosWhy, wline, origin, kp) {
   // ---------------------------------------------------------------- Saison
   U.ap(box, h('h2', null, `Saison ${S.man.season}`), h('div', {class: 'tiles'},
     U.tile('Pkt Saison', U.num(p.pts), spiele(p.g), 'spiele'),
+    U.tile('Rang Saison', U.val(p.saison_rang, v => `${p.pos} ${v}`, 'ohne Spiel'), U.ok(p.saison_rang_ges) ? `Gesamt ${p.saison_rang_ges}` : null, 'rang-saison'),
+    U.tile('ESPN-Rang', U.val(p.espn_rang, v => `${p.pos} ${v}`, 'kein ESPN-Rang'), U.ok(p.espn_rang_ges) ? `Gesamt ${p.espn_rang_ges}` : null, 'espn-rang'),
     U.tile('Ø Punkte', U.val(p.avg, U.num, 'ohne Spiel'), null, 'avg'),
     U.tile('Floor / Ceiling', `${U.num(p.floor)} / ${U.num(p.ceil)}`, null, 'floor-ceil'),
     U.tile('Schwan­kung', U.val(p.sd, U.num, 'unter 2 Spielen'), null, 'konstanz'),     // weiches Trennzeichen: schmale Kachel
@@ -290,7 +306,7 @@ function one(box, h1, P, W, rows, r, svg, rosWhy, wline, origin, kp) {
         U.tile('Rest je Spiel', U.val(p.ros_g, U.num, rosWhy), null, 'ros-spiel'),
         U.tile('Rest Saison', U.val(p.ros, U.num, rosWhy), U.ok(p.rest_g) ? `${p.rest_g} Restspiele` : null, 'ros'),
         U.tile('Rest Playoffs', U.val(p.ros_po, U.num, rosWhy), null, 'ros-po'),
-        U.tile('Rang Rest je Spiel', U.val(p.ros_rang, v => `${p.pos} ${v}`, rosWhy), null, 'ros-rang'),
+        U.tile('Rang Rest je Spiel', U.val(p.ros_rang, v => `${p.pos} ${v}`, rosWhy), U.ok(p.ros_rang_ges) ? `Gesamt ${p.ros_rang_ges}` : null, 'ros-rang'),
         m ? [U.tile('Faktor nächste 3', cell(m.naechste3, 'kein Spiel in den nächsten 3 Wochen'), null, dst ? 'naechste3' : 'mu-naechste3'),
           U.tile('Rest Regular Season', cell(m.rest, 'keine Regular-Season-Woche mehr'), null, dst ? 'rest' : 'mu-rest'),
           U.tile('Playoffs W15–17', cell(m.sos_po, 'kein Playoff-Spiel'), null, dst ? 'sos' : 'mu-sos')] : null),
@@ -337,6 +353,9 @@ function woche(box, p, P, W, wl) {
     z ? U.zwischenHinweis(z, m ? `Gegner, Faktor und Rang für W${z.neu} folgen mit dem Wochenabruf.` : null) : null,
     h('div', {class: 'tiles'},
       W ? U.tile(`Projektion W${W.woche}`, U.val(p.proj_n, U.num, 'noch keine ESPN-Projektion'), null, 'proj-naechste') : null,
+      // Rang der Wochenprojektion über alle Spieler des Wochenpools (Kader und frei); ohne Wochenwert (Bye, Ausfall) keiner
+      W?.ersatz_woche ? U.tile(`Rang Projektion W${W.woche}`, U.val(p.rang_woche, v => `${p.pos} ${v}`, p.nur_tag ? 'nicht in den Wochendaten' : p.bye === W.woche ? 'Bye' : 'kein Wochenwert'),
+        U.ok(p.rang_woche_ges) ? `Gesamt ${p.rang_woche_ges}` : null, 'rang-woche') : null,
       // 32 NFL-Teams: Rang 1 = höchster Faktor (F), also das günstigste Matchup
       m && !z ? [U.tile(n1 ? `Gegner W${n1.week}` : 'Gegner', n1 ? n1.opp || 'Bye' : U.na(n1Why), n1?.opp ? (dst ? 'Offense' : 'Defense') : null, 'mu-n1'),
         U.tile('Faktor', n1?.opp ? cell(n1.f, 'kein Faktor') : U.na(n1Why), null, dst ? 'f' : 'mu-f'),

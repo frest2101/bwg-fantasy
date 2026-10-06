@@ -45,7 +45,7 @@ def load_state(season: int) -> dict[int, int]:
 
 def interesting_ids(season: int, pool: dict) -> set[int]:
     """Spieler, die uns interessieren: alle Kaderspieler laut Pool-Auszug plus die Spieler der App (players.json:
-    Kader, mit Spiel, die 20 besten Free Agents je Position). Ohne players.json nur die Kaderspieler."""
+    Kader, mit Spiel, die besten Free Agents je Position). Ohne players.json nur die Kaderspieler."""
     ids = {p["id"] for p in pool["players"] if p.get("onTeamId")}
     app_players = ef.REPO_DIR / "app" / "data" / "players.json"
     if app_players.exists():

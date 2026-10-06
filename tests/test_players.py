@@ -260,6 +260,38 @@ def test_ros_rang(fake):
     assert [p[pid]["ros_rang"] for pid in (13, 11, 15, 12, 14, 16)] == [1, 2, 3, 4, 5, 6]
     assert (p[10]["ros_rang"], p[20]["ros_rang"], p[40]["ros_rang"]) == (1, 2, None)
     assert players.ros_ranks({1: (RB, D(10)), 2: (RB, D(10)), 3: (RB, D(5)), 4: (WR, None)}) == {1: 1, 2: 1, 3: 3}
+    # Rang gesamt über alle Positionen: Gleichstand teilt den besseren Rang, ohne Wert kein Rang
+    assert players.ranks({1: (RB, D(10)), 2: (WR, D(12)), 3: (RB, D(10)), 4: (QB, D(5)), 5: (WR, None)}) == (
+        {1: 1, 2: 1, 3: 1, 4: 1}, {1: 2, 2: 1, 3: 2, 4: 4})
+    assert [p[pid]["ros_rang_ges"] for pid in (10, 20, 30, 13, 11)] == [1, 2, 3, 3, 5]   # 20 · 15 · 12 · 12 · 10
+    assert p[40]["ros_rang_ges"] is None and p[50]["ros_rang_ges"] is None
+
+
+def test_saison_rang(fake):
+    """Saison-Rang nach Punkten nur für Spieler mit Spiel (im Fake nur QB 10), je Position und gesamt."""
+    p = fake["players"]
+    assert (p[10]["saison_rang"], p[10]["saison_rang_ges"]) == (1, 1)
+    assert all(p[pid]["saison_rang"] is None and p[pid]["saison_rang_ges"] is None for pid in p if pid != 10)
+    assert all(p[pid]["espn_rang"] is None for pid in p)   # der Fake-Pool trägt keine ESPN-Ratings
+
+
+def test_espn_raenge_echt(ssn3):
+    """ESPNs Saison-Ränge (kona ratings["0"]) stehen je Spieler im Pool; sie zählen wie der eigene Saison-Rang nach
+    Punkten im Liga-Scoring, nur dass ESPN auch Spieler ohne Spiel einreiht und Gleichstände nicht teilt – deshalb
+    stimmen Position und Rang bei fast allen Spielern mit Spiel überein. Stand des Abrufs: Der W3-Abruf vom 29.09.
+    trug noch ESPNs Stand nach W2 (wie die positionalRatings), sechs Spieler mit erstem Einsatz in W3 haben dort
+    keinen Rang; der W4-Abruf hat alle."""
+    result = players.compute_players(ssn3, [1, 2, 3])
+    ps = [p for p in result["players"].values() if p["games"]]
+    mit = [p for p in ps if p["espn_rang"]]
+    assert ps and len(mit) >= 0.98 * len(ps) and all(p["espn_rang_ges"] for p in mit)
+    assert all(r.espn_pos_rank >= 0 and r.espn_total_rank >= 0 for r in ssn3.pool(3))
+    assert all(p["saison_rang"] <= p["saison_rang_ges"] for p in ps)
+    ssn4 = rawdata.Season(2026, 4)
+    if ssn4.pool(4) is not None:   # der W4-Abruf trägt ESPNs Stand nach W4: Position und Rang wie der eigene Saison-Rang
+        ps4 = [p for p in players.compute_players(ssn4, [1, 2, 3, 4])["players"].values() if p["games"]]
+        assert all(p["espn_rang"] and p["espn_rang_ges"] for p in ps4)
+        assert sum(1 for p in ps4 if p["espn_rang"] == p["saison_rang"]) > 0.85 * len(ps4)   # W4: 540 von 577
 
 
 def test_kader_projektion():
