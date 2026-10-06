@@ -693,6 +693,17 @@ def test_wochensicht_vertrag():
     assert app_export.week_view(dict(pool, woche=18), result) is None
 
 
+def test_profil_byes_ab_offener_woche():
+    """Restwochen der Bye-Kosten im Profil: ab max(Wochenstand + 1, Woche des Tagesstands) bis W14, in den Playoffs bis
+    W17. Dienstags vor dem Wochenabruf führt der Tagesstand schon N+2, die Woche N+1 ist gespielt (Beschluss 06.10.2026)."""
+    f = app_export.profile_bye_weeks
+    assert f(4, 5, "regular") == list(range(5, 15))      # Montag bzw. nach dem Wochenabruf
+    assert f(4, 6, "regular") == list(range(6, 15))      # Di 13.10. vor dem Wochenabruf: W5 gespielt
+    assert f(4, None, "regular") == list(range(5, 15))   # ohne Woche im Tagesstand gilt der Wochenstand
+    assert f(13, 15, "regular") == []                    # Di nach W14 vor dem Wochenabruf: Regular Season vorbei
+    assert f(14, 15, "playoffs") == [15, 16, 17] and f(15, 17, "playoffs") == [17]
+
+
 def test_profil_und_zugewinn_echte_daten():
     """Profil und Zugewinn auf dem echten Stand. Der Tagesstand wechselt stündlich, deshalb nur Invarianten:
     sieben Gruppen je Team, Σ Gruppen = Gesamt, schwach und stark getrennt, Absicherung und Bye-Kosten ≤ 0,
@@ -716,6 +727,15 @@ def test_profil_und_zugewinn_echte_daten():
                    for a in p["absicherung"].values())
         assert all(b["kosten"] < 0 and b["ids"] for b in p["byes"])
         assert p["kader"]["spieler"] >= 13 and isinstance(p["kader"]["voll"], bool) and 0 <= p["kader"]["ir"] <= 1
+    # Byes (Verlust) erst ab der nächsten offenen Woche: nach dem Wochenstand und nicht vor der Woche des Tagesstands
+    after = res["players"]["ros_after_week"]
+    assert all(b["woche"] >= max(after + 1, res["pool_latest"]["woche"]) for p in out["profil"].values() for b in p["byes"])
+    if after + 2 <= app_export.players_module.LAST_REGULAR_WEEK:
+        # Dienstag vor dem Wochenabruf nachgestellt: Der Tageslauf führt schon N+2, die Woche N+1 ist gespielt, aber
+        # noch nicht gewertet – sie darf im Profil keine Bye-Kosten mehr tragen (Beschluss Stephan 06.10.2026)
+        tue = app_export.build_waiver(dict(res, pool_latest=dict(res["pool_latest"], woche=after + 2)))
+        early = sorted({b["woche"] for p in tue["profil"].values() for b in p["byes"] if b["woche"] < after + 2})
+        assert not early, f"Bye-Kosten in gespielten Wochen {early}"
     # IR-Slot laut Tagesstand: ein Team mit 24 Spielern und einem davon im IR-Slot hat einen Platz frei
     small = next(t for t, p in out["profil"].items() if p["kader"]["spieler"] == 24)
     parked = next(p["id"] for p in res["pool_latest"]["players"] if p.get("onTeamId") == small)

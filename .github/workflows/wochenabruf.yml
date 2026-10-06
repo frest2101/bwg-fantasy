@@ -6,6 +6,9 @@
 # oder zurückgenommene Korrektur erscheint als Hinweis am Lauf, ein Ausfall der Prüfung ebenso (der Lauf bleibt grün).
 # Rohdaten werden auch committet, wenn Rechenwerk oder Tests scheitern (ROS-Auszug und Dienstags-Stände gibt es nur
 # „jetzt“); die abgeleiteten Dateien (season_2026.json, app/data) nur, wenn beides grün ist. Der Lauf bleibt dann rot.
+# Zeiten in UTC, ohne Zeitzonen-Angabe: tests/test_zeitplan.py hält die cron-Zeilen, WOCHENABRUF_H in app/js/ui.js (Hinweis
+# „Gespielt, noch nicht gewertet“ und „Nächster Wochenabruf“ im Datenstand-Fenster), Glossar „Aktualisierung“ und README
+# zusammen – wer die cron-Zeilen ändert, zieht dort nach.
 name: Wochenabruf
 
 on:
