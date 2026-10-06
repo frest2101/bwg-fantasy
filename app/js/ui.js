@@ -195,24 +195,35 @@ export const saisonLaeuft = () => {
   return t < ende && (S.man.datenstand?.playoff_woche ?? 0) < last.week;
 };
 // Wochenabruf laut .github/workflows/wochenabruf.yml in Stunden nach Dienstag 00:00 UTC: Di 08:30, Nachläufe Di 16:30 und
-// Mi 08:30 UTC (tests/test_zeitplan.py vergleicht mit den cron-Zeilen); wochenabrufe(n) = die drei Termine am Beginn von Woche n
+// Mi 08:30 UTC (tests/test_zeitplan.py vergleicht mit den cron-Zeilen); wochenabrufe(tag) = die drei Termine ab dem Dienstag
+// tag („2026-10-06“, Beginn einer Woche), ohne tag keine
 export const WOCHENABRUF_H = [8.5, 16.5, 32.5];
-export const wochenabrufe = n => { const s = S.weeks?.find(w => w.week === n)?.start;
-  return s ? WOCHENABRUF_H.map(x => new Date(Date.parse(s + 'T00:00:00Z') + x * 36e5)) : []; };
+export const wochenabrufe = tag => tag ? WOCHENABRUF_H.map(x => new Date(Date.parse(tag + 'T00:00:00Z') + x * 36e5)) : [];
+// Nächster Wochenabruf als Text, gleich im Hinweis „Gespielt, noch nicht gewertet“ und im Datenstand-Fenster („Nächster
+// Wochenabruf“): vor dem ersten Termin „geplant …“, danach „fällig seit …“ mit dem nächsten Nachlauf, solange einer aussteht.
+// Ob GitHub den Lauf schon gestartet hat (meist 10–16 min nach dem Slot, manchmal deutlich später), weiß die App nicht –
+// deshalb nie „verpasst“; ohne tag null
+export function wochenabrufTxt(tag) {
+  const [erster, ...nach] = wochenabrufe(tag), jetzt = Date.now();
+  if (!erster) return null;
+  if (erster.getTime() > jetzt) return `geplant ${stamp(erster)}`;
+  const nachlauf = nach.find(t => t.getTime() > jetzt);
+  return `fällig seit ${stamp(erster)}` + (nachlauf ? `, nächster Nachlauf ${stamp(nachlauf)}` : '');
+}
 // Dienstags zwischen Wochenwechsel und Wochenabruf (Beschluss Stephan 06.10.2026): Der Tageslauf führt schon die neue Woche
 // (waiver.json › woche = N+2), der Wochenstand noch die alte (players.json › mu_woche = N+1, Rest der Saison nach W N).
 // Nicht über manifest › datenstand.pool_woche: das ist der Wochen-Pool (= gewertete Woche) und nie größer.
 // → {gespielt: N+1, neu: N+2, stand: N} oder null (Montag, nach dem Wochenabruf, ohne Tagesstand, nach W17: mu_woche null)
 export const zwischenstand = (W, P) => W && P && ok(W.woche) && ok(P.mu_woche) && W.woche > P.mu_woche
   ? {gespielt: P.mu_woche, neu: W.woche, stand: P.mu_woche - 1} : null;
-// Hinweiszeile dazu (Markt, Spielerseite, Team-Seite) mit dem nächsten Wochenabruf: ein Termin gilt bis 30 min nach dem Slot als
-// ausstehend (GitHub startet meist 10–16 min später), danach der nächste; sind alle drei vorbei, „steht noch aus“. zusatz =
-// Satz der Ansicht (was dort bis dahin fehlt)
+// Hinweiszeile dazu (Markt, Spielerseite, Team-Seite) mit dem nächsten Wochenabruf (wochenabrufTxt). „endet mit dem
+// Montagsspiel“ statt „ist gespielt“: Der Tagesstand wechselt um 00:00 UTC in die neue Woche, beim ersten Tageslauf am
+// Dienstag (rund 2 h 40 min nach dem Anstoß) läuft das Montagsspiel oft noch. Gegner nennt der Grundsatz nicht – die Ansichten
+// blenden ihn aus und sagen das im zusatz (Satz der Ansicht: was dort bis dahin fehlt)
 export function zwischenHinweis(z, zusatz) {
-  const laeufe = wochenabrufe(z.neu), lauf = laeufe.find(t => t.getTime() + 30 * 6e4 > Date.now());
-  const wann = !lauf ? 'steht noch aus' : lauf === laeufe[0] ? `geplant ${stamp(lauf)}` : `steht noch aus, nächster Lauf ${stamp(lauf)}`;
-  return h('p', {class: 'warn'}, `W${z.gespielt} ist gespielt und wird mit dem Wochenabruf gewertet (${wann}). Bis dahin gelten `
-    + `Kader und Projektion schon für W${z.neu}; Gegner, Faktoren, Rest der Saison sowie Stärken und Schwächen zeigen noch den Stand nach W${z.stand}.`,
+  const wann = wochenabrufTxt(S.weeks?.find(w => w.week === z.neu)?.start);
+  return h('p', {class: 'warn'}, `W${z.gespielt} endet mit dem Montagsspiel und wird mit dem Wochenabruf gewertet${wann ? ` (${wann})` : ''}. `
+    + `Bis dahin gelten Kader und Projektion schon für W${z.neu}; Faktoren, Rest der Saison sowie Stärken und Schwächen zeigen noch den Stand nach W${z.stand}.`,
   zusatz ? ' ' + zusatz : null, ' ', ib('vor-wochenabruf', ''));
 }
 // Farbklasse eines Faktors F um 1,00 (D/ST-Faktoren, Positions-Matchup): f1–f3 blau = günstig, g1–g3 orange = ungünstig,

@@ -115,8 +115,9 @@ def test_kurzformel_passt_zum_plan():
 
 def test_wochenabruf_zeiten_in_der_app():
     """WOCHENABRUF_H in app/js/ui.js (Stunden nach Dienstag 00:00 UTC) entspricht den cron-Zeilen von wochenabruf.yml;
-    app.js rechnet „Nächster Wochenabruf“ damit statt mit einer eigenen Uhrzeit, Glossar „Aktualisierung“ und README
-    nennen dieselben Termine. Der Workflow läuft in UTC (ohne timezone) – mit einer Zeitzone stimmten die Stunden nicht."""
+    app.js nimmt „Nächster Wochenabruf“ aus ui.js (U.wochenabrufe für „alt“, U.wochenabrufTxt für den Text wie im Hinweis
+    „Gespielt, noch nicht gewertet“) statt aus einer eigenen Uhrzeit, Glossar „Aktualisierung“ und README nennen dieselben
+    Termine. Der Workflow läuft in UTC (ohne timezone) – mit einer Zeitzone stimmten die Stunden nicht."""
     workflow = read(WOCHENABRUF)
     termine = [(int(tag), int(stunde), int(minute)) for minute, stunde, tag in CRON_WOCHE.findall(workflow)]
     assert termine and len(termine) == len(CRON_ZEILE.findall(workflow)), "cron-Eintrag in anderer Form in wochenabruf.yml"
@@ -126,7 +127,10 @@ def test_wochenabruf_zeiten_in_der_app():
     assert ui, "WOCHENABRUF_H in app/js/ui.js nicht gefunden"
     assert json.loads(ui.group(1)) == [(tag - 2) * 24 + stunde + minute / 60 for tag, stunde, minute in termine]
     (_, stunde, minute), *nach = termine
-    assert f"T{stunde:02d}:{minute:02d}:00Z" not in read(APP_JS) and "U.WOCHENABRUF_H[0]" in read(APP_JS)
+    app_js = read(APP_JS)
+    for name, inhalt in (("app/js/app.js", app_js), ("app/js/ui.js", read(UI_JS))):
+        assert f"T{stunde:02d}:{minute:02d}" not in inhalt, f"{name}: eigene Uhrzeit des Wochenabrufs statt WOCHENABRUF_H"
+    assert "U.wochenabrufe(" in app_js and "U.wochenabrufTxt(" in app_js, "app.js: Wochenabruf nicht aus ui.js"
     kurz = {2: "Di", 3: "Mi"}
     text = (f"dienstags {stunde:02d}:{minute:02d} UTC, Nachläufe "
             + " und ".join(f"{kurz[t]} {h:02d}:{m:02d}" for t, h, m in nach) + " UTC")

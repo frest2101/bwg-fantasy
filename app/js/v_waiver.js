@@ -81,8 +81,8 @@ export async function render(box, ctx, r) {
 }
 
 // ---------------------------------------------------------------- beste verfügbare Spieler je Position
-// z = U.zwischenstand (dienstags vor dem Wochenabruf) oder null
-function available(box, W, P, rows, r, wflag, me, kp, z) {
+// zw = U.zwischenstand (dienstags vor dem Wochenabruf) oder null
+function available(box, W, P, rows, r, wflag, me, kp, zw) {
   const q = r.q;
   const hasWeek = !!W.ersatz_woche, hasWert = !!kp;
   // erlaubte Horizonte: Nächste Woche und Nächste 3 Wochen nur mit Wochensicht, Langfristig (zukunft) nur mit Marktwerten
@@ -165,10 +165,10 @@ function available(box, W, P, rows, r, wflag, me, kp, z) {
   const rosG = num('ros_g', 'Rest je Spiel', U.num, rosWhy);
   const besitz = [num('own', 'Besitz %', v => U.pct(v)), num('own_d', 'seit gestern', v => U.sgn(v, 2)), num('started', 'aufgestellt %', v => U.pct(v))];
   // Spalten hinter dem Horizont; im Horizont „Rest der Saison“ ist Rest je Spiel einfach sichtbar, unter Langfristig alles ausführlich.
-  // Gegner und Faktor nächste 3 fehlen dienstags vor dem Wochenabruf (z) in allen Horizonten: Sie gälten noch für die gespielte
+  // Gegner und Faktor nächste 3 fehlen dienstags vor dem Wochenabruf (zw) in allen Horizonten: Sie gälten noch für die gespielte
   // Woche („Gegner W4“ neben „Projektion W5“, der Faktor zählt W4 mit)
-  const extra = hor => hor === 'zukunft' ? [...(z ? [] : [mu, mu3]), bye, verl, rosG, ...besitz, frist].map(X)
-    : [...(z ? [] : [mu, X(mu3)]), bye, verl, hor === 'ros' ? rosG : X(rosG), ...besitz.map(X), X(frist)];
+  const extra = hor => hor === 'zukunft' ? [...(zw ? [] : [mu, mu3]), bye, verl, rosG, ...besitz, frist].map(X)
+    : [...(zw ? [] : [mu, X(mu3)]), bye, verl, hor === 'ros' ? rosG : X(rosG), ...besitz.map(X), X(frist)];
   const count = h('p', {class: 'note', 'aria-live': 'polite'});
   const slot = h('div');
   const fst = {}, filters = [{k: 'nfl', l: 'NFL-Team', v: x => x.nfl, d: 1, cat: 1, f: x => x.nfl},
@@ -215,7 +215,7 @@ function available(box, W, P, rows, r, wflag, me, kp, z) {
       }}))),
     count, slot,
     U.legend(['verfuegbar', 'horizont', 'zugewinn', 'proj-ue', 'proj3', 'gespielt', 'ros-ue', 'ersatz', 'ros-spiel', 'proj-naechste',
-      ...(z ? [] : ['mu-n1', 'mu-naechste3']), 'bye-hinweis', 'besitz-trend', 'frist',
+      ...(zw ? [] : ['mu-n1', 'mu-naechste3']), 'bye-hinweis', 'besitz-trend', 'frist',
       'wetter-markierung', ...(hasWert ? ['marktwert', 'keeper-linie', 'wert-ue', 'wert-trend'] : []), 'filter', 'projektionen']));
   refresh(true);
   return {rebuild: () => refresh(true)};
