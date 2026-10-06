@@ -341,7 +341,8 @@ def league_games(ssn: rawdata.Season, weeks: list[int]) -> list[dict]:
 
     Für die gerechneten Wochen kommen Punkte und Sieger aus der Datei der jeweiligen Woche samt Stat-Korrektur
     (espn_fetch.load_week_matchups, wie Tabelle und Rekorde). Weicht der Spielplan der Stand-Woche davon ab, hat ESPN
-    nach dem Dienstag korrigiert und der Wochenabruf das noch nicht übernommen – dann eine Warnung am Lauf; nach der
+    nach dem Dienstag korrigiert und der Wochenabruf das noch nicht übernommen – oder nicht übernehmen können, weil die
+    Korrektur in sich nicht stimmt (dann meldet er „nicht übernommen“) –, dann eine Warnung am Lauf; nach der
     Übernahme (wNN/statkorrektur.json) ist sie still.
     """
     settings = ssn.settings()["scheduleSettings"]
@@ -363,7 +364,8 @@ def league_games(ssn: rawdata.Season, weeks: list[int]) -> list[dict]:
             if (game["home_pf"], game["away_pf"]) != (o["home_points"], o["away_points"]):
                 ef.warn(f"W{game['week']} Spiel {m['id']}: Spielplan der Stand-Woche {game['home_pf']}:{game['away_pf']}, "
                         f"Wochendatei {o['home_points']}:{o['away_points']} – Stat-Korrektur noch nicht übernommen "
-                        f"(übernimmt der Wochenabruf, wNN/{ef.STATKORREKTUR_FILE})")
+                        f"(der Wochenabruf übernimmt sie nach wNN/{ef.STATKORREKTUR_FILE}, sobald sie in sich stimmt; "
+                        f"sonst meldet er dort „nicht übernommen“)")
             pf, pa = o["home_points"], o["away_points"]
             game.update(home_pf=pf, away_pf=pa if o["away_id"] is not None else None,
                         winner=(o["home_id"] if pf > pa else o["away_id"] if pf < pa else "T")

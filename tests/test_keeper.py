@@ -186,6 +186,14 @@ def result():
     return compute.compute_season(2026, through=3)
 
 
+@pytest.fixture(scope="module")
+def dienstag():
+    """Wie result, aber ohne Stat-Korrekturen: der Dienstags-Stand der Wochendateien (Grundlage der Referenzwerte)."""
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(ef, "load_statkorrektur", lambda season, week: None)
+        return compute.compute_season(2026, through=3)
+
+
 def test_echte_daten_summe_gleich_pf(result):
     """Die vier Gruppen summieren sich je Team zur PF (wie der Positions-Breakdown); der Kern ist ein Teil davon."""
     k = result["keeper"]
@@ -210,26 +218,24 @@ def statkorrektur_delta(weeks) -> Decimal:
     return total
 
 
-def test_echte_daten_w3(result):
+def test_echte_daten_w3(dienstag, result):
     """Referenz W1–W3 im Dienstags-Stand (Inventur 30.09.2026, zweifach gerechnet): Keeper 75,8 % der Liga-PF, im Kern
     88,9 %; die zwei getauschten Spieler brachten 5,00 Punkte (Rotzleffe).
 
-    Stat-Korrekturen gelten rückwirkend wie bei ESPN (Beschluss 06.10.2026): Die vom 06.10.2026 (W3, zwei D/ST aus
-    dem Draft je −1 Punkt) verschiebt Summe und Draft-Punkte um ihren Betrag, Keeper, Kern, Zugänge und Trades
-    bleiben. Grün mit und ohne übernommene Korrektur; trifft eine spätere Korrektur W1–W3 eine andere Gruppe, hier
-    nachziehen."""
-    liga = result["keeper"]["liga"]
+    Stat-Korrekturen gelten rückwirkend wie bei ESPN (Beschluss 06.10.2026): Die Referenz rechnet ohne sie (Dienstag),
+    der Stand des Repos verschiebt die Summe um den Betrag der übernommenen Korrekturen (06.10.2026: W3, zwei D/ST
+    aus dem Draft je −1 Punkt). Grün mit und ohne übernommene Korrektur, auch bei einer späteren Korrektur von W1–W3."""
+    liga = dienstag["keeper"]["liga"]
     r1 = lambda v: v.quantize(D("0.1"))  # noqa: E731
-    delta = statkorrektur_delta(range(1, 4))
-    assert R2(liga["pf"]["summe"]) == D("6126.20") + delta
-    assert R2(liga["pf"]["pts"]["draft"]) == D("1424.44") + delta
-    assert {g: r1(v) for g, v in liga["pf"]["anteil"].items() if g != "draft"} == {
-        "keeper": D("75.8"), "zugang": D("0.9"), "trade": D("0.1")}
+    assert R2(liga["pf"]["summe"]) == D("6126.20")
+    assert {g: r1(v) for g, v in liga["pf"]["anteil"].items()} == {
+        "keeper": D("75.8"), "draft": D("23.3"), "zugang": D("0.9"), "trade": D("0.1")}
     assert R2(liga["pf"]["pts"]["trade"]) == D("5.00") and R2(liga["pf"]["pts"]["keeper"]) == D("4644.55")
     assert r1(liga["kern"]["anteil"]["keeper"]) == D("88.9") and R2(liga["kern"]["summe"]) == D("4934.20")
-    teams = {t["team_id"]: t for t in result["keeper"]["teams"]}
+    teams = {t["team_id"]: t for t in dienstag["keeper"]["teams"]}
     assert r1(teams[1]["pf"]["anteil"]["keeper"]) == D("87.0") and r1(teams[9]["pf"]["anteil"]["keeper"]) == D("60.3")
     assert R2(teams[7]["pf"]["pts"]["trade"]) == D("5.00")
+    assert R2(result["keeper"]["liga"]["pf"]["summe"]) == D("6126.20") + statkorrektur_delta(range(1, 4))
 
 
 def test_echte_daten_draft(result):

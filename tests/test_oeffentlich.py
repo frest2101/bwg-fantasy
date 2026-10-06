@@ -68,8 +68,9 @@ def test_statkorrekturen_nur_ids_und_zahlen():
     patterns = check_public.manager_patterns(ef.REPO_DIR)
     for path in sorted(ef.RAW_DIR.glob("*/w*/" + ef.STATKORREKTUR_FILE)):
         data = ef.load_json(path)
-        texte = [v for v in values([data["spiele"], data["spieler"]]) if isinstance(v, str) and not erlaubt.match(v)]
-        assert texte == [], ef.rel(path)
+        # nur die Zahl melden: pytest zeigt sonst die gefundenen Texte, und die Action-Logs sind öffentlich
+        texte = sum(1 for v in values([data["spiele"], data["spieler"]]) if isinstance(v, str) and not erlaubt.match(v))
+        assert texte == 0, f"{ef.rel(path)}: Textwerte in Spielen oder Spielern"
         text = path.read_text(encoding="utf-8")
         assert not [kind for kind, rx in patterns if rx.search(text)], ef.rel(path)
 

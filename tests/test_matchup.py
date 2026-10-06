@@ -17,6 +17,7 @@ import matchup
 import rawdata
 from lineup import DST, K, QB, RB, TE, WR
 from rawdata import NflTeam, PoolRow
+from test_dst import schnappschuss
 from zahlen import ONE, ZERO, dec, rounded
 
 FILES = ef.season_files(2026)
@@ -26,15 +27,11 @@ POS_KEYS = {"z25", "n25", "z26", "n", "r25", "r26", "f", "f_vorwoche", "delta", 
             "zugelassen", "f_verlauf"}
 
 
-def real(through: int) -> dict:
+def real(through: int, ssn: rawdata.Season | None = None) -> dict:
+    """Positions-Matchup nach Woche through; ohne ssn mit allen übernommenen Stat-Korrekturen (Stand des Repos)."""
     if not all((ef.week_dir(2026, w) / ef.KONA_FILE).exists() for w in range(1, through + 1)):
         pytest.skip(f"Spielerpool bis W{through} fehlt noch (holt der Wochenabruf)")
-    return matchup.compute_matchup(rawdata.Season(2026, through), list(range(1, through + 1)))
-
-
-@pytest.fixture(scope="module")
-def w2():
-    return real(2)
+    return matchup.compute_matchup(ssn or rawdata.Season(2026, through), list(range(1, through + 1)))
 
 
 @pytest.fixture(scope="module")
@@ -44,9 +41,12 @@ def w3():
 
 # ---------------------------------------------------------------- 1. ESPN positionAgainstOpponent
 
-def test_z26_gleich_espn(w2):
+def test_z26_gleich_espn():
     """ratingsByOpponent[Defense].average je Position aus kona w03 (Stand W2, siehe test_dst) = eigenes Z26 nach W2,
-    32 × 5; ESPN zählt wie matchup.py alle Spieler der Position mit 210 == 1 beim Team des Spiels."""
+    32 × 5; ESPN zählt wie matchup.py alle Spieler der Position mit 210 == 1 beim Team des Spiels. Gerechnet nur mit
+    den Stat-Korrekturen, die der Schnappschuss kannte (test_dst.IM_SCHNAPPSCHUSS) – eine spätere Korrektur von W1
+    oder W2 macht den Vergleich nicht rot."""
+    w2 = real(2, schnappschuss(2, 3))
     espn = rawdata.Season(2026, 3).ratings(3)["positionalRatings"]
     for pos in matchup.POSITIONS:
         by_def = espn[str(pos)]["ratingsByOpponent"]
