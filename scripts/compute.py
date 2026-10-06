@@ -339,8 +339,11 @@ def compute_teams(ssn: rawdata.Season, weeks: list[int], team_weeks: list[dict],
 def league_games(ssn: rawdata.Season, weeks: list[int]) -> list[dict]:
     """Alle Paarungen des Liga-Spielplans: Woche, Heim, Gast (None bei Bye), Punkte und Sieger, sobald final.
 
-    Für die gerechneten Wochen kommen Punkte und Sieger aus der Datei der jeweiligen Woche (Dienstags-Stand, wie
-    Tabelle und Rekorde); weicht der jüngere Spielplan davon ab (Stat-Korrektur nach Dienstag), gibt es eine Warnung.
+    Für die gerechneten Wochen kommen Punkte und Sieger aus der Datei der jeweiligen Woche samt Stat-Korrektur
+    (espn_fetch.load_week_matchups, wie Tabelle und Rekorde). Weicht der Spielplan der Stand-Woche davon ab, hat ESPN
+    nach dem Dienstag korrigiert und der Wochenabruf das noch nicht übernommen – oder nicht übernehmen können, weil die
+    Korrektur in sich nicht stimmt (dann meldet er „nicht übernommen“) –, dann eine Warnung am Lauf; nach der
+    Übernahme (wNN/statkorrektur.json) ist sie still.
     """
     settings = ssn.settings()["scheduleSettings"]
     week_of = {int(mp): min(wks) for mp, wks in settings["matchupPeriods"].items()}
@@ -359,8 +362,10 @@ def league_games(ssn: rawdata.Season, weeks: list[int]) -> list[dict]:
         if m["id"] in own and own[m["id"]]["final"]:
             o = own[m["id"]]
             if (game["home_pf"], game["away_pf"]) != (o["home_points"], o["away_points"]):
-                print(f"Warnung: W{game['week']} Spiel {m['id']}: jüngerer Spielplan {game['home_pf']}:{game['away_pf']}, "
-                      f"Wochendatei {o['home_points']}:{o['away_points']} (Stat-Korrektur?)", file=sys.stderr)
+                ef.warn(f"W{game['week']} Spiel {m['id']}: Spielplan der Stand-Woche {game['home_pf']}:{game['away_pf']}, "
+                        f"Wochendatei {o['home_points']}:{o['away_points']} – Stat-Korrektur noch nicht übernommen "
+                        f"(der Wochenabruf übernimmt sie nach wNN/{ef.STATKORREKTUR_FILE}, sobald sie in sich stimmt; "
+                        f"sonst meldet er dort „nicht übernommen“)")
             pf, pa = o["home_points"], o["away_points"]
             game.update(home_pf=pf, away_pf=pa if o["away_id"] is not None else None,
                         winner=(o["home_id"] if pf > pa else o["away_id"] if pf < pa else "T")
@@ -504,9 +509,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"FEHLER – {reason}", file=sys.stderr)
         return 1
     for r in season_data["team_weeks"]:
-        if ef.to_points(r["abweichung"]) != 0:
-            print(f"Warnung: W{r['week']} Team {r['team_id']}: Starter-Summe weicht von PF ab "
-                  f"({ef.to_points(r['abweichung'])})", file=sys.stderr)
+        if ef.to_points(r["abweichung"]) != 0:   # Prüfpunkt 1; nach einer übernommenen Stat-Korrektur weiter 0
+            ef.warn(f"W{r['week']} Team {r['team_id']}: Starter-Summe weicht von PF ab ({ef.to_points(r['abweichung'])})")
     for warning in season_data["matchup"]["warnungen"]:
         print(f"Warnung: Positions-Matchup {warning}", file=sys.stderr)
     for warning in (season_data["keeper"] or {}).get("warnungen", []):

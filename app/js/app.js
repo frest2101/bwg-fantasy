@@ -256,7 +256,8 @@ function standChip() {
   const wk = n => S.weeks.find(w => w.week === n);
   // Stand-Woche: in den Playoffs die letzte finale Playoff-Woche (Stufe 4), sonst die letzte gewertete Woche
   const po = ds.playoff_woche ?? null, sw = po ?? S.tw;
-  const fertig = po != null && po >= (S.weeks.at(-1)?.week ?? 17);   // nach W17 kein Wochenabruf bis zum Saisonwechsel
+  // nach W17 holt der Wochenabruf keine Woche mehr (Stat-Korrekturen noch drei Wochen, Glossar „Aktualisierung“)
+  const fertig = po != null && po >= (S.weeks.at(-1)?.week ?? 17);
   // Dienstag, an dem Woche n beginnt; nach der letzten Woche des Spielplans eine Woche weiter (Abruf nach W17)
   const start = n => wk(n)?.start ?? (wk(n - 1) ? new Date(Date.parse(wk(n - 1).start + 'T12:00:00Z') + 7 * 864e5).toISOString().slice(0, 10) : null);
   // nächster Wochenabruf: Dienstag nach der laufenden Woche, Termine laut U.wochenabrufe (WOCHENABRUF_H, erster 08:30 UTC); der
@@ -311,7 +312,7 @@ function standChip() {
         h('dt', null, 'Nächster Tageslauf'), h('dd', null, `ab ${U.stamp(nextDaily())}`),
         // Tageslauf von Hand: nur ein Knopf zur Workflow-Seite, kein Start aus der App (kein Token im Browser)
         knopf,
-        voll ? [h('dt', null, 'Nächster Wochenabruf'), h('dd', null, fertig ? '– (Saison beendet, erst wieder nach dem Saisonwechsel)' : U.wochenabrufTxt(nxt) ?? '–')] : null),
+        voll ? [h('dt', null, 'Nächster Wochenabruf'), h('dd', null, fertig ? '– (Saison beendet; Stat-Korrekturen übernimmt er noch drei Wochen lang)' : U.wochenabrufTxt(nxt) ?? '–')] : null),
       h('p', {class: 'note'}, '„Tageslauf starten“ öffnet GitHub: dort „Run workflow“ (GitHub-Anmeldung nötig). Etwa 2 Minuten später holt „Daten neu laden“ den neuen Stand. ',
         h('a', {href: '#erklaerungen/tageslauf-starten'}, 'Mehr dazu')),
       voll ? h('p', {class: 'note'}, 'Wertung und Projektionen rechnen nur mit abgeschlossenen Wochen; der Tageslauf frischt Besitz, Verletzung, Transaktionen und Wetter stündlich von etwa 05:00 Uhr bis Mitternacht (deutsche Zeit) auf. ', h('a', {href: '#erklaerungen/aktualisierung'}, 'Mehr zur Aktualisierung')) : null);

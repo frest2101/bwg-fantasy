@@ -9,6 +9,7 @@ from decimal import Decimal
 import pytest
 
 import compute
+import espn_fetch as ef
 import keeper
 import rawdata
 from lineup import DST, QB, SLOT_BENCH, SLOT_DST, SLOT_IR, SLOT_QB, SLOT_WR, WR
@@ -185,6 +186,14 @@ def result():
     return compute.compute_season(2026, through=3)
 
 
+@pytest.fixture(scope="module")
+def dienstag():
+    """Wie result, aber ohne Stat-Korrekturen: der Dienstags-Stand der Wochendateien (Grundlage der Referenzwerte)."""
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(ef, "load_statkorrektur", lambda season, week: None)
+        return compute.compute_season(2026, through=3)
+
+
 def test_echte_daten_summe_gleich_pf(result):
     """Die vier Gruppen summieren sich je Team zur PF (wie der Positions-Breakdown); der Kern ist ein Teil davon."""
     k = result["keeper"]
@@ -198,19 +207,35 @@ def test_echte_daten_summe_gleich_pf(result):
     assert R2(k["liga"]["pf"]["summe"]) == R2(sum(pf.values()))
 
 
-def test_echte_daten_w3(result):
-    """Referenz W1–W3 (Inventur 30.09.2026, zweifach gerechnet): Keeper 75,8 % der Liga-PF, im Kern 88,9 %;
-    die zwei getauschten Spieler brachten 5,00 Punkte (Rotzleffe). Wochenwerte ändern sich nicht mehr."""
-    liga = result["keeper"]["liga"]
+def statkorrektur_delta(weeks) -> Decimal:
+    """Σ (neu − vorher) über alle Spielseiten der übernommenen Stat-Korrekturen der Wochen (wNN/statkorrektur.json);
+    0 ohne Korrektur."""
+    total = D(0)
+    for week in weeks:
+        for g in (ef.load_statkorrektur(2026, week) or {}).get("spiele", []):
+            total += sum((D(str(new)) - D(str(old)) for new, old in zip(g["totalPoints"], g["vorher"]["totalPoints"])
+                          if new is not None), D(0))
+    return total
+
+
+def test_echte_daten_w3(dienstag, result):
+    """Referenz W1–W3 im Dienstags-Stand (Inventur 30.09.2026, zweifach gerechnet): Keeper 75,8 % der Liga-PF, im Kern
+    88,9 %; die zwei getauschten Spieler brachten 5,00 Punkte (Rotzleffe).
+
+    Stat-Korrekturen gelten rückwirkend wie bei ESPN (Beschluss 06.10.2026): Die Referenz rechnet ohne sie (Dienstag),
+    der Stand des Repos verschiebt die Summe um den Betrag der übernommenen Korrekturen (06.10.2026: W3, zwei D/ST
+    aus dem Draft je −1 Punkt). Grün mit und ohne übernommene Korrektur, auch bei einer späteren Korrektur von W1–W3."""
+    liga = dienstag["keeper"]["liga"]
     r1 = lambda v: v.quantize(D("0.1"))  # noqa: E731
     assert R2(liga["pf"]["summe"]) == D("6126.20")
     assert {g: r1(v) for g, v in liga["pf"]["anteil"].items()} == {
         "keeper": D("75.8"), "draft": D("23.3"), "zugang": D("0.9"), "trade": D("0.1")}
     assert R2(liga["pf"]["pts"]["trade"]) == D("5.00") and R2(liga["pf"]["pts"]["keeper"]) == D("4644.55")
     assert r1(liga["kern"]["anteil"]["keeper"]) == D("88.9") and R2(liga["kern"]["summe"]) == D("4934.20")
-    teams = {t["team_id"]: t for t in result["keeper"]["teams"]}
+    teams = {t["team_id"]: t for t in dienstag["keeper"]["teams"]}
     assert r1(teams[1]["pf"]["anteil"]["keeper"]) == D("87.0") and r1(teams[9]["pf"]["anteil"]["keeper"]) == D("60.3")
     assert R2(teams[7]["pf"]["pts"]["trade"]) == D("5.00")
+    assert R2(result["keeper"]["liga"]["pf"]["summe"]) == D("6126.20") + statkorrektur_delta(range(1, 4))
 
 
 def test_echte_daten_draft(result):

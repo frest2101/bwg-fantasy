@@ -1,6 +1,9 @@
 # Wochenabruf (Baustein 3): dienstags nach dem MNF die abgeschlossene Woche holen, rechnen, testen, committen.
 # Die Nachläufe holen eine Woche nur, wenn ESPN sie beim ersten Lauf noch nicht abgeschlossen hatte
 # (espn_fetch.py --due holt nur Wochen, die im Repo fehlen oder nicht final sind); den NFL-Spielplan gleicht jeder Lauf ab.
+# Jeder Lauf prüft außerdem alle finalen Wochen auf Stat-Korrekturen von ESPN (zwei Aufrufe, bis drei Kalenderwochen
+# nach W17) und legt Abweichungen als wNN/statkorrektur.json neben die unveränderten Wochendateien – eine übernommene
+# oder zurückgenommene Korrektur erscheint als Hinweis am Lauf, ein Ausfall der Prüfung ebenso (der Lauf bleibt grün).
 # Rohdaten werden auch committet, wenn Rechenwerk oder Tests scheitern (ROS-Auszug und Dienstags-Stände gibt es nur
 # „jetzt“); die abgeleiteten Dateien (season_2026.json, app/data) nur, wenn beides grün ist. Der Lauf bleibt dann rot.
 # Zeiten in UTC, ohne Zeitzonen-Angabe: tests/test_zeitplan.py hält die cron-Zeilen, WOCHENABRUF_H in app/js/ui.js (Hinweis

@@ -7,6 +7,11 @@ Punkte als ungerundete Decimal. Personenbezogene Felder (members, owners, outloo
 Stand-Dateien (ros.json, mStandings.json) und der Spielerpool kommen immer aus der Woche `through`, nie aus einer
 jüngeren – so bleiben Rechnungen mit --through N reproduzierbar, auch wenn später Wochen dazukommen. Einzige
 Ausnahme: teams() (Namen, Divisionen, Waiver-Prio, Moves) ist bewusst der jüngste mTeam-Abruf („Stand heute“).
+
+Stat-Korrekturen (wNN/statkorrektur.json, Wochenabruf, Beschluss Stephan 06.10.2026) gelten wie bei ESPN rückwirkend,
+auch für --through-Stände: Spielstände (espn_fetch.load_week_matchups, schedule()) und die Ist-Werte der Spieler
+(roster(), pool(): nur Ist-Punkte, Einsatz und NFL-Team des Spiels). Felder mit Stand des Abrufs (Verletzung, Status,
+Besitz, Fantasy-Team, NFL-Team des Spielers, Slots, Projektionen, positionAgainstOpponent) bleiben beim Dienstag.
 """
 
 import csv
@@ -91,13 +96,19 @@ def season_stat(player: dict, season: int) -> dict | None:
     return None
 
 
-def roster_rows(data: dict, season: int, week: int) -> list[RosterRow]:
-    """Alle Kaderplätze aller Teams einer mRoster-Antwort, sortiert nach Team und Spieler."""
+def roster_rows(data: dict, season: int, week: int, korr: dict | None = None) -> list[RosterRow]:
+    """Alle Kaderplätze aller Teams einer mRoster-Antwort, sortiert nach Team und Spieler.
+
+    korr: Ist-Einträge laut Stat-Korrektur der Woche (Spieler-ID → Eintrag) statt des Eintrags der Datei – das ändert
+    nur Ist-Punkte und Einsatz; Slot, NFL-Team, Projektion und Verletzung bleiben beim Stand des Abrufs.
+    """
+    korr = korr or {}
     rows = []
     for team in data["teams"]:
         for entry in team["roster"]["entries"]:
             player = entry["playerPoolEntry"]["player"]
-            actual, projection = (week_stat(player, season, week, s) for s in (STAT_ACTUAL, STAT_PROJECTION))
+            actual = korr.get(player.get("id", 0)) or week_stat(player, season, week, STAT_ACTUAL)
+            projection = week_stat(player, season, week, STAT_PROJECTION)
             prior = season_stat(player, season - 1)
             rows.append(RosterRow(team["id"], entry["lineupSlotId"], player.get("id", 0), player["defaultPositionId"],
                                   player.get("fullName", ""), player.get("proTeamId", 0),
@@ -109,12 +120,18 @@ def roster_rows(data: dict, season: int, week: int) -> list[RosterRow]:
     return sorted(rows, key=lambda r: (r.team_id, r.player_id))
 
 
-def pool_rows(data: dict, season: int, week: int) -> list[PoolRow]:
-    """Ganzer Spielerpool einer kona_player_info-Antwort, sortiert nach Spieler-ID."""
+def pool_rows(data: dict, season: int, week: int, korr: dict | None = None) -> list[PoolRow]:
+    """Ganzer Spielerpool einer kona_player_info-Antwort, sortiert nach Spieler-ID.
+
+    korr wie bei roster_rows: ersetzt nur Ist-Punkte, Einsatz und NFL-Team des Spiels (game_team); Status, Besitz,
+    Verletzung, Fantasy-Team und NFL-Team des Spielers bleiben beim Stand des Abrufs.
+    """
+    korr = korr or {}
     rows = []
     for entry in data["players"]:
         player = entry["player"]
-        actual, projection = (week_stat(player, season, week, s) for s in (STAT_ACTUAL, STAT_PROJECTION))
+        actual = korr.get(entry["id"]) or week_stat(player, season, week, STAT_ACTUAL)
+        projection = week_stat(player, season, week, STAT_PROJECTION)
         rows.append(PoolRow(entry["id"], player.get("fullName", ""), player["defaultPositionId"],
                             player.get("proTeamId", 0), entry.get("onTeamId", 0), entry.get("status"),
                             player.get("injuryStatus"), (player.get("ownership") or {}).get("percentOwned"),
@@ -122,6 +139,15 @@ def pool_rows(data: dict, season: int, week: int) -> list[PoolRow]:
                             dec(projection["appliedTotal"]) if projection and "appliedTotal" in projection else None,
                             played(actual), (actual or {}).get("proTeamId") or 0))
     return sorted(rows, key=lambda r: r.player_id)
+
+
+def spielstand(game: dict) -> tuple:
+    """Punkte beider Seiten (zwei Stellen) und winner einer Paarung aus mMatchupScore.schedule oder des Eintrags
+    „vorher“ einer Stat-Korrektur (dort totalPoints als Liste [Heim, Gast])."""
+    points = game.get("totalPoints")
+    if points is None:
+        points = [game[side].get("totalPoints") if game.get(side) else None for side in ("home", "away")]
+    return tuple(None if p is None else ef.to_points(p) for p in points), game.get("winner")
 
 
 def nfl_schedule(data: dict) -> dict[int, NflTeam]:
@@ -176,9 +202,25 @@ class Season:
         return self._get(("matchups", week), lambda: ef.load_week_matchups(self.season, week))
 
     def schedule(self) -> list[dict]:
-        """Ganzer Liga-Spielplan (mMatchupScore.schedule) aus der Woche through, inklusive offener Paarungen."""
-        return self._get(("schedule", self.through),
-                         lambda: ef.load_json(ef.week_dir(self.season, self.through) / "mMatchupScore.json")["schedule"])
+        """Ganzer Liga-Spielplan (mMatchupScore.schedule) aus der Woche through, inklusive offener Paarungen.
+
+        Stat-Korrekturen der Wochen bis through gelten auch hier (totalPoints und winner), aber nur für Spiele, die in
+        diesem Spielplan noch den Stand vor der Korrektur tragen – ein jüngerer Spielplan führt sie schon.
+        """
+        def load():
+            schedule = ef.load_json(ef.week_dir(self.season, self.through) / "mMatchupScore.json")["schedule"]
+            fixes = {g["id"]: g for week in range(1, self.through + 1)
+                     for g in (ef.load_statkorrektur(self.season, week) or {}).get("spiele", [])}
+            out = []
+            for m in schedule:
+                g = fixes.get(m["id"])
+                if g and spielstand(m) == spielstand(g["vorher"]):
+                    m = dict(m, winner=g["winner"], **{side: dict(m[side], totalPoints=points)
+                                                       for side, points in zip(("home", "away"), g["totalPoints"])
+                                                       if m.get(side)})
+                out.append(m)
+            return out
+        return self._get(("schedule", self.through), load)
 
     def teams(self) -> list[dict]:
         """Teams laut jüngstem mTeam-Abruf, nur Ligafelder (ohne owners, members, logo), sortiert nach id."""
@@ -191,19 +233,29 @@ class Season:
         return self._get("teams", load)
 
     def roster(self, week: int) -> list[RosterRow]:
-        """Kader aller Teams in einer Woche (historische Aufstellung laut mRoster der Woche)."""
+        """Kader aller Teams in einer Woche (historische Aufstellung laut mRoster der Woche, Ist mit Stat-Korrektur)."""
         return self._get(("roster", week),
-                         lambda: roster_rows(ef.load_json(ef.week_dir(self.season, week) / "mRoster.json"), self.season, week))
+                         lambda: roster_rows(ef.load_json(ef.week_dir(self.season, week) / "mRoster.json"), self.season,
+                                             week, self.statkorrektur(week)))
+
+    def statkorrektur(self, week: int) -> dict[int, dict]:
+        """Ist-Einträge laut Stat-Korrektur der Woche (wNN/statkorrektur.json, Wochenabruf): Spieler-ID → Eintrag;
+        leer ohne Datei. Einmal je Woche geladen, gemeinsam für roster() und pool()."""
+        def load():
+            data = ef.load_statkorrektur(self.season, week) or {}
+            return {s["id"]: s["ist"] for s in data.get("spieler", [])}
+        return self._get(("statkorrektur", week), load)
 
     # -------------------------------------------------------- Spielerpool und Stand-Dateien
     def pool(self, week: int) -> list[PoolRow] | None:
         """Spielerpool mit Ist und Projektion der Woche; None, solange kona_player_info fehlt.
 
-        Besitz, Verletzung und Status sind der Stand beim Abruf (bei nachgeholten Wochen der Nachholtag).
+        Besitz, Verletzung und Status sind der Stand beim Abruf (bei nachgeholten Wochen der Nachholtag); Ist-Werte mit
+        Stat-Korrektur der Woche.
         """
         def load():
             data = self._optional(ef.week_dir(self.season, week) / ef.KONA_FILE)
-            return pool_rows(data, self.season, week) if data else None
+            return pool_rows(data, self.season, week, self.statkorrektur(week)) if data else None
         return self._get(("pool", week), load)
 
     def ratings(self, week: int) -> dict | None:

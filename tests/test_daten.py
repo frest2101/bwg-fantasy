@@ -1,4 +1,5 @@
-"""Datenprüfung: neue Rohdaten (Baustein 3/4) gegen Notion-Referenzen in docs/referenz_dst.md.
+"""Datenprüfung: neue Rohdaten (Baustein 3/4) gegen Notion-Referenzen in docs/referenz_dst.md; committete
+Stat-Korrekturen (wNN/statkorrektur.json) in sich stimmig.
 
 Die Tests laufen, sobald der Wochenabruf die Dateien geholt hat; vorher werden sie übersprungen.
 Aufruf: python -m pytest
@@ -62,3 +63,25 @@ def test_dst_2025_ligaschnitt(allowed_2025):
 @pytest.mark.parametrize("row", table("Stichprobe"), ids=lambda r: r[0])
 def test_dst_2025_gegen_notion(allowed_2025, row):
     assert abs(Decimal(str(allowed_2025[row[0]])) - num(row[1])) <= Decimal("0.005")
+
+
+@pytest.mark.parametrize("path", sorted(ef.RAW_DIR.glob("*/w[0-9][0-9]/" + ef.STATKORREKTUR_FILE)), ids=ef.rel)
+def test_statkorrektur_stimmig(path):
+    """Jede committete Stat-Korrektur: gehört zu ihrer Woche, „vorher“ ist der Stand der Wochendatei, Ist-Einträge nur
+    mit Feldern aus IST_KEEP, Σ Starter (mRoster mit Korrektur) = korrigierte Team-Summe für alle Teams der Woche, und
+    die Datei ist genau so geschrieben, wie update_statkorrekturen schreibt. Ohne Korrektur: kein Testfall."""
+    korr = ef.load_json(path)
+    season, week = korr["season"], korr["woche"]
+    assert path.parent == ef.week_dir(season, week) and (korr["spiele"] or korr["spieler"])
+    assert all(set(s["ist"]) <= ef.IST_KEEP and s["ist"]["scoringPeriodId"] == week for s in korr["spieler"])
+    stored = {m["id"]: m for m in ef.load_json(path.parent / "mMatchupScore.json")["schedule"]}
+    for g in korr["spiele"]:
+        old = stored[g["id"]]
+        assert [ef.to_points(old[side]["totalPoints"]) if old.get(side) else None for side in ("home", "away")] \
+            == [ef.to_points(v) if v is not None else None for v in g["vorher"]["totalPoints"]], g["id"]
+    games = [{"home": {"teamId": m["home_id"], "totalPoints": m["home_points"]},
+              "away": {"teamId": m["away_id"], "totalPoints": m["away_points"]}}
+             for m in ef.load_week_matchups(season, week) if m["away_id"] is not None]
+    roster = ef.load_json(path.parent / "mRoster.json")
+    assert ef.check_statkorrektur(roster, season, week, games, korr["spieler"]) == []
+    assert path.read_bytes() == ef.statkorrektur_dumps(korr)

@@ -8,7 +8,8 @@ data/season_*.json text eol=lf
 app/data/*.json text eol=lf
 
 # ESPN-Rohdaten: byte-genau wie geliefert, eine Zeile je Datei (bis ~3 MB).
-# Ausnahmen (Auszüge): transactions/kona_league_communication_* (ohne Chat), wNN/mTeam.json (Positivlisten) und wNN/ros.json.
+# Ausnahmen (Auszüge): transactions/kona_league_communication_* (ohne Chat), wNN/mTeam.json (Positivlisten), wNN/ros.json
+# und wNN/statkorrektur.json (Stat-Korrekturen nach dem Dienstag, eine Zeile je Spiel und Spieler).
 # "binary" = kein Zeilenende-Umbau, kein Text-Diff, kein Merge – bei Konflikten neu abrufen.
 # Ansehen: python -m json.tool data/raw/2026/w01/mTeam.json
 data/raw/** binary
@@ -16,3 +17,7 @@ data/raw/** binary
 # Ausnahme: die Stadion-Tabelle ist von Hand gepflegt (Session 6) – Text-Diff und Merge erwünscht, immer LF.
 # Pool-Auszug (pool/latest.json) und Wetterdateien schreibt der Tageslauf mit LF; sie bleiben wie die übrigen Rohdaten binär.
 data/raw/*/nfl/stadien.json diff merge text eol=lf
+
+# Stat-Korrekturen (wNN/statkorrektur.json, eine Zeile je Spiel und Spieler): Text-Diff, damit eine rückwirkende
+# Punktänderung im Commit lesbar ist; Merge und Zeilenende bleiben wie bei den übrigen Rohdaten (binär).
+data/raw/*/w[0-9][0-9]/statkorrektur.json diff

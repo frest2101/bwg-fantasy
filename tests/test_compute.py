@@ -138,6 +138,15 @@ def test_starter_summe_gleich_pf(season):
         assert ef.to_points(r["abweichung"]) == 0, f"W{r['week']} Team {r['team_id']}"
 
 
+def test_starter_summe_gleich_pf_alle_wochen():
+    """Prüfpunkt 1 für alle gerechneten Wochen im Stand des Repos: Σ Starter (mRoster) = PF (mMatchupScore) je
+    Team-Woche – auch nach einer übernommenen Stat-Korrektur, die beide gemeinsam ändert (wNN/statkorrektur.json)."""
+    weeks = compute.completed_weeks(2026)
+    rows = compute.compute_team_weeks(rawdata.Season(2026, weeks[-1]), weeks)
+    assert len(rows) == 10 * len(weeks)
+    assert [(r["week"], r["team_id"]) for r in rows if ef.to_points(r["abweichung"]) != 0] == []
+
+
 @pytest.mark.parametrize("metric", compute.METRICS)
 def test_normierung(season, metric):
     minmax = [t["norm"]["minmax"][metric] for t in season["teams"]]

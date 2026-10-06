@@ -50,20 +50,56 @@ def by_abbrev(result: dict) -> dict[str, dict]:
     return {t["abbrev"]: t for t in result["teams"]}
 
 
-def real(through: int) -> dict:
+# Stat-Korrekturen, die ESPNs Ratings-Schnappschuss in kona wN schon kannte: je Schnappschuss-Woche N die korrigierte
+# Woche → Spieler-ID → appliedTotal laut Korrektur (Abnahme 06.10.2026: w04 trifft 32/32 nur mit der W3-Korrektur der
+# zwei D/ST). Was ESPN danach korrigiert, kennt der Schnappschuss nicht; eine Korrektur der Woche N selbst kam immer
+# nach dem Abruf von wN (sonst stünde sie schon in der Wochendatei). Die Vergleiche rechnen deshalb nur mit diesen
+# Korrekturen – sonst machte jede spätere, korrekt übernommene Korrektur die Tests rot und hielte die App-Daten auf.
+IM_SCHNAPPSCHUSS = {2: {}, 3: {}, 4: {3: {-16018: "14", -16011: "16"}}}
+
+
+class Schnappschuss(rawdata.Season):
+    """Saison, die von den übernommenen Stat-Korrekturen nur die Ist-Einträge der Spieler aus erlaubt anwendet
+    (Woche → Spieler-IDs); ohne erlaubt der Dienstags-Stand. Spielstände bleiben außen vor – D/ST-Faktoren und
+    Positions-Matchup lesen nur den Spielerpool."""
+
+    def __init__(self, through: int, erlaubt: dict):
+        super().__init__(2026, through)
+        self.erlaubt = erlaubt
+
+    def statkorrektur(self, week: int) -> dict:
+        return {pid: e for pid, e in super().statkorrektur(week).items() if pid in self.erlaubt.get(week, {})}
+
+
+def schnappschuss(through: int, ratings_week: int) -> Schnappschuss:
+    """Saison bis through mit den Korrekturen, die der Schnappschuss in kona w<ratings_week> kannte; skip, solange
+    eine davon nicht übernommen ist oder wenn ESPN sie seither erneut geändert hat (dann nicht mehr nachrechenbar)."""
+    erlaubt = IM_SCHNAPPSCHUSS[ratings_week]
+    for week, werte in erlaubt.items():
+        korr = rawdata.Season(2026, week).statkorrektur(week)
+        if not set(werte) <= set(korr):
+            pytest.skip(f"W{week}-Stat-Korrektur noch nicht übernommen (holt der Wochenabruf)")
+        if any(dec(korr[pid]["appliedTotal"]) != Decimal(wert) for pid, wert in werte.items()):
+            pytest.skip(f"W{week}-Stat-Korrektur seither geändert – Schnappschuss w{ratings_week:02d} nicht nachrechenbar")
+    return Schnappschuss(through, erlaubt)
+
+
+def real(through: int, ssn: rawdata.Season | None = None) -> dict:
+    """D/ST-Faktoren nach Woche through; ohne ssn mit allen übernommenen Stat-Korrekturen (Stand des Repos)."""
     if not (FILES["prior_dst"].exists() and FILES["prior_schedule"].exists()):
         pytest.skip("D/ST-Grundlage 2025 noch nicht abgerufen (holt der Wochenabruf)")
-    return dst.compute_dst(rawdata.Season(2026, through), list(range(1, through + 1)))
+    return dst.compute_dst(ssn or rawdata.Season(2026, through), list(range(1, through + 1)))
 
 
+# Referenz Notion = Dienstags-Stand nach W1/W2: ohne Stat-Korrekturen, damit eine spätere Korrektur sie nicht verschiebt
 @pytest.fixture(scope="module")
 def w1():
-    return real(1)
+    return real(1, Schnappschuss(1, {}))
 
 
 @pytest.fixture(scope="module")
 def w2():
-    return real(2)
+    return real(2, Schnappschuss(2, {}))
 
 
 LIGASCHNITT = dict((r[0], r[1]) for r in table("Ligaschnitt"))
@@ -103,20 +139,24 @@ def test_car_bye_in_naechsten_3(w2):
 
 # ---------------------------------------------------------------- 2. ESPN positionAgainstOpponent
 
-@pytest.mark.parametrize("through", [2, 3])
+@pytest.mark.parametrize("through", [2, 3, 4])
 def test_z26_gleich_espn(through):
     """ratingsByOpponent[Offense].average aus kona wN = eigenes Z26 nach Woche N oder N−1, 32/32.
 
     ESPN aktualisiert die Ratings dienstags erst im Lauf des Tages; der Wochenabruf trifft deshalb oft noch den Stand
     der Vorwoche (w03 vom 29.09. 07:30 UTC: Stand W2, 32/32). Das Gesamtfeld „average“ ist nicht der Ligaschnitt.
+    w04 (06.10. 08:30 UTC) trägt schon den Stand W4 und rechnet die W3-Stat-Korrektur vom 06.10.2026 mit ein: 32/32
+    nur mit übernommener Korrektur (ohne 30/32) – bis der Wochenabruf w03/statkorrektur.json anlegt, übersprungen.
+    Gerechnet wird nur mit den Korrekturen, die der Schnappschuss kannte (IM_SCHNAPPSCHUSS).
     """
     if not (ef.week_dir(2026, through) / ef.KONA_FILE).exists():
         pytest.skip(f"Spielerpool W{through} fehlt noch (holt der Wochenabruf)")
+    schnappschuss(through, through)   # skip, solange eine bekannte Korrektur fehlt
     espn = rawdata.Season(2026, through).ratings(through)["positionalRatings"][str(DST)]["ratingsByOpponent"]
     assert len(espn) == ef.NFL_TEAMS
 
     def matches(week):
-        teams = real(week)["teams"]
+        teams = real(week, schnappschuss(week, through))["teams"]
         return len(teams) == ef.NFL_TEAMS and all(abs(t["z26"] - dec(espn[str(t["id"])]["average"])) <= TOL_F
                                                  for t in teams)
     assert any(matches(week) for week in (through, through - 1) if week >= 1)

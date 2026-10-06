@@ -15,9 +15,11 @@ from decimal import Decimal
 
 import pytest
 
+import compute
 import espn_fetch as ef
 import fantasypros
 import nflverse
+import rawdata
 
 SOURCE_WEEK = ef.week_dir(2026, 1)  # echte, abgeschlossene Woche als Vorlage (Spielplan enthält alle Perioden 1–14)
 
@@ -170,6 +172,13 @@ def fake_pool(weeks, with_actual=False, dst_games=None) -> dict:
     return {"players": players, "positionAgainstOpponent": {}}
 
 
+def only_actual(pool: dict) -> dict:
+    """Spielerpool nur mit dem Wochen-Ist (wie die Ist-Abfrage der Stat-Korrekturen: Quelle 0, Split 1)."""
+    return dict(pool, players=[dict(e, player=dict(e["player"], stats=[
+        s for s in e["player"].get("stats", []) if (s["statSourceId"], s["statSplitTypeId"]) == (0, 1)]))
+        for e in pool["players"]])
+
+
 def stat(week: int, team: int, stats: dict, season: int = 2025, source: int = 0) -> dict:
     """Erfundener Wochen-Eintrag (Vorjahr 2025, Ist) mit dem NFL-Team des Spiels; appliedTotal ist bewusst Unsinn
     (ESPN-Standard, darf nicht zählen)."""
@@ -208,6 +217,21 @@ class FakeLeague:
         self.pool_without_week: set[int] = set()  # Wochen, für die der Spielerpool keine Werte liefert
         self.fantasypros_status = 200     # Antwort der FantasyPros-Sitemaps
         self.nflverse_status = 200        # Antwort der nflverse-Spielerliste
+        self.ist_status = 200             # Antwort der Ist-Abfrage (Stat-Korrekturen)
+
+    def current_schedule(self) -> dict:
+        """Spielplan von heute (mMatchupScore ohne scoringPeriodId): der Vorlage-Spielplan, alle Perioden bis zur
+        jüngsten Woche mit Antwort abgeschlossen wie in make_week (Sieger HOME) – also ohne Stat-Korrektur."""
+        latest = max(week for view, week in self.week_answers if view == "mMatchupScore")
+        data = json.loads((SOURCE_WEEK / "mMatchupScore.json").read_bytes())
+        for m in data["schedule"]:
+            if m["matchupPeriodId"] <= latest:
+                m["winner"] = "HOME"
+        return dict(data, scoringPeriodId=latest + 1)
+
+    def ist_answer(self, weeks) -> dict:
+        """Wochen-Ist aller erfundenen Spieler, dieselben Werte wie im gespeicherten Spielerpool (ohne Korrektur)."""
+        return only_actual(fake_pool(weeks, with_actual=True))
 
     def __enter__(self):
         return self
@@ -231,8 +255,13 @@ class FakeLeague:
             flt = json.loads(headers["X-Fantasy-Filter"])["players"]
             if "filterStatsForSourceIds" in flt:
                 assert flt["filterStatsForSplitTypeIds"]["value"] == [1] and "sortPercOwned" in flt
-                self.requests.append(("positionen_vorjahr", url))
-                return ok(self.prior_answer())
+                if "/leaguedefaults/" in url:
+                    self.requests.append(("positionen_vorjahr", url))
+                    return ok(self.prior_answer())
+                assert url == ef.league_url(2026) and flt["filterStatsForSourceIds"]["value"] == [0]
+                weeks = flt["filterStatsForCurrentSeasonScoringPeriodId"]["value"]
+                self.requests.append(("ist", tuple(weeks)))   # Stat-Korrekturen: Wochen-Ist aller finalen Wochen
+                return ok(self.ist_answer(weeks)) if self.ist_status == 200 else FakeResponse(self.ist_status, b"down")
             if "filterStatsForTopScoringPeriodIds" in flt:
                 self.requests.append(("dst_vorjahr",))
                 return ok(fake_pool([], dst_games=self.dst_games))
@@ -250,6 +279,9 @@ class FakeLeague:
             self.requests.append(("draft",))
             return ok({"id": ef.LEAGUE_ID, "seasonId": 2026,
                        "draftDetail": {"drafted": self.drafted, "picks": [{"overallPickNumber": 1}] if self.drafted else []}})
+        if view == "mMatchupScore" and week is None:   # Spielplan von heute (Stat-Korrekturen)
+            self.requests.append(("spielplan_aktuell",))
+            return ok(self.current_schedule())
         if view == "mSettings" and week is None:   # Liga-Scoring für die Positions-Grundlage (echtes W1-mSettings)
             self.requests.append(("scoring",))
             return self.week_answers[("mSettings", self.final_week)]
@@ -299,8 +331,10 @@ def test_neue_datei_je_woche_ueberschreibt_finale_wochen_nicht(espn_week3):
         assert not (ef.week_dir(2026, week) / ef.ROS_FILE).exists()  # … ROS/Standings nicht (nur „jetzt“ zu haben)
     assert ("kona", 1) in espn_week3.requests and ("kona", 2) in espn_week3.requests
     espn_week3.requests.clear()
-    assert ef.cmd_due(2026, date(2026, 9, 30)) == 0                 # Nachlauf: nur Spielplan, FantasyPros-Sitemap und nflverse
-    assert espn_week3.requests == [("spielplan", 2026)] + [("fantasypros", p) for p in fantasypros.POSITIONS] + [("nflverse",)]
+    assert ef.cmd_due(2026, date(2026, 9, 30)) == 0   # Nachlauf: Spielplan, FantasyPros, nflverse, Stat-Korrekturen
+    assert espn_week3.requests == [("spielplan", 2026)] + [("fantasypros", p) for p in fantasypros.POSITIONS] \
+        + [("nflverse",), ("spielplan_aktuell",), ("ist", (1, 2, 3))]
+    assert not any((ef.week_dir(2026, week) / ef.STATKORREKTUR_FILE).exists() for week in (1, 2, 3))
 
 
 def test_cmd_fetch_teilfehler_schreibt_nichts(espn_week3):
@@ -466,8 +500,9 @@ def test_positionen_vorjahr_einmalig(espn_week3):
     assert b"Testspieler" not in path.read_bytes()
     assert path.stat().st_size < 50_000                              # Auszug (echt rund 25 KB), nicht die 4-MB-Rohantwort
     espn_week3.requests.clear()
-    assert ef.cmd_due(2026, date(2026, 9, 30)) == 0                 # Nachlauf: nur Spielplan, FantasyPros-Sitemap und nflverse
-    assert espn_week3.requests == [("spielplan", 2026)] + [("fantasypros", p) for p in fantasypros.POSITIONS] + [("nflverse",)]
+    assert ef.cmd_due(2026, date(2026, 9, 30)) == 0   # Nachlauf: Spielplan, FantasyPros, nflverse, Stat-Korrekturen
+    assert espn_week3.requests == [("spielplan", 2026)] + [("fantasypros", p) for p in fantasypros.POSITIONS] \
+        + [("nflverse",), ("spielplan_aktuell",), ("ist", (1, 2, 3))]
 
 
 def test_positionen_vorjahr_fehler_nur_warnung(espn_week3, capsys):
@@ -530,6 +565,496 @@ def test_catch_up_stand_dateien_nur_fuer_juengste_woche(espn_week3):
     assert (w3 / ef.KONA_FILE).exists() and not (w3 / ef.ROS_FILE).exists() and not (w3 / ef.STANDINGS_FILE).exists()
     assert (w4 / ef.ROS_FILE).exists() and (w4 / ef.STANDINGS_FILE).exists()
     assert ("ros", 5, 17) in espn_week3.requests and ("ros", 4, 17) not in espn_week3.requests
+
+
+# ---------------------------------------------------------------- Stat-Korrekturen finaler Wochen (Beschluss 06.10.2026)
+# Rein: erfundene Mini-Paarungen und Ist-Einträge. Ablauf: echte W1-Dateien als Vorlage, darauf eine erfundene
+# Korrektur – ESPN hat W1 nie korrigiert, alle Abweichungen in diesen Tests sind erfunden.
+
+def spiel(gid: int, home: int, away: int, h, a, winner: str = "HOME") -> dict:
+    """Erfundene Paarung der Periode 3."""
+    return {"id": gid, "matchupPeriodId": 3, "winner": winner,
+            "home": {"teamId": home, "totalPoints": h}, "away": {"teamId": away, "totalPoints": a}}
+
+
+def ist(points, played: int = 1, team: int = 18, **raw) -> dict:
+    """Erfundener Ist-Eintrag der Woche 3 mit allen Feldern, die ESPN am 06.10.2026 lieferte; raw: Rohstats als s58=…"""
+    return {"appliedTotal": points, "externalId": "401", "id": "0401", "proTeamId": team, "scoringPeriodId": 3,
+            "seasonId": 2026, "statSourceId": 0, "statSplitTypeId": 1,
+            "stats": {"210": played, **{k[1:]: v for k, v in raw.items()}}}
+
+
+def test_ist_filter():
+    """Ist-Abfrage: ganzer Pool (sortPercOwned, sonst HTTP 400), nur Wochen-Ist (Quelle 0, Split 1) aller Wochen."""
+    flt = json.loads(ef.ist_filter([1, 2, 3])["X-Fantasy-Filter"])["players"]
+    assert flt["filterStatsForCurrentSeasonScoringPeriodId"]["value"] == [1, 2, 3]
+    assert (flt["filterStatsForSourceIds"]["value"], flt["filterStatsForSplitTypeIds"]["value"]) == ([0], [1])
+    assert "sortPercOwned" in flt and flt["limit"] == 2000 and "filterRanksForScoringPeriodIds" not in flt
+
+
+def test_statkorrektur_extract_ohne_abweichung():
+    games = [spiel(11, 5, 2, 199.56, 251.91), spiel(12, 9, 1, 178.92, 187.0)]
+    stored = [{101: ist(15.0), 102: ist(7.5)}]
+    assert ef.statkorrektur_extract(games, json.loads(json.dumps(games))[::-1], stored, {101: ist(15.0)}) == (None, [])
+
+
+def test_statkorrektur_extract_spiel_und_spieler():
+    """Wie der echte W3-Fall vom 06.10.2026 (Werte hier erfunden): Team-Summe und D/ST-Punkte je −1, Sieger bleibt."""
+    body, unknown = ef.statkorrektur_extract(
+        [spiel(11, 5, 2, 199.56, 251.91, "AWAY"), spiel(12, 9, 1, 178.92, 187.0, "AWAY")],
+        [spiel(11, 5, 2, 199.56, 250.91, "AWAY"), spiel(12, 9, 1, 178.92, 187.0, "AWAY")],
+        [{-16018: ist(15.0, s106=3), 4: ist(7.0)}], {-16018: ist(14.0, s106=2), 4: ist(7.0)})
+    assert unknown == []
+    assert body["spiele"] == [{"id": 11, "home": 5, "away": 2, "totalPoints": [199.56, 250.91], "winner": "AWAY",
+                               "vorher": {"totalPoints": [199.56, 251.91], "winner": "AWAY"}}]
+    assert body["spieler"] == [{"id": -16018, "vorher": {"appliedTotal": 15.0, "gespielt": True, "proTeamId": 18},
+                                "ist": ist(14.0, s106=2)}]
+    assert ef.sieger_wechsel(3, body["spiele"]) == []
+
+
+def test_statkorrektur_extract_nur_rohstats_zaehlt_nicht():
+    """Rohstat-Änderung ohne Punktwirkung (06.10.2026: sieben in W3, z. B. Stat 58) löst nichts aus."""
+    games = [spiel(11, 5, 2, 199.56, 251.91)]
+    assert ef.statkorrektur_extract(games, games, [{7: ist(9.0, s58=13)}], {7: ist(9.0, s58=14)}) == (None, [])
+
+
+@pytest.mark.parametrize("before, after", [(ist(0.0, played=0), ist(0.0, played=1)),    # Einsatz nachgetragen
+                                           (ist(5.0, team=18), ist(5.0, team=11))])     # anderes NFL-Team im Spiel
+def test_statkorrektur_extract_einsatz_und_team_zaehlen(before, after):
+    games = [spiel(11, 5, 2, 199.56, 251.91)]
+    body, _ = ef.statkorrektur_extract(games, games, [{7: before}], {7: after})
+    assert [s["id"] for s in body["spieler"]] == [7] and body["spiele"] == [] and body["spieler"][0]["ist"] == after
+
+
+def test_statkorrektur_extract_fehlender_spieler_und_quellen():
+    """Wer heute fehlt (filterActive) oder vorher keinen Eintrag hatte, bleibt außen vor; ein Spieler zählt, wenn
+    mindestens eine Quelle abweicht (z. B. ein später nachgeholter Spielerpool mit anderem Stand als mRoster)."""
+    games = [spiel(11, 5, 2, 199.56, 251.91)]
+    assert ef.statkorrektur_extract(games, games, [{1: ist(3.0)}], {2: ist(4.0)}) == (None, [])
+    body, _ = ef.statkorrektur_extract(games, games, [{1: ist(3.0)}, {1: ist(2.0)}], {1: ist(2.0)})
+    assert body["spieler"][0]["vorher"]["appliedTotal"] == 3.0
+
+
+def test_statkorrektur_extract_neuer_eintrag_nur_mit_neu():
+    """Ein Ist-Eintrag, den es am Dienstag nicht gab, zählt nur beim Rückgriff auf mRoster (neu) und nur punktwirksam;
+    „vorher“ ist dann leer (erfundene Werte)."""
+    games = [spiel(11, 5, 2, 199.56, 251.91)]
+    assert ef.statkorrektur_extract(games, games, [{}], {5: ist(12.0)}) == (None, [])
+    assert ef.statkorrektur_extract(games, games, [{}], {5: ist(0.0, played=0)}, neu={5}) == (None, [])
+    body, _ = ef.statkorrektur_extract(games, games, [{}], {5: ist(12.0)}, neu={5})
+    assert body["spieler"] == [{"id": 5, "vorher": {"appliedTotal": None, "gespielt": False, "proTeamId": None},
+                                "ist": ist(12.0)}]
+
+
+def test_statkorrektur_extract_ohne_freilos():
+    """Freilose der Playoffs (ohne Gegner) bleiben wie bei is_final außen vor: dass ESPN dort später einen Sieger oder
+    Punkte setzt, ist keine Stat-Korrektur und dreht kein Ergebnis (erfundene Paarung)."""
+    freilos = {"id": 12, "matchupPeriodId": 3, "winner": "UNDECIDED", "home": {"teamId": 7, "totalPoints": 0}}
+    jetzt = dict(freilos, winner="HOME", home={"teamId": 7, "totalPoints": 120.5})
+    assert ef.statkorrektur_extract([spiel(11, 5, 2, 1, 2), freilos], [spiel(11, 5, 2, 1, 2), jetzt], [{}], {}) \
+        == (None, [])
+
+
+def test_statkorrektur_extract_andere_paarungen():
+    with pytest.raises(ef.FetchError, match="weichen"):
+        ef.statkorrektur_extract([spiel(11, 5, 2, 1, 2)], [spiel(12, 5, 2, 1, 2)], [{}], {})
+    with pytest.raises(ef.FetchError, match="andere Teams"):
+        ef.statkorrektur_extract([spiel(11, 5, 2, 1, 2)], [spiel(11, 5, 3, 1, 2)], [{}], {})
+
+
+@pytest.mark.parametrize("after, dreht", [
+    (spiel(11, 5, 2, 199.56, 250.91, "AWAY"), False),
+    (spiel(11, 5, 2, 199.56, 199.0, "HOME"), True),     # Punkte und Sieger gedreht
+    (spiel(11, 5, 2, 199.56, 199.0, "AWAY"), True),     # nur nach Punkten gedreht (zählt in der Regular Season)
+    (spiel(11, 5, 2, 199.56, 199.56, "TIE"), True),
+])
+def test_statkorrektur_sieger_wechsel(after, dreht):
+    body, _ = ef.statkorrektur_extract([spiel(11, 5, 2, 199.56, 251.91, "AWAY")], [after], [{}], {})
+    warnings = ef.sieger_wechsel(3, body["spiele"])
+    assert bool(warnings) is dreht
+    if dreht:
+        assert warnings[0].startswith("Stat-Korrektur dreht das Ergebnis: W3 Spiel 11 (Team 5 gegen Team 2)")
+
+
+def test_ist_positivliste():
+    """Unbekannte Felder im Ist-Eintrag fallen weg und werden gemeldet; appliedStats (mRoster) fällt still weg."""
+    neu = dict(ist(14.0), appliedStats={"106": -1.0}, erfundenesFeld="erfundener Testwert")
+    games = [spiel(11, 5, 2, 199.56, 251.91)]
+    body, unknown = ef.statkorrektur_extract(games, games, [{1: ist(15.0)}], {1: neu})
+    assert unknown == ["erfundenesFeld"] and set(body["spieler"][0]["ist"]) == ef.IST_KEEP
+
+
+def kader(team: int, *entries) -> dict:
+    """Erfundener mRoster-Kader: entries = (Spieler-ID, Slot, Ist-Punkte oder None)."""
+    return {"id": team, "roster": {"entries": [
+        {"playerId": pid, "lineupSlotId": slot, "playerPoolEntry": {"player": {
+            "id": pid, "stats": [] if points is None else [ist(points)]}}} for pid, slot, points in entries]}}
+
+
+def test_check_statkorrektur():
+    """Σ Starter (ohne Bank und IR, Ist aus der Korrektur, sonst aus der Datei) = Team-Summe für alle Teams mit Gegner."""
+    roster = {"teams": [kader(5, (1, 0, 20.0), (2, 20, 99.0), (3, 21, 50.0), (4, 2, None)),
+                        kader(2, (11, 16, 15.0), (12, 4, 10.5))]}
+    games = [spiel(11, 5, 2, 20.0, 24.5)]
+    korr = [{"id": 11, "ist": ist(14.0)}]
+    assert ef.check_statkorrektur(roster, 2026, 3, games, korr) == []
+    assert ef.check_statkorrektur(roster, 2026, 3, games, []) == ["Team 2: Starter 25.50, Spielstand 24.50"]
+    bye = [spiel(11, 5, 2, 20.0, 24.5), {"id": 12, "matchupPeriodId": 3, "home": {"teamId": 7, "totalPoints": 1.0}}]
+    assert ef.check_statkorrektur(roster, 2026, 3, bye, korr) == []          # Freilos: nichts zu prüfen
+    assert ef.check_statkorrektur(roster, 2026, 3, [spiel(12, 7, 5, 1, 20.0)], []) == [f"Team 7 fehlt in {ef.ROSTER_VIEW}"]
+
+
+def test_statkorrektur_dumps_deterministisch():
+    body, _ = ef.statkorrektur_extract([spiel(11, 5, 2, 199.56, 251.91), spiel(14, 3, 7, 191.58, 219.54)],
+                                       [spiel(11, 5, 2, 199.56, 250.91), spiel(14, 3, 7, 190.58, 219.54)],
+                                       [{-16018: ist(15.0), -16011: ist(17.0)}], {-16011: ist(16.0), -16018: ist(14.0)})
+    doc = ef.statkorrektur_doc(2026, 3, "2026-10-13T0830Z", body)
+    raw = ef.statkorrektur_dumps(doc)
+    assert json.loads(raw) == doc and raw.endswith(b"]\n}\n")
+    assert list(doc) == ["season", "woche", "stand", "quelle", "spiele", "spieler"]
+    rows = [json.loads(line.rstrip(",")) for line in raw.decode("utf-8").splitlines() if line.startswith('{"id":')]
+    assert [r["id"] for r in rows] == [11, 14, -16018, -16011]                        # eine Zeile je Spiel und Spieler
+    assert [s["id"] for s in doc["spieler"]] == [-16018, -16011]                     # nach id sortiert
+    leer = ef.statkorrektur_dumps(dict(doc, spieler=[]))
+    assert json.loads(leer)["spieler"] == [] and b'"spieler":[]' in leer
+    assert ef.same_pool(doc, dict(json.loads(raw), stand="2026-10-14T0830Z"))       # Vergleich ohne stand
+
+
+DI_W2 = date(2026, 9, 15)   # Dienstag nach W1: letzte vergangene Woche ist W1
+W1_DATEIEN = tuple(f"{view}.json" for view in ef.VIEWS) + (ef.KONA_FILE,)
+
+
+class FakeKorrektur(FakeLeague):
+    """FakeLeague auf der echten, finalen W1 (byte-genau kopiert): Spielplan von heute, Wochen-Ist (kona) und mRoster
+    der Woche antworten mit den echten W1-Werten; korrigiere() legt eine erfundene Stat-Korrektur darüber."""
+
+    def __init__(self):
+        super().__init__(final_week=1)
+        self.schedule = json.loads((SOURCE_WEEK / "mMatchupScore.json").read_bytes())
+        self.roster = json.loads((SOURCE_WEEK / "mRoster.json").read_bytes())
+        self.ist = only_actual(json.loads((SOURCE_WEEK / ef.KONA_FILE).read_bytes()))
+
+    def current_schedule(self) -> dict:
+        return dict(self.schedule, scoringPeriodId=2)
+
+    def ist_answer(self, weeks) -> dict:
+        return self.ist
+
+    def get(self, url, params=None, headers=None, timeout=None):
+        if params.get("view") == ef.ROSTER_VIEW and params.get("scoringPeriodId") == 1:
+            self.requests.append((ef.ROSTER_VIEW, 1))
+            return ok(self.roster)
+        return super().get(url, params, headers, timeout)
+
+    def starter(self, ohne_dst: bool = False, bank: bool = False) -> tuple[int, int, str]:
+        """Erster Starter (nach Team und Spieler-ID) mit mindestens 2 Ist-Punkten, der auch im Spielerpool steht:
+        (Team, Spieler-ID, Name); ohne_dst: keine D/ST (die stehen immer im Pool); bank: Bankspieler statt Starter."""
+        in_pool = {e["id"] for e in self.ist["players"] if e["player"]["stats"]}
+        for team in sorted(self.roster["teams"], key=lambda t: t["id"]):
+            for e in sorted(team["roster"]["entries"], key=lambda e: e["playerId"]):
+                player = e["playerPoolEntry"]["player"]
+                stat = ef.ist_eintrag(player, 2026, 1)
+                if (e["lineupSlotId"] == 20 if bank else e["lineupSlotId"] not in (20, 21)) and e["playerId"] in in_pool \
+                        and stat and stat["appliedTotal"] >= 2 \
+                        and not (ohne_dst and player["defaultPositionId"] == ef.DST_POSITION):
+                    return team["id"], e["playerId"], player["fullName"]
+        raise AssertionError("kein Spieler gefunden")
+
+    def korrigiere(self, team: int, pid: int, spieler: bool = True, kader: bool = True, spielplan: bool = True) -> int:
+        """Erfundene Korrektur: Ist des Spielers pid im Spielerpool (spieler) und in mRoster (kader) um 1 kleiner,
+        ebenso die Summe seines Teams im Spielplan von heute (spielplan); gibt die Spiel-ID zurück."""
+        minus_eins = lambda value: float(Decimal(str(value)) - 1)  # noqa: E731 (ohne Binär-Artefakte)
+        if spieler:
+            stat = ef.ist_eintrag(next(e for e in self.ist["players"] if e["id"] == pid)["player"], 2026, 1)
+            stat["appliedTotal"] = minus_eins(stat["appliedTotal"])
+        if kader:
+            for t in self.roster["teams"]:
+                for e in t["roster"]["entries"]:
+                    if e["playerId"] == pid:
+                        stat = ef.ist_eintrag(e["playerPoolEntry"]["player"], 2026, 1)
+                        stat["appliedTotal"] = minus_eins(stat["appliedTotal"])
+        game = next(m for m in self.schedule["schedule"] if m["matchupPeriodId"] == 1
+                    and team in (m["home"]["teamId"], m["away"]["teamId"]))
+        if spielplan:
+            side = game["home"] if game["home"]["teamId"] == team else game["away"]
+            side["totalPoints"] = minus_eins(side["totalPoints"])
+        return game["id"]
+
+
+@pytest.fixture
+def korrektur(raw, monkeypatch):
+    """Echte W1 (alle Kern-Views und Spielerpool, byte-genau) im Temp-Verzeichnis; ESPN antwortet ohne Korrektur."""
+    folder = ef.week_dir(2026, 1)
+    folder.mkdir(parents=True)
+    for name in W1_DATEIEN:
+        shutil.copyfile(SOURCE_WEEK / name, folder / name)
+    session = FakeKorrektur()
+    monkeypatch.setattr(ef.requests, "Session", lambda: session)
+    monkeypatch.setattr(fantasypros, "PAUSE", 0)
+    return session
+
+
+def korr_path():
+    return ef.week_dir(2026, 1) / ef.STATKORREKTUR_FILE
+
+
+def test_statkorrektur_ohne_abweichung(korrektur, capsys):
+    """Echte W1 gegen dieselben Werte: zwei Aufrufe, keine Datei, kein mRoster-Rückgriff."""
+    assert ef.update_statkorrekturen(korrektur, 2026, DI_W2, "2026-09-15T0830Z") == 0
+    assert korrektur.requests == [("spielplan_aktuell",), ("ist", (1,))] and not korr_path().exists()
+    assert "W01  keine Abweichung" in capsys.readouterr().out
+
+
+def test_statkorrektur_uebernommen(korrektur, capsys):
+    """Erfundene Korrektur −1 auf einen Starter samt Team-Summe: Die Woche bekommt statkorrektur.json, alle
+    Wochendateien bleiben byte-gleich; Spielstand, Kader und Spielerpool gelten mit Korrektur, Σ Starter = PF."""
+    team, pid, name = korrektur.starter()
+    gid = korrektur.korrigiere(team, pid)
+    before = snapshot(1, W1_DATEIEN)
+    assert ef.update_statkorrekturen(korrektur, 2026, DI_W2, "2026-09-15T0830Z") == 0
+    assert snapshot(1, W1_DATEIEN) == before and (ef.ROSTER_VIEW, 1) not in korrektur.requests
+    raw_bytes = korr_path().read_bytes()
+    doc = json.loads(raw_bytes)
+    assert (doc["season"], doc["woche"], doc["stand"]) == (2026, 1, "2026-09-15T0830Z")
+    assert [g["id"] for g in doc["spiele"]] == [gid] and [s["id"] for s in doc["spieler"]] == [pid]
+    s = doc["spieler"][0]
+    assert round(s["vorher"]["appliedTotal"] - s["ist"]["appliedTotal"], 6) == 1 and set(s["ist"]) <= ef.IST_KEEP
+    assert name.encode("utf-8") not in raw_bytes and b"fullName" not in raw_bytes      # nur IDs und Zahlen
+    out = capsys.readouterr().out
+    # Präfix je nach Umgebung („Warnung: “ lokal, „::warning::“ in der Action)
+    assert "Stat-Korrektur übernommen: W1 – 1 Spiel, 1 Spieler (raw/2026/w01/statkorrektur.json)" in out
+    assert "dreht das Ergebnis" not in out
+    # Leser: Spielstand und Ist-Werte mit Korrektur, Felder mit Stand des Abrufs unverändert
+    row = next(m for m in ef.load_week_matchups(2026, 1) if m["id"] == gid)
+    side = "home" if row["home_id"] == team else "away"
+    game = next(m for m in korrektur.schedule["schedule"] if m["id"] == gid)
+    assert row[f"{side}_points"] == ef.to_points(game[side]["totalPoints"]) and row["final"]
+    ssn = rawdata.Season(2026, 1)
+    rows = compute.compute_team_weeks(ssn, [1])
+    assert [r["team_id"] for r in rows if ef.to_points(r["abweichung"]) != 0] == []
+    assert next(r for r in rows if r["team_id"] == team)["pf"] == ef.to_points(game[side]["totalPoints"])
+
+
+def test_rawdata_statkorrektur_aendert_keine_standfelder(korrektur):
+    """Nur Ist-Punkte, Einsatz und NFL-Team des Spiels kommen aus der Korrektur; Verletzung, Status, Besitz,
+    Fantasy-Team, NFL-Team des Spielers, Slot und Projektion bleiben beim Stand der Wochendatei (erfundene Korrektur)."""
+    team, pid, _ = korrektur.starter()
+    korrektur.korrigiere(team, pid)
+    ef.update_statkorrekturen(korrektur, 2026, DI_W2, "2026-09-15T0830Z")
+    ssn = rawdata.Season(2026, 1)
+    folder = ef.week_dir(2026, 1)
+    pool_alt = {r.player_id: r for r in rawdata.pool_rows(ef.load_json(folder / ef.KONA_FILE), 2026, 1)}
+    kader_alt = {(r.team_id, r.player_id): r for r in rawdata.roster_rows(ef.load_json(folder / "mRoster.json"), 2026, 1)}
+    neu, alt = next(r for r in ssn.pool(1) if r.player_id == pid), pool_alt[pid]
+    assert neu.actual == alt.actual - 1 and neu._replace(actual=alt.actual) == alt
+    assert [r for r in ssn.pool(1) if r.player_id != pid] == [r for r in pool_alt.values() if r.player_id != pid]
+    neu, alt = next(r for r in ssn.roster(1) if r.player_id == pid), kader_alt[(team, pid)]
+    assert neu.actual == alt.actual - 1 and neu._replace(actual=alt.actual) == alt
+    # NFL-Team des Spiels aus der Korrektur (erfundener Wechsel des Ist-Eintrags)
+    korr = ef.load_json(korr_path())
+    korr["spieler"][0]["ist"]["proTeamId"] = 99
+    row = rawdata.pool_rows(ef.load_json(folder / ef.KONA_FILE), 2026, 1, {pid: korr["spieler"][0]["ist"]})
+    assert next(r for r in row if r.player_id == pid).game_team == 99
+
+
+def test_statkorrektur_zweiter_lauf_schreibt_nicht(korrektur):
+    team, pid, _ = korrektur.starter()
+    korrektur.korrigiere(team, pid)
+    ef.update_statkorrekturen(korrektur, 2026, DI_W2, "2026-09-15T0830Z")
+    first = korr_path().read_bytes()
+    assert ef.update_statkorrekturen(korrektur, 2026, date(2026, 9, 16), "2026-09-16T0830Z") == 0
+    assert korr_path().read_bytes() == first and json.loads(first)["stand"] == "2026-09-15T0830Z"
+
+
+def test_statkorrektur_zurueckgenommen_loescht_datei(korrektur, capsys):
+    team, pid, _ = korrektur.starter()
+    korrektur.korrigiere(team, pid)
+    ef.update_statkorrekturen(korrektur, 2026, DI_W2, "2026-09-15T0830Z")
+    assert korr_path().exists()
+    capsys.readouterr()
+    ruecknahme = FakeKorrektur()   # ESPN führt wieder die Werte der Wochendateien
+    assert ef.update_statkorrekturen(ruecknahme, 2026, date(2026, 9, 22), "2026-09-22T0830Z") == 0
+    assert not korr_path().exists()
+    assert "Stat-Korrektur zurückgenommen: W1" in capsys.readouterr().out
+
+
+def test_statkorrektur_unstimmig(korrektur, capsys):
+    """Team-Summe geändert, aber kein Spieler (z. B. ein Ausgleich des Commissioners): mRoster wird nachgefragt, die
+    Woche bleibt unverändert, Warnung; der Wochenabruf bleibt grün."""
+    team, pid, _ = korrektur.starter()
+    korrektur.korrigiere(team, pid, spieler=False, kader=False)
+    assert ef.update_statkorrekturen(korrektur, 2026, DI_W2, "2026-09-15T0830Z") == 1
+    assert (ef.ROSTER_VIEW, 1) in korrektur.requests and not korr_path().exists()
+    out = capsys.readouterr().out
+    assert f"Stat-Korrektur W1 nicht übernommen (unstimmig auch mit mRoster der Woche (Team {team}: Starter" in out
+    korrektur.requests.clear()
+    assert ef.cmd_due(2026, DI_W2) == 0 and not korr_path().exists()
+    assert "Fehler bei Saisondateien oder beim Nachholen (auch Stat-Korrekturen)" in capsys.readouterr().out
+
+
+def test_statkorrektur_aus_mroster(korrektur):
+    """Ein korrigierter Starter fehlt heute im Spielerpool (filterActive): erst unstimmig, dann trägt mRoster der Woche
+    seinen neuen Ist-Wert nach (erfundene Korrektur)."""
+    team, pid, _ = korrektur.starter(ohne_dst=True)
+    gid = korrektur.korrigiere(team, pid, spieler=False)
+    korrektur.ist["players"] = [e for e in korrektur.ist["players"] if e["id"] != pid]
+    assert ef.update_statkorrekturen(korrektur, 2026, DI_W2, "2026-09-15T0830Z") == 0
+    assert (ef.ROSTER_VIEW, 1) in korrektur.requests
+    doc = ef.load_json(korr_path())
+    assert [g["id"] for g in doc["spiele"]] == [gid] and [s["id"] for s in doc["spieler"]] == [pid]
+    assert set(doc["spieler"][0]["ist"]) <= ef.IST_KEEP     # appliedStats aus mRoster fällt weg
+
+
+def test_statkorrektur_bleibt_wenn_spieler_heute_fehlt(korrektur, capsys):
+    """Ein schon korrigierter Spieler fehlt im nächsten Lauf in der Ist-Antwort (filterActive, Teilantwort): Seine
+    Korrektur bleibt, keine Rücknahme und kein Hin und Her in den Commits (erfundene Korrektur an einem Bankspieler –
+    sie ändert keine Team-Summe, die Konsistenzprüfung fiele also nicht auf)."""
+    team, pid, _ = korrektur.starter(ohne_dst=True, bank=True)
+    korrektur.korrigiere(team, pid, spielplan=False)
+    assert ef.update_statkorrekturen(korrektur, 2026, DI_W2, "2026-09-15T0830Z") == 0
+    first = korr_path().read_bytes()
+    assert ([s["id"] for s in json.loads(first)["spieler"]], json.loads(first)["spiele"]) == ([pid], [])
+    korrektur.ist["players"] = [e for e in korrektur.ist["players"] if e["id"] != pid]
+    capsys.readouterr()
+    assert ef.update_statkorrekturen(korrektur, 2026, date(2026, 9, 22), "2026-09-22T0830Z") == 0
+    assert korr_path().read_bytes() == first
+    out = capsys.readouterr().out
+    assert "1 korrigierte Spieler heute ohne Ist-Eintrag – ihre Korrektur bleibt" in out and "zurückgenommen" not in out
+
+
+def test_statkorrektur_neuer_eintrag_aus_mroster(korrektur):
+    """Ein Starter hatte am Dienstag keinen Ist-Eintrag (Team-Summe ohne ihn), ESPN führt ihn heute samt Team-Summe:
+    Der Rückgriff auf mRoster übernimmt ihn mit leerem „vorher“, statt die Woche dauerhaft unstimmig zu lassen
+    (erfundener Dienstags-Stand auf der echten W1, nur im Temp-Verzeichnis)."""
+    team, pid, _ = korrektur.starter(ohne_dst=True)
+    folder = ef.week_dir(2026, 1)
+    roster, kona = ef.load_json(folder / "mRoster.json"), ef.load_json(folder / ef.KONA_FILE)
+    players = [e["playerPoolEntry"]["player"] for t in roster["teams"] for e in t["roster"]["entries"]
+               if e["playerId"] == pid] + [e["player"] for e in kona["players"] if e["id"] == pid]
+    punkte = Decimal(str(ef.ist_eintrag(players[0], 2026, 1)["appliedTotal"]))
+    for player in players:
+        stat = ef.ist_eintrag(player, 2026, 1)
+        player["stats"] = [s for s in player["stats"] if s is not stat]
+    spielplan = ef.load_json(folder / "mMatchupScore.json")
+    game = next(m for m in spielplan["schedule"]
+                if m["matchupPeriodId"] == 1 and team in (m["home"]["teamId"], m["away"]["teamId"]))
+    side = game["home"] if game["home"]["teamId"] == team else game["away"]
+    side["totalPoints"] = float(Decimal(str(side["totalPoints"])) - punkte)
+    for name, data in (("mRoster.json", roster), (ef.KONA_FILE, kona), ("mMatchupScore.json", spielplan)):
+        (folder / name).write_text(json.dumps(data), encoding="utf-8")
+    assert ef.update_statkorrekturen(korrektur, 2026, DI_W2, "2026-09-15T0830Z") == 0
+    assert (ef.ROSTER_VIEW, 1) in korrektur.requests
+    doc = ef.load_json(korr_path())
+    assert [g["id"] for g in doc["spiele"]] == [game["id"]]
+    assert [(s["id"], s["vorher"]["appliedTotal"]) for s in doc["spieler"]] == [(pid, None)]
+    assert rawdata.Season(2026, 1).statkorrektur(1)[pid]["appliedTotal"] == float(punkte)
+    first = korr_path().read_bytes()
+    korrektur.requests.clear()   # nächster Lauf: der übernommene Eintrag zählt ohne erneuten Rückgriff
+    assert ef.update_statkorrekturen(korrektur, 2026, date(2026, 9, 22), "2026-09-22T0830Z") == 0
+    assert korrektur.requests == [("spielplan_aktuell",), ("ist", (1,))] and korr_path().read_bytes() == first
+
+
+def test_unlesbare_statkorrektur_holt_die_woche_nicht_neu(korrektur, capsys):
+    """Eine unlesbare statkorrektur.json (etwa von Hand bearbeitet) macht die Woche nicht „nicht final“ – sonst holte
+    --due sie neu und überschriebe die Dienstags-Dateien. Das Rechenwerk scheitert laut, der nächste Wochenabruf
+    schreibt die Datei neu (erfundene Korrektur)."""
+    team, pid, _ = korrektur.starter()
+    korrektur.korrigiere(team, pid)
+    ef.update_statkorrekturen(korrektur, 2026, DI_W2, "2026-09-15T0830Z")
+    good = korr_path().read_bytes()
+    korr_path().write_bytes(good[:-20])
+    before = snapshot(1, W1_DATEIEN)
+    assert ef.is_final(2026, 1) and ef.due_weeks(2026, DI_W2) == []
+    with pytest.raises(ef.FetchError, match="kein gültiges JSON"):
+        ef.load_week_matchups(2026, 1)
+    capsys.readouterr()
+    assert ef.update_statkorrekturen(korrektur, 2026, date(2026, 9, 16), "2026-09-15T0830Z") == 0
+    assert korr_path().read_bytes() == good and snapshot(1, W1_DATEIEN) == before
+    assert "statkorrektur.json unlesbar" in capsys.readouterr().out
+
+
+def test_statkorrektur_unerwartete_antwort_nur_warnung(korrektur, capsys):
+    """Eine unerwartete Form der Antwort (erfunden: ein Spielplan-Eintrag, der kein Objekt ist) ist nur eine Warnung
+    je Woche, kein Abbruch mit Traceback – der Wochenabruf bleibt grün."""
+    korrektur.schedule["schedule"].append(5)
+    assert ef.update_statkorrekturen(korrektur, 2026, DI_W2, "2026-09-15T0830Z") == 1
+    assert "Stat-Korrektur W1 nicht übernommen" in capsys.readouterr().out and not korr_path().exists()
+    assert ef.cmd_due(2026, DI_W2) == 0
+
+
+def test_statkorrektur_ausfall_nur_warnung(korrektur, capsys):
+    """Ist-Abfrage scheitert (HTTP 503): vorhandene Korrektur bleibt, Warnung, der Wochenabruf bleibt grün."""
+    team, pid, _ = korrektur.starter()
+    korrektur.korrigiere(team, pid)
+    ef.update_statkorrekturen(korrektur, 2026, DI_W2, "2026-09-15T0830Z")
+    before = korr_path().read_bytes()
+    korrektur.ist_status = 503
+    capsys.readouterr()
+    assert ef.update_statkorrekturen(korrektur, 2026, date(2026, 9, 22), "2026-09-22T0830Z") == 1
+    assert korr_path().read_bytes() == before
+    assert "Stat-Korrekturen nicht geprüft (HTTP 503" in capsys.readouterr().out
+    assert ef.cmd_due(2026, DI_W2) == 0 and korr_path().read_bytes() == before
+
+
+def test_statkorrektur_ruht_in_der_offseason(korrektur):
+    """Drei Kalenderwochen nach W17 wird noch geprüft (Di 19.01.2027), danach ruht die Prüfung (keine Aufrufe)."""
+    assert ef.update_statkorrekturen(korrektur, 2026, date(2027, 1, 19), "x") == 0
+    assert korrektur.requests == [("spielplan_aktuell",), ("ist", (1,))]
+    korrektur.requests.clear()
+    assert ef.update_statkorrekturen(korrektur, 2026, date(2027, 1, 26), "x") == 0 and korrektur.requests == []
+    assert ef.update_statkorrekturen(korrektur, 2026, date(2026, 9, 8), "x") == 0 and korrektur.requests == []  # vor W1
+
+
+def test_handabruf_mit_force_loescht_statkorrektur(korrektur):
+    """Wer eine finale Woche von Hand neu holt (--force), ersetzt die Grundlage: die Korrektur fällt weg."""
+    team, pid, _ = korrektur.starter()
+    korrektur.korrigiere(team, pid)
+    ef.update_statkorrekturen(korrektur, 2026, DI_W2, "2026-09-15T0830Z")
+    assert korr_path().exists()
+    assert ef.cmd_fetch(2026, [1], force=True) == 0 and not korr_path().exists()
+
+
+def test_league_games_still_nach_uebernahme_und_warnt_ohne(korrektur, capsys):
+    """Spielplan der App: Mit übernommener Korrektur ist die Warnung still – gleich, ob der Spielplan der Stand-Woche
+    die Korrektur schon trägt (jüngere Woche) oder noch den alten Wert (die Woche selbst); ohne Übernahme warnt sie
+    (erfundene Korrektur)."""
+    team, pid, _ = korrektur.starter()
+    gid = korrektur.korrigiere(team, pid)
+    ef.update_statkorrekturen(korrektur, 2026, DI_W2, "2026-09-15T0830Z")
+    w2 = ef.week_dir(2026, 2)   # jüngere Stand-Woche, deren Spielplan die Korrektur schon trägt
+    w2.mkdir()
+    shutil.copyfile(SOURCE_WEEK / "mSettings.json", w2 / "mSettings.json")
+    (w2 / "mMatchupScore.json").write_text(json.dumps(korrektur.schedule), encoding="utf-8")
+    korrigiert = next(m for m in ef.load_week_matchups(2026, 1) if m["id"] == gid)
+    capsys.readouterr()
+    for stand in (1, 2):
+        game = next(g for g in compute.league_games(rawdata.Season(2026, stand), [1]) if g["id"] == gid)
+        assert (game["home_pf"], game["away_pf"]) == (korrigiert["home_points"], korrigiert["away_points"])
+        spielplan = next(m for m in rawdata.Season(2026, stand).schedule() if m["id"] == gid)
+        assert [ef.to_points(spielplan[s]["totalPoints"]) for s in ("home", "away")] \
+            == [korrigiert["home_points"], korrigiert["away_points"]]
+    assert "Stat-Korrektur noch nicht übernommen" not in capsys.readouterr().out
+    korr_path().unlink()
+    compute.league_games(rawdata.Season(2026, 2), [1])
+    assert f"W1 Spiel {gid}: Spielplan der Stand-Woche" in capsys.readouterr().out
+
+
+def test_skriptaufruf_statkorrektur_als_hinweis_am_lauf(korrektur, monkeypatch, capsys):
+    """Wie in der Action (python scripts/espn_fetch.py --due, GITHUB_ACTIONS=true): Das Skript ist ein zweites
+    espn_fetch-Modul; die übernommene Korrektur erscheint als ::warning:: am Lauf, der Lauf bleibt grün (Lehre aus
+    PR #45/#46). Erfundene Korrektur."""
+    spec = importlib.util.spec_from_file_location("espn_fetch_als_skript", ef.__file__)
+    skript = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(skript)
+    monkeypatch.setattr(skript, "RAW_DIR", ef.RAW_DIR)
+    monkeypatch.setattr(skript, "REPO_DIR", ef.REPO_DIR)
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    team, pid, _ = korrektur.starter()
+    korrektur.korrigiere(team, pid)
+    assert skript.cmd_due(2026, DI_W2, "2026-09-15T0830Z") == 0
+    out = capsys.readouterr().out
+    assert "::warning::Stat-Korrektur übernommen: W1 – 1 Spiel, 1 Spieler (raw/2026/w01/statkorrektur.json)" in out
+    assert json.loads(korr_path().read_bytes())["stand"] == "2026-09-15T0830Z"
 
 
 class StubSession:
