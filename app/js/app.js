@@ -259,9 +259,10 @@ function standChip() {
   const fertig = po != null && po >= (S.weeks.at(-1)?.week ?? 17);   // nach W17 kein Wochenabruf bis zum Saisonwechsel
   // Dienstag, an dem Woche n beginnt; nach der letzten Woche des Spielplans eine Woche weiter (Abruf nach W17)
   const start = n => wk(n)?.start ?? (wk(n - 1) ? new Date(Date.parse(wk(n - 1).start + 'T12:00:00Z') + 7 * 864e5).toISOString().slice(0, 10) : null);
-  // nächster Wochenabruf: Dienstag nach der laufenden Woche, 08:30 UTC
+  // nächster Wochenabruf: Dienstag nach der laufenden Woche, Termine laut U.wochenabrufe (WOCHENABRUF_H, erster 08:30 UTC); der
+  // Text im Fenster kommt aus U.wochenabrufTxt wie im Hinweis „Gespielt, noch nicht gewertet“, „alt“ zählt ab dem ersten Termin
   const nxt = fertig ? null : start(sw + 2);
-  const due = nxt ? new Date(nxt + 'T08:30:00Z') : null;
+  const due = U.wochenabrufe(nxt)[0];
   const alt = due && Date.now() > due.getTime() + 27.5 * 36e5;     // Mittwoch 12:00 UTC ohne neue Woche
   // „W4 gewertet“ (App-Konzept, Abschnitt 7); auf schmalen Handys nur „W4 ✓“, der Rest steht im aria-label
   btn.replaceChildren(...(sw ? [`W${sw}`, h('span', {class: 'stw'}, ' gewertet'), h('span', {class: 'stk', 'aria-hidden': 'true'}, ' ✓')] : ['vor W1']));
@@ -310,7 +311,7 @@ function standChip() {
         h('dt', null, 'Nächster Tageslauf'), h('dd', null, `ab ${U.stamp(nextDaily())}`),
         // Tageslauf von Hand: nur ein Knopf zur Workflow-Seite, kein Start aus der App (kein Token im Browser)
         knopf,
-        voll ? [h('dt', null, 'Nächster Wochenabruf'), h('dd', null, fertig ? '– (Saison beendet, erst wieder nach dem Saisonwechsel)' : U.stamp(due))] : null),
+        voll ? [h('dt', null, 'Nächster Wochenabruf'), h('dd', null, fertig ? '– (Saison beendet, erst wieder nach dem Saisonwechsel)' : U.wochenabrufTxt(nxt) ?? '–')] : null),
       h('p', {class: 'note'}, '„Tageslauf starten“ öffnet GitHub: dort „Run workflow“ (GitHub-Anmeldung nötig). Etwa 2 Minuten später holt „Daten neu laden“ den neuen Stand. ',
         h('a', {href: '#erklaerungen/tageslauf-starten'}, 'Mehr dazu')),
       voll ? h('p', {class: 'note'}, 'Wertung und Projektionen rechnen nur mit abgeschlossenen Wochen; der Tageslauf frischt Besitz, Verletzung, Transaktionen und Wetter stündlich von etwa 05:00 Uhr bis Mitternacht (deutsche Zeit) auf. ', h('a', {href: '#erklaerungen/aktualisierung'}, 'Mehr zur Aktualisierung')) : null);
