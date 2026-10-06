@@ -2,7 +2,8 @@
 // verfügbare Spieler je Position nach Horizont, Tagesstand), Bedarf je Team (#markt/bedarf) und Reihenfolge & Claims
 // (#markt/reihenfolge: Waiver-Reihenfolge, Claims der letzten 7 Tage). Zahlen kommen aus Python; hier nur Anzeige, Filter
 // und die Zusammenführung von Tagesstand (waiver.json) und Wochenstand (players.json) je Spieler-ID.
-// Matchup je Spieler (Feld mu) aus dem Wochenstand; Wetter-Fähnchen aus wetter.json (Prognose der laufenden Woche).
+// Matchup je Spieler (Feld mu) aus dem Wochenstand, dienstags vor dem Wochenabruf ausgeblendet (Hinweis „Gespielt, noch nicht
+// gewertet“, U.zwischenstand); Wetter-Fähnchen aus wetter.json (Prognose der laufenden Woche).
 // Horizont (Beschluss 30.09.2026): „Nächste Woche (Wn)“ = N+1 (Standard), „Nächste 3 Wochen“ = Summe N+1…N+3 oder „Rest der
 // Saison“ – für die Liste und den Bedarf je Team; dazu „Langfristig (Marktwert)“ (Schlüssel zukunft, Session 9): freie Spieler
 // nach Marktwert (FantasyCalc, waiver.json), nur für die Liste. Namen nach App-Konzept 04.10.2026 (P4).
@@ -58,10 +59,14 @@ export async function render(box, ctx, r) {
     for (const a of box.querySelectorAll('.chips.bv a')) a.setAttribute('href', a.getAttribute('href').split('?')[0]);
     draw();
   }}, h('option', {value: 0}, 'Mein Team wählen'), S.teams.map(t => h('option', {value: t.team_id, selected: t.team_id === me.mine}, `${t.kuerzel} · ${t.name}`)));
+  // Dienstags vor dem Wochenabruf (U.zwischenstand): Hinweiszeile unter Freie Spieler und Bedarf je Team, nicht unter Reihenfolge &
+  // Claims (dort gilt nur die Spalte Schwächen noch nach dem Wochenstand)
+  const z = U.zwischenstand(W, P);
   U.ap(box, h('p', {class: 'note'}, `${U.standTxt(W.stand)} · Projektion und Bye-Hinweis für W${W.woche}`, ' ', U.ib('tagesstand', '')),
+    ansicht !== 'reihenfolge' && z ? U.zwischenHinweis(z, liste ? 'Gegner und Faktor nächste 3 fehlen in der Tabelle bis dahin.' : null) : null,
     h('div', {class: 'row'}, h('label', null, qTeam ? 'Sicht von ' : 'Mein Team ', mineSel)));
   if (liste) {
-    const av = available(box, W, P, rows, r, wx && (nfl => wx.flagLink(wx.gameOf(WX, nfl))), me, kp);
+    const av = available(box, W, P, rows, r, wx && (nfl => wx.flagLink(wx.gameOf(WX, nfl))), me, kp, z);
     draw = () => av.rebuild();
     return;
   }
@@ -76,7 +81,8 @@ export async function render(box, ctx, r) {
 }
 
 // ---------------------------------------------------------------- beste verfügbare Spieler je Position
-function available(box, W, P, rows, r, wflag, me, kp) {
+// z = U.zwischenstand (dienstags vor dem Wochenabruf) oder null
+function available(box, W, P, rows, r, wflag, me, kp, z) {
   const q = r.q;
   const hasWeek = !!W.ersatz_woche, hasWert = !!kp;
   // erlaubte Horizonte: Nächste Woche und Nächste 3 Wochen nur mit Wochensicht, Langfristig (zukunft) nur mit Marktwerten
@@ -158,9 +164,11 @@ function available(box, W, P, rows, r, wflag, me, kp) {
     ros: 'Freie Spieler nach Vorteil Rest der Saison', zukunft: 'Freie Spieler nach Marktwert'};
   const rosG = num('ros_g', 'Rest je Spiel', U.num, rosWhy);
   const besitz = [num('own', 'Besitz %', v => U.pct(v)), num('own_d', 'seit gestern', v => U.sgn(v, 2)), num('started', 'aufgestellt %', v => U.pct(v))];
-  // Spalten hinter dem Horizont; im Horizont „Rest der Saison“ ist Rest je Spiel einfach sichtbar, unter Langfristig alles ausführlich
-  const extra = hor => hor === 'zukunft' ? [mu, mu3, bye, verl, rosG, ...besitz, frist].map(X)
-    : [mu, X(mu3), bye, verl, hor === 'ros' ? rosG : X(rosG), ...besitz.map(X), X(frist)];
+  // Spalten hinter dem Horizont; im Horizont „Rest der Saison“ ist Rest je Spiel einfach sichtbar, unter Langfristig alles ausführlich.
+  // Gegner und Faktor nächste 3 fehlen dienstags vor dem Wochenabruf (z) in allen Horizonten: Sie gälten noch für die gespielte
+  // Woche („Gegner W4“ neben „Projektion W5“, der Faktor zählt W4 mit)
+  const extra = hor => hor === 'zukunft' ? [...(z ? [] : [mu, mu3]), bye, verl, rosG, ...besitz, frist].map(X)
+    : [...(z ? [] : [mu, X(mu3)]), bye, verl, hor === 'ros' ? rosG : X(rosG), ...besitz.map(X), X(frist)];
   const count = h('p', {class: 'note', 'aria-live': 'polite'});
   const slot = h('div');
   const fst = {}, filters = [{k: 'nfl', l: 'NFL-Team', v: x => x.nfl, d: 1, cat: 1, f: x => x.nfl},
@@ -206,7 +214,8 @@ function available(box, W, P, rows, r, wflag, me, kp) {
         timer = setTimeout(() => { st.text = e.target.value.trim().toLowerCase(); refresh(); }, 150);
       }}))),
     count, slot,
-    U.legend(['verfuegbar', 'horizont', 'zugewinn', 'proj-ue', 'proj3', 'gespielt', 'ros-ue', 'ersatz', 'ros-spiel', 'proj-naechste', 'mu-n1', 'mu-naechste3', 'bye-hinweis', 'besitz-trend', 'frist',
+    U.legend(['verfuegbar', 'horizont', 'zugewinn', 'proj-ue', 'proj3', 'gespielt', 'ros-ue', 'ersatz', 'ros-spiel', 'proj-naechste',
+      ...(z ? [] : ['mu-n1', 'mu-naechste3']), 'bye-hinweis', 'besitz-trend', 'frist',
       'wetter-markierung', ...(hasWert ? ['marktwert', 'keeper-linie', 'wert-ue', 'wert-trend'] : []), 'filter', 'projektionen']));
   refresh(true);
   return {rebuild: () => refresh(true)};

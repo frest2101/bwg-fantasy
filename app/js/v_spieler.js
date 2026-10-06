@@ -322,22 +322,25 @@ function one(box, h1, P, W, rows, r, svg, rosWhy, wline, origin, kp) {
 }
 
 // Woche: Gegner der nächsten Woche mit Faktor und Rang (players.json mu, Wochenstand; D/ST: Faktor der gegnerischen Offense aus
-// Matchups › D/ST), Projektion der Woche (Tageslauf) und die Wetterzeile des Spiels (wetter.json, Prognose der laufenden Woche)
+// Matchups › D/ST), Projektion der Woche (Tageslauf) und die Wetterzeile des Spiels (wetter.json, Prognose der laufenden Woche).
+// Dienstags vor dem Wochenabruf (U.zwischenstand) fehlen Gegner, Faktor und Rang: Sie gälten noch für die gespielte Woche;
+// die Hinweiszeile sagt das, Projektion und Wetter gelten schon für die neue Woche
 function woche(box, p, P, W, wl) {
-  const dst = p.pos === 'D/ST', m = p.mu, n1 = m?.n1;
+  const dst = p.pos === 'D/ST', m = p.mu, n1 = m?.n1, z = U.zwischenstand(W, P);
   const why = !('mu_woche' in P) ? 'ab dem nächsten Wochenabruf' : p.nur_tag ? 'der Spieler steht nicht in den Wochendaten (siehe Saison)'
     : !p.nfl ? 'kein NFL-Team' : 'kein Matchup-Wert für diese Position';
   const n1Why = !n1 ? 'keine offene Woche' : 'Bye';
   const cell = (v, reason) => U.val(v, x => h('span', {class: 'fz ' + U.fcls(x)}, U.num(x, 2)), reason);
   const wn = W?.woche ?? n1?.week ?? P.mu_woche;
   U.ap(box, h('h2', null, wn ? `Woche W${wn}` : 'Woche'),
+    z ? U.zwischenHinweis(z, `Gegner, Faktor und Rang für W${z.neu} folgen mit dem Wochenabruf.`) : null,
     h('div', {class: 'tiles'},
       W ? U.tile(`Projektion W${W.woche}`, U.val(p.proj_n, U.num, 'noch keine ESPN-Projektion'), null, 'proj-naechste') : null,
       // 32 NFL-Teams: Rang 1 = höchster Faktor (F), also das günstigste Matchup
-      m ? [U.tile(n1 ? `Gegner W${n1.week}` : 'Gegner', n1 ? n1.opp || 'Bye' : U.na(n1Why), n1?.opp ? (dst ? 'Offense' : 'Defense') : null, 'mu-n1'),
+      m && !z ? [U.tile(n1 ? `Gegner W${n1.week}` : 'Gegner', n1 ? n1.opp || 'Bye' : U.na(n1Why), n1?.opp ? (dst ? 'Offense' : 'Defense') : null, 'mu-n1'),
         U.tile('Faktor', n1?.opp ? cell(n1.f, 'kein Faktor') : U.na(n1Why), null, dst ? 'f' : 'mu-f'),
         U.tile('Rang', n1?.opp ? U.val(n1.rang, v => `${v}. von 32`, 'kein Faktor') : U.na(n1Why), '1 = günstigstes Matchup', dst ? 'f' : 'mu-rang')] : null),
-    !m ? h('p', {class: 'note'}, `Kein Matchup-Wert: ${why}.`) : h('p', {class: 'note'}, ...(dst
+    z ? null : !m ? h('p', {class: 'note'}, `Kein Matchup-Wert: ${why}.`) : h('p', {class: 'note'}, ...(dst
       ? ['Faktor der gegnerischen Offense, über 1,00 = günstig für die D/ST. ', h('a', {href: '#woche/matchups/dst'}, 'Matchups D/ST')]
       : ['Position gegen Defense, kein Einzelduell: Ein Faktor über 1,00 heißt, Spieler der Position holen gegen diese Defense mehr Punkte als im Schnitt. ',
         h('a', {href: '#woche/matchups/' + String(p.pos).toLowerCase()}, `Alle Defenses gegen ${p.pos}`)])),

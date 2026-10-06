@@ -259,9 +259,9 @@ function standChip() {
   const fertig = po != null && po >= (S.weeks.at(-1)?.week ?? 17);   // nach W17 kein Wochenabruf bis zum Saisonwechsel
   // Dienstag, an dem Woche n beginnt; nach der letzten Woche des Spielplans eine Woche weiter (Abruf nach W17)
   const start = n => wk(n)?.start ?? (wk(n - 1) ? new Date(Date.parse(wk(n - 1).start + 'T12:00:00Z') + 7 * 864e5).toISOString().slice(0, 10) : null);
-  // nächster Wochenabruf: Dienstag nach der laufenden Woche, 08:30 UTC
+  // nächster Wochenabruf: Dienstag nach der laufenden Woche, erster Termin laut U.WOCHENABRUF_H (08:30 UTC)
   const nxt = fertig ? null : start(sw + 2);
-  const due = nxt ? new Date(nxt + 'T08:30:00Z') : null;
+  const due = nxt ? new Date(Date.parse(nxt + 'T00:00:00Z') + U.WOCHENABRUF_H[0] * 36e5) : null;
   const alt = due && Date.now() > due.getTime() + 27.5 * 36e5;     // Mittwoch 12:00 UTC ohne neue Woche
   // „W4 gewertet“ (App-Konzept, Abschnitt 7); auf schmalen Handys nur „W4 ✓“, der Rest steht im aria-label
   btn.replaceChildren(...(sw ? [`W${sw}`, h('span', {class: 'stw'}, ' gewertet'), h('span', {class: 'stk', 'aria-hidden': 'true'}, ' ✓')] : ['vor W1']));

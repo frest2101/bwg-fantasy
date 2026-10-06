@@ -362,6 +362,14 @@ def need_basis(result: dict) -> tuple[dict, dict, str] | None:
             "playoffs")
 
 
+def profile_bye_weeks(after: int, pool_week: int | None, kind: str) -> list[int]:
+    """Restwochen der Bye-Kosten im Profil: ab der nächsten offenen Woche bis W14 (Playoffs: W17). Offen ist die Woche
+    nach dem Wochenstand (ros_after_week + 1), dienstags vor dem Wochenabruf aber erst die Woche des Tagesstands
+    (pool["woche"]) – die Woche dazwischen ist gespielt, nur noch nicht gewertet (Beschluss Stephan 06.10.2026)."""
+    last = players_module.LAST_REGULAR_WEEK if kind == "regular" else players_module.LAST_PLAYOFF_WEEK
+    return list(range(max(after + 1, pool_week or 0), last + 1))
+
+
 def pool_rosters(pool: dict, weekly: dict) -> dict[int, list[tuple[int, int]]]:
     """Kader laut Tagesstand: team_id → [(Spieler-ID, Position)]; ohne Wochenpool-Eintrag ist die Position
     unbekannt, der Spieler ist dann nicht aufstellbar und fehlt."""
@@ -458,9 +466,9 @@ def team_view(pool: dict, result: dict, view: dict | None, keep: set[int]) -> tu
 
     Profil (players.team_profiles) nach need_basis, dazu je Gruppe ist_rang (Ist-Punkte der Starter-Slots W1–N aus
     records.positions, QB-Gruppe = QB + OP), absicherung je Position (players.cover_loss mit dem besten
-    verfügbaren Spieler ohne OUT/IR) samt Rang (1 = geringster Verlust), byes = Kosten der Byes N+1 … W14 bzw.
-    W17 in den Playoffs (players.bye_costs), kader = {spieler, ir, voll, limit} (players.must_drop mit dem IR-Slot laut
-    Tagesstand ir_slot; ohne ihn steht niemand auf IR).
+    verfügbaren Spieler ohne OUT/IR) samt Rang (1 = geringster Verlust), byes = Kosten der Byes ab der nächsten offenen
+    Woche (profile_bye_weeks) bis W14 bzw. W17 in den Playoffs (players.bye_costs), kader = {spieler, ir, voll, limit}
+    (players.must_drop mit dem IR-Slot laut Tagesstand ir_slot; ohne ihn steht niemand auf IR).
     Zugewinn (players.team_gains) je Spieler der Auswahl keep mit Status WAIVERS/FREEAGENT und Horizont:
     woche = Wochenwert N+1, drei = Wochenwerte N+1 … N+3 (je Woche eigene Aufstellung), ros = need_basis.
     Rückgabe (profil oder None ohne Grundlage, {Spieler-ID: {Horizont: {team_id: {"b", "n"}}}}).
@@ -503,8 +511,7 @@ def team_view(pool: dict, result: dict, view: dict | None, keep: set[int]) -> tu
     cover_rank = {pos: ranked({tid: c[pos]["wert"] for tid, c in cover.items() if c[pos] is not None})
                   for pos in players_module.POSITION_CV}
     after, nfl = result["players"]["ros_after_week"], result.get("nfl") or {}
-    last = players_module.LAST_REGULAR_WEEK if kind == "regular" else players_module.LAST_PLAYOFF_WEEK
-    bye_weeks = list(range(after + 1, last + 1))
+    bye_weeks = profile_bye_weeks(after, pool.get("woche"), kind)
     byes = {pid: {w for w in bye_weeks if players_module.is_bye(nfl, weekly[pid]["pro_team"], w)}
             for r in rosters.values() for pid, _ in r}
     ist = (result.get("records") or {}).get("positions") or {}

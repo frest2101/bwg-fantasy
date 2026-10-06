@@ -100,7 +100,7 @@ export async function render(box, ctx, r) {
     const name = new Map(all.map(p => [p.id, p.name]));
     const kader = all.filter(p => p.team === id);
     wocheTeil(woche, t, W, name, new Map(all.map(p => [p.id, p.nfl])), kader, WX && wx ? {WX, wx} : null);
-    marktTeil(markt, t, W, name, ctx, r);
+    marktTeil(markt, t, W, name, ctx, r, U.zwischenstand(W, P));
     keeperTeil(keeper, t, P, kader, W, sp.nflTxt, kp && K, kp);
   }).catch(() => {
     for (const b of [woche, markt]) b.replaceChildren(h('p', {class: 'note'}, 'Spielerdaten konnten nicht geladen werden.'));
@@ -220,11 +220,14 @@ function wocheTeil(box, t, W, name, nflOf, kader, wetter) {
 }
 
 // ---------------------------------------------------------------- Markt: Stärken und Schwächen, Bedarf Rest der Saison, Moves
-function marktTeil(box, t, W, name, ctx, r) {
+// z = U.zwischenstand: dienstags vor dem Wochenabruf rechnen Profil und Bedarf noch mit dem Rest der Saison nach der Woche davor
+// (Byes schon ab der neuen Woche) – die Hinweiszeile steht dann über beiden
+function marktTeil(box, t, W, name, ctx, r, z) {
   const prof = W?.profil?.[String(t.team_id)], B = W?.bedarf?.[String(t.team_id)];
   const moves = h('div');
   box.replaceChildren();
   if (!W) U.ap(box, h('p', {class: 'note'}, 'Stärken und Schwächen und Bedarf erscheinen mit dem ersten Tageslauf.'));
+  if (z && (prof || B)) U.ap(box, U.zwischenHinweis(z));
   if (prof) U.ap(box, h('p', null, ...short(prof, W)), profile(t, W, prof, name));
   if (B) {
     const pl = id => h('a', {href: '#spieler/' + id}, name.get(id) ?? `Spieler ${id}`);
