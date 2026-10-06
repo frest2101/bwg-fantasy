@@ -103,15 +103,19 @@ def test_car_bye_in_naechsten_3(w2):
 
 # ---------------------------------------------------------------- 2. ESPN positionAgainstOpponent
 
-@pytest.mark.parametrize("through", [2, 3])
+@pytest.mark.parametrize("through", [2, 3, 4])
 def test_z26_gleich_espn(through):
     """ratingsByOpponent[Offense].average aus kona wN = eigenes Z26 nach Woche N oder N−1, 32/32.
 
     ESPN aktualisiert die Ratings dienstags erst im Lauf des Tages; der Wochenabruf trifft deshalb oft noch den Stand
     der Vorwoche (w03 vom 29.09. 07:30 UTC: Stand W2, 32/32). Das Gesamtfeld „average“ ist nicht der Ligaschnitt.
+    w04 (06.10. 08:30 UTC) trägt schon den Stand W4 und rechnet die W3-Stat-Korrektur vom 06.10.2026 mit ein: 32/32
+    nur mit übernommener Korrektur (ohne 30/32) – bis der Wochenabruf w03/statkorrektur.json anlegt, übersprungen.
     """
     if not (ef.week_dir(2026, through) / ef.KONA_FILE).exists():
         pytest.skip(f"Spielerpool W{through} fehlt noch (holt der Wochenabruf)")
+    if through == 4 and not (ef.week_dir(2026, 3) / ef.STATKORREKTUR_FILE).exists():
+        pytest.skip("W3-Stat-Korrektur noch nicht übernommen (holt der Wochenabruf)")
     espn = rawdata.Season(2026, through).ratings(through)["positionalRatings"][str(DST)]["ratingsByOpponent"]
     assert len(espn) == ef.NFL_TEAMS
 

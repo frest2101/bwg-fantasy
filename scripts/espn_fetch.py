@@ -10,6 +10,8 @@ basis/positionen_<vorjahr>.json (Punktsummen je NFL-Team, Position und Woche des
 Ablage je Saison (--due):
     wNN/  mSettings, mTeam, mMatchupScore, mRoster        Kern: bestimmen, ob die Woche final ist
     wNN/  kona_player_info, ros.json, mStandings           Stand beim Abschluss der Woche (Spielerpool, ROS, ESPN-Simulation)
+    wNN/  statkorrektur.json                               Stat-Korrekturen nach dem Dienstag (Auszug, nur bei Abweichung;
+                                                           die Wochendateien bleiben byte-genau, siehe update_statkorrekturen)
     nfl/proTeamSchedules_wl.json                           NFL-Spielplan mit Byes, wird aktualisiert
     draft/mDraftDetail.json                                Draft und Keeper, einmalig
     basis/kona_dst_<vorjahr>.json, proTeamSchedules_wl_<vorjahr>.json   D/ST-Grundlage des Vorjahrs, einmalig
@@ -29,7 +31,7 @@ Tageslauf (--transactions --pool --wetter --marktwert, Action stündlich von etw
 Aufrufe:
     python scripts/espn_fetch.py --weeks 1 2 3            # Kern-Views abrufen, Vorhandenes bleibt stehen
     python scripts/espn_fetch.py --weeks 3 --force        # vorhandene Dateien überschreiben
-    python scripts/espn_fetch.py --due                    # alles Fällige (Action dienstags), siehe cmd_due
+    python scripts/espn_fetch.py --due                    # alles Fällige samt Stat-Korrekturen (Action dienstags), siehe cmd_due
     python scripts/espn_fetch.py --transactions --pool --wetter --marktwert   # Tageslauf (Action stündlich), siehe cmd_daily
     python scripts/espn_fetch.py --transactions           # nur das Transaktions-Archiv fortschreiben
     python scripts/espn_fetch.py --summary                # Matchups aller lokalen Wochen ausgeben
@@ -88,6 +90,16 @@ OFFENSE_POSITIONS = {1: "QB", 2: "RB", 3: "WR", 4: "TE", 5: "K"}  # defaultPosit
 POSITION_SLOTS = {1: "0", 2: "2", 3: "4", 4: "6", 5: "17", 16: "16"}  # defaultPositionId → Lineup-Slot für pointsOverrides
 STAT_ACTUAL, STAT_PROJECTION, SPLIT_WEEK, STAT_PLAYED = 0, 1, 1, "210"  # statSourceId, statSplitTypeId, „hat gespielt“
 MAX_WEEK = 17  # W1–14 Regular Season, W15–17 Playoffs
+# Stat-Korrekturen finaler Wochen (Beschluss Stephan 06.10.2026, update_statkorrekturen): Auszug je Woche neben den
+# unveränderten Wochendateien. Je korrigiertem Spieler steht der Ist-Eintrag von heute in der Datei, nur mit den
+# Feldern aus IST_KEEP (am 06.10.2026 so geliefert, nur Zahlen und IDs); appliedStats (nur in mRoster, Punkte je Stat)
+# fällt still weg, jedes andere Feld fällt auch weg, wird aber am Lauf gemeldet (dann hier einordnen).
+STATKORREKTUR_FILE = "statkorrektur.json"   # nicht „korrektur“: nflverse.KORREKTUR ist etwas anderes
+IST_KEEP = frozenset({"appliedTotal", "externalId", "id", "proTeamId", "scoringPeriodId", "seasonId", "statSourceId",
+                      "statSplitTypeId", "stats"})
+IST_DROP = frozenset({"appliedStats"})
+KORREKTUR_RUHE = 3  # Kalenderwochen nach W17, in denen der Wochenabruf noch Korrekturen prüft; danach ruht er
+SLOT_BENCH = 20     # Lineup-Slot Bank (Starter = weder Bank noch IR)
 WEEK1_START = {2026: date(2026, 9, 8)}  # Dienstag, an dem NFL-Woche 1 beginnt; jede Woche läuft Di–Mo
 TIMEOUT = 30  # Sekunden je Anfrage
 
@@ -500,6 +512,11 @@ def fetch_week(session: requests.Session, season: int, week: int, force: bool, s
             print(f"  {name:<22} FEHLER beim Schreiben – {exc}", file=sys.stderr)
             return errors + 1
         print(f"  {name:<22} {len(fetched[name]):>10,} Bytes -> {rel(path)}")
+    korr = week_dir(season, week) / STATKORREKTUR_FILE
+    if korr.exists() and fetched.keys() & ({f"{view}.json" for view in VIEWS} | {KONA_FILE}):
+        # neue Grundlage (Handabruf mit --force): die Korrektur bezog sich auf die alten Dateien, --due prüft neu
+        korr.unlink()
+        print(f"  {STATKORREKTUR_FILE:<22} gelöscht – Woche neu geholt, der Wochenabruf prüft sie erneut")
     try:
         matchups = load_week_matchups(season, week)
         if not matchups:  # z. B. Playoff-Woche, bevor ESPN das Bracket anlegt
@@ -516,7 +533,8 @@ def cmd_fetch(season: int, weeks: list[int], force: bool) -> int:
     """Kern-Views der genannten Wochen (Handabruf für Test oder Notfall – Wochen holt der Wochenabruf).
 
     --due ergänzt für finale Wochen nur den Spielerpool; ROS-Auszug und mStandings entstehen nur, wenn --due die
-    jüngste Woche selbst holt.
+    jüngste Woche selbst holt. Eine Woche mit --force neu geholt: ihre Stat-Korrektur fällt weg (neue Grundlage),
+    der nächste Wochenabruf prüft sie erneut.
     """
     with requests.Session() as session:
         errors = sum(fetch_week(session, season, week, force) for week in weeks)
@@ -537,22 +555,38 @@ def load_json(path: Path):
         raise FetchError(f"{rel(path)} ist kein gültiges JSON: {exc}") from exc
 
 
+def week_period(settings: dict, week: int) -> int:
+    """Matchup-Periode einer NFL-Woche laut mSettings (settings-Block); matchupPeriods ordnet Perioden den Wochen zu,
+    z. B. {"1": [1]}."""
+    periods = settings["scheduleSettings"]["matchupPeriods"]
+    period = next((int(mp) for mp, wks in periods.items() if week in wks), None)
+    if period is None:
+        raise FetchError(f"Woche {week} gehört laut mSettings zu keiner Matchup-Periode")
+    return period
+
+
+def load_statkorrektur(season: int, week: int) -> dict | None:
+    """Stat-Korrektur einer Woche (wNN/statkorrektur.json, update_statkorrekturen); None ohne Datei."""
+    path = week_dir(season, week) / STATKORREKTUR_FILE
+    return load_json(path) if path.exists() else None
+
+
 def load_week_matchups(season: int, week: int) -> list[dict]:
     """Liest die Matchups einer Woche aus den lokalen Rohdaten.
 
     Je Matchup: id, home, away (Teamname, away None bei Bye), home_id, away_id,
     home_points, away_points (Decimal, zwei Stellen) und final (False, solange ESPN kein Ergebnis führt).
+    Hat ESPN die Woche nach dem Dienstag korrigiert (wNN/statkorrektur.json), gelten für korrigierte Spiele deren
+    Punkte; final bleibt die Angabe der Wochendatei.
     """
     folder = week_dir(season, week)
     settings = load_json(folder / "mSettings.json")["settings"]
     names = {t["id"]: t["name"] for t in load_json(folder / "mTeam.json")["teams"]}
     schedule = load_json(folder / "mMatchupScore.json")["schedule"]
+    korr = {g["id"]: g["totalPoints"] for g in (load_statkorrektur(season, week) or {}).get("spiele", [])}
 
-    # mMatchupScore enthält den ganzen Spielplan; matchupPeriods ordnet Perioden den NFL-Wochen zu, z. B. {"1": [1]}
-    periods = settings["scheduleSettings"]["matchupPeriods"]
-    period = next((int(mp) for mp, wks in periods.items() if week in wks), None)
-    if period is None:
-        raise FetchError(f"Woche {week} gehört laut mSettings zu keiner Matchup-Periode")
+    # mMatchupScore enthält den ganzen Spielplan; nur die Periode der Woche zählt
+    period = week_period(settings, week)
 
     matchups = []
     for m in schedule:
@@ -560,7 +594,7 @@ def load_week_matchups(season: int, week: int) -> list[dict]:
             continue
         final = m.get("winner") != "UNDECIDED"
         row = {"id": m["id"], "final": final}
-        for side in ("home", "away"):
+        for i, side in enumerate(("home", "away")):
             team = m.get(side)
             if team is None:
                 row[side], row[f"{side}_id"], row[f"{side}_points"] = None, None, None
@@ -569,6 +603,8 @@ def load_week_matchups(season: int, week: int) -> list[dict]:
             row[side] = names.get(team["teamId"], f"Team {team['teamId']}")
             # totalPoints ist erst nach Abschluss gefüllt; bis dahin steht der Zwischenstand in totalPointsLive
             points = team["totalPoints"] if final else team.get("totalPointsLive", 0)
+            if final and m["id"] in korr:   # Stat-Korrektur nach dem Dienstag
+                points = korr[m["id"]][i]
             row[f"{side}_points"] = to_points(points)
         matchups.append(row)
     return matchups
@@ -644,7 +680,7 @@ def due_weeks(season: int, today: date) -> list[int]:
     """Vergangene Wochen (Montag vor today oder früher), die lokal fehlen oder noch nicht final sind.
 
     Finale Wochen werden nie neu geholt: ESPN liefert bei jedem Abruf andere Bytes (Ownership, Status),
-    das gäbe Commits ohne Inhalt.
+    das gäbe Commits ohne Inhalt. Spätere Stat-Korrekturen kommen als Auszug daneben (update_statkorrekturen).
     """
     return [week for week in range(1, last_past_week(season, today) + 1) if not is_final(season, week)]
 
@@ -711,17 +747,355 @@ def warn(message: str) -> None:
     print(prefix + message)
 
 
-def cmd_due(season: int, today: date) -> int:
-    """Alles Fällige: Saisondateien, nicht finale Wochen, fehlende Spielerpools finaler Wochen.
+# ---------------------------------------------------------------- Stat-Korrekturen finaler Wochen (Wochenabruf)
+
+def ist_filter(weeks: list[int]) -> dict:
+    """X-Fantasy-Filter für den ganzen Spielerpool, nur mit dem Wochen-Ist (statSourceId 0, statSplitTypeId 1) der
+    genannten Wochen – Projektionen, Saisonwerte und Ränge fallen weg.
+
+    Wie kona_filter (ohne sortPercOwned HTTP 400); die drei Stat-Filter sind UND-verknüpft (geprüft 06.10.2026: W1–4
+    in einem Aufruf, 1051 Spieler, 5,2 MB, gzip 0,66 MB – der größere Teil sind Spieler-Metadaten, jede weitere
+    Woche kostet rund 0,2 MB).
+    """
+    players = {"limit": 2000, "filterActive": {"value": True},
+               "sortPercOwned": {"sortPriority": 1, "sortAsc": False},
+               "filterStatsForCurrentSeasonScoringPeriodId": {"value": list(weeks)},
+               "filterStatsForSourceIds": {"value": [STAT_ACTUAL]},
+               "filterStatsForSplitTypeIds": {"value": [SPLIT_WEEK]}}
+    return {"X-Fantasy-Filter": json.dumps({"players": players})}
+
+
+def ist_eintrag(player: dict, season: int, week: int) -> dict | None:
+    """Wochen-Ist eines Spielers (statSourceId 0, statSplitTypeId 1) aus player.stats; None ohne Eintrag."""
+    for s in player.get("stats") or []:
+        if (s.get("seasonId"), s.get("scoringPeriodId"), s.get("statSourceId"), s.get("statSplitTypeId")) \
+                == (season, week, STAT_ACTUAL, SPLIT_WEEK):
+            return s
+    return None
+
+
+def roster_ist(data: dict, season: int, week: int) -> dict[int, dict]:
+    """Wochen-Ist aller Kaderspieler einer mRoster-Antwort: Spieler-ID → Eintrag (Spieler ohne Eintrag fehlen)."""
+    out = {}
+    for team in data["teams"]:
+        for e in team["roster"]["entries"]:
+            player = e["playerPoolEntry"]["player"]
+            stat = ist_eintrag(player, season, week)
+            if stat is not None:
+                out[player["id"]] = stat
+    return out
+
+
+def pool_ist(data: dict, season: int, weeks) -> dict[int, dict[int, dict]]:
+    """Wochen-Ist aller Spieler einer kona-Antwort: Woche → Spieler-ID → Eintrag (nur die Wochen weeks)."""
+    out = {week: {} for week in weeks}
+    for entry in data["players"]:
+        for s in entry["player"].get("stats") or []:
+            if (s.get("seasonId"), s.get("statSourceId"), s.get("statSplitTypeId")) == (season, STAT_ACTUAL, SPLIT_WEEK) \
+                    and s.get("scoringPeriodId") in out:
+                out[s["scoringPeriodId"]][entry["id"]] = s
+    return out
+
+
+def fetch_current_schedule(session: requests.Session, season: int) -> list[dict]:
+    """Liga-Spielplan von heute (mMatchupScore ohne scoringPeriodId): alle Paarungen, für finale Perioden mit den
+    Endständen, wie ESPN sie nach Stat-Korrekturen führt (geprüft 06.10.2026: 329 KB, gzip 91 KB)."""
+    _, data = get_json(session, league_url(season), {"view": "mMatchupScore"})
+    if (data.get("id"), data.get("seasonId")) != (LEAGUE_ID, season):
+        raise FetchError(f"mMatchupScore passt nicht zu Liga und Saison: {(data.get('id'), data.get('seasonId'))}")
+    schedule = data.get("schedule")
+    if not isinstance(schedule, list) or not schedule:
+        raise FetchError("mMatchupScore ohne Spielplan")
+    return schedule
+
+
+def fetch_ist(session: requests.Session, season: int, weeks: list[int]) -> dict[int, dict[int, dict]]:
+    """Wochen-Ist aller aktiven Spieler für alle Wochen weeks in einem Aufruf: Woche → Spieler-ID → Eintrag.
+
+    Je Woche mindestens MIN_POOL Einträge (echt 665–696), sonst gilt die Antwort als Teilantwort (FetchError).
+    filterActive lässt heute inaktive Spieler weg – für Kaderspieler fängt das der mRoster-Rückgriff auf.
+    """
+    _, data = get_json(session, league_url(season), {"view": KONA_VIEW}, ist_filter(weeks))
+    check_pool(data)
+    try:
+        ist = pool_ist(data, season, weeks)
+    except (KeyError, TypeError, AttributeError) as exc:
+        raise FetchError(f"Ist-Abfrage unbrauchbar ({exc!r})") from exc
+    short = [f"W{week} {len(ist[week])}" for week in weeks if len(ist[week]) < MIN_POOL]
+    if short:
+        raise FetchError(f"Ist-Abfrage unvollständig (Einträge {', '.join(short)})")
+    return ist
+
+
+def stored_ist(season: int, week: int, roster: dict) -> list[dict[int, dict]]:
+    """Wochen-Ist laut Wochendateien als Quellen [mRoster, kona_player_info] (kona nur, wenn vorhanden): je Quelle
+    Spieler-ID → Eintrag. Beide tragen dieselben Werte; verglichen wird mit beiden, weil das Rechenwerk beide liest
+    (Kader aus mRoster, Spielerwerte, D/ST-Faktoren und Positions-Matchup aus kona)."""
+    sources = [roster_ist(roster, season, week)]
+    kona = week_dir(season, week) / KONA_FILE
+    if kona.exists():
+        sources.append(pool_ist(load_json(kona), season, [week])[week])
+    return sources
+
+
+def _pts(value) -> Decimal | None:
+    return None if value is None else to_points(value)
+
+
+def _scores(game: dict) -> list:
+    """totalPoints [Heim, Gast] einer Paarung wie geliefert (Gast None bei Bye)."""
+    return [game[side].get("totalPoints") if game.get(side) else None for side in ("home", "away")]
+
+
+def _wertung(entry: dict) -> tuple:
+    """Was an einem Ist-Eintrag in die Wertung eingeht: Punkte, Einsatz (Stat 210), NFL-Team des Spiels."""
+    points = entry.get("appliedTotal")
+    return (None if points is None else Decimal(str(points)), (entry.get("stats") or {}).get(STAT_PLAYED) == 1,
+            entry.get("proTeamId"))
+
+
+def _ist_auszug(entry: dict) -> dict:
+    """Ist-Eintrag nach IST_KEEP, Schlüssel sortiert (Stats numerisch), damit die Datei stabil bleibt."""
+    out = {k: entry[k] for k in sorted(entry) if k in IST_KEEP}
+    if isinstance(out.get("stats"), dict):
+        out["stats"] = dict(sorted(out["stats"].items(), key=lambda kv: (len(kv[0]), kv[0])))
+    return out
+
+
+def statkorrektur_extract(stored_games: list[dict], games_now: list[dict], stored: list[dict[int, dict]],
+                          current: dict[int, dict]) -> tuple[dict | None, list[str]]:
+    """Stat-Korrekturen einer Woche (rein): Wochendateien gegen ESPN von heute.
+
+    stored_games, games_now: Paarungen der Periode laut Wochendatei bzw. aktuellem Spielplan; stored: Wochen-Ist der
+    Wochendateien je Quelle (stored_ist); current: Wochen-Ist von heute (Spieler-ID → Eintrag).
+    Ein Spiel zählt, wenn totalPoints einer Seite (zwei Stellen) oder winner anders ist; ein Spieler, wenn sich in
+    mindestens einer Quelle Punkte (appliedTotal), Einsatz (Stat 210) oder NFL-Team des Spiels (proTeamId)
+    unterscheiden – reine Rohstat-Änderungen ohne Punktwirkung (06.10.2026: sieben in W3) lösen nichts aus. Wer heute
+    fehlt (filterActive) oder vorher keinen Eintrag hatte, bleibt außen vor. Andere Paarungen als in der Wochendatei
+    sind ein Fehler (FetchError).
+
+    Rückgabe ({"spiele", "spieler"} oder None ohne Abweichung, Namen unbekannter Felder im Ist-Eintrag). Je Spiel
+    {id, home, away, totalPoints [Heim, Gast], winner, vorher {totalPoints, winner}}, je Spieler {id, vorher
+    {appliedTotal, gespielt, proTeamId}, ist (Eintrag nach IST_KEEP)}; nur IDs und Zahlen, nach id sortiert.
+    """
+    now = {m["id"]: m for m in games_now}
+    if set(now) != {m["id"] for m in stored_games}:
+        raise FetchError("Paarungen der Woche weichen vom aktuellen Spielplan ab")
+    spiele = []
+    for old in sorted(stored_games, key=lambda m: m["id"]):
+        new = now[old["id"]]
+        teams = [(old.get(side) or {}).get("teamId") for side in ("home", "away")]
+        if teams != [(new.get(side) or {}).get("teamId") for side in ("home", "away")]:
+            raise FetchError(f"Spiel {old['id']}: andere Teams im aktuellen Spielplan")
+        before, after = _scores(old), _scores(new)
+        if [_pts(v) for v in before] != [_pts(v) for v in after] or old.get("winner") != new.get("winner"):
+            spiele.append({"id": old["id"], "home": teams[0], "away": teams[1], "totalPoints": after,
+                           "winner": new.get("winner"), "vorher": {"totalPoints": before, "winner": old.get("winner")}})
+    spieler, unknown = [], set()
+    for pid in sorted(set().union(*stored) & set(current)):
+        new = current[pid]
+        old = next((src[pid] for src in stored if pid in src and _wertung(src[pid]) != _wertung(new)), None)
+        if old is None:
+            continue
+        unknown |= {k for k in new if k not in IST_KEEP | IST_DROP}
+        spieler.append({"id": pid, "vorher": {"appliedTotal": old.get("appliedTotal"), "gespielt": _wertung(old)[1],
+                                              "proTeamId": old.get("proTeamId")},
+                        "ist": _ist_auszug(new)})
+    return ({"spiele": spiele, "spieler": spieler} if spiele or spieler else None), sorted(unknown)
+
+
+def check_statkorrektur(roster: dict, season: int, week: int, games_now: list[dict], spieler: list[dict]) -> list[str]:
+    """Stimmt eine Korrektur in sich (rein)? Je Team mit Gegner: Σ der Starter (Slots aus mRoster der Woche, Ist aus
+    der Korrektur, sonst aus der Wochendatei) = Team-Summe laut aktuellem Spielplan, auf zwei Stellen.
+
+    Rückgabe: Befunde mit Team-IDs und Zahlen, leer = stimmig. Gilt für alle Teams der Woche, nicht nur für
+    korrigierte Spiele – so fällt auch ein korrigierter Starter auf, dessen Team-Summe ESPN nicht mitgeändert hat.
+    """
+    fixes = {s["id"]: s["ist"] for s in spieler}
+    totals = {m[side]["teamId"]: m[side].get("totalPoints") for m in games_now if m.get("home") and m.get("away")
+              for side in ("home", "away")}
+    teams = {t["id"]: t for t in roster["teams"]}
+    problems = []
+    for team_id in sorted(totals):
+        if team_id not in teams:
+            problems.append(f"Team {team_id} fehlt in {ROSTER_VIEW}")
+            continue
+        starters = Decimal(0)
+        for e in teams[team_id]["roster"]["entries"]:
+            if e["lineupSlotId"] in (SLOT_BENCH, SLOT_IR_ID):
+                continue
+            player = e["playerPoolEntry"]["player"]
+            stat = fixes.get(player.get("id")) or ist_eintrag(player, season, week) or {}
+            starters += Decimal(str(stat.get("appliedTotal", 0)))
+        total = to_points(totals[team_id] or 0)
+        if to_points(starters) != total:
+            problems.append(f"Team {team_id}: Starter {to_points(starters)}, Spielstand {total}")
+    return problems
+
+
+def statkorrektur_doc(season: int, week: int, stand: str, body: dict) -> dict:
+    """Kopf und Inhalt von wNN/statkorrektur.json."""
+    return {"season": season, "woche": week, "stand": stand,
+            "quelle": f"Wochendateien gegen ESPN von heute: mMatchupScore ohne scoringPeriodId (spiele: Paarungen mit "
+                      f"anderem totalPoints oder winner) und {KONA_VIEW} mit filterStatsForSourceIds [0] und "
+                      f"filterStatsForSplitTypeIds [1], bei Unstimmigkeit {ROSTER_VIEW} der Woche (spieler: Wochen-Ist "
+                      f"mit anderem appliedTotal, Einsatz (Stat 210) oder proTeamId, Felder nach IST_KEEP); "
+                      f"vorher = Wert der Wochendatei; stand = Abrufzeit (UTC) des Laufs, der die Datei zuletzt "
+                      f"geändert hat",
+            "spiele": body["spiele"], "spieler": body["spieler"]}
+
+
+def statkorrektur_dumps(doc: dict) -> bytes:
+    """JSON mit einer Zeile je Spiel und Spieler (Muster pool_dumps) – Diffs bleiben lesbar; UTF-8, Zeilenende "\\n"."""
+    lists = ("spiele", "spieler")
+    parts = [f"{json.dumps(k)}:{json.dumps(v, ensure_ascii=False)}" for k, v in doc.items() if k not in lists]
+    for key in lists:
+        rows = ",\n".join(json.dumps(r, ensure_ascii=False, separators=(",", ":")) for r in doc[key])
+        parts.append(f'"{key}":[\n{rows}\n]' if rows else f'"{key}":[]')
+    return ("{\n" + ",\n".join(parts) + "\n}\n").encode("utf-8")
+
+
+def _anzahl(n: int, one: str, many: str) -> str:
+    return f"{n} {one if n == 1 else many}"
+
+
+def _ergebnis(points: list, winner: str | None) -> str:
+    """Spielstand und Sieger, z. B. „199.56:250.91 (AWAY)“; nur Zahlen und ESPN-Kennungen."""
+    return f"{':'.join(str(_pts(v)) for v in points if v is not None)} ({winner})"
+
+
+def sieger_wechsel(week: int, spiele: list[dict]) -> list[str]:
+    """Warnungen für Spiele, deren Ergebnis die Korrektur dreht – nach ESPN-Feld winner (zählt in den Playoffs) oder
+    nach Punkten (zählt in der Regular Season)."""
+    def result(points, winner):
+        home, away = (_pts(v) for v in points)
+        return winner, None if away is None else "HOME" if home > away else "AWAY" if home < away else "TIE"
+    return [f"Stat-Korrektur dreht das Ergebnis: W{week} Spiel {g['id']} (Team {g['home']} gegen Team {g['away']}) "
+            f"vorher {_ergebnis(g['vorher']['totalPoints'], g['vorher']['winner'])}, jetzt "
+            f"{_ergebnis(g['totalPoints'], g['winner'])} – Tabelle, Serien und Rekorde ändern sich rückwirkend, "
+            f"freigegebene Kernsätze prüfen"
+            for g in spiele if result(g["totalPoints"], g["winner"]) != result(g["vorher"]["totalPoints"],
+                                                                                g["vorher"]["winner"])]
+
+
+def update_statkorrektur(session: requests.Session, season: int, week: int, schedule: list[dict],
+                         current: dict[int, dict], stamp: str) -> None:
+    """Eine finale Woche gegen ESPN von heute: wNN/statkorrektur.json schreiben, ändern oder löschen.
+
+    Alles oder nichts je Woche: Erst wird geprüft, ob die Korrektur in sich stimmt (check_statkorrektur); wenn nicht,
+    genau ein Rückgriff auf mRoster der Woche (z. B. ein Kaderspieler, den filterActive heute weglässt). Bleibt sie
+    unstimmig (etwa ein Ausgleich des Commissioners), FetchError – die vorhandene Datei bleibt unverändert.
+    Geschrieben wird nur bei anderem Inhalt (ohne stand), gelöscht, wenn ESPN wieder die Werte der Wochendateien führt.
+    """
+    folder = week_dir(season, week)
+    path = folder / STATKORREKTUR_FILE
+    period = week_period(load_json(folder / "mSettings.json")["settings"], week)
+    stored_games = [m for m in load_json(folder / "mMatchupScore.json")["schedule"] if m["matchupPeriodId"] == period]
+    games_now = [m for m in schedule if m.get("matchupPeriodId") == period]
+    roster = load_json(folder / "mRoster.json")
+    stored = stored_ist(season, week, roster)
+    body, unknown = statkorrektur_extract(stored_games, games_now, stored, current)
+    problems = check_statkorrektur(roster, season, week, games_now, body["spieler"]) if body else []
+    if problems:
+        print(f"  W{week:02d}  unstimmig ({'; '.join(problems)}) – {ROSTER_VIEW} der Woche als Rückgriff")
+        fresh = roster_ist(json.loads(fetch_view(session, season, week, ROSTER_VIEW)), season, week)
+        body, unknown = statkorrektur_extract(stored_games, games_now, stored, {**current, **fresh})
+        problems = check_statkorrektur(roster, season, week, games_now, body["spieler"]) if body else []
+        if problems:
+            raise FetchError(f"unstimmig auch mit {ROSTER_VIEW} der Woche ({'; '.join(problems)})")
+    if unknown:
+        warn(f"Stat-Korrektur: unbekannte Felder im Ist-Eintrag nicht gespeichert ({', '.join(unknown)}) – in "
+             f"scripts/espn_fetch.py einordnen (IST_KEEP nur für Zahlen und IDs, sonst IST_DROP)")
+    old = None
+    if path.exists():
+        try:
+            old = load_json(path)
+        except FetchError as exc:
+            warn(f"{rel(path)} unlesbar ({exc}) – wird neu geschrieben")
+    if body is None:
+        if path.exists():
+            path.unlink()
+            print(f"  W{week:02d}  keine Abweichung mehr -> {rel(path)} gelöscht")
+            warn(f"Stat-Korrektur zurückgenommen: W{week} – ESPN führt wieder die Werte der Wochendateien "
+                 f"({rel(path)} gelöscht)")
+        else:
+            print(f"  W{week:02d}  keine Abweichung")
+        return
+    summary = f"{_anzahl(len(body['spiele']), 'Spiel', 'Spiele')}, {_anzahl(len(body['spieler']), 'Spieler', 'Spieler')}"
+    doc = statkorrektur_doc(season, week, stamp, body)
+    if same_pool(old, doc):
+        print(f"  W{week:02d}  {summary} unverändert (Stand {old['stand']})")
+        return
+    save_atomic(path, statkorrektur_dumps(doc))
+    print(f"  W{week:02d}  {summary} -> {rel(path)}")
+    for g in body["spiele"]:
+        print(f"       Spiel {g['id']} (Team {g['home']} : Team {g['away']}): "
+              f"{_ergebnis(g['vorher']['totalPoints'], g['vorher']['winner'])} -> "
+              f"{_ergebnis(g['totalPoints'], g['winner'])}")
+    for s in body["spieler"]:
+        print(f"       Spieler {s['id']}: {s['vorher']['appliedTotal']} -> {s['ist'].get('appliedTotal')}")
+    warn(f"Stat-Korrektur übernommen: W{week} – {summary} ({rel(path)})")
+    for message in sieger_wechsel(week, body["spiele"]):
+        warn(message)
+
+
+def update_statkorrekturen(session: requests.Session, season: int, today: date, stamp: str) -> int:
+    """Stat-Korrekturen finaler Wochen „analog zu ESPN“ übernehmen (Beschluss Stephan 06.10.2026) – Teil jedes
+    Wochenabrufs (--due), auch wenn keine Woche fällig ist; gibt die Zahl der Fehler zurück.
+
+    ESPN korrigiert Statistiken gewerteter Wochen nachträglich (meist bis Donnerstag der Folgewoche) und rechnet
+    Team-Summen und abgeleitete Werte damit neu. Finale Wochen holt --due aber nie neu (due_weeks): Ein Neuabruf
+    änderte auch die Felder mit Stand des Abrufs (Verletzung, Besitz, Status, positionalRatings), und die Dateien
+    blieben nicht byte-genau. Deshalb ein Auszug je Woche neben den unveränderten Dateien (wNN/statkorrektur.json),
+    den die Leser anwenden (load_week_matchups, rawdata.Season). Zwei Aufrufe für alle finalen Wochen zusammen:
+    Spielplan von heute und das Wochen-Ist aller Spieler (fetch_ist); nur bei Unstimmigkeit je Woche ein mRoster.
+    Nach W17 + KORREKTUR_RUHE Kalenderwochen ruht die Prüfung bis zum Saisonwechsel (keine Aufrufe).
+    Ausfälle sind Warnungen: vorhandene Korrekturen bleiben, der nächste Wochenabruf prüft erneut.
+    """
+    try:
+        if calendar_week(season, today) > MAX_WEEK + KORREKTUR_RUHE:
+            return 0
+        finals = [week for week in range(1, last_past_week(season, today) + 1) if is_final(season, week)]
+    except FetchError as exc:
+        print(f"Stat-Korrekturen: FEHLER – {exc}", file=sys.stderr)
+        return 1
+    if not finals:
+        return 0
+    print(f"Stat-Korrekturen: Woche {', '.join(map(str, finals))} gegen ESPN von heute")
+    try:
+        schedule = fetch_current_schedule(session, season)
+        current = fetch_ist(session, season, finals)
+    except FetchError as exc:
+        print(f"  FEHLER – {exc}", file=sys.stderr)
+        warn(f"Stat-Korrekturen nicht geprüft ({exc}) – vorhandene Korrekturen bleiben, der nächste Wochenabruf "
+             f"prüft erneut")
+        return 1
+    errors = 0
+    for week in finals:
+        try:
+            update_statkorrektur(session, season, week, schedule, current[week], stamp)
+        except (FetchError, KeyError, TypeError, ValueError, ArithmeticError, OSError) as exc:
+            errors += 1
+            reason = f"fehlender Schlüssel {exc}" if isinstance(exc, KeyError) else exc
+            print(f"  W{week:02d}  FEHLER – {reason}", file=sys.stderr)
+            warn(f"Stat-Korrektur W{week} nicht übernommen ({reason}) – die Woche bleibt beim bisherigen Stand, "
+                 f"der nächste Wochenabruf prüft erneut")
+    return errors
+
+
+def cmd_due(season: int, today: date, stamp: str | None = None) -> int:
+    """Alles Fällige: Saisondateien, nicht finale Wochen, fehlende Spielerpools finaler Wochen, Stat-Korrekturen.
 
     Saisondateien: NFL-Spielplan, Draft, Vorjahresgrundlagen basis/proTeamSchedules_wl_<vorjahr>.json,
     basis/kona_dst_<vorjahr>.json und basis/positionen_<vorjahr>.json (siehe refresh_season_files).
-    Finale Wochen werden nie überschrieben – auch nicht, wenn später eine Datei je Woche dazukommt.
+    Finale Wochen werden nie überschrieben – auch nicht, wenn später eine Datei je Woche dazukommt; was ESPN dort
+    später korrigiert, kommt als Auszug daneben (update_statkorrekturen, stamp = Abrufzeit UTC, Standard jetzt).
     Stand-Dateien (ROS-Auszug, mStandings) gibt es nur für die jüngste vergangene Woche: ESPN liefert sie nur
     „jetzt“, bei nachgeholten älteren Wochen stünde sonst ein späterer Stand unter der alten Woche.
-    Nur Fehler bei fälligen Wochen machen den Lauf rot; Saisondateien und Nachholen erzeugen Warnungen,
-    damit ein kurzer ESPN-Fehler dort nicht den Commit einer korrekt geholten Woche verhindert.
+    Nur Fehler bei fälligen Wochen machen den Lauf rot; Saisondateien, Nachholen und Stat-Korrekturen erzeugen
+    Warnungen, damit ein kurzer ESPN-Fehler dort nicht den Commit einer korrekt geholten Woche verhindert.
     """
+    stamp = stamp or datetime.now(timezone.utc).strftime("%Y-%m-%dT%H%MZ")
     try:
         check_season_open(season, today)
         weeks = due_weeks(season, today)
@@ -749,10 +1123,12 @@ def cmd_due(season: int, today: date) -> int:
             print(f"Spielerpool nachholen: Woche {', '.join(map(str, backfill))}")
         for week in backfill:
             side_errors += backfill_kona(session, season, week)
-    if not weeks and not backfill:
-        print(f"Keine Woche fällig: alle Wochen vor dem {today:%d.%m.%Y} liegen final und vollständig vor.")
+        if not weeks and not backfill:
+            print(f"Keine Woche fällig: alle Wochen vor dem {today:%d.%m.%Y} liegen final und vollständig vor.")
+        side_errors += update_statkorrekturen(session, season, today, stamp)
     if side_errors:
-        warn(f"{side_errors} Fehler bei Saisondateien oder beim Nachholen – der nächste Lauf versucht es erneut")
+        warn(f"{side_errors} Fehler bei Saisondateien oder beim Nachholen (auch Stat-Korrekturen) – der nächste Lauf "
+             f"versucht es erneut")
     if errors:
         print(f"\n{errors} Fehler – betroffene Wochen wurden nicht geschrieben.", file=sys.stderr)
         return 1
@@ -1122,7 +1498,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--summary", action="store_true",
                         help="nicht abrufen, sondern Matchups aus den lokalen Dateien ausgeben")
     parser.add_argument("--due", action="store_true",
-                        help="alles Fällige: Saisondateien, nicht finale Wochen samt Stand-Dateien, fehlende Spielerpools")
+                        help="alles Fällige: Saisondateien, nicht finale Wochen samt Stand-Dateien, fehlende Spielerpools, "
+                             "Stat-Korrekturen finaler Wochen")
     parser.add_argument("--transactions", action="store_true",
                         help="Tageslauf: Transaktions-Archiv fortschreiben (mTransactions2 je Periode, kona_league_communication)")
     parser.add_argument("--pool", action="store_true",
@@ -1163,7 +1540,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.summary:
         return cmd_summary(args.season, args.weeks)
     if args.due:
-        return cmd_due(args.season, datetime.now(timezone.utc).date())
+        now = datetime.now(timezone.utc)
+        return cmd_due(args.season, now.date(), now.strftime("%Y-%m-%dT%H%MZ"))
     if args.transactions or args.pool or args.wetter or args.news or args.marktwert:
         return cmd_daily(args.season, datetime.now(timezone.utc), args.transactions, args.pool, args.wetter, args.news,
                          args.marktwert)

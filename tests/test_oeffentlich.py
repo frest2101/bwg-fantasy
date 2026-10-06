@@ -5,6 +5,7 @@ Aufruf: python -m pytest
 """
 
 import json
+import re
 import shutil
 
 import pytest
@@ -46,6 +47,31 @@ def test_mteam_rohdaten_sind_auszuege():
         if ef.team_extract(json.loads(raw)) != (raw, []):
             kein_auszug.append(ef.rel(path))
     assert not kein_auszug, "kein mTeam-Auszug (scripts/espn_fetch.py, team_extract)"
+
+
+def values(obj):
+    """Alle Blattwerte eines JSON-Objekts (ohne Schlüssel)."""
+    if isinstance(obj, dict):
+        for v in obj.values():
+            yield from values(v)
+    elif isinstance(obj, list):
+        for v in obj:
+            yield from values(v)
+    else:
+        yield obj
+
+
+def test_statkorrekturen_nur_ids_und_zahlen():
+    """wNN/statkorrektur.json ist öffentlich: in Spielen und Spielern nur Zahlen, Ziffernfolgen (IDs) und ESPN-Kennungen
+    des Siegers – keine Spieler- oder Manager-Namen, keine Texte. Ohne Korrektur im Repo gibt es nichts zu prüfen."""
+    erlaubt = re.compile(r"^(\d+|HOME|AWAY|TIE|UNDECIDED)$")
+    patterns = check_public.manager_patterns(ef.REPO_DIR)
+    for path in sorted(ef.RAW_DIR.glob("*/w*/" + ef.STATKORREKTUR_FILE)):
+        data = ef.load_json(path)
+        texte = [v for v in values([data["spiele"], data["spieler"]]) if isinstance(v, str) and not erlaubt.match(v)]
+        assert texte == [], ef.rel(path)
+        text = path.read_text(encoding="utf-8")
+        assert not [kind for kind, rx in patterns if rx.search(text)], ef.rel(path)
 
 
 def write(folder, name, content):

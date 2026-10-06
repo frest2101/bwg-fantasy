@@ -58,15 +58,26 @@ def test_echter_spieler_von_hand(real):
     assert p["sparkline"] == "▅█"                                                  # 30,18/48,44·7 = 4,36 → Stufe 4
 
 
-def test_summen_gegen_team_wochen(ssn2, real):
-    """Σ Bank-Punkte und Σ Starter-Punkte aller Spieler = Werte der Team-Wochen; Σ Starts = Starter-Plätze."""
-    team_weeks = compute.compute_team_weeks(ssn2, [1, 2])
+@pytest.fixture(scope="module")
+def alle():
+    """Alle gerechneten Wochen im Stand des Repos: Saison bis zur jüngsten Woche, Wochen und Spielerwerte."""
+    weeks = compute.completed_weeks(2026)
+    ssn = rawdata.Season(2026, weeks[-1])
+    return ssn, weeks, players.compute_players(ssn, weeks)
+
+
+def test_summen_gegen_team_wochen(alle):
+    """Σ Bank-Punkte und Σ Starter-Punkte aller Spieler (Wochenwerte aus dem Spielerpool) = Werte der Team-Wochen (aus
+    mRoster); Σ Starts = Starter-Plätze – in allen gerechneten Wochen. Fängt eine Stat-Korrektur ab, die nur in einer
+    der beiden Quellen ankäme (sie gilt für Kader und Spielerpool gemeinsam, Beschluss 06.10.2026)."""
+    ssn, weeks, real = alle
+    team_weeks = compute.compute_team_weeks(ssn, weeks)
     ps = list(real["players"].values())
     assert sum(p["bench_pts"] for p in ps) == sum(r["bench"] for r in team_weeks)
     starter_points = sum(w["actual"] or 0 for p in ps for w in p["weeks"] if w["slot"] is not None and is_starter(w["slot"]))
     assert starter_points == sum(r["starter_sum"] for r in team_weeks)
-    assert sum(p["starts"] for p in ps) == sum(1 for w in (1, 2) for r in ssn2.roster(w) if is_starter(r.slot))
-    assert sum(p["games"] for p in ps) == sum(1 for w in (1, 2) for r in ssn2.pool(w) if r.played)
+    assert sum(p["starts"] for p in ps) == sum(1 for w in weeks for r in ssn.roster(w) if is_starter(r.slot))
+    assert sum(p["games"] for p in ps) == sum(1 for w in weeks for r in ssn.pool(w) if r.played)
 
 
 def test_ligafaktor_nach_w2(ssn2):
