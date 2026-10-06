@@ -17,7 +17,7 @@ import fantasypros
 import matchup as matchup_module
 import players as players_module
 from records import ranked
-from lineup import POSITION_NAMES, SLOT_NAMES
+from lineup import POSITION_NAMES, RB, SLOT_NAMES, WR
 from zahlen import ZERO, dec, round_to, rounded
 
 SCHEMA = 1
@@ -167,7 +167,13 @@ def build_schedule(result: dict) -> dict:
 
 # ---------------------------------------------------------------- lazy-Dateien und claude.json
 
-FREE_AGENTS_PER_POS = 20
+# beste Free Agents je Position nach ROS/Spiel in players.json (Stephan 06.10.2026: 30, bei RB und WR 40; vorher 20)
+FREE_AGENTS_PER_POS = {RB: 40, WR: 40}
+FREE_AGENTS_DEFAULT = 30
+
+
+def free_agents_per_pos(pos: int) -> int:
+    return FREE_AGENTS_PER_POS.get(pos, FREE_AGENTS_DEFAULT)
 
 
 def market_values(result: dict) -> dict[int, dict]:
@@ -176,8 +182,8 @@ def market_values(result: dict) -> dict[int, dict]:
 
 
 def player_selection(result: dict) -> set[int]:
-    """Spieler der App: mindestens ein Spiel oder im Kader (Wochenstand), dazu die 20 besten Free Agents je Position
-    nach ROS/Spiel. Leer ohne Spielerdaten."""
+    """Spieler der App: mindestens ein Spiel oder im Kader (Wochenstand), dazu die besten Free Agents je Position
+    nach ROS/Spiel (free_agents_per_pos: 30, bei RB und WR 40). Leer ohne Spielerdaten."""
     data = result.get("players")
     if not data:
         return set()
@@ -186,7 +192,7 @@ def player_selection(result: dict) -> set[int]:
     for pos in POSITION_NAMES:
         free = sorted((p for p in pool.values() if not p["team_id"] and p["pos"] == pos
                        and p["ros_pro_spiel"] is not None), key=lambda p: (-p["ros_pro_spiel"], p["player_id"]))
-        keep |= {p["player_id"] for p in free[:FREE_AGENTS_PER_POS]}
+        keep |= {p["player_id"] for p in free[:free_agents_per_pos(pos)]}
     return keep
 
 
@@ -217,7 +223,7 @@ def add_fantasypros(rows: list[dict], result: dict) -> None:
 
 
 def build_players(result: dict) -> dict | None:
-    """Spieler mit mindestens einem Spiel oder im Kader, dazu die 20 besten Free Agents je Position nach ROS/Spiel.
+    """Spieler mit mindestens einem Spiel oder im Kader, dazu die besten Free Agents je Position nach ROS/Spiel (30, RB/WR 40).
 
     mu = Positions-Matchup des Spielers (matchup.player_mu: Gegner und F in Woche mu_woche = N+1, nächste 3, Rest,
     SoS; D/ST aus den D/ST-Faktoren), Wochenstand wie ROS.
@@ -241,7 +247,10 @@ def build_players(result: dict) -> dict | None:
                      "wk": [[w["actual"], w["projection"], 1 if w["bye"] else 0, w["team_id"] or 0,
                              SLOT_NAMES.get(w["slot"]) if w["slot"] is not None else None] for w in p["weeks"]],
                      "ros": p["ros"], "ros_g": p["ros_pro_spiel"], "rest_g": p["restspiele"], "ros_po": p["ros_po"],
-                     "ros_rang": p["ros_rang"], "ros_ue": p["ros_ueber_ersatz"],
+                     "ros_rang": p["ros_rang"], "ros_rang_ges": p["ros_rang_ges"], "ros_ue": p["ros_ueber_ersatz"],
+                     # Ränge (06.10.2026): Saison nach Punkten (nur mit Spiel), ESPNs eigene Saison-Ränge (kona ratings)
+                     "saison_rang": p["saison_rang"], "saison_rang_ges": p["saison_rang_ges"],
+                     "espn_rang": p["espn_rang"], "espn_rang_ges": p["espn_rang_ges"],
                      "mu": matchup_module.player_mu(m, dst, p["pos"], p["pro_team"])})
     add_fantasypros(rows, result)
     return {"weeks": data["weeks"], "ersatz": {POSITION_NAMES.get(k, str(k)): v for k, v in data["ersatz"].items()},
@@ -398,6 +407,9 @@ def team_needs(pool: dict, result: dict) -> dict | None:
 WEEK_VIEW_HEAD = ("horizont", "ersatz_woche", "ersatz_3", "anstoss", "bedarf_woche")
 
 
+WEEK_PLAYER_KEYS = ("proj_ue", "proj3", "proj3_ue", "rang_woche", "rang_woche_ges", "rang_3", "rang_3_ges")
+
+
 def week_view(pool: dict, result: dict) -> dict | None:
     """Wochensicht des Waiver-Tabs (Beschluss 30.09.2026) für die Woche N+1 = pool["woche"] laut Tagesstand.
 
@@ -425,10 +437,18 @@ def week_view(pool: dict, result: dict) -> dict | None:
             and r["grund"] not in players_module.WEEK_OUT}
     level = players_module.week_replacement_levels([(r["pos"], r["value"]) for r in free.values() if r["grund"] is None])
     level3 = players_module.week_replacement_levels([(r["pos"], r["sum"]) for r in free.values() if r["sum"] is not None])
+    # Ränge je Position und gesamt (06.10.2026) über alle Spieler des Wochenpools mit Wochenwert bzw. Summe > 0 –
+    # Kader und frei zusammen, damit „RB 12“ den Platz unter allen RB meint; 0 (Bye, Ausfall, keine Projektion) ohne Rang
+    rank_w, rank_w_ges = players_module.ranks({pid: (r["pos"], r["value"] if r["value"] > 0 else None)
+                                               for pid, r in rows.items()})
+    rank_3, rank_3_ges = players_module.ranks({pid: (r["pos"], r["sum"] if r["sum"] is not None and r["sum"] > 0 else None)
+                                               for pid, r in rows.items()})
     per_player = {pid: {"proj_ue": r["value"] - level[r["pos"]] if level.get(r["pos"]) is not None else None,
                         "proj3": r["sum"],
                         "proj3_ue": r["sum"] - level3[r["pos"]]
-                        if r["sum"] is not None and level3.get(r["pos"]) is not None else None}
+                        if r["sum"] is not None and level3.get(r["pos"]) is not None else None,
+                        "rang_woche": rank_w.get(pid), "rang_woche_ges": rank_w_ges.get(pid),
+                        "rang_3": rank_3.get(pid), "rang_3_ges": rank_3_ges.get(pid)}
                   for pid, r in rows.items()}
     rosters: dict[int, list] = {}
     for pid, r in rows.items():
@@ -557,7 +577,7 @@ def build_waiver(result: dict) -> dict | None:
                "started": number(p.get("percentStarted")), "waiver_bis": p.get("waiverProcessDate"),
                "proj": number(p.get("proj_naechste_woche")), "news": p.get("lastNewsDate")}
         if p["id"] not in selection:
-            # Spieler, den players.json nicht führt (Kaderspieler unter der Woche geholt, ohne Spiel, nicht Top 20 seiner
+            # Spieler, den players.json nicht führt (Kaderspieler unter der Woche geholt, ohne Spiel, nicht unter den besten seiner
             # Position; oder freier Spieler mit Marktwert): Stammdaten aus dem Wochenpool, damit die App ihn benennen
             # kann; None, wenn auch dort unbekannt
             w = weekly.get(p["id"])
@@ -575,7 +595,7 @@ def build_waiver(result: dict) -> dict | None:
     view = week_view(pool, result)
     if view:
         for row in rows:
-            row.update(view["spieler"].get(row["id"], dict.fromkeys(("proj_ue", "proj3", "proj3_ue"))))
+            row.update(view["spieler"].get(row["id"], dict.fromkeys(WEEK_PLAYER_KEYS)))
     profil, gains = team_view(pool, result, view, keep)
     for row in rows:
         if row["id"] in gains:

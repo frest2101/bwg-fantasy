@@ -290,6 +290,7 @@ td.wrap,th.wrap{white-space:normal;min-width:12rem}
 /* D/ST-Farbzellen: blau günstig, orange ungünstig, Zahl immer sichtbar */
 .fz{text-align:center;min-width:4.2rem;font-variant-numeric:tabular-nums;line-height:1.1}
 .fz small{display:block;font-size:.72rem;font-weight:600}
+.rg small{display:block;font-size:.72rem;font-weight:400;color:var(--mu)}  /* Rang: „Gesamt n“ unter dem Positionsrang */
 .f3{background:var(--f3)}.f2{background:var(--f2)}.f1{background:var(--f1)}.f0{background:var(--f0)}.g1{background:var(--g1)}.g2{background:var(--g2)}.g3{background:var(--g3)}
 .fz.bye{background:var(--sf2);color:var(--mu)}
 .flag{color:var(--wa);font-weight:700}

@@ -92,6 +92,8 @@ export function na(reason) {         // „–“ mit Grund: in Tabellen als Fu�
   return h('span', {class: 'na'}, '–', reason ? h('span', {class: 'vh'}, ` (${reason})`) : null);
 }
 export const val = (v, f, reason) => ok(v) ? f(v) : na(reason);
+// Rang innerhalb der Position mit dem Rang über alle Positionen klein darunter („RB 12“, „Gesamt 38“); 1 = bester
+export const rang = (pos, r, ges) => h('span', {class: 'rg'}, `${pos ?? '–'} ${r}`, ok(ges) ? h('small', null, `Gesamt ${ges}`) : null);
 
 // ---------------------------------------------------------------- Speicher (nur Komfort, darf fehlen)
 export const store = {

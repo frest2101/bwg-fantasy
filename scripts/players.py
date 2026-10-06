@@ -10,6 +10,7 @@ Gerechnet wird ungerundet mit Decimal; gerundet wird erst beim Export (zahlen.ro
 """
 
 import statistics
+from bisect import bisect_left
 from decimal import ROUND_HALF_UP, Decimal
 
 import espn_fetch as ef
@@ -30,7 +31,7 @@ REPLACEMENT_STATUS = ("WAIVERS", "FREEAGENT")
 INJURED = ("OUT", "INJURY_RESERVE")     # zählen im Ersatzniveau nicht und in der Kader-Projektion in Woche N+1 als 0
 REPLACEMENT_COUNT = 3                   # Ersatzniveau = Ø der drei besten verfügbaren Spieler je Position
 ROS_KEYS = ("ros", "restspiele", "ros_pro_spiel", "ros_po", "restspiele_po", "ros_po_pro_spiel", "ros_rang",
-            "ros_ueber_ersatz")
+            "ros_rang_ges", "ros_ueber_ersatz")
 
 
 # ---------------------------------------------------------------- Hilfen
@@ -82,14 +83,17 @@ def player_weeks(ssn: rawdata.Season, weeks: list[int]) -> tuple[dict[int, dict]
         for r in pool or []:
             info[r.player_id] = {"player_id": r.player_id, "name": r.name, "pos": r.pos, "pro_team": r.pro_team,
                                  "team_id": r.on_team or None, "status": r.status, "injury": r.injury,
-                                 "owned": dec(r.owned) if r.owned is not None else None}
+                                 "owned": dec(r.owned) if r.owned is not None else None,
+                                 # ESPNs Saison-Ränge (kona ratings, Stand des Abrufs der Woche), 0 = keiner
+                                 "espn_rang": r.espn_pos_rank or None, "espn_rang_ges": r.espn_total_rank or None}
             rows.setdefault(r.player_id, {})[week] = {
                 "actual": (r.actual if r.actual is not None else ZERO) if r.played else None,
                 "projection": r.projection, "pro_team": r.pro_team}
         for r in roster.values():
             if week not in rows.get(r.player_id, {}):  # Kaderspieler ohne Pool-Zeile: Werte aus mRoster
                 info[r.player_id] = {"player_id": r.player_id, "name": r.name, "pos": r.pos, "pro_team": r.pro_team,
-                                     "team_id": r.team_id, "status": None, "injury": r.injury, "owned": None}
+                                     "team_id": r.team_id, "status": None, "injury": r.injury, "owned": None,
+                                     "espn_rang": None, "espn_rang_ges": None}
                 rows.setdefault(r.player_id, {})[week] = {"actual": r.actual if r.played else None,
                                                           "projection": r.projection, "pro_team": r.pro_team}
         for pid, row in rows.items():
@@ -203,14 +207,34 @@ def ros_player(projections: dict | None, pro_team: int, nfl: dict[int, rawdata.N
             "restspiele_po": len(po_weeks), "ros_po_pro_spiel": po / len(po_weeks) if po_weeks else None}
 
 
-def ros_ranks(per_game: dict[int, tuple[int, Decimal | None]]) -> dict[int, int]:
-    """ROS-Rang je Position nach ROS/Spiel (1 + Zahl der besseren Spieler); nur Spieler mit ROS/Spiel."""
+def ranks(values: dict[int, tuple[int, Decimal | None]]) -> tuple[dict[int, int], dict[int, int]]:
+    """Rang je Position und Rang über alle Positionen nach einem Wert (1 + Zahl der besseren Spieler, Gleichstand
+    teilt den besseren Rang); nur Spieler mit Wert. values: pid → (Position, Wert | None)."""
     by_pos: dict[int, list[Decimal]] = {}
-    for pos, value in per_game.values():
+    for pos, value in values.values():
         if value is not None:
             by_pos.setdefault(pos, []).append(value)
-    return {pid: 1 + sum(1 for other in by_pos[pos] if other > value)
-            for pid, (pos, value) in sorted(per_game.items()) if value is not None}
+    everyone = sorted((v for vs in by_pos.values() for v in vs), reverse=True)
+    pos_rank, total_rank = {}, {}
+    for pid, (pos, value) in sorted(values.items()):
+        if value is None:
+            continue
+        pos_rank[pid] = 1 + sum(1 for other in by_pos[pos] if other > value)
+        total_rank[pid] = 1 + bisect_left([-v for v in everyone], -value)
+    return pos_rank, total_rank
+
+
+def ros_ranks(per_game: dict[int, tuple[int, Decimal | None]]) -> dict[int, int]:
+    """ROS-Rang je Position nach ROS/Spiel (1 + Zahl der besseren Spieler); nur Spieler mit ROS/Spiel."""
+    return ranks(per_game)[0]
+
+
+def season_ranks(players: dict[int, dict]) -> None:
+    """Saison-Rang je Position und gesamt nach Punkten Saison (pts) – nur Spieler mit mindestens einem Spiel; die
+    übrigen None. Schreibt saison_rang und saison_rang_ges in players."""
+    pos_rank, total_rank = ranks({pid: (p["pos"], p["pts"] if p["games"] else None) for pid, p in players.items()})
+    for pid, p in players.items():
+        p["saison_rang"], p["saison_rang_ges"] = pos_rank.get(pid), total_rank.get(pid)
 
 
 def replacement_levels(pool: list[rawdata.PoolRow], per_game: dict[int, Decimal | None]) -> dict[int, Decimal | None]:
@@ -239,11 +263,11 @@ def add_ros(players: dict[int, dict], ssn: rawdata.Season, ros: dict,
     for pid, p in players.items():
         p.update(ros_player(projections.get(str(pid)), current.get(pid, p["pro_team"]), nfl, after, last_regular))
     per_game = {pid: p["ros_pro_spiel"] for pid, p in players.items()}
-    ranks = ros_ranks({pid: (p["pos"], p["ros_pro_spiel"]) for pid, p in players.items()})
+    pos_rank, total_rank = ranks({pid: (p["pos"], p["ros_pro_spiel"]) for pid, p in players.items()})
     levels = replacement_levels(pool, per_game)
     for pid, p in players.items():
         level = levels.get(p["pos"])
-        p["ros_rang"] = ranks.get(pid)
+        p["ros_rang"], p["ros_rang_ges"] = pos_rank.get(pid), total_rank.get(pid)
         p["ros_ueber_ersatz"] = ((p["ros_pro_spiel"] - level) * p["restspiele"]
                                  if p["ros_pro_spiel"] is not None and level is not None else None)
     return levels, replacement_levels(pool, {pid: p["ros_po_pro_spiel"] for pid, p in players.items()})
@@ -406,6 +430,7 @@ def compute_players(ssn: rawdata.Season, weeks: list[int]) -> dict:
     for p in players.values():
         p.update(player_stats(p["weeks"], p["pos"]))
         p.update(dict.fromkeys(ROS_KEYS))
+    season_ranks(players)
     ros, levels, levels_po = ssn.ros(), {}, {}
     if ros is None and ssn.through >= LAST_PLAYOFF_WEEK:
         ros = {"after_week": ssn.through, "weeks": [], "players": {}}   # Saisonende: keine Restwoche mehr

@@ -17,6 +17,7 @@ import check_public
 import compute
 import espn_fetch as ef
 import rawdata
+from lineup import QB, RB, WR
 from zahlen import round_to
 
 FIRST_LOAD = ("manifest.json", "teams.json", "schedule.json")
@@ -93,7 +94,8 @@ def test_waiver_vertrag(result):
     assert [p["id"] for p in out["spieler"]] == [inside, outside]
     first = out["spieler"][0]
     assert set(first) == {"id", "team", "status", "inj", "own", "own_d", "started", "waiver_bis", "proj", "news",
-                          "proj_ue", "proj3", "proj3_ue"}
+                          "proj_ue", "proj3", "proj3_ue", "rang_woche", "rang_woche_ges", "rang_3", "rang_3_ges"}
+    assert (first["rang_woche"], first["rang_woche_ges"]) == (1, 1)   # einziger Spieler des Pools mit Wochenwert
     assert (first["team"], first["status"], first["inj"], first["own"], first["own_d"], first["started"],
             first["waiver_bis"], first["proj"], first["news"]) \
         == (0, "WAIVERS", "QUESTIONABLE", 64.66, -0.07, 58.81, 1790751600000, 8.72, 1790569213000)
@@ -252,13 +254,25 @@ def test_players_auswahl(result, data):
     for pos in {p["pos"] for p in pool.values()}:
         free = sorted((p for p in pool.values() if not p["team_id"] and p["pos"] == pos
                        and p["ros_pro_spiel"] is not None), key=lambda p: (-p["ros_pro_spiel"], p["player_id"]))
-        must |= {p["player_id"] for p in free[:app_export.FREE_AGENTS_PER_POS]}
-    assert set(rows) == must  # genau Kader ∪ mit Spiel ∪ die 20 besten Free Agents je Position
+        must |= {p["player_id"] for p in free[:app_export.free_agents_per_pos(pos)]}
+    assert set(rows) == must  # genau Kader ∪ mit Spiel ∪ die 30 (RB, WR: 40) besten Free Agents je Position
+    assert (app_export.free_agents_per_pos(RB), app_export.free_agents_per_pos(WR), app_export.free_agents_per_pos(QB)) == (40, 40, 30)
     assert all(len(p["wk"]) == len(data["players.json"]["weeks"]) for p in rows.values())
     assert rows[3139477]["bye"] == 5 and isinstance(rows[3139477]["bye"], int) and rows[3139477]["nfl"] == "KC"  # Mahomes: KC, Bye W5
     assert all(p["bye"] is None or 1 <= p["bye"] <= 18 for p in rows.values())
     assert all(p["bye"] is None for p in rows.values() if p["nfl"] is None)  # ohne NFL-Team kein Bye
     assert {p["pos"] for p in rows.values()} <= {"QB", "RB", "WR", "TE", "K", "D/ST"}
+    # Ränge (06.10.2026): Saison nach Punkten nur mit Spiel, je Position und gesamt; Rest je Spiel genauso; ESPNs
+    # Saison-Ränge aus kona (Position und gesamt) – alle Spieler mit Spiel tragen sie
+    with_game = [p for p in rows.values() if p["g"]]
+    assert all(p["saison_rang"] is None and p["saison_rang_ges"] is None for p in rows.values() if not p["g"])
+    assert all(1 <= p["saison_rang"] <= p["saison_rang_ges"] for p in with_game)
+    assert all(p["espn_rang"] and p["espn_rang_ges"] for p in with_game)
+    for pos in ("QB", "RB", "WR", "TE", "K", "D/ST"):
+        best = [p for p in with_game if p["pos"] == pos and p["saison_rang"] == 1]
+        assert best and all(p["pts"] == max(x["pts"] for x in with_game if x["pos"] == pos) for p in best)
+    assert all((p["ros_rang"] is None) == (p["ros_rang_ges"] is None) for p in rows.values())
+    assert all(p["ros_rang"] <= p["ros_rang_ges"] for p in rows.values() if p["ros_rang"] is not None)
 
 
 def test_dst_und_transaktionen(data):
@@ -678,8 +692,13 @@ def test_wochensicht_vertrag():
     assert view["horizont"] == [4, 5, 6] and view["anstoss"] == dict.fromkeys(("AAA", "BBB"), int(kick.timestamp() * 1000))
     assert view["ersatz_woche"]["QB"] == 22.25 and view["ersatz_woche"]["RB"] is None
     assert view["ersatz_3"]["QB"] == 40.25                      # Σ: 10 = 24,5 + Bye + 1 = 25,5; 11 = 20 + 18 + 17 = 55
-    assert view["spieler"][10] == {"proj_ue": 2.25, "proj3": 25.5, "proj3_ue": -14.75}
-    assert view["spieler"][12] == {"proj_ue": -22.25, "proj3": None, "proj3_ue": None}   # OUT: 0, ohne ROS-Eintrag
+    # Ränge über alle Spieler des Wochenpools mit Wert > 0: Woche 10 (24,5) vor 11 (20) vor 31 (10); Summe 11 (55) vor
+    # 10 (25,5) vor 30 (OUT in W4 = 0, Bye W5, W6 22 = 22); alle QB, deshalb gesamt = Position
+    assert view["spieler"][10] == {"proj_ue": 2.25, "proj3": 25.5, "proj3_ue": -14.75,
+                                   "rang_woche": 1, "rang_woche_ges": 1, "rang_3": 2, "rang_3_ges": 2}
+    assert view["spieler"][12] == {"proj_ue": -22.25, "proj3": None, "proj3_ue": None,   # OUT: 0, ohne ROS-Eintrag
+                                   "rang_woche": None, "rang_woche_ges": None, "rang_3": None, "rang_3_ges": None}
+    assert (view["spieler"][30]["rang_woche"], view["spieler"][30]["rang_3"]) == (None, 3)
     assert 99 not in view["spieler"]
     need = view["bedarf_woche"][1]
     assert [(g["slot"], g["id"], g["pos"], g["proj"], g["grund"], g["kandidaten"]) for g in need["luecken"]][:2] == [

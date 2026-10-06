@@ -60,6 +60,8 @@ class PoolRow(NamedTuple):
     projection: object        # Decimal oder None
     played: bool
     game_team: int = 0        # proTeamId des Ist-Eintrags (NFL-Team im Spiel der Woche), 0 ohne Ist-Eintrag
+    espn_pos_rank: int = 0    # ESPNs Saison-Rang innerhalb der Position (ratings["0"].positionalRanking), 0 = keiner
+    espn_total_rank: int = 0  # ESPNs Saison-Rang über alle Spieler (ratings["0"].totalRanking), 0 = keiner
 
 
 class NflTeam(NamedTuple):
@@ -132,12 +134,14 @@ def pool_rows(data: dict, season: int, week: int, korr: dict | None = None) -> l
         player = entry["player"]
         actual = korr.get(entry["id"]) or week_stat(player, season, week, STAT_ACTUAL)
         projection = week_stat(player, season, week, STAT_PROJECTION)
+        rating = (entry.get("ratings") or {}).get("0") or {}   # ESPNs Saison-Ränge, Stand des Abrufs
         rows.append(PoolRow(entry["id"], player.get("fullName", ""), player["defaultPositionId"],
                             player.get("proTeamId", 0), entry.get("onTeamId", 0), entry.get("status"),
                             player.get("injuryStatus"), (player.get("ownership") or {}).get("percentOwned"),
                             dec(actual["appliedTotal"]) if actual and "appliedTotal" in actual else None,
                             dec(projection["appliedTotal"]) if projection and "appliedTotal" in projection else None,
-                            played(actual), (actual or {}).get("proTeamId") or 0))
+                            played(actual), (actual or {}).get("proTeamId") or 0,
+                            int(rating.get("positionalRanking") or 0), int(rating.get("totalRanking") or 0)))
     return sorted(rows, key=lambda r: r.player_id)
 
 
