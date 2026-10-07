@@ -132,12 +132,15 @@ def test_kader_aelter_als_das_archiv(lines):
 
 
 def test_echte_daten_ohne_tagesstand():
-    """Ohne pool/latest.json gilt der Kader des Wochenpools W3 (Stand Dienstag); das Archiv reicht weiter. Wer
-    seitdem entlassen wurde, behält seine Herkunft – als Trade bleiben nur die zwei getauschten Spieler."""
+    """Ohne pool/latest.json gilt der Kader des Wochenpools W3 (Stand Dienstag); das Archiv reicht weiter (hier bis
+    Periode 4, eingefroren – das echte Archiv wächst täglich, und am 07.10.2026 holte ein Team einen der zwei
+    getauschten Spieler per Waiver zurück, womit er zu Recht als Zugang gilt). Wer bis Periode 4 entlassen wurde,
+    behält seine Herkunft – als Trade bleiben nur die zwei getauschten Spieler."""
     import players
     import records
     ssn = rawdata.Season(2026, 3)
     ssn._memo["pool_latest"] = None
+    ssn._memo["transactions"] = [t for t in ssn.transactions() if (t.get("scoringPeriodId") or 0) <= 4]
     weeks = [1, 2, 3]
     k = keeper.compute_keeper(ssn, weeks, players.compute_players(ssn, weeks), records.player_names(ssn))
     assert k["stand"] is None and k["warnungen"] == []
