@@ -62,5 +62,5 @@
 {"id":"e3a3f291-03e8-45ea-970d-e16b4353b136","type":"FREEAGENT","team_id":1,"datum":1791359397023,"periode":5,"items":[{"type":"ADD","player_id":3116164,"name":"Mike Gesicki","from_team_id":0,"to_team_id":1,"in_app":true},{"type":"DROP","player_id":2576980,"name":"Marcus Mariota","from_team_id":1,"to_team_id":0,"in_app":true}]},
 {"id":"b5de9a0f-28ea-49e3-a87c-41e637333f9b","type":"FREEAGENT","team_id":3,"datum":1791361660943,"periode":5,"items":[{"type":"ADD","player_id":4384852,"name":"Dohnte Meyers","from_team_id":0,"to_team_id":3,"in_app":true},{"type":"DROP","player_id":5220680,"name":"Ted Hurst III","from_team_id":3,"to_team_id":0,"in_app":true}]}
 ],
-"aufstellungswechsel":{"1":21,"2":21,"3":8,"4":22,"5":23,"6":5,"7":13,"8":14,"9":20,"10":34}
+"aufstellungswechsel":{"1":21,"2":21,"3":9,"4":22,"5":23,"6":5,"7":13,"8":16,"9":20,"10":34}
 }
