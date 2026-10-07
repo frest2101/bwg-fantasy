@@ -1,7 +1,7 @@
 {
 "legende":"BWG Fantasy Liga (ESPN 1166555857), inoffizielle Auswertung. Punkte = ESPN appliedTotal; Projektionen sind ESPN-Input. Zeilen gehören zu den *_spalten; id = ESPN-Spieler-ID wie in waiver.json; mu_n1 = Faktor (Position) des Gegners in matchup_woche (App: Matchups), > 1 günstig. Definitionen: docs/app_daten.md und CLAUDE.md (Rechenregeln) im Repo frest2101/bwg-fantasy.",
 "legende_stand":"Tagesstand (pool_stand): Zuordnung zu kader/free_agents, inj, status, proj (ESPN-Projektion pool_woche, roh: bei Bye/OUT/IR nicht 0), proj3 (Σ pool_woche…+2; erste Woche Bye/OUT/IR 0, dann ROS-Auszug), D/ST-besitzer, transaktionen. Wochenstand (nach_woche): alles Übrige; Spieler nur aus dem Tagesstand: avg…mu_n1 null. pool_stand null: alles Wochenstand, proj/proj3 null.",
-"stand":{"saison":2026,"nach_woche":4,"kader_quelle":"projektion","ros_nach_woche":4,"matchup_woche":5,"pool_stand":"2026-10-07T0557Z","pool_woche":5},
+"stand":{"saison":2026,"nach_woche":4,"kader_quelle":"projektion","ros_nach_woche":4,"matchup_woche":5,"pool_stand":"2026-10-07T0701Z","pool_woche":5},
 "teams":{"ACB":"Asse's Cowboys","HJS":"Hugh Jass","CRN":"cool runnings","SAM":"SaschaM","GLS":"gloane saubande","4DS":"4th Down Syndrom","DYN":"Dynamo","RTZ":"Rotzleffe","TTY":"TeamTy","SGK":"SaureGurken"},
 "tabelle_spalten":["rang","team","name","w_l_t","pf","allplay_pct","matchup_glueck","effizienz_pct","form","score_50_10z","kader","pr_rang","mu","e","trend","playoff_anteil"],
 "tabelle":[
