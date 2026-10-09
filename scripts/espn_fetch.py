@@ -1346,7 +1346,7 @@ def pool_extract(data: dict, season: int, week: int, stamp: str) -> dict:
             "quelle": f"{KONA_VIEW} mit filterStatsForCurrentSeasonScoringPeriodId = [{week}] und "
                       f"filterRanksForScoringPeriodIds = [{week}] ({RANK_TYPE}), Auszug je Spieler; "
                       f"proTeamId = NFL-Team zum Abruf (0 = ohne Team); "
-                      f"experten =veröffentlichte {RANK_TYPE}-Ränge der ESPN-Experten in der Liste der eigenen Position, "
+                      f"experten = veröffentlichte {RANK_TYPE}-Ränge der ESPN-Experten in der Liste der eigenen Position, "
                       f"aufsteigend, ohne Quellen-IDs, ohne ESPNs Durchschnitt (Quelle {RANK_AVERAGE_SOURCE}) und ohne "
                       f"unveröffentlichte; experten_quellen = Zahl der Experten mit veröffentlichter Liste für die Woche; "
                       f"waiver_reihenfolge = waiverRank je Team aus {TEAM_VIEW} (1 = zuerst), "

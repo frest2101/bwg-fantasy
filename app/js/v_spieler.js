@@ -69,7 +69,7 @@ export function merge(P, W) {
     if (!d) return p;
     const out = {...p, own_d: d.own_d, started: d.started, waiver_bis: d.waiver_bis, proj_n: d.proj, proj_ue: d.proj_ue, news: d.news};
     for (const k of [...DAILY, ...WERT, ...RANG_TAG]) if (d[k] !== undefined) out[k] = d[k];
-    return U.nflTag(out, d);
+    return U.nflTag(out, d, P);
   });
   const known = new Set(P.players.map(p => p.id));
   for (const d of daily.values()) {
@@ -77,7 +77,7 @@ export function merge(P, W) {
     const out = {id: d.id, name: d.name ?? `Spieler ${d.id}`, pos: d.pos ?? null, nfl: d.nfl ?? null, team: d.team, status: d.status, inj: d.inj,
       own: d.own, own_d: d.own_d, started: d.started, waiver_bis: d.waiver_bis, proj_n: d.proj, proj_ue: d.proj_ue, news: d.news, fp: d.fp, nur_tag: true};
     for (const k of [...WERT, ...RANG_TAG]) if (d[k] !== undefined) out[k] = d[k];
-    rows.push(U.nflTag(out, d));
+    rows.push(U.nflTag(out, d, P));
   }
   return rows;
 }
@@ -368,14 +368,14 @@ function woche(box, p, P, W, wl) {
     h('div', {class: 'tiles'},
       W ? U.tile(`Projektion W${W.woche}`, U.val(p.proj_n, U.num, 'noch keine ESPN-Projektion'), null, 'proj-naechste') : null,
       // Rang der Wochenprojektion über alle Spieler des Wochenpools (Kader und frei); ohne Wochenwert (Bye, Ausfall) keiner
-      W?.ersatz_woche ? U.tile(`Rang Projektion W${W.woche}`, U.val(p.rang_woche, v => `${p.pos} ${v}`, p.nur_tag ? 'nicht in den Wochendaten' : p.bye === W.woche ? 'Bye' : 'kein Wochenwert'),
+      W?.ersatz_woche ? U.tile(`Rang Projektion W${W.woche}`, U.val(p.rang_woche, v => `${p.pos} ${v}`, p.nur_tag ? 'nicht in den Wochendaten' : !p.nfl ? 'kein NFL-Team' : p.bye === W.woche ? 'Bye' : 'kein Wochenwert'),
         U.ok(p.rang_woche_ges) ? `Gesamt ${p.rang_woche_ges}` : null, 'rang-woche') : null,
       exp ? U.tile(`Experten W${W.woche}`, exp.why ? U.na(exp.why) : exp.v, exp.n ? `${exp.n} (ESPN)` : null, 'experten') : null,
       // 32 NFL-Teams: Rang 1 = höchster Faktor (F), also das günstigste Matchup
       m && !z ? [U.tile(n1 ? `Gegner W${n1.week}` : 'Gegner', n1 ? n1.opp || 'Bye' : U.na(n1Why), n1?.opp ? (dst ? 'Offense' : 'Defense') : null, 'mu-n1'),
         U.tile('Faktor', n1?.opp ? cell(n1.f, 'kein Faktor') : U.na(n1Why), null, dst ? 'f' : 'mu-f'),
         U.tile('Rang', n1?.opp ? U.val(n1.rang, v => `${v}. von 32`, 'kein Faktor') : U.na(n1Why), '1 = günstigstes Matchup', dst ? 'f' : 'mu-rang')] : null),
-    !m ? h('p', {class: 'note'}, p.wechsel ? U.wechselSatz(p) : `Kein Matchup-Wert: ${why}.`) : z ? null : h('p', {class: 'note'}, ...(dst
+    !m ? h('p', {class: 'note'}, p.wechsel && !p.nur_tag ? U.wechselSatz(p) : `Kein Matchup-Wert: ${why}.`) : z ? null : h('p', {class: 'note'}, ...(dst
       ? ['Faktor der gegnerischen Offense, über 1,00 = günstig für die D/ST. ', h('a', {href: '#woche/matchups/dst'}, 'Matchups D/ST')]
       : ['Position gegen Defense, kein Einzelduell: Ein Faktor über 1,00 heißt, Spieler der Position holen gegen diese Defense mehr Punkte als im Schnitt. ',
         h('a', {href: '#woche/matchups/' + String(p.pos).toLowerCase()}, `Alle Defenses gegen ${p.pos}`)])),

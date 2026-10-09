@@ -162,7 +162,8 @@ def test_expertenrang_waiver(result):
 def test_expertenrang_nfl_team_tagesstand(result):
     """Sperre nach dem Anstoß mit dem NFL-Team laut Tagesstand (Beschluss Stephan 09.10.2026; erfundene Wechsel echter
     Spieler, Stand nach dem ersten Spiel der W3): Wer vom Team des ersten Spiels wegwechselt, behält seinen Wert, wer
-    zu ihm wechselt, verliert ihn; ohne Wochenpool-Eintrag bleibt der Wert leer, auch mit NFL-Team."""
+    zu ihm wechselt, verliert ihn; ohne Wochenpool-Eintrag bleibt der Wert leer, auch mit NFL-Team, und der Spieler gilt
+    nicht als Wechsel (kein nfl_tag, nfl laut Tagesstand)."""
     result = dict(result, fantasypros=None)
     weekly, abbrev = result["players"]["players"], app_export.nfl_abbrev(result)
     games = sorted((g for g in result["nfl_spiele"] if g["woche"] == 3 and not g["tbd"]), key=lambda g: g["kickoff"])
@@ -179,8 +180,9 @@ def test_expertenrang_nfl_team_tagesstand(result):
     out = app_export.round_file("waiver.json", app_export.build_waiver(dict(result, pool_latest=pool)))
     assert {s["id"]: (s["exp"], s["exp_n"]) for s in out["spieler"]} == {early: (5.5, 8), late: (None, None),
                                                                          unknown: (None, None)}
-    assert {s["id"]: s["nfl_tag"] for s in out["spieler"]} == {early: abbrev[late_team], late: abbrev[first[0]],
-                                                               unknown: abbrev[late_team]}
+    assert {s["id"]: s.get("nfl_tag", "fehlt") for s in out["spieler"]} == {early: abbrev[late_team], late: abbrev[first[0]],
+                                                                            unknown: "fehlt"}
+    assert next(s["nfl"] for s in out["spieler"] if s["id"] == unknown) == abbrev[late_team]
 
 
 def test_nfl_team_tagesstand_exporte(result):
@@ -189,11 +191,14 @@ def test_nfl_team_tagesstand_exporte(result):
     Wochenstands, keeper.json und claude_marktwert.json das neue Team; ohne proTeamId gilt der Wochenstand."""
     result = dict(result, fantasypros=None)
     weekly, abbrev = result["players"]["players"], app_export.nfl_abbrev(result)
-    keep = app_export.player_selection(result)
-    kader = [k for k in (result.get("keeper") or {}).get("kader", []) if k["id"] in keep and (weekly.get(k["id"]) or {}).get("pro_team")]
-    if len(kader) < 4:
-        pytest.skip("zu wenige Kaderspieler im Stand")
-    a, b, c, d = kader[:4]
+    keep, werte = app_export.player_selection(result), app_export.market_values(result)
+    field = [k for k in (result.get("keeper") or {}).get("kader", []) if k["id"] in keep and k["pos"] != 16
+             and (weekly.get(k["id"]) or {}).get("pro_team")]                     # Feldspieler (D/ST wechseln nicht)
+    with_value = [k for k in field if k["id"] in werte]
+    if not with_value or len(field) < 4:
+        pytest.skip("zu wenige Kaderspieler mit Marktwert im Stand")
+    a = with_value[0]
+    b, c, d = [k for k in field if k is not a][:3]
     other = next(t for t in abbrev if t != weekly[a["id"]]["pro_team"])
     pool = {"season": 2026, "woche": 3, "stand": "2026-09-29T0645Z", "players": [
         {"id": a["id"], "onTeamId": a["team"], "status": "ONTEAM", "proTeamId": other},                       # Trade
@@ -214,11 +219,26 @@ def test_nfl_team_tagesstand_exporte(result):
     assert (rows[c["id"]]["nfl"], rows[d["id"]]["nfl"]) == (weekly[c["id"]]["nfl"], weekly[d["id"]]["nfl"])
     keeper = {k["id"]: k["nfl"] for k in data["keeper.json"]["kader"]}
     assert (keeper[a["id"]], keeper[b["id"]], keeper[c["id"]]) == (abbrev[other], None, weekly[c["id"]]["nfl"])
-    if "claude_marktwert.json" in data:   # nur Spieler mit Marktwert, Zeilen nach Namen
-        mw = data["claude_marktwert.json"]
-        nfl_by_name = {r[mw["spalten"].index("name")]: r[mw["spalten"].index("nfl")] for r in mw["spieler"]}
-        if weekly[a["id"]]["name"] in nfl_by_name:
-            assert nfl_by_name[weekly[a["id"]]["name"]] == abbrev[other]
+    mw = data["claude_marktwert.json"]   # Zeilen nach Namen, nur Spieler mit Marktwert
+    nfl_by_name = {r[mw["spalten"].index("name")]: r[mw["spalten"].index("nfl")] for r in mw["spieler"]}
+    assert nfl_by_name[weekly[a["id"]]["name"]] == abbrev[other]
+
+
+def test_claude_free_agents_nfl_team_tagesstand():
+    """Free Agents in claude.json nach einem Teamwechsel (Beschluss Stephan 09.10.2026; erfundene Spieler und Werte):
+    Spieler 1 wechselt von KC (Spiel offen) zu PHI (zum Stand schon angepfiffen) und fällt aus dem Wochenteil, Gegner
+    und Faktor des alten Teams sind leer; Spieler 2 bleibt bei KC."""
+    mu = {"n1": {"week": 5, "opp": "LV", "f": Decimal("1.1"), "rang": 3}}
+    players = {"players": [{"id": pid, "name": f"Erfundener TE {pid}", "pos": "TE", "nfl": "KC", "team": 0,
+                            "status": "FREEAGENT", "ros_g": None, "mu": mu} for pid in (1, 2)]}
+    stand = int(datetime(2026, 10, 9, 8, 45, tzinfo=timezone.utc).timestamp() * 1000)
+    daily = {"team": 0, "status": "FREEAGENT", "inj": None, "proj": Decimal(5), "proj3": None, "exp": None, "exp_n": None}
+    waiver = {"stand": "2026-10-09T0845Z", "anstoss": {"PHI": stand - 3_600_000, "KC": stand + 86_400_000},
+              "spieler": [daily | {"id": 1, "proj_ue": Decimal(3), "nfl_tag": "PHI"}, daily | {"id": 2, "proj_ue": Decimal(2)}]}
+    rows = app_export.claude_rows(players, waiver)
+    assert [(r["id"], r["nfl"], r["mu"]) for r in rows] == [(1, "PHI", None), (2, "KC", mu)]
+    assert [p["id"] for p in app_export.claude_free_agents(rows, waiver)["TE"]] == [2]
+    assert app_export.claude_player(rows[0])[app_export.CLAUDE_PLAYER_COLS.index("gegner_n1")] is None
 
 
 def test_fantasypros_adressen(result):
@@ -869,9 +889,11 @@ def test_wochensicht_nfl_team_tagesstand():
         ("QB", 44, [40, 41]), ("OP", None, [40, 41, 43])]
     assert [(a["id"], a["grund"]) for a in need["ausfaelle"]] == [(42, "KEIN_TEAM")]
     assert [(b["woche"], b["id"]) for b in need["byes"]] == [(5, 44)]
-    # Byes im Profil (Kader laut Tagesstand): 44 fehlt in W5 mit dem neuen Team AAA
-    profil, _ = app_export.team_view(pool, result, app_export.week_view(pool, result), {40, 41, 43})
+    # Byes im Profil (Kader laut Tagesstand): 44 fehlt in W5 mit dem neuen Team AAA. Zugewinn „drei“ von 40 für Team 1
+    # je Woche: W4 32 − 12, W5 7 − 0 (44 hat Bye, 40 spielt jetzt bei BBB), W6 16 − 8 = 35 (mit AAA wären es 28)
+    profil, gains = app_export.team_view(pool, result, app_export.week_view(pool, result), {40, 41, 43})
     assert 5 in [b["woche"] for b in profil[1]["byes"]]
+    assert gains[40]["drei"][1]["b"] == Decimal(35) and gains[40]["woche"][1]["b"] == Decimal(20)
     old = [dict(p, proTeamId=weekly[p["id"]]["pro_team"]) for p in pool["players"]]   # alle beim Wochenstand
     profil, _ = app_export.team_view(dict(pool, players=old), result, None, set())
     assert 5 not in [b["woche"] for b in profil[1]["byes"]]

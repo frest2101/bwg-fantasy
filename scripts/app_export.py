@@ -327,7 +327,7 @@ def build_keeper(result: dict) -> dict | None:
     data = result.get("keeper")
     if not data:
         return None
-    known, changes = app_player_ids(result), team_changes(result)
+    known, nfl_now = app_player_ids(result), current_nfl(result)
     pos = lambda p: POSITION_NAMES.get(p, str(p)) if p is not None else None  # noqa: E731
     liga = {k: data["liga"][k] for k in KEEPER_TEAM}
     if liga["altersprofil"]:   # Positionsschnitt der Liga mit Kürzeln als Schlüssel
@@ -341,8 +341,8 @@ def build_keeper(result: dict) -> dict | None:
     return {k: data[k] for k in KEEPER_HEAD} | {"draft_folgejahr": draft_next} | {
         "liga": liga,
         "teams": [{"team_id": t["team_id"]} | {k: t[k] for k in KEEPER_TEAM} for t in data["teams"]],
-        # NFL-Team laut Tagesstand, wenn der Spieler seit dem Wochenstand gewechselt hat (wie waiver.json nfl_tag)
-        "kader": [{k: r[k] for k in KEEPER_ROSTER} | {"pos": pos(r["pos"]), "nfl": changes.get(r["id"], r["nfl"]),
+        # NFL-Team laut Tagesstand (current_nfl; nach einem Wechsel unter der Woche wie waiver.json nfl_tag)
+        "kader": [{k: r[k] for k in KEEPER_ROSTER} | {"pos": pos(r["pos"]), "nfl": nfl_now.get(r["id"], r["nfl"]),
                                                        "in_app": r["id"] in known}
                   for r in data["kader"]],
         "picks": [{k: p[k] for k in KEEPER_PICK} | {"pos": pos(p["pos"]), "in_app": p["player_id"] in known}
@@ -425,14 +425,27 @@ def daily_team(p: dict, w: dict | None, abbrev: dict[int, str]) -> tuple[int, st
 
 
 def team_changes(result: dict) -> dict[int, str | None]:
-    """Spieler, deren NFL-Team laut Tagesstand ein anderes ist als laut Wochenstand: Spieler-ID → Kürzel laut Tagesstand
-    (None = jetzt ohne NFL-Team). Leer ohne Pool-Auszug oder ohne proTeamId darin."""
-    weekly, abbrev = result["players"]["players"], nfl_abbrev(result)
+    """Spieler des Wochenpools, deren NFL-Team laut Tagesstand ein anderes ist als laut Wochenstand: Spieler-ID →
+    Kürzel laut Tagesstand (None = jetzt ohne NFL-Team). Wochenstand = Team im Wochenpool der letzten gewerteten Woche
+    der Regular Season – ab den Playoffs bleibt es beim Stand nach W14 (players.compute_players), dann gleicht kein
+    Wochenabruf mehr aus. Spieler, die der Wochenpool nicht kennt, sind kein Wechsel (ihr Team: current_nfl). Leer ohne
+    Pool-Auszug oder ohne proTeamId darin."""
+    weekly, abbrev = (result.get("players") or {}).get("players") or {}, nfl_abbrev(result)
     out = {}
     for p in (result.get("pool_latest") or {}).get("players", []):
-        if p.get("proTeamId") is not None and p["proTeamId"] != ((weekly.get(p["id"]) or {}).get("pro_team") or 0):
+        w = weekly.get(p["id"])
+        if w and p.get("proTeamId") is not None and p["proTeamId"] != (w.get("pro_team") or 0):
             out[p["id"]] = abbrev.get(p["proTeamId"])
     return out
+
+
+def current_nfl(result: dict) -> dict[int, str | None]:
+    """NFL-Kürzel laut Tagesstand je Spieler des Pool-Auszugs (daily_team; ohne proTeamId das Team des Wochenstands) –
+    für Ausgaben, die das NFL-Team nur anzeigen (keeper.json, claude_marktwert.json), auch für Spieler ohne
+    Wochenpool-Eintrag."""
+    weekly, abbrev = (result.get("players") or {}).get("players") or {}, nfl_abbrev(result)
+    return {p["id"]: daily_team(p, weekly.get(p["id"]), abbrev)[1]
+            for p in (result.get("pool_latest") or {}).get("players", [])}
 
 
 WEEK_VIEW_HEAD = ("horizont", "ersatz_woche", "ersatz_3", "anstoss", "bedarf_woche")
@@ -601,7 +614,7 @@ def build_waiver(result: dict) -> dict | None:
         return None
     keep = daily_selection(result)
     weekly = result["players"]["players"]  # ganzer Wochenpool mit Stammdaten (Name, Position, NFL-Team)
-    changes = team_changes(result)
+    changes, abbrev = team_changes(result), nfl_abbrev(result)
     number = lambda v: dec(v) if v is not None else None  # noqa: E731 – ESPN-Floats erst beim Schreiben runden
     rows, extra = [], []
     for p in pool["players"]:
@@ -616,10 +629,10 @@ def build_waiver(result: dict) -> dict | None:
         if p["id"] not in selection:
             # Spieler, den players.json nicht führt (Kaderspieler unter der Woche geholt, ohne Spiel, nicht unter den besten seiner
             # Position; oder freier Spieler mit Marktwert): Stammdaten aus dem Wochenpool, damit die App ihn benennen
-            # kann; None, wenn auch dort unbekannt
+            # kann; None, wenn auch dort unbekannt – das NFL-Team dann laut Tagesstand (kein Wechsel, kein nfl_tag)
             w = weekly.get(p["id"])
             row.update(name=w["name"] if w else None, pos=POSITION_NAMES.get(w["pos"], str(w["pos"])) if w else None,
-                       nfl=w["nfl"] if w else None)
+                       nfl=w["nfl"] if w else daily_team(p, None, abbrev)[1])
             extra.append(row)
         rows.append(row)
     add_fantasypros(extra, result)
@@ -784,12 +797,13 @@ def build_claude(result: dict, teams: dict, schedule: dict, players: dict | None
            "legende_stand": "Tagesstand (pool_stand): kader/free_agents, inj, status, nfl bei Teamwechsel (gegner_n1/"
                             "mu_n1 null), proj (ESPN-Projektion pool_woche, roh: Bye/OUT/IR nicht 0), proj3 (Σ "
                             "pool_woche…+2; erste Woche Bye/OUT/IR 0, dann ROS-Auszug), D/ST-besitzer, transaktionen. "
-                            "Wochenstand (nach_woche): alles Übrige; Spieler nur aus dem Tagesstand: avg…mu_n1 null. "
+                            "Wochenstand (nach_woche): alles Übrige; nur im Tagesstand: avg…mu_n1 null. "
                             "pool_stand null: alles Wochenstand, proj/proj3 null.",
            "legende_experten": "exp = Median der PPR-Ränge der ESPN-Experten pool_woche in der Position (fehlend = "
                                "außerhalb Top N, N = stand.experten_tiefe); exp_n = Experten mit Rang von "
                                "stand.experten_quellen. exp null bei exp_n höchstens der Hälfte; beide null = Spiel lief "
-                               "schon oder kein NFL-Team. Ab dem TNF zählen die Experten nur noch offene Spieler. "
+                               "schon, kein NFL-Team oder nicht im Wochenpool. Ab dem TNF zählen die Experten nur noch "
+                               "offene Spieler. "
                                "Standard-PPR, nicht Liga-Scoring.",
            "stand": {"saison": result["season"], "nach_woche": result["through_week"],
                      "kader_quelle": teams["meta"]["kader_quelle"], "ros_nach_woche": result.get("ros_after_week"),
@@ -840,13 +854,13 @@ def build_claude_marktwert(result: dict) -> dict | None:
     """Datei für das Claude-Projekt (claude.ai, Beschluss Stephan 01.10.2026): alle Spieler mit Marktwert als Gesamt-
     rangliste, spaltenweise wie claude.json, aber eigene Datei (claude.json bleibt unter 50 KB). Keine Liste „beste
     zwölf je Team“ – das Projekt rechnet selbst. Namen, Position und NFL-Team aus dem Wochenpool (ESPN-Namen, nicht
-    FantasyCalcs; NFL-Team nach einem Wechsel laut Tagesstand, team_changes), team = Kürzel laut Tagesstand oder
+    FantasyCalcs; NFL-Team laut Tagesstand, current_nfl), team = Kürzel laut Tagesstand oder
     Status (WAIVERS, FREEAGENT), herkunft = Art bei Kaderspielern.
     None ohne Marktwert-Auszug."""
     werte, keeper = market_values(result), result.get("keeper") or {}
     if not werte:
         return None
-    weekly, changes = result["players"]["players"], team_changes(result)
+    weekly, nfl_now = result["players"]["players"], current_nfl(result)
     daily = {p["id"]: p.get("status") for p in (result.get("pool_latest") or {}).get("players", [])}
     roster = {k["id"]: k for k in keeper.get("kader", [])}
     rows = []
@@ -855,7 +869,7 @@ def build_claude_marktwert(result: dict) -> dict | None:
         p = weekly.get(pid) or roster.get(pid) or {}
         pos = p.get("pos")
         rows.append([p.get("name") or f"Spieler {pid}", POSITION_NAMES.get(pos, str(pos)) if pos is not None else None,
-                     changes.get(pid, p.get("nfl")),
+                     nfl_now.get(pid, p.get("nfl")),
                      KUERZEL.get(w["team"]) if w["team"] else daily.get(pid) or p.get("status"),
                      w["wert"], w["wert_rang"], w["wert_posrang"], w["wert_trend"], w["wert_redraft"], w["wert_ue"],
                      fixed(w["alter"], 1), w["art"]])

@@ -46,7 +46,7 @@ export async function render(box, ctx, r) {
   // NFL-Team nach einem Wechsel unter der Woche laut Tagesstand (U.nflTag, wie merge() in v_spieler.js)
   const rows = W.spieler.map(d => {
     const p = byId.get(d.id) || {};
-    return U.nflTag({...p, ...d, name: p.name ?? d.name ?? `Spieler ${d.id}`, pos: p.pos ?? d.pos ?? null, nfl: p.nfl ?? d.nfl ?? null}, d);
+    return U.nflTag({...p, ...d, name: p.name ?? d.name ?? `Spieler ${d.id}`, pos: p.pos ?? d.pos ?? null, nfl: p.nfl ?? d.nfl ?? null}, d, P);
   });
   const rowById = new Map(rows.map(x => [x.id, x]));
   const name = id => byId.get(id)?.name ?? rowById.get(id)?.name ?? T?.spieler?.[String(id)] ?? `Spieler ${id}`;
@@ -140,7 +140,7 @@ function available(box, W, P, rows, r, wflag, me, kp, zw) {
   const rank = (k, l, kg, why) => ({k, l, num: 1, d: 1, v: x => x[k] ?? null,
     f: x => U.val(x[k], v => U.rang(x.pos, v, x[kg]), typeof why === 'function' ? why(x) : why)});
   const rangW = rank('rang_woche', `Rang W${W.woche}`, 'rang_woche_ges', x => played(W, x) ? 'Spiel der Woche schon angepfiffen'
-    : x.bye === W.woche ? 'Bye' : 'kein Wochenwert (Ausfall oder keine Projektion)');
+    : !x.nfl ? 'kein NFL-Team' : x.bye === W.woche ? 'Bye' : 'kein Wochenwert (Ausfall oder keine Projektion)');
   const rang3 = rank('rang_3', `Rang ${span(W)}`, 'rang_3_ges', 'keine Projektion der Folgewochen');
   const rangRos = rank('ros_rang', 'Rang Rest je Spiel', 'ros_rang_ges', rosWhy);
   const rangSaison = rank('saison_rang', 'Rang Saison', 'saison_rang_ges', x => inWeek.has(x.id) ? 'ohne Spiel' : notInWeek);
