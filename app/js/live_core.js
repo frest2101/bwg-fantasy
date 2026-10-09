@@ -184,13 +184,30 @@ export function konaFilter(ids, woche) {
 
 // Auszug der App-Daten als Nachschlagetabellen. app = {teams: [{id, kz, name}], spieler: {id: {name, pos, nfl}},
 // kader: {team_id: [Spieler-IDs]} oder null (Tagesstand waiver.json), tx: [Transaktions-IDs] oder null
-// (transactions.json führt jede ausgeführte Bewegung mit ihrer ESPN-ID)}
+// (transactions.json führt jede ausgeführte Bewegung mit ihrer ESPN-ID), experten: {woche, quellen, tiefe: {Position: N},
+// je: {id: [exp, exp_n]}} oder null (Expertenrang laut Tagesstand waiver.json)}
 function appIndex(app) {
   const a = app || {};
   const teams = new Map((a.teams || []).map(t => [+t.id, t]));
   const spieler = new Map(Object.entries(a.spieler || {}).map(([k, v]) => [+k, v]));
   const kader = a.kader ? new Map(Object.entries(a.kader).map(([k, v]) => [+k, new Set(v)])) : null;
-  return {teams, spieler, kader, tx: a.tx ? new Set(a.tx.map(String)) : null};
+  const e = a.experten;
+  const experten = e ? {woche: e.woche, quellen: e.quellen, tiefe: e.tiefe || {},
+    je: new Map(Object.entries(e.je || {}).map(([k, v]) => [+k, v]))} : null;
+  return {teams, spieler, kader, tx: a.tx ? new Set(a.tx.map(String)) : null, experten};
+}
+
+// Expertenrang laut App (waiver.json exp und exp_n, Kopf experten_quellen und experten_tiefe) – Regel wie
+// claude_stand.expertenrang: nur, wenn die App dieselbe Woche meint wie ESPN, ESPN zum Stand der App Listen
+// veröffentlicht hatte, das Spiel des Spielers noch nicht begonnen hat (nach dem Anpfiff nehmen die Experten Spieler aus
+// ihren Listen) und er nicht spielfrei ist, und mindestens ein Experte ihn führt; sonst null.
+// → {pos, wert (Median; null = höchstens die Hälfte führt ihn, „>tiefe“), tiefe, n, k}
+export function expertenrang(L, z) {
+  const e = L.app.experten;
+  if (!e || e.woche !== L.woche || !e.quellen || !OFFEN.includes(z.state) || SPIELFREI.includes(z.state)) return null;
+  const [wert, n] = e.je.get(z.id) || [null, 0];
+  if (!Number.isInteger(n) || n < 1) return null;
+  return {pos: z.pos, wert: wert ?? null, tiefe: e.tiefe[z.pos] ?? null, n, k: e.quellen};
 }
 
 // Laufende Matchup-Periode; in den Playoffs und nach W17 muss sie nicht die Woche (scoringPeriodId) sein
@@ -288,12 +305,13 @@ function matchups(L, mein) {
 const wert = z => SPIELFREI.includes(z.state) ? 0 : z.proj || 0;
 
 // Eine Zeile der Aufstellung. Ohne Spiel (Bye, ohne NFL-Team) ist proj null: ESPN projiziert D/ST auch in ihrer
-// Bye-Woche, die Zahl wäre keine Erwartung (gezählt wird 0).
+// Bye-Woche, die Zahl wäre keine Erwartung (gezählt wird 0). exp = Expertenrang laut App oder null (expertenrang).
 function zeile(L, z, hinweis) {
   const sp = L.hatSb && !SPIELFREI.includes(z.state) ? L.jeTeam.get(z.pro) : null;
   return {id: z.id, name: z.name, pos: z.pos, nfl: z.nfl, slot: SLOT[z.slot] ?? 'Bank', state: z.state,
     spiel: sp ? {gegner: sp.gegner, detail: sp.detail, anstoss: sp.anstoss} : null,
-    ist: z.ist, proj: SPIELFREI.includes(z.state) ? null : z.proj, inj: z.inj, hinweis: hinweis || null};
+    ist: z.ist, proj: SPIELFREI.includes(z.state) ? null : z.proj, inj: z.inj, hinweis: hinweis || null,
+    exp: expertenrang(L, z)};
 }
 
 // Starter eines Teams und seine ganze Bank samt IR. Hinweis an einem Bankspieler: mehr Projektion als ein noch
