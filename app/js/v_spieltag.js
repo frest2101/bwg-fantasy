@@ -86,7 +86,8 @@ async function abrufen(saison, bekannt, signal) {
 }
 
 // Auszug der App-Daten für live_core: Namen je Spieler (players.json, waiver.json, transactions.json), Kader laut
-// Stand der App (Tageslauf), bekannte Transaktionen; dazu die Spieler mit eigener Seite in der App (wie merge() in v_spieler.js)
+// Stand der App (Tageslauf), bekannte Transaktionen, Expertenrang laut Tagesstand (waiver.json exp und exp_n, nur Spieler
+// mit Rang); dazu die Spieler mit eigener Seite in der App (wie merge() in v_spieler.js)
 function appAuszug(P, W, T) {
   const spieler = {}, seiten = new Set();
   for (const [id, name] of Object.entries(T?.spieler || {})) if (name) spieler[id] = {name};
@@ -102,9 +103,13 @@ function appAuszug(P, W, T) {
     kader = Object.fromEntries(S.teams.map(t => [t.team_id, []]));
     for (const d of W.spieler) if (d.team > 0) (kader[d.team] ||= []).push(d.id);
   }
+  const experten = W?.spieler && W.experten_quellen != null ? {woche: W.woche, quellen: W.experten_quellen, tiefe: W.experten_tiefe || {},
+    je: Object.fromEntries(W.spieler.filter(d => d.exp_n > 0).map(d => [d.id, [d.exp ?? null, d.exp_n]]))} : null;
   return {teams: S.teams.map(t => ({id: t.team_id, kz: t.kuerzel, name: t.name})), spieler, kader,
-    tx: T?.items ? T.items.map(x => x.id) : null, seiten};
+    tx: T?.items ? T.items.map(x => x.id) : null, seiten, experten};
 }
+// Expertenrang laut App in der Unterzeile eines Spielers: „Experten RB 12,5 (8/8)“ bzw. „Experten RB >50 (3/8)“
+const expTxt = e => `Experten${U.NB}${e.pos} ${U.ok(e.wert) ? U.num(e.wert, e.wert % 1 ? 1 : 0) : '>' + (e.tiefe ?? '?')} (${e.n}/${e.k})`;
 
 // Ein ganzer Abruf: Datenstand der App auffrischen, ESPN holen, rechnen. Nur ein auswertbares Ergebnis wird gemerkt –
 // eine unbrauchbare Antwort überschreibt den letzten guten Stand nicht und gilt nicht als „frisch“.
@@ -271,7 +276,7 @@ export async function render(box, ctx, r) {
       aufstellungen(auf, E, mine);
     }
     U.ap(body, bewegungen(E), kader(E, merk.ausfall),
-      U.legend(['live', 'live-punkte', 'live-siegchance', 'live-starter', 'neu-tagesstand', 'tageslauf-starten', 'projektionen']));
+      U.legend(['live', 'live-punkte', 'live-siegchance', 'live-starter', 'neu-tagesstand', 'tageslauf-starten', 'projektionen', 'experten']));
   }
 
   // Team-Auswahl (Standard: Mein Team, sonst das erste Team der ersten Paarung) und sein Gegner; ohne neuen Abruf
@@ -377,7 +382,7 @@ function teamBox(a, E, tid) {
   const cols = [
     {k: 's', l: 'Slot', f: z => z.slot},
     {k: 'n', l: 'Spieler', f: z => h(seite(z.id) ? 'a' : 'span', {href: seite(z.id) ? '#spieler/' + z.id : null, class: 'pl'},
-      h('span', null, z.name, verl(z)), h('span', {class: 'sub'}, `${z.pos} · ${z.nfl} · ${spielTxt(z, E.hatSb)}`),
+      h('span', null, z.name, verl(z)), h('span', {class: 'sub'}, `${z.pos} · ${z.nfl} · ${spielTxt(z, E.hatSb)}` + (z.exp ? `${U.NB}· ${expTxt(z.exp)}` : '')),
       z.hinweis ? h('span', {class: 'sub'}, `→ mehr Projektion als ${zielTxt(z.hinweis)}`) : null)},
     {k: 'i', l: 'Pkt', num: 1, f: z => U.ok(z.ist) ? pkt(z.ist) : U.na(z.state === 'unklar' ? 'Spielstatus unklar' : C.OFFEN.includes(z.state) ? 'noch nicht gespielt' : 'kein Wert von ESPN')},
     {k: 'p', l: 'Projektion', num: 1, f: z => U.ok(z.proj) ? pkt(z.proj) : U.na(C.SPIELFREI.includes(z.state) ? 'spielfrei: keine Projektion' : 'keine ESPN-Projektion')}];

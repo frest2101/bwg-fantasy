@@ -251,12 +251,12 @@ def test_vertrag_mit_der_committeten_claude_json():
         pytest.skip("app/data/claude.json fehlt (schreibt compute.py)")
     echt = json.loads(datei.read_text(encoding="utf-8"))
     stand = echt["stand"]
-    assert {"saison", "nach_woche", "matchup_woche", "pool_stand", "pool_woche"} <= set(stand)
+    assert {"saison", "nach_woche", "matchup_woche", "pool_stand", "pool_woche", "experten_quellen", "experten_tiefe"} <= set(stand)
     index = cs.app_index(echt, stand["matchup_woche"], stand["saison"])
     assert index["da"] and not index["fremd"] and index["marken"]
     assert set(index["kader"]) == set(cs.KUERZEL.values()) and any(index["kader"].values())
     assert set().union(*index["kader"].values()) <= set(index["spieler"])
-    gelesen = {"id", "name", "pos", "nfl", "ros_g", "mu_n1", "proj"}          # diese Spalten liest das Skript
+    gelesen = {"id", "name", "pos", "nfl", "ros_g", "mu_n1", "proj", "exp", "exp_n"}   # diese Spalten liest das Skript
     assert gelesen <= set(echt["spieler_spalten"]) and gelesen <= set(echt["free_agents_spalten"])
     assert all(gelesen <= set(s) and isinstance(s["id"], int) and s["name"] for s in index["spieler"].values())
     assert ("transaktionen" in echt) == ("transaktionen_spalten" in echt)
@@ -486,6 +486,38 @@ def test_starter_zeilen():
     assert zeilen[gegner + 1:gegner + 3] == ["  QB   Gustav Gegner PHI vs DAL Sa 19:00 MESZ | – | 18.13",
                                              "  K    Heinz Holzbein DEN vs KC final | 9.00 | 8.00"]
     assert "ACB Testteam Eins –" not in "\n".join(zeilen)            # nur eigenes Team und Gegner
+
+
+def test_expertenrang_in_der_aufstellung():
+    """Exp = Expertenrang laut claude.json (Werte erfunden, 09.10.2026): nur vor dem Anstoß (Rudi SF @ SEA offen;
+    Quentin final und Fritz läuft ohne), nicht bei Bye (Willi), „>N“ bei höchstens der Hälfte, auch auf der Bank, ohne
+    Rang nichts; Kopf „| Exp“ und Werte nur, wenn claude.json die Woche von ESPN meint und ESPN Listen hatte."""
+    a = app()
+    a["stand"].update(experten_quellen=8, experten_tiefe={"QB": 25, "RB": 50, "WR": 60, "TE": 25, "K": 20, "D/ST": 20})
+    i, n = SPALTEN.index("exp"), SPALTEN.index("exp_n")
+    werte = {101: (1.0, 8), 102: (12.5, 8), 103: (30.0, 8), 104: (20.0, 8), -16026: (None, 3), 109: (40.0, 8),
+             106: (None, 0)}
+    for zeile in a["kader"]["HJS"]:
+        zeile[i], zeile[n] = werte.get(zeile[0], (None, None))
+    zeilen = text(app=a).split("\n")
+    start = zeilen.index("HJS Testteam Zwei – Slot Spieler NFL Spiel | Punkte | Proj | F | Exp")
+    assert zeilen[start + 1:start + 6] == [
+        "  QB   Quentin Erfunden KC @ DEN final | 21.35 | 20.00 | F 1.050",
+        "  RB   Rudi Beispiel SF @ SEA So 19:00 MEZ | – | 15.33 | F 0.947 | Exp RB 12.5 (8/8)",
+        "  WR   Willi Muster CHI Bye | – | –",
+        "  FLEX Fritz Flex RB BUF @ MIA läuft (5:23 - 3rd) | 7.67 | 9.00 | Q",
+        "  D/ST Testabwehr Eins D/ST SEA vs SF So 19:00 MEZ | – | 6.00 | Exp D/ST >20 (3/8)"]
+    assert "  Bank Otto Offen RB SEA vs SF So 19:00 MEZ | – | 3.00 | Exp RB 40 (8/8)" in zeilen
+    assert any(z.startswith("  Bank Bodo Bank WR SF @ SEA So 19:00 MEZ | – | 12.50 → mehr Proj") for z in zeilen)
+    assert "SGK Testteam Zehn – Slot Spieler NFL Spiel | Punkte | Proj | F | Exp" in zeilen
+    # die Lesehilfe im Kopf erklärt Exp, damit der Chat es nicht als Punkteprognose liest
+    assert any("Exp = Expertenrang, Median der ESPN-Expertenränge innerhalb der Position" in z and "nur vor dem Anstoß" in z
+               for z in zeilen[:6])
+    # claude.json meint eine andere Woche, oder ESPN hatte zum Stand der App noch nichts veröffentlicht: kein Exp
+    for anders in ({"pool_woche": WOCHE + 1}, {"experten_quellen": 0}, {"experten_quellen": None}):
+        b = json.loads(json.dumps(a))
+        b["stand"].update(anders)
+        assert "Exp" not in text(app=b), anders
 
 
 def test_bank_des_eigenen_teams_vollstaendig():

@@ -289,3 +289,8 @@ def test_konstanten_wie_im_stand_skript():
     zahl = {name: int(wert) for name, wert in re.findall(r"const (STARTER_ZAHL|SAMMEL_AB|TEXT_MAX) = (\d+);", core)}
     assert zahl == {"STARTER_ZAHL": cs.STARTER_ZAHL, "SAMMEL_AB": cs.SAMMEL_AB, "TEXT_MAX": cs.TEXT_MAX}
     assert re.search(r"const SLOT_BANK = (\d+), SLOT_IR = (\d+);", core).groups() == (str(cs.SLOT_BANK), str(cs.SLOT_IR))
+    # Expertenrang (09.10.2026): dieselbe Regel in beiden Sprachen – die Gegenprobe mit node prüft die Werte, hier nur,
+    # dass beide Seiten sie haben und die Ansicht sie aus waiver.json speist
+    assert "export function expertenrang(L, z)" in core and callable(cs.expertenrang)
+    view = code(VIEW)
+    assert "experten_quellen" in view and "exp_n" in view and "expTxt(z.exp)" in view
