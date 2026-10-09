@@ -1291,7 +1291,7 @@ def cmd_transactions(season: int, now: datetime) -> int:
 
 # ---------------------------------------------------------------- Pool-Auszug (Tageslauf, Session 6)
 
-POOL_KEYS = ("id", "status", "onTeamId", "injuryStatus", "percentOwned", "percentChange", "percentStarted",
+POOL_KEYS = ("id", "status", "onTeamId", "proTeamId", "injuryStatus", "percentOwned", "percentChange", "percentStarted",
              "waiverProcessDate", "lastNewsDate", "proj_naechste_woche", "experten")
 
 
@@ -1317,11 +1317,13 @@ def pool_week(season: int, today: date) -> int:
 
 
 def pool_extract(data: dict, season: int, week: int, stamp: str) -> dict:
-    """Pool-Auszug aus einer kona-Antwort: je Spieler Status, Fantasy-Team, Verletzung, Besitz ESPN-weit (Anteil,
-    Änderung, gestartet), Waiver-Frist, letzte ESPN-News, die Wochenprojektion der Woche week und die Expertenränge
-    dieser Woche (experten: sortierte veröffentlichte Ränge ohne Quellen-IDs, None ohne Rang; Beschluss 09.10.2026).
+    """Pool-Auszug aus einer kona-Antwort: je Spieler Status, Fantasy-Team, NFL-Team (proTeamId, 0 = ohne Team;
+    seit 09.10.2026, damit Anstoß und Bye unter der Woche zum aktuellen Team passen), Verletzung, Besitz ESPN-weit
+    (Anteil, Änderung, gestartet), Waiver-Frist, letzte ESPN-News, die Wochenprojektion der Woche week und die
+    Expertenränge dieser Woche (experten: sortierte veröffentlichte Ränge ohne Quellen-IDs, None ohne Rang; Beschluss
+    09.10.2026).
 
-    Rund 250 KB statt 2,9 MB; Besitz, Verletzung, Status und Ränge sind der Stand des Abrufs (ESPN führt keine
+    Rund 250 KB statt 2,9 MB; Besitz, NFL-Team, Verletzung, Status und Ränge sind der Stand des Abrufs (ESPN führt keine
     Historie). Kein members-Feld, keine Texte – die Datei bleibt öffentlich unbedenklich. Kopf experten_quellen = Zahl
     der Experten mit veröffentlichter Liste für die Woche (0, solange ESPN die Woche noch nicht veröffentlicht hat).
     """
@@ -1335,7 +1337,7 @@ def pool_extract(data: dict, season: int, week: int, stamp: str) -> dict:
         ranks = expert_ranks(player, week)
         sources |= set(ranks)
         rows.append({"id": entry["id"], "status": entry.get("status"), "onTeamId": entry.get("onTeamId", 0),
-                     "injuryStatus": player.get("injuryStatus"), "percentOwned": own.get("percentOwned"),
+                     "proTeamId": player.get("proTeamId"), "injuryStatus": player.get("injuryStatus"), "percentOwned": own.get("percentOwned"),
                      "percentChange": own.get("percentChange"), "percentStarted": own.get("percentStarted"),
                      "waiverProcessDate": entry.get("waiverProcessDate"), "lastNewsDate": player.get("lastNewsDate"),
                      "proj_naechste_woche": proj, "experten": sorted(ranks.values()) or None})
@@ -1343,7 +1345,8 @@ def pool_extract(data: dict, season: int, week: int, stamp: str) -> dict:
     return {"season": season, "woche": week, "stand": stamp, "experten_quellen": len(sources),
             "quelle": f"{KONA_VIEW} mit filterStatsForCurrentSeasonScoringPeriodId = [{week}] und "
                       f"filterRanksForScoringPeriodIds = [{week}] ({RANK_TYPE}), Auszug je Spieler; "
-                      f"experten = veröffentlichte {RANK_TYPE}-Ränge der ESPN-Experten in der Liste der eigenen Position, "
+                      f"proTeamId = NFL-Team zum Abruf (0 = ohne Team); "
+                      f"experten =veröffentlichte {RANK_TYPE}-Ränge der ESPN-Experten in der Liste der eigenen Position, "
                       f"aufsteigend, ohne Quellen-IDs, ohne ESPNs Durchschnitt (Quelle {RANK_AVERAGE_SOURCE}) und ohne "
                       f"unveröffentlichte; experten_quellen = Zahl der Experten mit veröffentlichter Liste für die Woche; "
                       f"waiver_reihenfolge = waiverRank je Team aus {TEAM_VIEW} (1 = zuerst), "

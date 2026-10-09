@@ -15,9 +15,10 @@ const ART = {WAIVER: 'Waiver', FREEAGENT: 'Free Agent'};
 const DAYS7 = 7 * 864e5;
 const fz = v => 'fz' + (U.ok(v) ? ' ' + U.fcls(v) : '');   // Farbzelle um F = 1,00; ohne Wert ohne Farbe
 const HOR = ['woche', 'drei', 'ros', 'zukunft'];
-const GRUND = {BYE: 'Bye', OUT: 'fällt aus', INJURY_RESERVE: 'IR', SUSPENSION: 'gesperrt', QUESTIONABLE: 'fraglich',
+const GRUND = {BYE: 'Bye', KEIN_TEAM: 'kein NFL-Team', OUT: 'fällt aus', INJURY_RESERVE: 'IR', SUSPENSION: 'gesperrt', QUESTIONABLE: 'fraglich',
   DOUBTFUL: 'zweifelhaft', DAY_TO_DAY: 'Day-to-Day'};
-// Spiel der Woche N+1 schon angepfiffen: Der Spieler bringt in dieser Woche nichts mehr (Anstoß aus waiver.json)
+// Spiel der Woche N+1 schon angepfiffen: Der Spieler bringt in dieser Woche nichts mehr (Anstoß aus waiver.json, NFL-Team laut
+// Tagesstand: U.nflTag beim Zusammenführen)
 const played = (W, x) => U.ok(W.anstoss?.[x.nfl]) && W.anstoss[x.nfl] <= Date.now();
 const span = W => W.horizont?.length ? `W${W.horizont[0]}` + (W.horizont.length > 1 ? `–${W.horizont.at(-1)}` : '') : 'nächste 3';
 
@@ -41,10 +42,11 @@ export async function render(box, ctx, r) {
   const kp = liste && W.wert_stand ? await ctx.mod('v_keeper').catch(() => null) : null;
   if (!r.alive()) return;
   const byId = new Map(P.players.map(p => [p.id, p]));
-  // Tagesstand je Spieler, Stammdaten und ROS aus dem Wochenstand; wer dort fehlt, heißt wie im Tagesstand (ohne ROS)
+  // Tagesstand je Spieler, Stammdaten und ROS aus dem Wochenstand; wer dort fehlt, heißt wie im Tagesstand (ohne ROS); das
+  // NFL-Team nach einem Wechsel unter der Woche laut Tagesstand (U.nflTag, wie merge() in v_spieler.js)
   const rows = W.spieler.map(d => {
     const p = byId.get(d.id) || {};
-    return {...p, ...d, name: p.name ?? d.name ?? `Spieler ${d.id}`, pos: p.pos ?? d.pos ?? null, nfl: p.nfl ?? d.nfl ?? null};
+    return U.nflTag({...p, ...d, name: p.name ?? d.name ?? `Spieler ${d.id}`, pos: p.pos ?? d.pos ?? null, nfl: p.nfl ?? d.nfl ?? null}, d);
   });
   const rowById = new Map(rows.map(x => [x.id, x]));
   const name = id => byId.get(id)?.name ?? rowById.get(id)?.name ?? T?.spieler?.[String(id)] ?? `Spieler ${id}`;
@@ -114,9 +116,9 @@ function available(box, W, P, rows, r, wflag, me, kp, zw) {
     return fl ? h('span', {class: 'plw'}, a, fl) : a;
   }};
   // Matchup (players.json mu, Wochenstand): Spalte „Gegner Wn“ = Gegner in Woche mu_woche mit dem Faktor als Farbzelle wie
-  // unter Matchups, Bye grau
+  // unter Matchups, Bye grau; nach einem Teamwechsel unter der Woche (x.wechsel) leer bis zum Wochenabruf
   const hasMu = 'mu_woche' in P, week = inWeek;
-  const muWhy = x => !hasMu ? 'ab dem nächsten Wochenabruf' : x.mu ? 'keine offene Woche' : !x.nfl ? 'kein NFL-Team'
+  const muWhy = x => !hasMu ? 'ab dem nächsten Wochenabruf' : x.wechsel ? U.WECHSEL : x.mu ? 'keine offene Woche' : !x.nfl ? 'kein NFL-Team'
     : week.has(x.id) ? 'kein Matchup-Wert für diese Position' : notInWeek;
   const mu = {k: 'mu', l: U.ok(P.mu_woche) ? `Gegner W${P.mu_woche}` : 'Gegner', num: 1, v: x => x.mu?.n1?.opp ? x.mu.n1.f ?? null : null,
     cls: x => x.mu?.n1 ? (x.mu.n1.opp ? fz(x.mu.n1.f) : 'fz bye') : 'fz',
@@ -127,7 +129,7 @@ function available(box, W, P, rows, r, wflag, me, kp, zw) {
     }};
   const mu3 = {k: 'mu3', l: 'Faktor nächste 3', num: 1, v: x => x.mu?.naechste3 ?? null, cls: x => fz(x.mu?.naechste3),
     f: x => U.val(x.mu?.naechste3, v => U.num(v, 2), x.mu ? 'kein Spiel in den nächsten 3 Wochen' : muWhy(x))};
-  const bye = {k: 'bye', l: 'Bye', num: 1, cat: 1, v: x => x.bye, d: 1, f: x => !U.ok(x.bye) ? U.na(x.nfl && !inWeek.has(x.id) ? notInWeek : 'kein NFL-Team')
+  const bye = {k: 'bye', l: 'Bye', num: 1, cat: 1, v: x => x.bye, d: 1, f: x => !U.ok(x.bye) ? U.na(x.wechsel ? U.WECHSEL : x.nfl && !inWeek.has(x.id) ? notInWeek : 'kein NFL-Team')
     : x.bye === W.woche ? h('span', {class: 'dn'}, 'W' + x.bye, h('span', {class: 'vh'}, ' – nächste Woche spielfrei')) : 'W' + x.bye};
   const verl = {k: 'inj', l: 'Verletzung', v: x => U.INJ[x.inj] ? x.inj : null, d: 1, f: x => U.INJ[x.inj]?.[1] || (x.inj === 'ACTIVE' ? 'aktiv' : '–')};
   const frist = {k: 'frist', l: 'Frist', v: x => x.status === 'WAIVERS' ? x.waiver_bis : null, d: 1,

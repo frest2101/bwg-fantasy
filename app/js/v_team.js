@@ -10,7 +10,7 @@ const POS = ['QB', 'RB', 'WR', 'TE', 'K', 'D/ST'];
 const GRP = {QB: ['QB+OP', 'QB'], RB: ['RB', 'RB'], WR: ['WR', 'WR'], TE: ['TE', 'TE'], FLEX: ['FLEX', null], 'D/ST': ['D/ST', 'D/ST'], K: ['K', 'K']};
 // Slots in der Reihenfolge der Aufstellung (Sortierung im Kader)
 const ORD = ['QB', 'RB', 'WR', 'TE', 'FLEX', 'OP', 'D/ST', 'K', 'Bank', 'IR'];
-const GRUND = {BYE: 'Bye', OUT: 'fällt aus', INJURY_RESERVE: 'IR', SUSPENSION: 'gesperrt', QUESTIONABLE: 'fraglich', DOUBTFUL: 'zweifelhaft',
+const GRUND = {BYE: 'Bye', KEIN_TEAM: 'kein NFL-Team', OUT: 'fällt aus', INJURY_RESERVE: 'IR', SUSPENSION: 'gesperrt', QUESTIONABLE: 'fraglich', DOUBTFUL: 'zweifelhaft',
   DAY_TO_DAY: 'Day-to-Day'};
 
 export async function render(box, ctx, r) {

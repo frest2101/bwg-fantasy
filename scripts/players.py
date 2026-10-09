@@ -331,12 +331,15 @@ SLOT_POSITIONS = {"QB": (QB,), "RB": (RB,), "WR": (WR,), "TE": (TE,), "D/ST": (D
                   "FLEX": (RB, WR, TE), "OP": (QB, RB, WR, TE)}
 
 
-def week_value(projection, injury: str | None, game: bool) -> tuple[Decimal, str | None]:
+def week_value(projection, injury: str | None, game: bool, team: bool = True) -> tuple[Decimal, str | None]:
     """Wert eines Spielers in der Woche N+1 und der Grund, wenn er sicher ausfällt.
 
-    Ohne Spiel seines NFL-Teams 0 mit Grund "BYE"; OUT, INJURY_RESERVE und gesperrt 0 mit dem Status als Grund;
-    sonst die ESPN-Wochenprojektion (ohne Projektion 0), auch bei fraglichen Spielern (QUESTIONABLE, DOUBTFUL).
+    Ohne NFL-Team (team False: entlassen, vereinslos) 0 mit Grund "KEIN_TEAM"; ohne Spiel seines NFL-Teams 0 mit Grund
+    "BYE"; OUT, INJURY_RESERVE und gesperrt 0 mit dem Status als Grund; sonst die ESPN-Wochenprojektion (ohne Projektion
+    0), auch bei fraglichen Spielern (QUESTIONABLE, DOUBTFUL).
     """
+    if not team:
+        return ZERO, "KEIN_TEAM"
     if not game:
         return ZERO, "BYE"
     if injury in WEEK_OUT:
@@ -388,11 +391,11 @@ def team_week_needs(rosters: dict[int, list[tuple[int, int]]], value: dict[int, 
     """Wochenbedarf je Team für die Woche N+1 (Tagesstand).
 
     Aufstellung = lineup.optimal_lineup des Kaders mit dem Wochenwert (week_value). Lücken = unbesetzte Slots,
-    Starter, die sicher ausfallen (Grund BYE, OUT, INJURY_RESERVE, SUSPENSION), und Starter unter dem
+    Starter, die sicher ausfallen (Grund KEIN_TEAM, BYE, OUT, INJURY_RESERVE, SUSPENSION), und Starter unter dem
     Wochen-Ersatzniveau ihrer Position; je Lücke die drei besten freien Spieler (free, absteigend sortiert), die
     in den Slot passen und mehr bringen als die Besetzung.
     Ausfälle und Byes beziehen sich auf die ROS-optimale Aufstellung (per_game wie team_needs): Starter, die in N+1
-    ausfallen oder fraglich sind (Grund = Status bzw. BYE), und Starter mit Bye in N+2 … N+3 (byes_ahead: Spieler →
+    ausfallen oder fraglich sind (Grund = Status bzw. BYE, KEIN_TEAM), und Starter mit Bye in N+2 … N+3 (byes_ahead: Spieler →
     Wochen). Ohne per_game (keine ROS-Grundlage, app_export.need_basis) bleiben beide leer.
     Rückgabe team_id → {"luecken": [{"slot", "id", "pos", "proj", "grund", "kandidaten"}],
     "ausfaelle": [{"slot", "id", "pos", "grund"}], "byes": [{"woche", "slot", "id", "pos"}]}.

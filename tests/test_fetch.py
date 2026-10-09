@@ -1418,17 +1418,20 @@ def test_pool_extract_felder():
     first = data["players"][0]
     first.update(status="WAIVERS", waiverProcessDate=1790751600000)
     first["player"].update(ownership={"percentOwned": 64.66, "percentChange": -0.07, "percentStarted": 58.81},
-                           injuryStatus="ACTIVE", lastNewsDate=1790569213000)
+                           injuryStatus="ACTIVE", lastNewsDate=1790569213000, proTeamId=21)
+    data["players"][2]["player"]["proTeamId"] = 0                                    # laut ESPN ohne NFL-Team
     extract = ef.pool_extract(data, 2026, 4, "2026-09-29T0645Z")
     assert (extract["season"], extract["woche"], extract["stand"]) == (2026, 4, "2026-09-29T0645Z")
     assert [p["id"] for p in extract["players"]] == list(range(1, 301))
     row = extract["players"][0]
     assert tuple(row) == ef.POOL_KEYS
-    assert (row["status"], row["onTeamId"], row["injuryStatus"], row["percentOwned"], row["percentChange"],
+    assert (row["status"], row["onTeamId"], row["proTeamId"], row["injuryStatus"], row["percentOwned"], row["percentChange"],
             row["percentStarted"], row["waiverProcessDate"], row["lastNewsDate"], row["proj_naechste_woche"]) \
-        == ("WAIVERS", 0, "ACTIVE", 64.66, -0.07, 58.81, 1790751600000, 1790569213000, 4.1)
+        == ("WAIVERS", 0, 21, "ACTIVE", 64.66, -0.07, 58.81, 1790751600000, 1790569213000, 4.1)
     second = extract["players"][1]
     assert second["percentOwned"] is None and second["status"] is None and second["proj_naechste_woche"] == 4.2
+    # NFL-Team (09.10.2026): 0 bleibt 0 (ohne Team), fehlt das Feld bei ESPN, None
+    assert extract["players"][2]["proTeamId"] == 0 and second["proTeamId"] is None
     # ohne Projektion der Woche: None; unvollständiger Pool: Fehler
     assert all(p["proj_naechste_woche"] is None for p in ef.pool_extract(fake_pool([5]), 2026, 4, "x")["players"])
     with pytest.raises(ef.FetchError, match="unvollständig"):
