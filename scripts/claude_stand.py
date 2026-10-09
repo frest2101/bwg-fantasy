@@ -24,7 +24,8 @@ Aufbau: Der Abruf (hole, parallel, abrufen) ist getrennt von den reinen Funktion
 geladenen JSON-Objekten und einem übergebenen Zeitpunkt den Text bauen – so laufen die Tests ohne Netz.
 Jeder Ausfall wird eine Textzeile, nie ein Traceback; das Skript endet immer normal (Exit-Code 0).
 Zahlen: ESPN-Werte ungerundet übernommen, erst bei der Ausgabe gerundet (round half up): Punkte zwei Stellen,
-F drei, Prozente ganzzahlig. Eine Zeitzone im Text: deutsche Zeit mit Etikett MESZ/MEZ je Zeitpunkt, UTC nur im Kopf.
+F drei, Prozente ganzzahlig, Expertenrang (Exp, Median der ESPN-Experten laut App, nur vor dem Anstoß) ganz oder mit
+einer Stelle. Eine Zeitzone im Text: deutsche Zeit mit Etikett MESZ/MEZ je Zeitpunkt, UTC nur im Kopf.
 """
 
 import json
@@ -267,8 +268,9 @@ def app_index(app, woche, saison=None) -> dict:
     Kürzel, Moves als Zähler (Zeit, Kürzel). f_ok/proj_ok: Die Datei meint dieselbe Woche wie ESPN.
 
     Vertrag mit scripts/app_export.py (build_claude; tests/test_claude_stand.py liest dazu die committete Datei):
-    stand (saison, nach_woche, matchup_woche, pool_stand, pool_woche), spieler_spalten mit id, name, pos, nfl, ros_g,
-    mu_n1, proj, kader je Kürzel, free_agents, transaktionen_spalten mit datum_ms und team.
+    stand (saison, nach_woche, matchup_woche, pool_stand, pool_woche, experten_quellen, experten_tiefe), spieler_spalten
+    mit id, name, pos, nfl, ros_g, mu_n1, proj, exp, exp_n, kader je Kürzel, free_agents, transaktionen_spalten mit
+    datum_ms und team.
     fremd: Die Datei zeigt eine andere Saison als ESPN (nach dem Saisonwechsel, bis W1 final ist) – dann gilt nur
     die Kopfzeile, nichts aus der Datei wird verglichen. marken: Moves lassen sich als [App]/[NEU] markieren;
     führt die Datei Transaktionen ohne die Spalten datum_ms und team, wäre sonst jeder Move fälschlich [NEU].
@@ -490,15 +492,41 @@ def spiel_text(lage: dict, z: dict) -> str:
     return f"{spiel['gegner']} {zeit_text(spiel['anstoss'], datum=False)}"
 
 
+def exp_ok(lage: dict) -> bool:
+    """Expertenränge der App gelten für diese Woche: claude.json meint dieselbe Woche wie ESPN (pool_woche) und ESPN
+    hatte zum Stand der App schon Listen veröffentlicht (stand.experten_quellen > 0)."""
+    return bool(lage["app"]["proj_ok"] and lage["app"]["stand"].get("experten_quellen"))
+
+
+def expertenrang(lage: dict, z: dict):
+    """Expertenrang laut App (claude.json exp und exp_n, stand.experten_quellen und experten_tiefe) als „RB 12.5 (8/8)“
+    (Median der ESPN-Experten, Experten mit Rang von allen) bzw. „RB >50 (3/8)“ (höchstens die Hälfte führt ihn in
+    ihren Top 50); None, wenn die App eine andere Woche meint, das Spiel schon begonnen hat (nach dem Anpfiff nehmen die
+    Experten Spieler aus ihren Listen), der Spieler spielfrei ist oder kein Experte ihn führt.
+    Regel wie live_core.expertenrang (Live-Ansicht der App)."""
+    if not exp_ok(lage) or z["state"] not in OFFEN or z["state"] in SPIELFREI:
+        return None
+    a, stand = lage["app"]["spieler"].get(z["id"]) or {}, lage["app"]["stand"]
+    n = a.get("exp_n")
+    if not isinstance(n, int) or isinstance(n, bool) or n < 1:
+        return None
+    wert, tiefe = a.get("exp"), (stand.get("experten_tiefe") or {}).get(z["pos"])
+    rang = zahl(wert, 1 if wert % 1 else 0) if wert is not None else f">{tiefe if tiefe is not None else '?'}"
+    return f"{z['pos']} {rang} ({n}/{stand['experten_quellen']})"
+
+
 def spielerspalten(lage: dict, z: dict, kopf_text: str) -> str:
-    """Eine Zeile: Slot Spieler NFL Spiel | Punkte | Proj | F | Verletzung (F nur, wenn die App dieselbe Woche meint).
+    """Eine Zeile: Slot Spieler NFL Spiel | Punkte | Proj | F | Exp | Verletzung (F nur, wenn die App dieselbe Woche
+    meint; Exp = Expertenrang laut App, nur vor dem Anstoß, siehe expertenrang).
 
     Ohne Spiel (Bye, ohne NFL-Team) steht bei Proj „–“: ESPN projiziert D/ST auch in ihrer Bye-Woche, die Zahl wäre
     keine Erwartung (gezählt wird 0)."""
     f = (lage["app"]["spieler"].get(z["id"]) or {}).get("mu_n1") if lage["app"]["f_ok"] else None
     proj = None if z["state"] in SPIELFREI else z["proj"]
+    exp = expertenrang(lage, z)
     return (f"  {kopf_text} {z['nfl']} {spiel_text(lage, z)} | {zahl(z['ist'])} | {zahl(proj)}"
-            + (f" | F {zahl(f, 3)}" if f is not None else "") + (f" | {z['inj']}" if z["inj"] else ""))
+            + (f" | F {zahl(f, 3)}" if f is not None else "") + (f" | Exp {exp}" if exp else "")
+            + (f" | {z['inj']}" if z["inj"] else ""))
 
 
 def team_zeilen(lage: dict, team_id: int, ganz: bool = False) -> list:
@@ -510,7 +538,7 @@ def team_zeilen(lage: dict, team_id: int, ganz: bool = False) -> list:
         return [f"Team-ID {team_id} gibt es in der Liga nicht – keine Aufstellung"]
     kader = lage["kader"][team_id]
     aus = [f"{lage['kz'][team_id]} {kurz(team.get('name', ''))} – Slot Spieler NFL Spiel | Punkte | Proj"
-           + (" | F" if lage["app"]["f_ok"] else "")]
+           + (" | F" if lage["app"]["f_ok"] else "") + (" | Exp" if exp_ok(lage) else "")]
     starter = sorted((z for z in kader if z["slot"] in STARTER_SLOTS),
                      key=lambda z: (STARTER_SLOTS.index(z["slot"]), -(z["proj"] or 0), z["name"]))
     for z in starter:

@@ -488,6 +488,35 @@ def test_starter_zeilen():
     assert "ACB Testteam Eins –" not in "\n".join(zeilen)            # nur eigenes Team und Gegner
 
 
+def test_expertenrang_in_der_aufstellung():
+    """Exp = Expertenrang laut claude.json (Werte erfunden, 09.10.2026): nur vor dem Anstoß (Rudi SF @ SEA offen;
+    Quentin final und Fritz läuft ohne), nicht bei Bye (Willi), „>N“ bei höchstens der Hälfte, auch auf der Bank, ohne
+    Rang nichts; Kopf „| Exp“ und Werte nur, wenn claude.json die Woche von ESPN meint und ESPN Listen hatte."""
+    a = app()
+    a["stand"].update(experten_quellen=8, experten_tiefe={"QB": 25, "RB": 50, "WR": 60, "TE": 25, "K": 20, "D/ST": 20})
+    i, n = SPALTEN.index("exp"), SPALTEN.index("exp_n")
+    werte = {101: (1.0, 8), 102: (12.5, 8), 103: (30.0, 8), 104: (20.0, 8), -16026: (None, 3), 109: (40.0, 8),
+             106: (None, 0)}
+    for zeile in a["kader"]["HJS"]:
+        zeile[i], zeile[n] = werte.get(zeile[0], (None, None))
+    zeilen = text(app=a).split("\n")
+    start = zeilen.index("HJS Testteam Zwei – Slot Spieler NFL Spiel | Punkte | Proj | F | Exp")
+    assert zeilen[start + 1:start + 6] == [
+        "  QB   Quentin Erfunden KC @ DEN final | 21.35 | 20.00 | F 1.050",
+        "  RB   Rudi Beispiel SF @ SEA So 19:00 MEZ | – | 15.33 | F 0.947 | Exp RB 12.5 (8/8)",
+        "  WR   Willi Muster CHI Bye | – | –",
+        "  FLEX Fritz Flex RB BUF @ MIA läuft (5:23 - 3rd) | 7.67 | 9.00 | Q",
+        "  D/ST Testabwehr Eins D/ST SEA vs SF So 19:00 MEZ | – | 6.00 | Exp D/ST >20 (3/8)"]
+    assert "  Bank Otto Offen RB SEA vs SF So 19:00 MEZ | – | 3.00 | Exp RB 40 (8/8)" in zeilen
+    assert any(z.startswith("  Bank Bodo Bank WR SF @ SEA So 19:00 MEZ | – | 12.50 → mehr Proj") for z in zeilen)
+    assert "SGK Testteam Zehn – Slot Spieler NFL Spiel | Punkte | Proj | F | Exp" in zeilen
+    # claude.json meint eine andere Woche, oder ESPN hatte zum Stand der App noch nichts veröffentlicht: kein Exp
+    for anders in ({"pool_woche": WOCHE + 1}, {"experten_quellen": 0}, {"experten_quellen": None}):
+        b = json.loads(json.dumps(a))
+        b["stand"].update(anders)
+        assert "Exp" not in text(app=b), anders
+
+
 def test_bank_des_eigenen_teams_vollstaendig():
     """Eigenes Team: alle Bank- und IR-Spieler (Alternativen für fragliche Starter), IR-Slot zuletzt und als „IR“."""
     zeilen = text().split("\n")
