@@ -98,8 +98,11 @@ export const rang = (pos, r, ges) => h('span', {class: 'rg'}, `${pos ?? '–'} $
 // Tageslauf ein anderes ist als laut Wochenstand (Trade, Neuverpflichtung, Entlassung; null = jetzt ohne Team). Die Zeile x
 // (Wochenstand, players.json) bekommt dann dieses Team, damit Anstoß, Wetter und Anzeige zum aktuellen Team passen; wechsel =
 // {von: NFL-Team laut Wochenstand}. Gegner und Faktoren (mu) und der Bye des Wochenstands gälten für das alte Team und
-// entfallen bis zum Wochenabruf (Grund: WECHSEL). Ohne nfl_tag bleibt x unverändert. d = Zeile aus waiver.json
-export const WECHSEL = 'NFL-Team gewechselt: Gegner, Faktor und Bye ab dem Wochenabruf';
+// entfallen bis zum Wochenabruf (Grund: wechselWhy). Ohne nfl_tag bleibt x unverändert. d = Zeile aus waiver.json
+export const wechselWhy = x => x.nfl ? 'NFL-Team gewechselt: Gegner, Faktor und Bye ab dem Wochenabruf' : 'laut Tageslauf ohne NFL-Team';
+// Satz dazu auf der Spielerseite
+export const wechselSatz = x => x.nfl ? `Neues NFL-Team laut Tageslauf (vorher ${x.wechsel.von || 'ohne Team'}): Gegner, Faktor und Rang folgen mit dem Wochenabruf.`
+  : `Laut Tageslauf ohne NFL-Team (vorher ${x.wechsel.von}): kein Gegner.`;
 export function nflTag(x, d) {
   if (!d || !('nfl_tag' in d)) return x;
   return Object.assign(x, {wechsel: {von: x.nfl ?? null}, nfl: d.nfl_tag, mu: null, bye: null});

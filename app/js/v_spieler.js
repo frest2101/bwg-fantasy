@@ -135,7 +135,7 @@ function list(box, W, all, r, rosWhy, ersatz, hasRos) {
     rank('espn_rang', 'ESPN-Rang', 'espn_rang_ges', p => p.nur_tag ? 'nicht in den Wochendaten' : 'kein ESPN-Rang'),
     ...(W?.wert_stand ? [{k: 'wert_rang', l: 'Marktwert-Rang', num: 1, d: 1, v: p => p.wert_rang,
       f: p => U.val(p.wert_rang, v => h('span', {class: 'rg'}, String(v), h('small', null, `${p.pos} ${p.wert_posrang}`)), 'kein Marktwert')}] : []),
-    {k: 'bye', l: 'Bye', num: 1, cat: 1, v: p => p.bye, d: 1, f: p => U.val(p.bye, v => 'W' + v, p.wechsel ? U.WECHSEL : 'kein NFL-Team')},
+    {k: 'bye', l: 'Bye', num: 1, cat: 1, v: p => p.bye, d: 1, f: p => U.val(p.bye, v => 'W' + v, p.wechsel ? U.wechselWhy(p) : 'kein NFL-Team')},
     num('own', 'Besitz %', v => U.pct(v)),
     ...(W ? [num('own_d', 'seit gestern', v => U.sgn(v, 2), 'keine Tagesdaten'), num('started', 'aufgestellt %', v => U.pct(v), 'keine Tagesdaten')] : []),
     {k: 'inj', l: 'Verletzung', v: p => U.INJ[p.inj] ? p.inj : null, d: 1, f: p => U.INJ[p.inj]?.[1] || (p.inj === 'ACTIVE' ? 'aktiv' : '–')},
@@ -316,9 +316,9 @@ function one(box, h1, P, W, rows, r, svg, rosWhy, wline, origin, kp) {
         U.tile('Rest Playoffs', U.val(p.ros_po, U.num, rosWhy), null, 'ros-po'),
         U.tile('Rang Rest je Spiel', U.val(p.ros_rang, v => `${p.pos} ${v}`, rosWhy), U.ok(p.ros_rang_ges) ? `Gesamt ${p.ros_rang_ges}` : null, 'ros-rang'),
         // nach einem Teamwechsel unter der Woche „–“: Die Faktoren gälten für die Gegner des alten Teams
-        m || p.wechsel ? [U.tile('Faktor nächste 3', cell(m?.naechste3, p.wechsel ? U.WECHSEL : 'kein Spiel in den nächsten 3 Wochen'), null, dst ? 'naechste3' : 'mu-naechste3'),
-          U.tile('Rest Regular Season', cell(m?.rest, p.wechsel ? U.WECHSEL : 'keine Regular-Season-Woche mehr'), null, dst ? 'rest' : 'mu-rest'),
-          U.tile('Playoffs W15–17', cell(m?.sos_po, p.wechsel ? U.WECHSEL : 'kein Playoff-Spiel'), null, dst ? 'sos' : 'mu-sos')] : null),
+        m || p.wechsel ? [U.tile('Faktor nächste 3', cell(m?.naechste3, p.wechsel ? U.wechselWhy(p) : 'kein Spiel in den nächsten 3 Wochen'), null, dst ? 'naechste3' : 'mu-naechste3'),
+          U.tile('Rest Regular Season', cell(m?.rest, p.wechsel ? U.wechselWhy(p) : 'keine Regular-Season-Woche mehr'), null, dst ? 'rest' : 'mu-rest'),
+          U.tile('Playoffs W15–17', cell(m?.sos_po, p.wechsel ? U.wechselWhy(p) : 'kein Playoff-Spiel'), null, dst ? 'sos' : 'mu-sos')] : null),
       h('p', {class: 'note'}, 'Alle Projektionen sind ESPN-Schätzungen; die Faktoren beschreiben die Gegner im Schnitt (über 1,00 = günstig). ', U.ib('projektionen', '')));
   }
 
@@ -375,8 +375,7 @@ function woche(box, p, P, W, wl) {
       m && !z ? [U.tile(n1 ? `Gegner W${n1.week}` : 'Gegner', n1 ? n1.opp || 'Bye' : U.na(n1Why), n1?.opp ? (dst ? 'Offense' : 'Defense') : null, 'mu-n1'),
         U.tile('Faktor', n1?.opp ? cell(n1.f, 'kein Faktor') : U.na(n1Why), null, dst ? 'f' : 'mu-f'),
         U.tile('Rang', n1?.opp ? U.val(n1.rang, v => `${v}. von 32`, 'kein Faktor') : U.na(n1Why), '1 = günstigstes Matchup', dst ? 'f' : 'mu-rang')] : null),
-    !m ? h('p', {class: 'note'}, p.wechsel ? `Neues NFL-Team laut Tageslauf (vorher ${p.wechsel.von || 'ohne Team'}): Gegner, Faktor und Rang folgen mit dem Wochenabruf.`
-      : `Kein Matchup-Wert: ${why}.`) : z ? null : h('p', {class: 'note'}, ...(dst
+    !m ? h('p', {class: 'note'}, p.wechsel ? U.wechselSatz(p) : `Kein Matchup-Wert: ${why}.`) : z ? null : h('p', {class: 'note'}, ...(dst
       ? ['Faktor der gegnerischen Offense, über 1,00 = günstig für die D/ST. ', h('a', {href: '#woche/matchups/dst'}, 'Matchups D/ST')]
       : ['Position gegen Defense, kein Einzelduell: Ein Faktor über 1,00 heißt, Spieler der Position holen gegen diese Defense mehr Punkte als im Schnitt. ',
         h('a', {href: '#woche/matchups/' + String(p.pos).toLowerCase()}, `Alle Defenses gegen ${p.pos}`)])),
