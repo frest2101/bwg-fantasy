@@ -118,7 +118,7 @@ function available(box, W, P, rows, r, wflag, me, kp, zw) {
   // Matchup (players.json mu, Wochenstand): Spalte „Gegner Wn“ = Gegner in Woche mu_woche mit dem Faktor als Farbzelle wie
   // unter Matchups, Bye grau; nach einem Teamwechsel unter der Woche (x.wechsel) leer bis zum Wochenabruf
   const hasMu = 'mu_woche' in P, week = inWeek;
-  const muWhy = x => !hasMu ? 'ab dem nächsten Wochenabruf' : x.wechsel ? U.wechselWhy(x) : x.mu ? 'keine offene Woche' : !x.nfl ? 'kein NFL-Team'
+  const muWhy = x => !hasMu ? 'ab dem nächsten Wochenabruf' : x.wechsel && week.has(x.id) ? U.wechselWhy(x) : x.mu ? 'keine offene Woche' : !x.nfl ? 'kein NFL-Team'
     : week.has(x.id) ? 'kein Matchup-Wert für diese Position' : notInWeek;
   const mu = {k: 'mu', l: U.ok(P.mu_woche) ? `Gegner W${P.mu_woche}` : 'Gegner', num: 1, v: x => x.mu?.n1?.opp ? x.mu.n1.f ?? null : null,
     cls: x => x.mu?.n1 ? (x.mu.n1.opp ? fz(x.mu.n1.f) : 'fz bye') : 'fz',
@@ -129,7 +129,7 @@ function available(box, W, P, rows, r, wflag, me, kp, zw) {
     }};
   const mu3 = {k: 'mu3', l: 'Faktor nächste 3', num: 1, v: x => x.mu?.naechste3 ?? null, cls: x => fz(x.mu?.naechste3),
     f: x => U.val(x.mu?.naechste3, v => U.num(v, 2), x.mu ? 'kein Spiel in den nächsten 3 Wochen' : muWhy(x))};
-  const bye = {k: 'bye', l: 'Bye', num: 1, cat: 1, v: x => x.bye, d: 1, f: x => !U.ok(x.bye) ? U.na(x.wechsel ? U.wechselWhy(x) : x.nfl && !inWeek.has(x.id) ? notInWeek : 'kein NFL-Team')
+  const bye = {k: 'bye', l: 'Bye', num: 1, cat: 1, v: x => x.bye, d: 1, f: x => !U.ok(x.bye) ? U.na(x.wechsel && inWeek.has(x.id) ? U.wechselWhy(x) : x.nfl && !inWeek.has(x.id) ? notInWeek : 'kein NFL-Team')
     : x.bye === W.woche ? h('span', {class: 'dn'}, 'W' + x.bye, h('span', {class: 'vh'}, ' – nächste Woche spielfrei')) : 'W' + x.bye};
   const verl = {k: 'inj', l: 'Verletzung', v: x => U.INJ[x.inj] ? x.inj : null, d: 1, f: x => U.INJ[x.inj]?.[1] || (x.inj === 'ACTIVE' ? 'aktiv' : '–')};
   const frist = {k: 'frist', l: 'Frist', v: x => x.status === 'WAIVERS' ? x.waiver_bis : null, d: 1,

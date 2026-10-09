@@ -135,7 +135,7 @@ function list(box, W, all, r, rosWhy, ersatz, hasRos) {
     rank('espn_rang', 'ESPN-Rang', 'espn_rang_ges', p => p.nur_tag ? 'nicht in den Wochendaten' : 'kein ESPN-Rang'),
     ...(W?.wert_stand ? [{k: 'wert_rang', l: 'Marktwert-Rang', num: 1, d: 1, v: p => p.wert_rang,
       f: p => U.val(p.wert_rang, v => h('span', {class: 'rg'}, String(v), h('small', null, `${p.pos} ${p.wert_posrang}`)), 'kein Marktwert')}] : []),
-    {k: 'bye', l: 'Bye', num: 1, cat: 1, v: p => p.bye, d: 1, f: p => U.val(p.bye, v => 'W' + v, p.wechsel ? U.wechselWhy(p) : 'kein NFL-Team')},
+    {k: 'bye', l: 'Bye', num: 1, cat: 1, v: p => p.bye, d: 1, f: p => U.val(p.bye, v => 'W' + v, p.nur_tag ? 'nicht in den Wochendaten' : p.wechsel ? U.wechselWhy(p) : 'kein NFL-Team')},
     num('own', 'Besitz %', v => U.pct(v)),
     ...(W ? [num('own_d', 'seit gestern', v => U.sgn(v, 2), 'keine Tagesdaten'), num('started', 'aufgestellt %', v => U.pct(v), 'keine Tagesdaten')] : []),
     {k: 'inj', l: 'Verletzung', v: p => U.INJ[p.inj] ? p.inj : null, d: 1, f: p => U.INJ[p.inj]?.[1] || (p.inj === 'ACTIVE' ? 'aktiv' : '–')},
