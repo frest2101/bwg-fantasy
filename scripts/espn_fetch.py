@@ -1480,6 +1480,12 @@ def update_pool(session: requests.Session, season: int, now: datetime, stamp: st
         # Expertenränge nur als Zahlen im (öffentlichen) Log; aus den Läufen ergibt sich, ab wann ESPN eine Woche füllt
         ranked = sum(1 for r in extract["players"] if r["experten"])
         expert = f"Expertenränge {extract['experten_quellen']} Quellen, {ranked} Spieler"
+        # Ab Freitag (UTC, nach dem Donnerstagsspiel) einer laufenden Woche waren die Listen W1–W5 immer veröffentlicht;
+        # 0 Quellen heißt dann eher, dass ESPN Filter oder Felder geändert hat, als „noch nicht veröffentlicht“
+        if (not extract["experten_quellen"] and 1 <= calendar_week(season, now.date()) <= MAX_WEEK
+                and now.weekday() in (4, 5, 6, 0)):
+            warn(f"Expertenränge W{week}: ESPN liefert keine veröffentlichte Rangliste, obwohl die Woche läuft – "
+                 f"Rangfilter und Felder in scripts/espn_fetch.py (expert_ranks) prüfen")
         if same_pool(previous, extract):
             print(f"  {POOL_FILE:<22} unverändert (W{week}, {len(extract['players'])} Spieler, {expert}, Stand {previous['stand']})")
             return 0, previous

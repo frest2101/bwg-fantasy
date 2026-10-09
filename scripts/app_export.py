@@ -630,8 +630,10 @@ def expert_view(pool: dict, result: dict, kick: dict[str, int]) -> dict:
 
     Ist das Spiel des Spielers (NFL-Team laut Wochenstand) zum Stand des Tagesstands schon angepfiffen (kick wie anstoss
     in waiver.json), bleibt er leer (None, None): Die Experten nehmen Spieler nach dem Anpfiff verschieden schnell aus
-    ihren Listen, ein Median aus dem Rest wäre ein Zufallswert. Ohne Feld im Pool-Auszug (vor dem ersten Tageslauf mit
-    Rängen) quellen und tiefe None, alle Spieler ohne Wert."""
+    ihren Listen, ein Median aus dem Rest wäre ein Zufallswert. Ebenso ohne NFL-Team im Wochenstand (ohne Spiel keine
+    Sperre nach dem Anstoß). Die übrigen rücken nach dem Donnerstagsspiel um wenige Plätze auf, weil die Experten ihre
+    Listen ohne dessen Spieler neu zählen – exp ist dann der Rang unter den noch offenen Spielern. Ohne Feld im
+    Pool-Auszug (vor dem ersten Tageslauf mit Rängen) quellen und tiefe None, alle Spieler ohne Wert."""
     sources = pool.get("experten_quellen")
     if sources is None:
         return {"quellen": None, "tiefe": None, "spieler": {}}
@@ -643,7 +645,7 @@ def expert_view(pool: dict, result: dict, kick: dict[str, int]) -> dict:
         if ranks and w.get("pos") is not None:
             name = POSITION_NAMES.get(w["pos"], str(w["pos"]))
             depth[name] = max(depth.get(name, 0), max(ranks))
-        started = w.get("nfl") in kick and kick[w["nfl"]] <= stand
+        started = not w.get("nfl") or (w["nfl"] in kick and kick[w["nfl"]] <= stand)
         out[p["id"]] = (None, None) if started else players_module.expert_rank(ranks, sources)
     return {"quellen": sources, "tiefe": {n: depth[n] for n in POSITION_NAMES.values() if n in depth}, "spieler": out}
 
@@ -738,10 +740,10 @@ def build_claude(result: dict, teams: dict, schedule: dict, players: dict | None
                             "0, dann ROS-Auszug), D/ST-besitzer, transaktionen. Wochenstand (nach_woche): alles Übrige; "
                             "Spieler nur aus dem Tagesstand: avg…mu_n1 null. pool_stand null: alles Wochenstand, "
                             "proj/proj3 null.",
-           "legende_experten": "exp = Expertenrang pool_woche: Median der veröffentlichten PPR-Ränge der ESPN-Experten "
-                               "innerhalb der Position (wer den Spieler nicht führt, zählt als außerhalb seiner Top N); "
-                               "null, wenn ihn weniger als die Hälfte führt oder sein Spiel schon lief. exp_n = Experten "
-                               "mit Rang, stand.experten_quellen = Experten, stand.experten_tiefe = N je Position. "
+           "legende_experten": "exp = Median der PPR-Ränge der ESPN-Experten pool_woche in der Position (fehlend = "
+                               "außerhalb Top N, N = stand.experten_tiefe); exp_n = Experten mit Rang von "
+                               "stand.experten_quellen. exp null bei exp_n höchstens der Hälfte; beide null = Spiel lief "
+                               "schon oder kein NFL-Team. Ab dem TNF zählen die Experten nur noch offene Spieler. "
                                "Standard-PPR, nicht Liga-Scoring.",
            "stand": {"saison": result["season"], "nach_woche": result["through_week"],
                      "kader_quelle": teams["meta"]["kader_quelle"], "ros_nach_woche": result.get("ros_after_week"),
@@ -865,8 +867,9 @@ def render(files: dict[str, dict], result: dict) -> dict[str, bytes]:
                                # Stufe 4: letzte finale Playoff-Woche (W15–17), null bis dahin
                                "playoff_woche": result.get("playoff_woche"),
                                "pool_woche": result.get("pool_week"),
-                               # Expertenränge laut Tageslauf (Datenstand-Fenster): Woche des Tagesstands und Zahl der
-                               # ESPN-Experten mit veröffentlichter Liste (0 = noch keine), null ohne Pool-Auszug mit Rängen
+                               # Expertenränge laut Tageslauf (Datenstand-Fenster): Woche des Tagesstands (null ohne
+                               # Pool-Auszug) und Zahl der ESPN-Experten mit veröffentlichter Liste (0 = noch keine, null
+                               # ohne Pool-Auszug mit Rängen)
                                "experten_woche": (result.get("pool_latest") or {}).get("woche"),
                                "experten_quellen": (result.get("pool_latest") or {}).get("experten_quellen"),
                                "transaktionen_bis": result.get("transactions_until"),

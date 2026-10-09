@@ -1648,6 +1648,22 @@ def test_fetch_waiver_order():
         ef.fetch_waiver_order(StubSession(dict(fake_mteam(), seasonId=2025)), 2026)
 
 
+@pytest.mark.parametrize("now, warnt", [
+    (datetime(2026, 10, 9, 8, 0, tzinfo=timezone.utc), True),      # Freitag W5: Listen sind sonst immer veröffentlicht
+    (datetime(2026, 10, 12, 20, 0, tzinfo=timezone.utc), True),    # Montag W5
+    (datetime(2026, 10, 6, 8, 0, tzinfo=timezone.utc), False),     # Dienstag: N+1 noch nicht veröffentlicht, normal
+    (datetime(2026, 10, 8, 20, 0, tzinfo=timezone.utc), False),    # Donnerstag vor dem Anstoß
+    (datetime(2027, 1, 15, 8, 0, tzinfo=timezone.utc), False)])    # Freitag nach W17: keine laufende Woche
+def test_update_pool_warnt_ohne_expertenraenge(raw, capsys, now, warnt):
+    """Liefert ESPN von Freitag bis Montag einer laufenden Woche keine veröffentlichte Rangliste (der Fake-Pool hat keine),
+    warnt der Tageslauf – dann hat ESPN eher Filter oder Felder geändert; dienstags bis donnerstags ist 0 normal. Das Log
+    nennt die Expertenränge nur als Zahlen."""
+    errors, current = ef.update_pool(FakePoolSession(), 2026, now, now.strftime("%Y-%m-%dT%H%MZ"))
+    out = capsys.readouterr().out
+    assert errors == 0 and current["experten_quellen"] == 0 and "Expertenränge 0 Quellen, 0 Spieler" in out
+    assert ("ESPN liefert keine veröffentlichte Rangliste" in out) == warnt
+
+
 def test_update_pool_mit_waiver_reihenfolge(raw, capsys):
     """Der Auszug trägt die Reihenfolge; ändert nur sie sich, gibt es eine neue Datei; scheitert mTeam, bleibt die
     Reihenfolge des letzten Laufs (Warnung), beim ersten Lauf None. Namen und members aus mTeam landen nie im Auszug."""

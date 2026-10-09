@@ -55,7 +55,8 @@ def test_manifest(content, data):
         assert info["bytes"] == len(content[name])
         assert info["lazy"] == (name not in FIRST_LOAD)
     ds = m["datenstand"]
-    assert {"woche_final", "ros_nach_woche", "pool_woche", "transaktionen_bis", "pool_stand", "wetter_stand"} <= set(ds)
+    assert {"woche_final", "ros_nach_woche", "pool_woche", "transaktionen_bis", "pool_stand", "wetter_stand",
+            "experten_woche", "experten_quellen"} <= set(ds)
     assert all(ds[k] is None or isinstance(ds[k], str) for k in ("pool_stand", "wetter_stand"))
     assert (ds["pool_stand"] is None) == ("waiver.json" not in data)
     assert (ds["wetter_stand"] is None) == ("wetter.json" not in data)
@@ -127,21 +128,35 @@ def test_expertenrang_waiver(result):
                 {"id": late[0], "onTeamId": 1, "experten": [3, 4, 4, 5, 6, 6, 7, 9]},      # alle acht: (5 + 6) / 2
                 {"id": late[1], "onTeamId": 0, "status": "FREEAGENT", "experten": [40, 44, 47, 50, 50]},  # 5 von 8
                 {"id": late[2], "onTeamId": 0, "status": "FREEAGENT", "experten": [12, 30, 48, 49]},      # 4 von 8
-                {"id": early, "onTeamId": 2, "experten": [1, 1, 1, 1, 1, 1, 1, 2]}]}
+                {"id": early, "onTeamId": 2, "experten": [1, 1, 1, 1, 1, 1, 1, 2]},
+                # im Kader, aber nicht im Wochenpool (unter der Woche aktiviert): ohne NFL-Team keine Sperre nach dem
+                # Anstoß möglich, also kein Wert
+                {"id": max(weekly) + 1, "onTeamId": 3, "experten": [3, 3, 4, 4, 5, 5, 6, 6]}]}
 
     def build(p):
         out = app_export.round_file("waiver.json", app_export.build_waiver(dict(result, pool_latest=p)))
         return out, {s["id"]: (s["exp"], s["exp_n"]) for s in out["spieler"]}
 
     out, exp = build(pool)
-    assert exp == {late[0]: (5.5, 8), late[1]: (50.0, 5), late[2]: (None, 4), early: (1.0, 8)}
+    assert exp == {late[0]: (5.5, 8), late[1]: (50.0, 5), late[2]: (None, 4), early: (1.0, 8), max(weekly) + 1: (None, None)}
     assert (out["experten_quellen"], out["experten_tiefe"]) == (8, {"RB": 50})
+    # bis in Manifest (Datenstand-Fenster) und claude.json (Chat): Woche und Zahl der Experten, Tiefe, Spalten
+    res = dict(result, pool_latest=pool)
+    content = app_export.render(app_export.build(res), res)
+    ds = json.loads(content["manifest.json"])["datenstand"]
+    claude = json.loads(content["claude.json"])
+    assert (ds["experten_woche"], ds["experten_quellen"]) == (3, 8)
+    assert (claude["stand"]["experten_quellen"], claude["stand"]["experten_tiefe"]) == (8, {"RB": 50})
+    cols = claude["spieler_spalten"]
+    row = next(r for rows in claude["kader"].values() for r in rows if r[0] == late[0])
+    assert (row[cols.index("exp")], row[cols.index("exp_n")]) == (5.5, 8)
     # Stand nach dem ersten Anstoß: dessen Spieler leer, die übrigen unverändert
     _, exp = build(dict(pool, stand=(games[0]["kickoff"] + timedelta(hours=8)).strftime("%Y-%m-%dT%H%MZ")))
     assert exp[early] == (None, None) and exp[late[0]] == (5.5, 8)
     # ESPN hat die Woche noch nicht veröffentlicht: keine Werte, n = 0
     out, exp = build(dict(pool, experten_quellen=0, players=[dict(p, experten=None) for p in pool["players"]]))
-    assert set(exp.values()) == {(None, 0)} and (out["experten_quellen"], out["experten_tiefe"]) == (0, {})
+    assert {v for pid, v in exp.items() if pid in weekly} == {(None, 0)} and exp[max(weekly) + 1] == (None, None)
+    assert (out["experten_quellen"], out["experten_tiefe"]) == (0, {})
 
 
 def test_fantasypros_adressen(result):
