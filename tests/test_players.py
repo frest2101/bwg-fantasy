@@ -518,6 +518,8 @@ def test_week_value_und_horizont():
     assert players.week_value(12.5, "SUSPENSION", True) == (D(0), "SUSPENSION")
     assert players.week_value(12.5, "OUT", False) == (D(0), "BYE")               # Bye vor Verletzung
     assert players.week_value(None, None, True) == (D(0), None)                  # ohne Projektion 0
+    # ohne NFL-Team (laut Tagesstand entlassen, vereinslos) 0 mit eigenem Grund, vor Bye und Verletzung
+    assert players.week_value(12.5, "OUT", False, False) == (D(0), "KEIN_TEAM")
     assert players.horizon_weeks(4) == [4, 5, 6] and players.horizon_weeks(16) == [16, 17]   # W18 zählt nicht
     nfl = {1: NflTeam(1, "AAA", 5, {4: 2, 6: 2}), 2: NflTeam(2, "BBB", 5, {4: 1, 6: 1})}
     proj = {"4": 9, "5": 11, "6": 7.5}

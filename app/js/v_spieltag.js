@@ -96,6 +96,8 @@ function appAuszug(P, W, T) {
     if (P && (d.team > 0 || d.wert != null)) seiten.add(d.id);
   }
   for (const p of P?.players || []) { spieler[p.id] = {name: p.name, pos: p.pos, nfl: p.nfl}; seiten.add(p.id); }
+  // NFL-Team nach einem Wechsel unter der Woche laut Tagesstand (waiver.json nfl_tag, wie U.nflTag)
+  for (const d of W?.spieler || []) if ('nfl_tag' in d && spieler[d.id]) spieler[d.id].nfl = d.nfl_tag;
   let kader = null;
   if (W?.spieler) {
     kader = Object.fromEntries(S.teams.map(t => [t.team_id, []]));

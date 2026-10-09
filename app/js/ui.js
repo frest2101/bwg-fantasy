@@ -94,15 +94,35 @@ export function na(reason) {         // „–“ mit Grund: in Tabellen als Fu�
 export const val = (v, f, reason) => ok(v) ? f(v) : na(reason);
 // Rang innerhalb der Position mit dem Rang über alle Positionen klein darunter („RB 12“, „Gesamt 38“); 1 = bester
 export const rang = (pos, r, ges) => h('span', {class: 'rg'}, `${pos ?? '–'} ${r}`, ok(ges) ? h('small', null, `Gesamt ${ges}`) : null);
+// NFL-Team laut Tagesstand (Beschluss Stephan 09.10.2026): waiver.json führt nfl_tag nur bei Spielern, deren NFL-Team laut
+// Tageslauf ein anderes ist als laut Wochenstand (Trade, Neuverpflichtung, Entlassung; null = jetzt ohne Team). Die Zeile x
+// (Wochenstand, players.json) bekommt dann dieses Team, damit Anstoß, Wetter und Anzeige zum aktuellen Team passen; wechsel =
+// {von: NFL-Team laut Wochenstand, abruf}. Gegner und Faktoren (mu) und der Bye des Wochenstands gälten für das alte Team und
+// entfallen (Grund: wechselWhy). abruf = der nächste Wochenabruf führt das neue Team: players.json nimmt das NFL-Team aus dem
+// Wochenpool der Regular Season, ab den Playoffs (P.mu_woche eine Playoff-Woche) bleibt es beim Stand nach W14.
+// Ohne nfl_tag bleibt x unverändert. d = Zeile aus waiver.json, P = players.json
+const NEU_TEAM = 'NFL-Team gewechselt: Gegner, Faktor und Bye';
+export const wechselWhy = x => !x.nfl ? 'kein NFL-Team' : x.wechsel.abruf ? `${NEU_TEAM} ab dem Wochenabruf` : `${NEU_TEAM} gälten für das alte Team`;
+// Satz dazu auf der Spielerseite (nur für Spieler in den Wochendaten: wer nur im Tagesstand steht, bekommt auch mit dem
+// Wochenabruf keinen Gegner – dort bleibt die Notiz „Kein Matchup-Wert“)
+export const wechselSatz = x => !x.nfl ? `Laut Tageslauf ohne NFL-Team (vorher ${x.wechsel.von || 'ohne Team'}): kein Gegner.`
+  : `Neues NFL-Team laut Tageslauf (vorher ${x.wechsel.von || 'ohne Team'}): `
+    + (x.wechsel.abruf ? 'Gegner, Faktor und Rang folgen mit dem Wochenabruf.' : 'Gegner, Faktor und Rang gälten für das alte Team und entfallen.');
+export function nflTag(x, d, P) {
+  if (!d || !('nfl_tag' in d)) return x;
+  const abruf = S.weeks?.find(w => w.week === P?.mu_woche)?.playoff === false;
+  return Object.assign(x, {wechsel: {von: x.nfl ?? null, abruf}, nfl: d.nfl_tag, mu: null, bye: null});
+}
 // Expertenrang der Woche (Beschluss Stephan 09.10.2026; waiver.json exp und exp_n je Spieler, im Kopf experten_quellen und
 // experten_tiefe): {v: „RB 12,5“ (Median der ESPN-Experten) oder „RB >50“ (höchstens die Hälfte führt ihn in ihren Top 50),
 // n: „8/8 Experten“} oder {why: Grund für „–“}. gespielt = Spiel der Woche schon angepfiffen (die Experten nehmen den Spieler
-// dann aus ihren Listen; exp_n null = zum Stand des Tageslaufs angepfiffen oder ohne NFL-Team, undefined = nicht im Tagesstand)
+// dann aus ihren Listen; exp_n null = zum Stand des Tageslaufs angepfiffen, ohne NFL-Team laut Tagesstand oder nicht in den
+// Wochendaten, undefined = nicht im Tagesstand)
 export function expRang(x, W, gespielt) {
   const k = W?.experten_quellen, pos = x.pos ?? '–', tiefe = W?.experten_tiefe?.[x.pos];
   const why = gespielt ? 'Spiel der Woche schon angepfiffen' : !W ? 'keine Tagesdaten' : !ok(k) ? 'ab dem nächsten Tageslauf'
     : !k ? `ESPN hat für W${W.woche} noch keine Expertenränge veröffentlicht`
-    : x.exp_n === null ? (x.nfl ? 'Spiel der Woche schon angepfiffen' : 'kein NFL-Team in den Wochendaten')
+    : x.exp_n === null ? (!x.nfl ? 'kein NFL-Team' : !x.pos ? 'nicht in den Wochendaten' : 'Spiel der Woche schon angepfiffen')
     : x.exp_n === undefined ? 'nicht im Tagesstand' : !x.exp_n ? 'in keiner Expertenliste' + (tiefe ? ` (Top ${tiefe})` : '') : null;
   if (why) return {why};
   const n = `${x.exp_n}/${k} Experten`;
