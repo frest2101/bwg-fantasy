@@ -36,7 +36,9 @@ PRECISION = {"z": 3, "e": 3, "f": 3, "f_vorwoche": 3, "delta": 3, "r25": 3, "r26
              # Alter je Spieler und Altersprofil je Team (keeper.json): eine Stelle wie in der Anzeige
              "alter": 1, "altersprofil": 1,
              # Marktwert je Team (keeper.json): Werte ganzzahlig wie bei FantasyCalc, das gewichtete Alter mit einer Stelle
-             "marktwert": 0}
+             "marktwert": 0,
+             # Expertenrang der Woche (waiver.json): Median ganzer Ränge, also ganz oder auf ,5
+             "exp": 1}
 LAZY = ("players.json", "dst.json", "matchup.json", "history.json", "transactions.json", "keeper.json", "waiver.json",
         "wetter.json", "claude.json", "claude_marktwert.json")
 
@@ -596,6 +598,9 @@ def build_waiver(result: dict) -> dict | None:
     if view:
         for row in rows:
             row.update(view["spieler"].get(row["id"], dict.fromkeys(WEEK_PLAYER_KEYS)))
+    experten = expert_view(pool, result, (view or {}).get("anstoss") or {})
+    for row in rows:
+        row["exp"], row["exp_n"] = experten["spieler"].get(row["id"], (None, None))
     profil, gains = team_view(pool, result, view, keep)
     for row in rows:
         if row["id"] in gains:
@@ -609,18 +614,51 @@ def build_waiver(result: dict) -> dict | None:
             "bedarf_ersatz": {POSITION_NAMES.get(k, str(k)): v for k, v in basis[1].items()} if basis else None,
             "profil": profil,
             # Horizont „Zukunft“: Stand des Marktwert-Auszugs und Keeper-Linie (beide None ohne Auszug)
-            "wert_stand": keeper.get("marktwert_stand"), "keeper_linie": keeper.get("keeper_linie")} | head | {"spieler": rows}
+            "wert_stand": keeper.get("marktwert_stand"), "keeper_linie": keeper.get("keeper_linie"),
+            "experten_quellen": experten["quellen"], "experten_tiefe": experten["tiefe"]} | head | {"spieler": rows}
 
 
-# id = ESPN-Spieler-ID (Schlüssel von waiver.json, das die meisten Spieler nur per id führt); proj und proj3 sind die
-# Wochenwerte des Tagesstands (waiver.json), ohne Eintrag dort None
+def stamp_ms(stamp: str) -> int:
+    """Abrufzeit des Tageslaufs „JJJJ-MM-TTThhmmZ“ (UTC) als Epoch-ms wie anstoss."""
+    return int(datetime.strptime(stamp, "%Y-%m-%dT%H%MZ").replace(tzinfo=timezone.utc).timestamp() * 1000)
+
+
+def expert_view(pool: dict, result: dict, kick: dict[str, int]) -> dict:
+    """Expertenrang der Woche pool["woche"] (Beschluss Stephan 09.10.2026) aus dem Pool-Auszug: je Spieler (Median, n)
+    nach players.expert_rank, quellen = Zahl der Experten mit veröffentlichter Liste, tiefe = Listentiefe N je Position
+    (höchster veröffentlichter Rang, für „außerhalb Top N“). Fließt in keine Kennzahl.
+
+    Ist das Spiel des Spielers (NFL-Team laut Wochenstand) zum Stand des Tagesstands schon angepfiffen (kick wie anstoss
+    in waiver.json), bleibt er leer (None, None): Die Experten nehmen Spieler nach dem Anpfiff verschieden schnell aus
+    ihren Listen, ein Median aus dem Rest wäre ein Zufallswert. Ebenso ohne NFL-Team im Wochenstand (ohne Spiel keine
+    Sperre nach dem Anstoß). Die übrigen rücken nach dem Donnerstagsspiel um wenige Plätze auf, weil die Experten ihre
+    Listen ohne dessen Spieler neu zählen – exp ist dann der Rang unter den noch offenen Spielern. Ohne Feld im
+    Pool-Auszug (vor dem ersten Tageslauf mit Rängen) quellen und tiefe None, alle Spieler ohne Wert."""
+    sources = pool.get("experten_quellen")
+    if sources is None:
+        return {"quellen": None, "tiefe": None, "spieler": {}}
+    weekly, stand = result["players"]["players"], stamp_ms(pool["stand"])
+    depth: dict[str, int] = {}
+    out = {}
+    for p in pool["players"]:
+        ranks, w = p.get("experten"), weekly.get(p["id"]) or {}
+        if ranks and w.get("pos") is not None:
+            name = POSITION_NAMES.get(w["pos"], str(w["pos"]))
+            depth[name] = max(depth.get(name, 0), max(ranks))
+        started = not w.get("nfl") or (w["nfl"] in kick and kick[w["nfl"]] <= stand)
+        out[p["id"]] = (None, None) if started else players_module.expert_rank(ranks, sources)
+    return {"quellen": sources, "tiefe": {n: depth[n] for n in POSITION_NAMES.values() if n in depth}, "spieler": out}
+
+
+# id = ESPN-Spieler-ID (Schlüssel von waiver.json, das die meisten Spieler nur per id führt); proj, proj3, exp und exp_n
+# sind die Wochenwerte des Tagesstands (waiver.json), ohne Eintrag dort None
 CLAUDE_PLAYER_COLS = ("id", "name", "pos", "nfl", "inj", "avg", "form", "trend", "ros_g", "ros_rang", "gegner_n1",
-                      "mu_n1", "proj", "proj3")
+                      "mu_n1", "proj", "proj3", "exp", "exp_n")
 # Free Agents zusätzlich mit Status
 CLAUDE_FREE_COLS = CLAUDE_PLAYER_COLS + ("status",)
 # je Spieler aus dem Tagesstand (waiver.json) überlagert; die Wochenwerte gibt es nur dort
-CLAUDE_DAILY = ("team", "status", "inj", "proj", "proj3")
-CLAUDE_DAILY_ONLY = ("proj", "proj3")
+CLAUDE_DAILY = ("team", "status", "inj", "proj", "proj3", "exp", "exp_n")
+CLAUDE_DAILY_ONLY = ("proj", "proj3", "exp", "exp_n")
 
 
 def fixed(value, places: int):
@@ -661,8 +699,7 @@ def claude_free_agents(rows: list[dict], waiver: dict | None) -> dict[str, list[
     wie played() in app/js/v_waiver.js mit dem Stand statt der Uhrzeit). Ohne Tagesstand nur nach ROS/Spiel."""
     ue = {s["id"]: s.get("proj_ue") for s in (waiver or {}).get("spieler", [])}
     kick = (waiver or {}).get("anstoss") or {}
-    stand = (int(datetime.strptime(waiver["stand"], "%Y-%m-%dT%H%MZ").replace(tzinfo=timezone.utc).timestamp() * 1000)
-             if waiver else None)
+    stand = stamp_ms(waiver["stand"]) if waiver else None
     free = [p for p in rows if p.get("status") in players_module.REPLACEMENT_STATUS]
     out = {}
     for pos in POSITION_NAMES.values():
@@ -703,11 +740,19 @@ def build_claude(result: dict, teams: dict, schedule: dict, players: dict | None
                             "0, dann ROS-Auszug), D/ST-besitzer, transaktionen. Wochenstand (nach_woche): alles Übrige; "
                             "Spieler nur aus dem Tagesstand: avg…mu_n1 null. pool_stand null: alles Wochenstand, "
                             "proj/proj3 null.",
+           "legende_experten": "exp = Median der PPR-Ränge der ESPN-Experten pool_woche in der Position (fehlend = "
+                               "außerhalb Top N, N = stand.experten_tiefe); exp_n = Experten mit Rang von "
+                               "stand.experten_quellen. exp null bei exp_n höchstens der Hälfte; beide null = Spiel lief "
+                               "schon oder kein NFL-Team. Ab dem TNF zählen die Experten nur noch offene Spieler. "
+                               "Standard-PPR, nicht Liga-Scoring.",
            "stand": {"saison": result["season"], "nach_woche": result["through_week"],
                      "kader_quelle": teams["meta"]["kader_quelle"], "ros_nach_woche": result.get("ros_after_week"),
                      "matchup_woche": (result.get("matchup") or {}).get("wochen", {}).get("n1"),
                      # Tagesstand: Abrufzeit (UTC) wie manifest datenstand.pool_stand, Woche der Projektion proj
-                     "pool_stand": waiver["stand"] if waiver else None, "pool_woche": waiver["woche"] if waiver else None},
+                     "pool_stand": waiver["stand"] if waiver else None, "pool_woche": waiver["woche"] if waiver else None,
+                     # Expertenränge pool_woche: Zahl der ESPN-Experten (0 = noch nicht veröffentlicht), Listentiefe N
+                     "experten_quellen": waiver.get("experten_quellen") if waiver else None,
+                     "experten_tiefe": waiver.get("experten_tiefe") if waiver else None},
            "teams": {k(t["team_id"]): t["name"] for t in teams["teams"]},
            "tabelle_spalten": ["rang", "team", "name", "w_l_t", "pf", "allplay_pct", "matchup_glueck", "effizienz_pct", "form",
                                "score_50_10z", "kader", "pr_rang", "mu", "e", "trend", "playoff_anteil"],
@@ -822,6 +867,11 @@ def render(files: dict[str, dict], result: dict) -> dict[str, bytes]:
                                # Stufe 4: letzte finale Playoff-Woche (W15–17), null bis dahin
                                "playoff_woche": result.get("playoff_woche"),
                                "pool_woche": result.get("pool_week"),
+                               # Expertenränge laut Tageslauf (Datenstand-Fenster): Woche des Tagesstands (null ohne
+                               # Pool-Auszug) und Zahl der ESPN-Experten mit veröffentlichter Liste (0 = noch keine, null
+                               # ohne Pool-Auszug mit Rängen)
+                               "experten_woche": (result.get("pool_latest") or {}).get("woche"),
+                               "experten_quellen": (result.get("pool_latest") or {}).get("experten_quellen"),
                                "transaktionen_bis": result.get("transactions_until"),
                                # Tageslauf: Abrufzeit (UTC, ISO) des jüngsten Pool-Auszugs bzw. Wetterabrufs
                                "pool_stand": (result.get("pool_latest") or {}).get("stand"),

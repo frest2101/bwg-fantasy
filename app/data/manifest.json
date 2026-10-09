@@ -2,9 +2,9 @@
 "schema":1,
 "season":2026,
 "through_week":4,
-"datenstand":{"woche_final":4,"ros_nach_woche":4,"playoff_woche":null,"pool_woche":4,"transaktionen_bis":1791546643993,"pool_stand":"2026-10-09T1303Z","wetter_stand":"2026-10-09T1303Z"},
+"datenstand":{"woche_final":4,"ros_nach_woche":4,"playoff_woche":null,"pool_woche":4,"experten_woche":5,"experten_quellen":null,"transaktionen_bis":1791546643993,"pool_stand":"2026-10-09T1303Z","wetter_stand":"2026-10-09T1303Z"},
 "files":{
-"claude.json":{"v":"5228281ab729","bytes":38367,"lazy":true},
+"claude.json":{"v":"d477259eca2d","bytes":41950,"lazy":true},
 "claude_marktwert.json":{"v":"968b2098dbfd","bytes":31105,"lazy":true},
 "dst.json":{"v":"b16a0e73fee3","bytes":11549,"lazy":true},
 "history.json":{"v":"f4a943d88bfe","bytes":151932,"lazy":true},
@@ -14,7 +14,7 @@
 "schedule.json":{"v":"45f9cbead4ca","bytes":19171,"lazy":false},
 "teams.json":{"v":"c7de4e1b7109","bytes":34171,"lazy":false},
 "transactions.json":{"v":"26bf5badc725","bytes":27303,"lazy":true},
-"waiver.json":{"v":"ff14deeaffed","bytes":230468,"lazy":true},
+"waiver.json":{"v":"d913425ce0de","bytes":245636,"lazy":true},
 "wetter.json":{"v":"5c86cd76dd4f","bytes":21763,"lazy":true}
 }
 }

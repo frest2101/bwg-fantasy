@@ -145,6 +145,10 @@ function available(box, W, P, rows, r, wflag, me, kp, zw) {
   const rangEspn = rank('espn_rang', 'ESPN-Rang', 'espn_rang_ges', x => inWeek.has(x.id) ? 'kein ESPN-Rang' : notInWeek);
   const wertRang = {k: 'wert_rang', l: 'Marktwert-Rang', num: 1, d: 1, v: x => x.wert_rang,
     f: x => U.val(x.wert_rang, v => h('span', {class: 'rg'}, String(v), h('small', null, `${x.pos} ${x.wert_posrang}`)), 'kein Marktwert')};
+  // Expertenrang der Woche (ESPN-Experten, Beschluss 09.10.2026): eigener Wert neben Projektion und ESPN-Rang, nur ausführlich
+  // und nie die Standardsortierung; nach dem Anstoß „–“ wie die übrigen Wochenwerte
+  const expCol = {k: 'exp', l: `Experten W${W.woche}`, num: 1, d: 1, v: x => played(W, x) ? null : x.exp ?? null,
+    f: x => { const e = U.expRang(x, W, played(W, x)); return e.why ? U.na(e.why) : h('span', {class: 'rg'}, e.v, h('small', null, e.n)); }};
   // Spalte „Gewinn für <Kürzel>“ = Zugewinn für das Bezugsteam (waiver.json spieler[].zug, Python): brutto, netto nur, wenn
   // ein Drop etwas kostet
   const gain = x => x.zug?.[st.hor]?.[String(me.mine)] ?? null;
@@ -185,9 +189,11 @@ function available(box, W, P, rows, r, wflag, me, kp, zw) {
   // Spalten hinter dem Horizont; im Horizont „Rest der Saison“ ist Rest je Spiel einfach sichtbar, unter Langfristig alles ausführlich.
   // Gegner und Faktor nächste 3 fehlen dienstags vor dem Wochenabruf (zw) in allen Horizonten: Sie gälten noch für die gespielte
   // Woche („Gegner W4“ neben „Projektion W5“, der Faktor zählt W4 mit)
-  // Ränge der anderen Horizonte, Saison und ESPN immer ausführlich; der Rang des eigenen Horizonts steht einfach in base
-  const raenge = hor => [...(hasWeek && hor !== 'woche' ? [rangW] : []), ...(hasWeek && hor !== 'drei' ? [rang3] : []),
-    ...(hor !== 'ros' ? [rangRos] : []), rangSaison, rangEspn, ...(hasWert && hor !== 'zukunft' ? [wertRang] : [])].map(X);
+  // Ränge der anderen Horizonte, Saison und ESPN immer ausführlich; der Rang des eigenen Horizonts steht einfach in base.
+  // Experten Wn gilt für die nächste Woche: nicht im Horizont Langfristig (Marktwert)
+  const raenge = hor => [...(hor !== 'zukunft' ? [expCol] : []), ...(hasWeek && hor !== 'woche' ? [rangW] : []),
+    ...(hasWeek && hor !== 'drei' ? [rang3] : []), ...(hor !== 'ros' ? [rangRos] : []), rangSaison, rangEspn,
+    ...(hasWert && hor !== 'zukunft' ? [wertRang] : [])].map(X);
   const extra = hor => hor === 'zukunft' ? [...(zw ? [] : [mu, mu3]), bye, verl, rosG, ...raenge(hor), ...besitz, frist].map(X)
     : [...(zw ? [] : [mu, X(mu3)]), bye, verl, hor === 'ros' ? rosG : X(rosG), ...raenge(hor), ...besitz.map(X), X(frist)];
   const count = h('p', {class: 'note', 'aria-live': 'polite'});
@@ -240,8 +246,12 @@ function available(box, W, P, rows, r, wflag, me, kp, zw) {
         timer = setTimeout(() => { st.text = e.target.value.trim().toLowerCase(); refresh(); }, 150);
       }}))),
     count, slot,
+    // FantasyPros: nur Verweise auf die Wochenranglisten, keine Werte (Beschluss 09.10.2026)
+    h('p', {class: 'note'}, 'Wochenranglisten bei FantasyPros (externe Seiten): ', [...POS, 'Superflex'].map((p, i) => [i ? ' · ' : '',
+      h('a', {href: U.fpRangUrl(p), target: '_blank', rel: 'noopener'}, p, h('span', {class: 'vh'}, ' (neues Fenster)'))]),
+      ' ', U.ib('experten', '')),
     U.legend(['verfuegbar', 'markt-status', 'horizont', 'zugewinn', 'proj-ue', 'proj3', 'gespielt', 'ros-ue', 'ersatz', 'ros-spiel', 'proj-naechste',
-      'rang-woche', 'rang-3', 'ros-rang', 'rang-saison', 'espn-rang',
+      'rang-woche', 'rang-3', 'ros-rang', 'rang-saison', 'espn-rang', 'experten',
       ...(zw ? [] : ['mu-n1', 'mu-naechste3']), 'bye-hinweis', 'besitz-trend', 'frist',
       'wetter-markierung', ...(hasWert ? ['marktwert', 'keeper-linie', 'wert-ue', 'wert-trend'] : []), 'filter', 'projektionen']));
   refresh(true);

@@ -9,8 +9,8 @@ const POS = ['QB', 'RB', 'WR', 'TE', 'K', 'D/ST'];
 const DAILY = ['team', 'status', 'inj', 'own'];
 // Marktwert je Spieler (waiver.json, nur bei Spielern mit Wert; täglich von FantasyCalc)
 const WERT = ['wert', 'wert_rang', 'wert_posrang', 'wert_trend', 'wert_ue'];
-// Ränge der Wochensicht (Tagesstand, waiver.json): Woche N+1 und Σ nächste 3, je Position und gesamt
-const RANG_TAG = ['rang_woche', 'rang_woche_ges', 'rang_3', 'rang_3_ges', 'proj3'];
+// Ränge der Wochensicht (Tagesstand, waiver.json): Woche N+1 und Σ nächste 3, je Position und gesamt; Expertenrang der Woche
+const RANG_TAG = ['rang_woche', 'rang_woche_ges', 'rang_3', 'rang_3_ges', 'proj3', 'exp', 'exp_n'];
 const span = W => W?.horizont?.length ? `W${W.horizont[0]}` + (W.horizont.length > 1 ? `–${W.horizont.at(-1)}` : '') : 'nächste 3';
 // Rückweg zur Liste: zuletzt geöffneter Spieler und die Spaltenfilter der Liste (Modul bleibt geladen, gilt bis zum Neuladen)
 let lastOpened = null, keptFilters = {};
@@ -217,12 +217,14 @@ export function links(p) {
   // und die zeigt so offenbar nur das eigene Team (Test Stephan 30.09.2026). seasonId ist Pflicht (sonst gilt die Saison aus ESPNs Cookie).
   // Nur für Kaderspieler und nur, bis die letzte Woche der Saison final ist.
   const kader = p.team > 0 && S.weeks.at(-1)?.status !== 'final';
-  const nbc = nbcUrl(p.name, p.nfl, dst), fp = fpUrl(p.name, p.nfl, p.fp);
+  const nbc = nbcUrl(p.name, p.nfl, dst), fp = fpUrl(p.name, p.nfl, p.fp), rangliste = U.fpRangUrl(p.pos);
   return [
     dst ? [`https://www.espn.com/nfl/team/_/name/${String(p.nfl || '').toLowerCase()}`, 'ESPN-Teamseite']
       : [`https://www.espn.com/nfl/player/_/id/${p.id}`, 'ESPN-Spielerseite'],
     kader ? [`https://fantasy.espn.com/football/league/rosters?leagueId=${LIGA}&seasonId=${S.man.season}`, 'ESPN Fantasy – Liga-Kader'] : null,
     dst && !FP_DST[p.nfl] ? null : [fp, fp.startsWith(FP_SUCHE) ? 'FantasyPros – Suche' : 'FantasyPros'],
+    // Wochenrangliste der Position bei FantasyPros (nur Verweis, keine Werte; Beschluss 09.10.2026)
+    rangliste ? [rangliste, `FantasyPros – Rangliste ${p.pos}`] : null,
     nbc ? [nbc, dst ? 'NBC Rotoworld – Team-News' : 'NBC Rotoworld – Suche'] : null].filter(Boolean);
 }
 function newsBox(p, W) {
@@ -349,6 +351,8 @@ function woche(box, p, P, W, wl) {
   const n1Why = !n1 ? 'keine offene Woche' : 'Bye';
   const cell = (v, reason) => U.val(v, x => h('span', {class: 'fz ' + U.fcls(x)}, U.num(x, 2)), reason);
   const wn = W?.woche ?? n1?.week ?? P.mu_woche;
+  // Expertenrang der Woche (ESPN-Experten, Beschluss 09.10.2026); nach dem Anstoß des Spiels „–“ (Anstoß laut waiver.json)
+  const exp = W ? U.expRang(p, W, U.ok(W.anstoss?.[p.nfl]) && W.anstoss[p.nfl] <= Date.now()) : null;
   U.ap(box, h('h2', null, wn ? `Woche W${wn}` : 'Woche'),
     z ? U.zwischenHinweis(z, m ? `Gegner, Faktor und Rang für W${z.neu} folgen mit dem Wochenabruf.` : null) : null,
     h('div', {class: 'tiles'},
@@ -356,6 +360,7 @@ function woche(box, p, P, W, wl) {
       // Rang der Wochenprojektion über alle Spieler des Wochenpools (Kader und frei); ohne Wochenwert (Bye, Ausfall) keiner
       W?.ersatz_woche ? U.tile(`Rang Projektion W${W.woche}`, U.val(p.rang_woche, v => `${p.pos} ${v}`, p.nur_tag ? 'nicht in den Wochendaten' : p.bye === W.woche ? 'Bye' : 'kein Wochenwert'),
         U.ok(p.rang_woche_ges) ? `Gesamt ${p.rang_woche_ges}` : null, 'rang-woche') : null,
+      exp ? U.tile(`Experten W${W.woche}`, exp.why ? U.na(exp.why) : exp.v, exp.n ? `${exp.n} (ESPN)` : null, 'experten') : null,
       // 32 NFL-Teams: Rang 1 = höchster Faktor (F), also das günstigste Matchup
       m && !z ? [U.tile(n1 ? `Gegner W${n1.week}` : 'Gegner', n1 ? n1.opp || 'Bye' : U.na(n1Why), n1?.opp ? (dst ? 'Offense' : 'Defense') : null, 'mu-n1'),
         U.tile('Faktor', n1?.opp ? cell(n1.f, 'kein Faktor') : U.na(n1Why), null, dst ? 'f' : 'mu-f'),

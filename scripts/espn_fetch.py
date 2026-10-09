@@ -88,6 +88,9 @@ MIN_POOL = 300              # ein vollständiger Spielerpool hat rund 1050 aktiv
 DST_POSITION, NFL_TEAMS, NFL_GAMES = 16, 32, 17
 OFFENSE_POSITIONS = {1: "QB", 2: "RB", 3: "WR", 4: "TE", 5: "K"}  # defaultPositionId → Kürzel (Positions-Grundlage)
 POSITION_SLOTS = {1: "0", 2: "2", 3: "4", 4: "6", 5: "17", 16: "16"}  # defaultPositionId → Lineup-Slot für pointsOverrides
+# Expertenränge (Beschluss Stephan 09.10.2026): ESPN-Experten veröffentlichen je Woche PPR-Ranglisten je Position, slotId =
+# Lineup-Slot der Position wie in POSITION_SLOTS; rankSourceId 0 ist ESPNs Durchschnitt (averageRank), kein Experte
+RANK_TYPE, RANK_AVERAGE_SOURCE = "PPR", 0
 STAT_ACTUAL, STAT_PROJECTION, SPLIT_WEEK, STAT_PLAYED = 0, 1, 1, "210"  # statSourceId, statSplitTypeId, „hat gespielt“
 MAX_WEEK = 17  # W1–14 Regular Season, W15–17 Playoffs
 # Stat-Korrekturen finaler Wochen (Beschluss Stephan 06.10.2026, update_statkorrekturen): Auszug je Woche neben den
@@ -230,14 +233,16 @@ def fetch_team(session: requests.Session, season: int, week: int) -> bytes:
 def kona_filter(stat_weeks: list[int], rank_week: int | None = None) -> dict:
     """X-Fantasy-Filter für den ganzen Spielerpool mit Wochenwerten (Ist und Projektion) der genannten Wochen.
 
-    Ohne sortPercOwned antwortet ESPN auf limit mit HTTP 400 (FILTER_LIMIT_MISSING_SORT). Wochen-Ränge gibt es nur als PPR.
+    Ohne sortPercOwned antwortet ESPN auf limit mit HTTP 400 (FILTER_LIMIT_MISSING_SORT). Mit rank_week kommen nur die
+    PPR-Ränge dieser Woche (alle acht ESPN-Experten; STANDARD und SUPERFLEX führt ESPN je Spieler nur von einer Quelle);
+    ohne rank_week schickt ESPN die Ränge aller Wochen und Typen mit (am 09.10.2026 5,1 statt 2,9 MB).
     """
     players = {"limit": 2000, "filterActive": {"value": True},
                "sortPercOwned": {"sortPriority": 1, "sortAsc": False},
                "filterStatsForCurrentSeasonScoringPeriodId": {"value": stat_weeks}}
     if rank_week is not None:
         players["filterRanksForScoringPeriodIds"] = {"value": [rank_week]}
-        players["filterRanksForRankTypes"] = {"value": ["PPR"]}
+        players["filterRanksForRankTypes"] = {"value": [RANK_TYPE]}
     return {"X-Fantasy-Filter": json.dumps({"players": players})}
 
 
@@ -1287,7 +1292,23 @@ def cmd_transactions(season: int, now: datetime) -> int:
 # ---------------------------------------------------------------- Pool-Auszug (Tageslauf, Session 6)
 
 POOL_KEYS = ("id", "status", "onTeamId", "injuryStatus", "percentOwned", "percentChange", "percentStarted",
-             "waiverProcessDate", "lastNewsDate", "proj_naechste_woche")
+             "waiverProcessDate", "lastNewsDate", "proj_naechste_woche", "experten")
+
+
+def expert_ranks(player: dict, week: int) -> dict[int, int]:
+    """Veröffentlichte PPR-Ränge der ESPN-Experten für die Woche, je Quelle (rankSourceId → Rang) in der Liste der
+    eigenen Position (slotId laut POSITION_SLOTS, nicht fremde Slots wie DB bei Spielern mit zweiter Position).
+
+    Ohne Quelle 0 (ESPNs Durchschnitt) und ohne published=false: Das ist die Fortsetzung jeder Liste unterhalb der
+    veröffentlichten Tiefe (QB 25, RB 50, WR 60, TE 25, K 20, D/ST 20), die ESPN nicht zeigt.
+    """
+    slot = POSITION_SLOTS.get(player.get("defaultPositionId"))
+    out = {}
+    for r in (player.get("rankings") or {}).get(str(week)) or []:
+        if (r.get("rankType") == RANK_TYPE and r.get("published") is True and str(r.get("slotId")) == slot
+                and r.get("rankSourceId") != RANK_AVERAGE_SOURCE and isinstance(r.get("rank"), int) and r["rank"] > 0):
+            out.setdefault(r.get("rankSourceId"), r["rank"])
+    return out
 
 
 def pool_week(season: int, today: date) -> int:
@@ -1297,26 +1318,34 @@ def pool_week(season: int, today: date) -> int:
 
 def pool_extract(data: dict, season: int, week: int, stamp: str) -> dict:
     """Pool-Auszug aus einer kona-Antwort: je Spieler Status, Fantasy-Team, Verletzung, Besitz ESPN-weit (Anteil,
-    Änderung, gestartet), Waiver-Frist, letzte ESPN-News und die Wochenprojektion der Woche week.
+    Änderung, gestartet), Waiver-Frist, letzte ESPN-News, die Wochenprojektion der Woche week und die Expertenränge
+    dieser Woche (experten: sortierte veröffentlichte Ränge ohne Quellen-IDs, None ohne Rang; Beschluss 09.10.2026).
 
-    Rund 80 KB statt 2,8 MB; Besitz, Verletzung und Status sind der Stand des Abrufs (ESPN führt keine Historie).
-    Kein members-Feld, keine Texte – die Datei bleibt öffentlich unbedenklich.
+    Rund 250 KB statt 2,9 MB; Besitz, Verletzung, Status und Ränge sind der Stand des Abrufs (ESPN führt keine
+    Historie). Kein members-Feld, keine Texte – die Datei bleibt öffentlich unbedenklich. Kopf experten_quellen = Zahl
+    der Experten mit veröffentlichter Liste für die Woche (0, solange ESPN die Woche noch nicht veröffentlicht hat).
     """
-    rows = []
+    rows, sources = [], set()
     for entry in check_pool(data):
         player = entry["player"]
         own = player.get("ownership") or {}
         proj = next((s.get("appliedTotal") for s in player.get("stats", [])
                      if (s.get("seasonId"), s.get("scoringPeriodId"), s.get("statSourceId"), s.get("statSplitTypeId"))
                      == (season, week, STAT_PROJECTION, SPLIT_WEEK)), None)
+        ranks = expert_ranks(player, week)
+        sources |= set(ranks)
         rows.append({"id": entry["id"], "status": entry.get("status"), "onTeamId": entry.get("onTeamId", 0),
                      "injuryStatus": player.get("injuryStatus"), "percentOwned": own.get("percentOwned"),
                      "percentChange": own.get("percentChange"), "percentStarted": own.get("percentStarted"),
                      "waiverProcessDate": entry.get("waiverProcessDate"), "lastNewsDate": player.get("lastNewsDate"),
-                     "proj_naechste_woche": proj})
+                     "proj_naechste_woche": proj, "experten": sorted(ranks.values()) or None})
     rows.sort(key=lambda r: r["id"])
-    return {"season": season, "woche": week, "stand": stamp,
-            "quelle": f"{KONA_VIEW} mit filterStatsForCurrentSeasonScoringPeriodId = [{week}], Auszug je Spieler; "
+    return {"season": season, "woche": week, "stand": stamp, "experten_quellen": len(sources),
+            "quelle": f"{KONA_VIEW} mit filterStatsForCurrentSeasonScoringPeriodId = [{week}] und "
+                      f"filterRanksForScoringPeriodIds = [{week}] ({RANK_TYPE}), Auszug je Spieler; "
+                      f"experten = veröffentlichte {RANK_TYPE}-Ränge der ESPN-Experten in der Liste der eigenen Position, "
+                      f"aufsteigend, ohne Quellen-IDs, ohne ESPNs Durchschnitt (Quelle {RANK_AVERAGE_SOURCE}) und ohne "
+                      f"unveröffentlichte; experten_quellen = Zahl der Experten mit veröffentlichter Liste für die Woche; "
                       f"waiver_reihenfolge = waiverRank je Team aus {TEAM_VIEW} (1 = zuerst), "
                       f"waiver_reihenfolge_stand = Abrufzeit ihrer letzten Änderung; "
                       f"ir_slot = Spieler-IDs im IR-Slot (lineupSlotId {SLOT_IR_ID}) je Team aus {ROSTER_VIEW}, "
@@ -1340,8 +1369,9 @@ def same_pool(old: dict | None, new: dict) -> bool:
 
 
 def fetch_pool(session: requests.Session, season: int, week: int) -> dict:
-    """Ganzer Spielerpool mit den Wochenwerten (Ist und Projektion) der Woche week, ungeprüft (pool_extract prüft)."""
-    _, data = get_json(session, league_url(season), {"view": KONA_VIEW}, kona_filter([week]))
+    """Ganzer Spielerpool mit den Wochenwerten (Ist und Projektion) und den Expertenrängen (PPR) der Woche week,
+    ungeprüft (pool_extract prüft)."""
+    _, data = get_json(session, league_url(season), {"view": KONA_VIEW}, kona_filter([week], rank_week=week))
     return data
 
 
@@ -1447,14 +1477,23 @@ def update_pool(session: requests.Session, season: int, now: datetime, stamp: st
             warn(f"IR-Slots ({ROSTER_VIEW}) nicht abrufbar, Stand des letzten Laufs bleibt: {exc}")
             extract["ir_slot"], extract["ir_slot_stand"] = old_ir, old_ir_stand
             extract["trades"] = (previous or {}).get("trades")
+        # Expertenränge nur als Zahlen im (öffentlichen) Log; aus den Läufen ergibt sich, ab wann ESPN eine Woche füllt
+        ranked = sum(1 for r in extract["players"] if r["experten"])
+        expert = f"Expertenränge {extract['experten_quellen']} Quellen, {ranked} Spieler"
+        # Ab Freitag (UTC, nach dem Donnerstagsspiel) einer laufenden Woche waren die Listen W1–W5 immer veröffentlicht;
+        # 0 Quellen heißt dann eher, dass ESPN Filter oder Felder geändert hat, als „noch nicht veröffentlicht“
+        if (not extract["experten_quellen"] and 1 <= calendar_week(season, now.date()) <= MAX_WEEK
+                and now.weekday() in (4, 5, 6, 0)):
+            warn(f"Expertenränge W{week}: ESPN liefert keine veröffentlichte Rangliste, obwohl die Woche läuft – "
+                 f"Rangfilter und Felder in scripts/espn_fetch.py (expert_ranks) prüfen")
         if same_pool(previous, extract):
-            print(f"  {POOL_FILE:<22} unverändert (W{week}, {len(extract['players'])} Spieler, Stand {previous['stand']})")
+            print(f"  {POOL_FILE:<22} unverändert (W{week}, {len(extract['players'])} Spieler, {expert}, Stand {previous['stand']})")
             return 0, previous
         save_atomic(path, pool_dumps(extract))
     except (FetchError, KeyError, OSError) as exc:
         print(f"  {POOL_FILE:<22} FEHLER – {exc}", file=sys.stderr)
         return 1, None
-    print(f"  {POOL_FILE:<22} W{week}, {len(extract['players']):,} Spieler -> {rel(path)}")
+    print(f"  {POOL_FILE:<22} W{week}, {len(extract['players']):,} Spieler, {expert} -> {rel(path)}")
     return 0, extract
 
 

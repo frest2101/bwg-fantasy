@@ -275,6 +275,49 @@ def test_saison_rang(fake):
     assert all(p[pid]["espn_rang"] is None for pid in p)   # der Fake-Pool trägt keine ESPN-Ratings
 
 
+def test_expertenrang():
+    """Expertenrang (Beschluss 09.10.2026): Median über alle Experten mit veröffentlichter Liste, ein fehlender Rang
+    zählt als außerhalb der Top N; ein Wert erst, wenn mehr als die Hälfte den Spieler führt (Ränge erfunden)."""
+    assert players.expert_rank([3, 4, 4, 5, 6, 6, 7, 9], 8) == (Decimal("5.5"), 8)
+    assert players.expert_rank([2, 2, 2, 2, 2, 2, 2, 2], 8) == (Decimal(2), 8)
+    # fünf von acht: die drei fehlenden liegen hinter allen fünf, der Median sind der 4. und 5. Rang
+    assert players.expert_rank([40, 44, 47, 50, 50], 8) == (Decimal(50), 5)
+    assert players.expert_rank([12, 30, 48, 49], 8) == (None, 4)        # vier von acht: Median außerhalb
+    assert players.expert_rank([5, 9, 30, 41], 7) == (Decimal(41), 4)   # ungerade: der 4. von 7
+    assert players.expert_rank([5, 9, 30], 7) == (None, 3)
+    assert players.expert_rank([], 8) == players.expert_rank(None, 8) == (None, 0)
+    assert players.expert_rank(None, 0) == (None, 0)                    # Woche noch nicht veröffentlicht
+    assert players.expert_rank([7], None) == (Decimal(7), 1)            # mehr Ränge als gemeldete Quellen: k = n
+
+
+def test_expertenraenge_echt():
+    """Die Wochendateien tragen die Expertenränge der gespielten Woche (Dienstagsabruf, Endstand der Listen): je Woche
+    acht Experten mit je 200 veröffentlichten PPR-Rängen (QB 25, RB 50, WR 60, TE 25, K 20, D/ST 20, lückenlos ab 1).
+    Der Pool-Auszug (espn_fetch.expert_ranks) liest genau diese Listen; Quelle 0 (ESPNs Durchschnitt, averageRank) ist
+    das Mittel der acht, ein fehlender Rang zählt dort als Grenze + 1 (selbst nachgerechnet 222/222 in W4)."""
+    depth = {"0": 25, "2": 50, "4": 60, "6": 25, "17": 20, "16": 20}
+    for week in (1, 2, 3, 4):
+        data = json.loads((ef.week_dir(2026, week) / ef.KONA_FILE).read_bytes())
+        lists: dict[int, dict[str, list[int]]] = {}
+        avg_ok = avg_all = 0
+        for entry in data["players"]:
+            player = entry["player"]
+            ranks = ef.expert_ranks(player, week)
+            slot = ef.POSITION_SLOTS.get(player.get("defaultPositionId"))
+            for source, rank in ranks.items():
+                lists.setdefault(source, {}).setdefault(slot, []).append(rank)
+            avg = [r["averageRank"] for r in player.get("rankings", {}).get(str(week), [])
+                   if r["rankSourceId"] == 0 and str(r["slotId"]) == slot]
+            if avg and slot:
+                avg_all += 1
+                mean = sum(ranks.get(s, depth[slot] + 1) for s in (3, 5, 6, 7, 9, 10, 11, 12)) / 8
+                avg_ok += abs(mean - avg[0]) < 1e-9
+        assert sorted(lists) == [3, 5, 6, 7, 9, 10, 11, 12], week
+        assert all(sorted(ranks) == list(range(1, depth[slot] + 1)) for by_slot in lists.values()
+                   for slot, ranks in by_slot.items()), week
+        assert avg_all and avg_ok == avg_all, (week, avg_ok, avg_all)
+
+
 def test_espn_raenge_echt(ssn3):
     """ESPNs Saison-Ränge (kona ratings["0"]) stehen je Spieler im Pool; sie zählen wie der eigene Saison-Rang nach
     Punkten im Liga-Scoring, nur dass ESPN auch Spieler ohne Spiel einreiht und Gleichstände nicht teilt – deshalb

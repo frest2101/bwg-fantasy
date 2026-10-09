@@ -224,6 +224,22 @@ def ranks(values: dict[int, tuple[int, Decimal | None]]) -> tuple[dict[int, int]
     return pos_rank, total_rank
 
 
+def expert_rank(ranks: list[int] | None, sources: int | None) -> tuple[Decimal | None, int]:
+    """Expertenrang der Woche (Beschluss Stephan 09.10.2026): Median über alle sources ESPN-Experten, die für die Woche
+    eine Liste veröffentlicht haben. Wer den Spieler nicht führt, zählt als „außerhalb seiner Top N“ (zensiert) – der
+    Median nur der vorhandenen Ränge fiele für Spieler an der Listengrenze zu gut aus (W5: im Schnitt 6,9 Plätze).
+    Endlich ist der Median erst, wenn mehr als die Hälfte der Experten den Spieler führt (n ≥ sources // 2 + 1), sonst
+    None. Rückgabe (Median, n = Zahl der Experten mit Rang); ein Rang je Experte, aufsteigend wie im Pool-Auszug."""
+    values = sorted(ranks or [])
+    n = len(values)
+    k = max(sources or 0, n)
+    if not n or n < k // 2 + 1:
+        return None, n
+    if k % 2:
+        return Decimal(values[k // 2]), n
+    return (Decimal(values[k // 2 - 1]) + Decimal(values[k // 2])) / 2, n
+
+
 def ros_ranks(per_game: dict[int, tuple[int, Decimal | None]]) -> dict[int, int]:
     """ROS-Rang je Position nach ROS/Spiel (1 + Zahl der besseren Spieler); nur Spieler mit ROS/Spiel."""
     return ranks(per_game)[0]
