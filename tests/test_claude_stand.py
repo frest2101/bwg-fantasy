@@ -35,7 +35,7 @@ OFFENSE = [20, 21]                                         # eligibleSlots: Bank
 # erfunden: Manager-Daten und eine Absicht (tradeBlock, draftStrategy) – nichts davon darf je im Text stehen
 MANAGER = ("Zacharias", "Erfundenmann", "zerfunden99", "ERFUNDENE-GUID", "ERFUNDENE-ABSICHT")
 SPALTEN = ["id", "name", "pos", "nfl", "inj", "avg", "form", "trend", "ros_g", "ros_rang", "gegner_n1", "mu_n1",
-           "proj", "proj3"]
+           "proj", "proj3", "exp", "exp_n"]
 AUFRUF = "exec(r.content, {'__name__': '__main__'})"         # der empfohlene Aufruf aus dem Kopf des Skripts
 BANK_GANZ = "  Bank und IR vollständig (→ = mehr Proj als ein noch offener Starter im passenden Slot):"
 BANK_AUFFAELLIG = "  Bank, nur Auffällige (Punkte, oder mehr Proj als ein noch offener Starter im passenden Slot):"
@@ -173,7 +173,7 @@ def kona() -> dict:
 def app(matchup_woche=WOCHE) -> dict:
     """claude.json in Kurzform: Kader gleich dem Live-Kader bis auf SGK (203 fehlt, 9002 steht noch darin)."""
     zeile = lambda pid, name, pos, nfl, ros=None, mu=None, proj=None: [pid, name, pos, nfl, None, None, None, None, ros,
-                                                                       None, None, mu, proj, None]
+                                                                       None, None, mu, proj, None, None, None]
     return {"stand": {"saison": 2026, "nach_woche": WOCHE - 1, "matchup_woche": matchup_woche,
                       "pool_stand": "2026-10-23T1045Z", "pool_woche": WOCHE},
             "teams": {"ACB": "Testteam Eins", "HJS": "Testteam Zwei", "4DS": "Testteam Drei", "SGK": "Testteam Zehn"},

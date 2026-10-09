@@ -7,7 +7,7 @@ Nennung „FantasyCalc“ und Link auf jeder Seite mit den Daten (auch für abge
 wiederzugeben oder zu ersetzen. Kein Eindruck von Partnerschaft oder Billigung: Nennung neutral („Werte: FantasyCalc“).
 Beschlüsse Stephan 01.10.2026: keine Mail an FantasyCalc, nur die genutzten Felder, keine Pick-Werte, ein Abruf je Tag.
 
-- Abruf (Tageslauf, espn_fetch.py --marktwert): eine Anfrage an den einzigen dokumentierten Endpunkt values/current
+- Abruf (Tageslauf, espn_fetch.py --marktwert): eine Anfrage an den dokumentierten Endpunkt values/current
   mit den Parametern der Liga (Dynasty, Superflex, 10 Teams, PPR), rund 330 KB. Höchstens einmal je UTC-Tag: Stammt
   der gespeicherte Auszug vom selben Tag, fragt der Lauf nicht. Abgelegt wird nur ein Auszug für die Spieler des
   ESPN-Pools unter fantasycalc/latest.json – je ESPN-ID Wert, Rang, Positionsrang, Trend 30 Tage und Redraft-Wert,
@@ -32,7 +32,9 @@ import requests
 import espn_fetch as ef
 import nflverse
 
-URL = "https://api.fantasycalc.com/values/current"   # der einzige dokumentierte Endpunkt (fantasycalc.com/api-docs)
+# dokumentierter Endpunkt (fantasycalc.com/api-docs; seit spätestens 09.10.2026 dazu /players, hier nicht genutzt) – nur
+# dokumentierte Endpunkte dürfen programmatisch abgerufen werden
+URL = "https://api.fantasycalc.com/values/current"
 PARAMETER = {"isDynasty": "true", "numQbs": 2, "numTeams": 10, "ppr": 1}   # Liga: Dynasty-Werte, Superflex, 10 Teams, PPR
 QUELLE = "FantasyCalc (https://fantasycalc.com), Dynasty-Werte values/current; Auszug für die Spieler des ESPN-Pools"
 LABEL = "fantasycalc/latest.json"

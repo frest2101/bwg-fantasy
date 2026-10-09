@@ -94,6 +94,23 @@ export function na(reason) {         // „–“ mit Grund: in Tabellen als Fu�
 export const val = (v, f, reason) => ok(v) ? f(v) : na(reason);
 // Rang innerhalb der Position mit dem Rang über alle Positionen klein darunter („RB 12“, „Gesamt 38“); 1 = bester
 export const rang = (pos, r, ges) => h('span', {class: 'rg'}, `${pos ?? '–'} ${r}`, ok(ges) ? h('small', null, `Gesamt ${ges}`) : null);
+// Expertenrang der Woche (Beschluss Stephan 09.10.2026; waiver.json exp und exp_n je Spieler, im Kopf experten_quellen und
+// experten_tiefe): {v: „RB 12,5“ (Median der ESPN-Experten) oder „RB >50“ (weniger als die Hälfte führt ihn in ihren Top 50),
+// n: „8/8 Experten“} oder {why: Grund für „–“}. gespielt = Spiel der Woche schon angepfiffen (die Experten nehmen den Spieler
+// dann aus ihren Listen; exp_n null = schon zum Stand des Tageslaufs angepfiffen, undefined = nicht im Tagesstand)
+export function expRang(x, W, gespielt) {
+  const k = W?.experten_quellen, tiefe = W?.experten_tiefe?.[x.pos];
+  const why = gespielt ? 'Spiel der Woche schon angepfiffen' : !W ? 'keine Tagesdaten' : !ok(k) ? 'ab dem nächsten Tageslauf'
+    : !k ? `ESPN hat für W${W.woche} noch keine Expertenränge veröffentlicht` : x.exp_n === null ? 'Spiel der Woche schon angepfiffen'
+    : x.exp_n === undefined ? 'nicht im Tagesstand' : !x.exp_n ? 'in keiner Expertenliste' + (tiefe ? ` (Top ${tiefe})` : '') : null;
+  if (why) return {why};
+  const n = `${x.exp_n}/${k} Experten`;
+  return ok(x.exp) ? {v: `${x.pos} ${num(x.exp, x.exp % 1 ? 1 : 0)}`, n} : {v: `${x.pos} >${tiefe ?? '?'}`, n};
+}
+// FantasyPros-Wochenranglisten je Position, dazu Superflex (nur Verweise, keine Werte; Beschluss Stephan 09.10.2026). Alle am
+// 09.10.2026 im Browser am Seitentitel „Week 5 … Rankings“ geprüft – FantasyPros beantwortet falsche Adressen mit HTTP 200
+export const FP_RANG = {QB: 'qb', RB: 'ppr-rb', WR: 'ppr-wr', TE: 'ppr-te', K: 'k', 'D/ST': 'dst', Superflex: 'ppr-superflex'};
+export const fpRangUrl = key => FP_RANG[key] ? `https://www.fantasypros.com/nfl/rankings/${FP_RANG[key]}.php` : null;
 
 // ---------------------------------------------------------------- Speicher (nur Komfort, darf fehlen)
 export const store = {

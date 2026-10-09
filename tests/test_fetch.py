@@ -1435,6 +1435,39 @@ def test_pool_extract_felder():
         ef.pool_extract({"players": data["players"][:10]}, 2026, 4, "x")
 
 
+def test_pool_extract_experten():
+    """Expertenränge im Pool-Auszug (Beschluss 09.10.2026; Ränge erfunden, Felder wie bei ESPN am 09.10.2026): je Spieler
+    die veröffentlichten PPR-Ränge in der Liste der eigenen Position, aufsteigend und ohne Quellen-IDs; nicht dabei sind
+    Quelle 0 (ESPNs Durchschnitt), published=false (Fortsetzung unter der Veröffentlichungstiefe), andere Wochen und
+    Typen, fremde Slots und ein zweiter Eintrag derselben Quelle. Kopf experten_quellen = Experten mit Liste."""
+    def rank(source, value, slot=2, published=True, week="4", typ="PPR"):
+        return week, {"auctionValue": 0, "published": published, "rank": value, "rankSourceId": source,
+                      "rankType": typ, "slotId": slot}
+
+    data = fake_pool([4])
+    entries = [rank(5, 12), rank(3, 9), rank(7, 14), rank(3, 30),                      # Quelle 3 doppelt: der erste zählt
+               rank(0, 0), rank(6, 61, published=False), rank(9, 2, slot=14),         # Durchschnitt, unveröffentlicht, DB
+               rank(10, 1, week="5"), rank(11, 4, typ="SUPERFLEX")]                     # andere Woche, anderer Typ
+    data["players"][40]["player"]["rankings"] = {}
+    for week, entry in entries:
+        data["players"][40]["player"]["rankings"].setdefault(week, []).append(entry)
+    data["players"][41]["player"]["rankings"] = {"4": [rank(12, 3)[1]]}
+    data["players"][0]["player"]["rankings"] = {"4": [rank(5, 7, slot=16)[1]]}       # D/ST in Slot 16
+    data["players"][1]["player"]["rankings"] = {"4": []}
+    extract = ef.pool_extract(data, 2026, 4, "2026-10-09T0845Z")
+    rows = {p["id"]: p for p in extract["players"]}
+    assert rows[41]["experten"] == [9, 12, 14] and rows[42]["experten"] == [3] and rows[1]["experten"] == [7]
+    assert rows[2]["experten"] is None and rows[300]["experten"] is None
+    assert extract["experten_quellen"] == 4                                             # 3, 5, 7, 12
+    assert "experten_quellen" in ef.pool_dumps(extract).decode("utf-8").split('"players"')[0]
+    # ESPN hat die Woche noch nicht veröffentlicht: keine Ränge, 0 Quellen
+    empty = ef.pool_extract(fake_pool([4]), 2026, 4, "x")
+    assert empty["experten_quellen"] == 0 and all(p["experten"] is None for p in empty["players"])
+    # Abruf: nur die Ränge der Pool-Woche, nur PPR
+    flt = json.loads(ef.kona_filter([4], rank_week=4)["X-Fantasy-Filter"])["players"]
+    assert (flt["filterRanksForScoringPeriodIds"], flt["filterRanksForRankTypes"]) == ({"value": [4]}, {"value": ["PPR"]})
+
+
 def test_pool_dumps_und_same_pool():
     extract = ef.pool_extract(fake_pool([4]), 2026, 4, "2026-09-29T0645Z")
     raw = ef.pool_dumps(extract)
@@ -1476,7 +1509,7 @@ class FakePoolSession:
     mteam_broken bzw. roster_broken lassen nur mTeam bzw. mRoster scheitern."""
 
     def __init__(self):
-        self.owned, self.broken, self.weeks = None, False, []
+        self.owned, self.broken, self.weeks, self.filters = None, False, [], []
         self.ranks, self.mteam_broken, self.mteam_calls = list(RANKS), False, 0
         self.ir, self.roster_broken, self.trades = dict(IR), False, {}
 
@@ -1495,8 +1528,10 @@ class FakePoolSession:
         assert params["view"] == ef.KONA_VIEW
         if self.broken:
             return FakeResponse(503, b"down")
-        week = json.loads(headers["X-Fantasy-Filter"])["players"]["filterStatsForCurrentSeasonScoringPeriodId"]["value"][0]
+        flt = json.loads(headers["X-Fantasy-Filter"])["players"]
+        week = flt["filterStatsForCurrentSeasonScoringPeriodId"]["value"][0]
         self.weeks.append(week)
+        self.filters.append(flt)
         data = fake_pool([week])
         if self.owned is not None:
             data["players"][0]["player"]["ownership"] = {"percentOwned": self.owned}
@@ -1624,8 +1659,11 @@ def test_update_pool_mit_waiver_reihenfolge(raw, capsys):
     saved, text = json.loads(path.read_bytes()), path.read_text(encoding="utf-8")
     assert saved["waiver_reihenfolge"]["6"] == 1 and "Testteam" not in text and "Testmanager" not in text
     assert saved["waiver_reihenfolge_stand"] == "2026-09-29T0645Z"
-    assert list(saved) == ["season", "woche", "stand", "quelle", "waiver_reihenfolge", "waiver_reihenfolge_stand",
-                           "ir_slot", "ir_slot_stand", "trades", "players"]
+    assert list(saved) == ["season", "woche", "stand", "experten_quellen", "quelle", "waiver_reihenfolge",
+                           "waiver_reihenfolge_stand", "ir_slot", "ir_slot_stand", "trades", "players"]
+    # der Pool-Abruf holt die Expertenränge der Pool-Woche (nur PPR), nicht die aller Wochen
+    assert all(f["filterRanksForScoringPeriodIds"] == {"value": [f["filterStatsForCurrentSeasonScoringPeriodId"]["value"][0]]}
+               and f["filterRanksForRankTypes"] == {"value": ["PPR"]} for f in session.filters) and session.filters
     # unverändert (auch die Reihenfolge): keine neue Datei, kein neuer Stand der Reihenfolge
     errors, current = ef.update_pool(session, 2026, now + timedelta(minutes=30), "2026-09-29T0715Z")
     assert errors == 0 and current["stand"] == "2026-09-29T0645Z" and current["waiver_reihenfolge_stand"] == "2026-09-29T0645Z"

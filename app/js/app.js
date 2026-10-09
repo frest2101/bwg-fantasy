@@ -306,6 +306,9 @@ function standChip() {
         voll && po ? [h('dt', null, 'Playoffs'), h('dd', null, `W${po} gewertet`)] : null,
         voll ? [h('dt', null, 'Projektionen Rest der Saison'), h('dd', null, ds.ros_nach_woche != null ? `Stand nach W${ds.ros_nach_woche}` : `ab Wochenabruf W${sw + 1}`)] : null,
         h('dt', null, ds.pool_stand ? 'Besitz, Verletzung, Projektion nächste Woche' : 'Besitz, Verletzung'), h('dd', null, tag),
+        // Expertenränge laut Tageslauf (Beschluss 09.10.2026): Zahl der ESPN-Experten mit Liste für die Woche des Tagesstands
+        voll && ds.experten_woche != null ? [h('dt', null, `Expertenränge W${ds.experten_woche}`), h('dd', null,
+          ds.experten_quellen == null ? 'ab dem nächsten Tageslauf' : ds.experten_quellen ? `${ds.experten_quellen} ESPN-Experten` : 'noch nicht veröffentlicht')] : null,
         voll ? [h('dt', null, 'Wetter'), h('dd', null, ds.wetter_stand ? U.standTxt(ds.wetter_stand) : '–'),
           h('dt', null, 'Letzter Move'), h('dd', null, ds.transaktionen_bis ? U.stamp(ds.transaktionen_bis) : '–')] : null,
         // „ab“: geplanter Slot, GitHub startet meist rund 15 min später (Glossar „Aktualisierung“)

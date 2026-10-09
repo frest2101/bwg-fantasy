@@ -7,7 +7,7 @@ import gzip
 import hashlib
 import json
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import pytest
@@ -78,7 +78,8 @@ def test_waiver_vertrag(result):
     assert (out["stand"], out["woche"]) == ("2026-09-29T0645Z", 3)
     assert set(out) == {"stand", "woche", "reihenfolge", "reihenfolge_quelle", "reihenfolge_stand", "bedarf", "spieler",
                         "horizont", "ersatz_woche", "ersatz_3", "anstoss", "bedarf_woche", "bedarf_basis", "bedarf_ersatz", "profil",
-                        "wert_stand", "keeper_linie"}
+                        "wert_stand", "keeper_linie", "experten_quellen", "experten_tiefe"}
+    assert (out["experten_quellen"], out["experten_tiefe"]) == (None, None)   # Pool-Auszug ohne Expertenränge
     assert out["horizont"] == [3, 4, 5] and len(out["anstoss"]) == 32   # W3: alle 32 Teams spielen
     # ohne Reihenfolge im Pool-Auszug: Wochenstand (waiver_prio aus mTeam des Wochenabrufs); ohne ROS kein Bedarf
     weekly = sorted(result["teams"], key=lambda t: t["waiver_prio"])
@@ -94,7 +95,9 @@ def test_waiver_vertrag(result):
     assert [p["id"] for p in out["spieler"]] == [inside, outside]
     first = out["spieler"][0]
     assert set(first) == {"id", "team", "status", "inj", "own", "own_d", "started", "waiver_bis", "proj", "news",
-                          "proj_ue", "proj3", "proj3_ue", "rang_woche", "rang_woche_ges", "rang_3", "rang_3_ges"}
+                          "proj_ue", "proj3", "proj3_ue", "rang_woche", "rang_woche_ges", "rang_3", "rang_3_ges",
+                          "exp", "exp_n"}
+    assert (first["exp"], first["exp_n"]) == (None, None)
     assert (first["rang_woche"], first["rang_woche_ges"]) == (1, 1)   # einziger Spieler des Pools mit Wochenwert
     assert (first["team"], first["status"], first["inj"], first["own"], first["own_d"], first["started"],
             first["waiver_bis"], first["proj"], first["news"]) \
@@ -106,6 +109,39 @@ def test_waiver_vertrag(result):
     out = app_export.build_waiver(dict(result, pool_latest=dict(pool, players=[dict(row, id=known, onTeamId=3)])))
     assert out["spieler"][0]["name"] == result["players"]["players"][known]["name"] and out["spieler"][0]["pos"]
     assert app_export.build_waiver(dict(result, pool_latest=None)) is None
+
+
+def test_expertenrang_waiver(result):
+    """Expertenrang in waiver.json (Beschluss 09.10.2026) aus einem Pool-Auszug mit erfundenen Rängen und echten Spielern:
+    Median über alle acht Experten, wer fehlt, zählt als außerhalb seiner Top N (ab 5 von 8 ein Wert), Listentiefe je
+    Position aus den Rängen; ist das Spiel zum Stand schon angepfiffen, bleibt der Spieler leer."""
+    result = dict(result, fantasypros=None)
+    weekly = result["players"]["players"]
+    games = sorted((g for g in result["nfl_spiele"] if g["woche"] == 3 and not g["tbd"]), key=lambda g: g["kickoff"])
+    first = (games[0]["heim"], games[0]["gast"])           # Teams des ersten Spiels der Woche (Donnerstag)
+    rbs = [pid for pid in sorted(app_export.player_selection(result)) if weekly[pid]["pos"] == RB]
+    early = next(pid for pid in rbs if weekly[pid]["pro_team"] in first)
+    late = [pid for pid in rbs if weekly[pid]["pro_team"] not in first][:3]
+    pool = {"season": 2026, "woche": 3, "stand": (games[0]["kickoff"] - timedelta(hours=2)).strftime("%Y-%m-%dT%H%MZ"),
+            "experten_quellen": 8, "players": [
+                {"id": late[0], "onTeamId": 1, "experten": [3, 4, 4, 5, 6, 6, 7, 9]},      # alle acht: (5 + 6) / 2
+                {"id": late[1], "onTeamId": 0, "status": "FREEAGENT", "experten": [40, 44, 47, 50, 50]},  # 5 von 8
+                {"id": late[2], "onTeamId": 0, "status": "FREEAGENT", "experten": [12, 30, 48, 49]},      # 4 von 8
+                {"id": early, "onTeamId": 2, "experten": [1, 1, 1, 1, 1, 1, 1, 2]}]}
+
+    def build(p):
+        out = app_export.round_file("waiver.json", app_export.build_waiver(dict(result, pool_latest=p)))
+        return out, {s["id"]: (s["exp"], s["exp_n"]) for s in out["spieler"]}
+
+    out, exp = build(pool)
+    assert exp == {late[0]: (5.5, 8), late[1]: (50.0, 5), late[2]: (None, 4), early: (1.0, 8)}
+    assert (out["experten_quellen"], out["experten_tiefe"]) == (8, {"RB": 50})
+    # Stand nach dem ersten Anstoß: dessen Spieler leer, die übrigen unverändert
+    _, exp = build(dict(pool, stand=(games[0]["kickoff"] + timedelta(hours=8)).strftime("%Y-%m-%dT%H%MZ")))
+    assert exp[early] == (None, None) and exp[late[0]] == (5.5, 8)
+    # ESPN hat die Woche noch nicht veröffentlicht: keine Werte, n = 0
+    out, exp = build(dict(pool, experten_quellen=0, players=[dict(p, experten=None) for p in pool["players"]]))
+    assert set(exp.values()) == {(None, 0)} and (out["experten_quellen"], out["experten_tiefe"]) == (0, {})
 
 
 def test_fantasypros_adressen(result):
@@ -507,39 +543,44 @@ def test_claude_vertrag(data):
     Spaltenköpfe, Legenden unter der Textgrenze des Öffentlichkeits-Checks. Auf dem echten Stand nur Invarianten,
     weil der Tagesstand stündlich wechselt."""
     c = data["claude.json"]
-    assert set(c) == {"legende", "legende_stand", "stand", "teams", "tabelle_spalten", "tabelle", "spiele_spalten",
-                      "spiele", "spieler_spalten", "free_agents_spalten", "kader", "free_agents", "dst_spalten", "dst",
-                      "transaktionen_spalten", "transaktionen"}
+    assert set(c) == {"legende", "legende_stand", "legende_experten", "stand", "teams", "tabelle_spalten", "tabelle",
+                      "spiele_spalten", "spiele", "spieler_spalten", "free_agents_spalten", "kader", "free_agents",
+                      "dst_spalten", "dst", "transaktionen_spalten", "transaktionen"}
     assert set(c["stand"]) == {"saison", "nach_woche", "kader_quelle", "ros_nach_woche", "matchup_woche",
-                               "pool_stand", "pool_woche"}
+                               "pool_stand", "pool_woche", "experten_quellen", "experten_tiefe"}
     assert c["stand"]["pool_stand"] == data["manifest.json"]["datenstand"]["pool_stand"]
     assert c["stand"]["pool_woche"] == data.get("waiver.json", {}).get("woche")
+    assert c["stand"]["experten_quellen"] == data.get("waiver.json", {}).get("experten_quellen")
+    assert c["stand"]["experten_quellen"] == data["manifest.json"]["datenstand"]["experten_quellen"]
     assert c["spieler_spalten"] == list(app_export.CLAUDE_PLAYER_COLS)
-    assert c["spieler_spalten"][0] == "id" and {"proj", "proj3"} <= set(c["spieler_spalten"])
+    assert c["spieler_spalten"][0] == "id" and {"proj", "proj3", "exp", "exp_n"} <= set(c["spieler_spalten"])
     assert c["free_agents_spalten"] == c["spieler_spalten"] + ["status"]
     assert list(c["kader"]) == [app_export.KUERZEL[t] for t in sorted(app_export.KUERZEL)]
-    assert all(len(c[k]) <= check_public.MAX_TEXT for k in ("legende", "legende_stand"))
+    assert all(len(c[k]) <= check_public.MAX_TEXT for k in ("legende", "legende_stand", "legende_experten"))
     status = c["free_agents_spalten"].index("status")
     assert all(r[status] in ("WAIVERS", "FREEAGENT") for rows in c["free_agents"].values() for r in rows)
     # id ist eindeutig: kein Spieler steht zweimal, keiner zugleich im Kader und frei
     ids = [r[0] for rows in [*c["kader"].values(), *c["free_agents"].values()] for r in rows]
     assert ids and all(isinstance(i, int) for i in ids) and len(ids) == len(set(ids))
     proj, proj3 = c["free_agents_spalten"].index("proj"), c["free_agents_spalten"].index("proj3")
+    exp, exp_n = c["free_agents_spalten"].index("exp"), c["free_agents_spalten"].index("exp_n")
     if "waiver.json" in data:   # jeder Kaderspieler laut Tagesstand steht im Kader seines Teams
         daily = Counter(s["team"] for s in data["waiver.json"]["spieler"] if s["team"])
         assert all(len(c["kader"][kz]) >= daily[tid] for tid, kz in app_export.KUERZEL.items())
         # je id Team, Status und Wochenwerte wie in waiver.json (beide gleich gerundet); ohne Eintrag dort null
         tag = {s["id"]: s for s in data["waiver.json"]["spieler"]}
         team_id = {kz: tid for tid, kz in app_export.KUERZEL.items()}
+        none = {"proj": None, "proj3": None, "exp": None, "exp_n": None}
         for kz, rows in c["kader"].items():
             for r in rows:
-                s = tag.get(r[0], {"team": None, "proj": None, "proj3": None})
+                s = tag.get(r[0], {"team": None} | none)
                 assert s["team"] in (None, team_id[kz]) and (r[proj], r[proj3]) == (s["proj"], s["proj3"])
+                assert (r[exp], r[exp_n]) == (s["exp"], s["exp_n"])
         for r in (r for rows in c["free_agents"].values() for r in rows):
-            s = tag.get(r[0], {"status": r[status], "proj": None, "proj3": None})
-            assert (r[status], r[proj], r[proj3]) == (s["status"], s["proj"], s["proj3"])
+            s = tag.get(r[0], {"status": r[status]} | none)
+            assert (r[status], r[proj], r[proj3], r[exp], r[exp_n]) == (s["status"], s["proj"], s["proj3"], s["exp"], s["exp_n"])
     else:                       # ohne Tagesstand keine Wochenwerte
-        assert all(r[proj] is None and r[proj3] is None
+        assert all(r[proj] is None and r[proj3] is None and r[exp] is None
                    for rows in [*c["kader"].values(), *c["free_agents"].values()] for r in rows)
 
 
@@ -568,7 +609,7 @@ def test_claude_tagesstand(result):
                            woche(6, "Erfundener WR Fünf", "WR", 6, "ONTEAM", 8)]}     # Kader, fehlt im Tagesstand
     waiver = {"stand": "2026-10-06T0845Z", "woche": 5,
               "spieler": [tag(-16001, 0, "FREEAGENT"), tag(1, 5, "ONTEAM", inj="OUT"),
-                          tag(2, 3, "ONTEAM", proj=Decimal("14.125"), proj3=Decimal("41.205")),
+                          tag(2, 3, "ONTEAM", proj=Decimal("14.125"), proj3=Decimal("41.205"), exp=Decimal("12.5"), exp_n=8),
                           tag(3, 0, "WAIVERS", proj=Decimal("11.456"), proj3=Decimal("30.1")),
                           tag(5, 0, "FREEAGENT"),
                           tag(99, 2, "ONTEAM", name="Erfundener Neuzugang", pos="WR", nfl="KC",  # nur Tagesstand
@@ -590,12 +631,12 @@ def test_claude_tagesstand(result):
     assert names(out["kader"]["TTY"]) == ["Erfundener QB"] and out["kader"]["TTY"][0][cols["inj"]] == "OUT"
     assert out["kader"]["TTY"][0][cols["proj"]] is None   # Wochenwerte nur aus dem Tagesstand (dort None)
     assert out["kader"]["4DS"] == [[2, "Erfundener RB Eins", "RB", "KC", "ACTIVE"] + [None] * 3 + [12.0]
-                                   + [None] * 3 + [14.13, 41.21]]   # proj, proj3 round half up
-    assert out["kader"]["HJS"] == [[99, "Erfundener Neuzugang", "WR", "KC", "ACTIVE"] + [None] * 7 + [7.5, None]]
+                                   + [None] * 3 + [14.13, 41.21, 12.5, 8]]   # proj, proj3 round half up; exp, exp_n
+    assert out["kader"]["HJS"] == [[99, "Erfundener Neuzugang", "WR", "KC", "ACTIVE"] + [None] * 7 + [7.5, None, None, None]]
     # Kaderspieler ohne Eintrag im Tagesstand: Wochenstand, aber keine Wochenwerte (proj 99 im Wochenstand bleibt draußen)
     assert [(r[cols["id"]], r[cols["name"]], r[cols["proj"]], r[cols["proj3"]]) for r in out["kader"]["SAM"]] == [
         (6, "Erfundener WR Fünf", None, None)]
-    assert out["kader"]["RTZ"] == [[97, "Spieler 97", None, None, "ACTIVE"] + [None] * 9]
+    assert out["kader"]["RTZ"] == [[97, "Spieler 97", None, None, "ACTIVE"] + [None] * 11]
     assert out["kader"]["ACB"] == [] and out["kader"]["CRN"] == []
     assert [(r[cols["id"]], r[cols["name"]], r[cols["status"]], r[cols["proj"]], r[cols["proj3"]])
             for r in out["free_agents"]["RB"]] == [
