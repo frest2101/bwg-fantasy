@@ -380,7 +380,7 @@ function teamBox(a, E, tid) {
   const cols = [
     {k: 's', l: 'Slot', f: z => z.slot},
     {k: 'n', l: 'Spieler', f: z => h(seite(z.id) ? 'a' : 'span', {href: seite(z.id) ? '#spieler/' + z.id : null, class: 'pl'},
-      h('span', null, z.name, verl(z)), h('span', {class: 'sub'}, `${z.pos} · ${z.nfl} · ${spielTxt(z, E.hatSb)}` + (z.exp ? ` · ${expTxt(z.exp)}` : '')),
+      h('span', null, z.name, verl(z)), h('span', {class: 'sub'}, `${z.pos} · ${z.nfl} · ${spielTxt(z, E.hatSb)}` + (z.exp ? `${U.NB}· ${expTxt(z.exp)}` : '')),
       z.hinweis ? h('span', {class: 'sub'}, `→ mehr Projektion als ${zielTxt(z.hinweis)}`) : null)},
     {k: 'i', l: 'Pkt', num: 1, f: z => U.ok(z.ist) ? pkt(z.ist) : U.na(z.state === 'unklar' ? 'Spielstatus unklar' : C.OFFEN.includes(z.state) ? 'noch nicht gespielt' : 'kein Wert von ESPN')},
     {k: 'p', l: 'Projektion', num: 1, f: z => U.ok(z.proj) ? pkt(z.proj) : U.na(C.SPIELFREI.includes(z.state) ? 'spielfrei: keine Projektion' : 'keine ESPN-Projektion')}];
