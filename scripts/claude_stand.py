@@ -400,6 +400,10 @@ def kopf(jetzt: datetime, liga, index: dict, abweichung, ausfall: dict) -> list:
             lesehilfe += ", F = Faktor (Position) des Gegners laut Matchups (> 1 günstig)."
         else:
             lesehilfe += f"; F fehlt, die App rechnet die Matchups für Woche {stand.get('matchup_woche', '?')}."
+        if index["proj_ok"] and stand.get("experten_quellen"):  # wie exp_ok: nur dann steht Exp in den Zeilen
+            lesehilfe += (" Laut App (Tagesstand): Exp = Expertenrang, Median der ESPN-Expertenränge innerhalb der "
+                          "Position (Standard-PPR, keine Punktprognose); (n/k) = Experten mit Rang von allen; >N = "
+                          "höchstens die Hälfte führt ihn in ihren Top N; nur vor dem Anstoß.")
     aus.append(lesehilfe)
     return aus
 

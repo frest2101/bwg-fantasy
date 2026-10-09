@@ -251,12 +251,12 @@ def test_vertrag_mit_der_committeten_claude_json():
         pytest.skip("app/data/claude.json fehlt (schreibt compute.py)")
     echt = json.loads(datei.read_text(encoding="utf-8"))
     stand = echt["stand"]
-    assert {"saison", "nach_woche", "matchup_woche", "pool_stand", "pool_woche"} <= set(stand)
+    assert {"saison", "nach_woche", "matchup_woche", "pool_stand", "pool_woche", "experten_quellen", "experten_tiefe"} <= set(stand)
     index = cs.app_index(echt, stand["matchup_woche"], stand["saison"])
     assert index["da"] and not index["fremd"] and index["marken"]
     assert set(index["kader"]) == set(cs.KUERZEL.values()) and any(index["kader"].values())
     assert set().union(*index["kader"].values()) <= set(index["spieler"])
-    gelesen = {"id", "name", "pos", "nfl", "ros_g", "mu_n1", "proj"}          # diese Spalten liest das Skript
+    gelesen = {"id", "name", "pos", "nfl", "ros_g", "mu_n1", "proj", "exp", "exp_n"}   # diese Spalten liest das Skript
     assert gelesen <= set(echt["spieler_spalten"]) and gelesen <= set(echt["free_agents_spalten"])
     assert all(gelesen <= set(s) and isinstance(s["id"], int) and s["name"] for s in index["spieler"].values())
     assert ("transaktionen" in echt) == ("transaktionen_spalten" in echt)
@@ -510,6 +510,9 @@ def test_expertenrang_in_der_aufstellung():
     assert "  Bank Otto Offen RB SEA vs SF So 19:00 MEZ | – | 3.00 | Exp RB 40 (8/8)" in zeilen
     assert any(z.startswith("  Bank Bodo Bank WR SF @ SEA So 19:00 MEZ | – | 12.50 → mehr Proj") for z in zeilen)
     assert "SGK Testteam Zehn – Slot Spieler NFL Spiel | Punkte | Proj | F | Exp" in zeilen
+    # die Lesehilfe im Kopf erklärt Exp, damit der Chat es nicht als Punkteprognose liest
+    assert any("Exp = Expertenrang, Median der ESPN-Expertenränge innerhalb der Position" in z and "nur vor dem Anstoß" in z
+               for z in zeilen[:6])
     # claude.json meint eine andere Woche, oder ESPN hatte zum Stand der App noch nichts veröffentlicht: kein Exp
     for anders in ({"pool_woche": WOCHE + 1}, {"experten_quellen": 0}, {"experten_quellen": None}):
         b = json.loads(json.dumps(a))
