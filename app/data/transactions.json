@@ -66,5 +66,5 @@
 {"id":"6584ef72-da78-4c12-8a46-69c7d5e53e53","type":"FREEAGENT","team_id":4,"datum":1791546643993,"periode":5,"items":[{"type":"ADD","player_id":4373626,"name":"Tyler Allgeier","from_team_id":0,"to_team_id":4,"in_app":true},{"type":"DROP","player_id":3055899,"name":"Harrison Butker","from_team_id":4,"to_team_id":0,"in_app":true}]},
 {"id":"4be0174f-3b54-4874-ae36-366fac489f5d","type":"FREEAGENT","team_id":1,"datum":1791573672587,"periode":5,"items":[{"type":"ADD","player_id":4426386,"name":"Roschon Johnson","from_team_id":0,"to_team_id":1,"in_app":true},{"type":"DROP","player_id":4682745,"name":"Jaylen Wright","from_team_id":1,"to_team_id":0,"in_app":true}]}
 ],
-"aufstellungswechsel":{"1":21,"2":24,"3":10,"4":22,"5":23,"6":5,"7":16,"8":17,"9":22,"10":36}
+"aufstellungswechsel":{"1":21,"2":24,"3":10,"4":22,"5":23,"6":6,"7":16,"8":17,"9":22,"10":36}
 }
