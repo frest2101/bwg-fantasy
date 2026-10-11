@@ -11,8 +11,8 @@ Aufrufe (team_id optional, Standard 2; nur das erste Argument zählt, und nur al
 etwa '-c' oder die Argumente eines Notebooks, wird ignoriert):
     python3 <Skill-Ordner>/scripts/claude_stand.py [team_id]     (claude.ai: Skill bwg-spieltag)
     python scripts/claude_stand.py [team_id]                     (lokal, Claude Code)
-Im claude.ai-Chat liegt das Skript seit 11.10.2026 als Skill bwg-spieltag im Container (plugins/bwg-spieltag, Kopie
-dieser Datei, gebaut mit scripts/skill_bauen.py): Seit Chat und Cowork eins sind, prüft dort der Auto-Modus jeden
+Für den claude.ai-Chat wird das Skript seit 11.10.2026 als Skill bwg-spieltag ausgeliefert (plugins/bwg-spieltag,
+Kopie dieser Datei, gebaut mit scripts/skill_bauen.py; Abnahme per Probe-Chat offen): Seit Chat und Cowork eins sind, prüft dort der Auto-Modus jeden
 Aufruf, und seine Regel „Code from External“ blockiert den früheren Weg, den Quelltext aus dem Netz zu laden und
 per exec auszuführen. Läuft das Skript im Skill, vergleicht es dessen Kennung (skill_kennung) mit claude.json ›
 stand.skill und sagt im Kopf, ob der Skill aktuell ist.

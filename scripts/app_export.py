@@ -815,7 +815,7 @@ def build_claude(result: dict, teams: dict, schedule: dict, players: dict | None
                      "experten_quellen": waiver.get("experten_quellen") if waiver else None,
                      "experten_tiefe": waiver.get("experten_tiefe") if waiver else None,
                      # Kennung des Skills bwg-spieltag (plugins/, scripts/skill_bauen.py): Das Stand-Skript im Skill
-                     # vergleicht sie mit seiner eigenen und meldet „veraltet“, wenn der Skill im Chat älter ist
+                     # vergleicht sie mit seiner eigenen und meldet, wenn der Skill im Chat eine andere Fassung hat
                      "skill": skill_bauen.kennung()},
            "teams": {k(t["team_id"]): t["name"] for t in teams["teams"]},
            "tabelle_spalten": ["rang", "team", "name", "w_l_t", "pf", "allplay_pct", "matchup_glueck", "effizienz_pct", "form",

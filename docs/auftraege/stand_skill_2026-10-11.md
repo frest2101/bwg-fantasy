@@ -55,4 +55,4 @@ Weg A bauen, mit den Verbesserungen der Richter:
 ## Offen
 
 - Ob claude.ai den Plugin-Skill in Projektchats lädt, ob der Auto-Modus den Aufruf im interaktiven Chat durchlässt (Schritte 1–4) und ob und wie schnell claude.ai eine Änderung ohne `version` übernimmt (Schritt 5) – klärt die Probe.
-- Nach einem Merge, der den Skill ändert, meldet das Skript „verschieden“, bis claude.ai abgeglichen hat. Beim ZIP-Weg heißt jede Änderung an `claude_stand.py` oder SKILL.md: neu hochladen. Änderungen am Stand-Skript deshalb bündeln.
+- Nach einem Merge, der den Skill ändert, meldet das Skript „verschieden“, bis claude.ai abgeglichen hat. In der Vorsaison (nach dem Saisonwechsel, bis W1 final ist) zeigt `claude.json` noch die alte Saison; ein Skill, der schon die neue liest, vergleicht dann keine Kennung (die App-Daten gelten als fremd), Schritt 5 lässt sich in dieser Zeit nicht prüfen. Beim ZIP-Weg heißt jede Änderung an `claude_stand.py` oder SKILL.md: neu hochladen. Änderungen am Stand-Skript deshalb bündeln.

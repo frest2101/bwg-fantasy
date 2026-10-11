@@ -4,7 +4,7 @@
 "through_week":4,
 "datenstand":{"woche_final":4,"ros_nach_woche":4,"playoff_woche":null,"pool_woche":4,"experten_woche":5,"experten_quellen":8,"transaktionen_bis":1791705300212,"pool_stand":"2026-10-11T2149Z","wetter_stand":"2026-10-11T2149Z"},
 "files":{
-"claude.json":{"v":"f2b0fec3c9bb","bytes":43840,"lazy":true},
+"claude.json":{"v":"859bb288c7c1","bytes":43840,"lazy":true},
 "claude_marktwert.json":{"v":"28effc6e95c6","bytes":30749,"lazy":true},
 "dst.json":{"v":"b16a0e73fee3","bytes":11549,"lazy":true},
 "history.json":{"v":"f4a943d88bfe","bytes":151932,"lazy":true},

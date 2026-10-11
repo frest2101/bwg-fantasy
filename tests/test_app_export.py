@@ -805,7 +805,8 @@ def test_committete_app_daten_sind_aktuell():
     latest = compute.compute_season(2026)
     fresh = app_export.render(app_export.build(latest), latest)
     stale = [n for n, raw in fresh.items() if (app_export.APP_DATA / n).read_bytes() != raw]
-    assert not stale, f"app/data veraltet ({', '.join(stale)}) – python scripts/compute.py ausführen"
+    assert not stale, (f"app/data veraltet ({', '.join(stale)}) – python scripts/compute.py ausführen "
+                       "(in der Vorsaison, bis W1 final ist, --season <Vorjahr>)")
 
 
 def test_wochensicht_vertrag():
