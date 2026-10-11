@@ -88,6 +88,7 @@ APP_FENSTER_TAGE = 14                  # claude.json führt die Moves der 14 Tag
 APP_FENSTER_MS = APP_FENSTER_TAGE * 86_400_000
 SKILL = "bwg-spieltag"                 # Skill für claude.ai (plugins/bwg-spieltag, scripts/skill_bauen.py)
 SKILL_DATEIEN = ("SKILL.md", "scripts/claude_stand.py")   # über diese Dateien geht die Kennung des Skills
+SKILL_AKTUALISIEREN = f"Skill aktualisieren (Plugin {SKILL} nach Updates suchen lassen, sonst {SKILL}.zip neu hochladen)"
 
 
 # ---------------------------------------------------------------- Zahlen, Zeit, Fremdtext (rein)
@@ -374,7 +375,9 @@ def gegner_von(liga: dict, team_id: int):
 def kopf(jetzt: datetime, liga, index: dict, abweichung, ausfall: dict, skill=None) -> list:
     """Uhrzeit (deutsche Zeit und UTC), Abweichung zur ESPN-Serverzeit, Woche, Datenstand der App und Lesehilfe;
     skill = Kennung des Skills, aus dem das Skript läuft (None außerhalb eines Skills): Vergleich mit
-    claude.json › stand.skill – aktuell, veraltet (eigene Zeile mit „!“) oder ohne Kennung nicht prüfbar."""
+    claude.json › stand.skill – gleich („aktuell“), verschieden (eigene Zeile mit „!“, ohne Richtung: kurz nach einem
+    Merge kann claude.json von raw bis zu 5 min älter sein als der Skill) oder ohne Kennung nicht prüfbar. Zeigt die
+    App eine spätere Saison als die, die das Skript bei ESPN liest, ist der Skill sicher veraltet (eigene Zeile)."""
     zeile = f"STAND {zeit_text(jetzt, jahr=True)} ({jetzt:%H:%M} UTC, Uhr des Containers"
     if abweichung is not None:
         sek = zahl(abweichung, 0)  # Vorzeichen am gerundeten Wert: gerundet 0 steht ohne
@@ -396,6 +399,10 @@ def kopf(jetzt: datetime, liga, index: dict, abweichung, ausfall: dict, skill=No
     elif index["fremd"]:
         aus.append(f"App zeigt Saison {kurz(stand.get('saison'), 10)}, ESPN Saison {index['saison']} – F, ROS/Sp, "
                    "Marken [App]/[NEU] und Kadervergleich fehlen")
+        if skill is not None and isinstance(stand.get("saison"), int) and isinstance(index["saison"], int) \
+                and index["saison"] < stand["saison"]:   # das Skript im Skill fragt noch die alte Saison ab
+            aus.append(f"! Skill {SKILL} veraltet: Er liest ESPN-Saison {index['saison']}, die App zeigt Saison "
+                       f"{stand['saison']} – {SKILL_AKTUALISIEREN}")
     else:
         pool = None
         try:
@@ -411,9 +418,9 @@ def kopf(jetzt: datetime, liga, index: dict, abweichung, ausfall: dict, skill=No
             "" if soll else f"; Skill {SKILL} nicht prüfbar (claude.json ohne Kennung)"
         aus.append(f"App: gerechnet bis Woche {stand.get('nach_woche', '?')}; {tagesstand}; {letzter}{zusatz}")
         if skill is not None and soll and soll != skill:
-            aus.append(f"! Skill {SKILL} veraltet (Skill {kurz(skill, 12)}, App {kurz(soll, 12)}): Der Stand unten kommt "
-                       f"von der älteren Fassung – Skill aktualisieren (Plugin {SKILL} nach Updates suchen lassen, sonst "
-                       f"{SKILL}.zip neu hochladen)")
+            aus.append(f"! Skill {SKILL} und App verschieden (Skill {kurz(skill, 12)}, App {kurz(soll, 12)}): kurz nach "
+                       f"einer Änderung am Skill normal (claude.json kommt bis zu 5 min alt); hält es an, "
+                       f"{SKILL_AKTUALISIEREN}")
         lesehilfe += " Laut App (Wochenstand): ROS/Sp = ROS-Projektion je Spiel"
         if index["f_ok"]:
             lesehilfe += ", F = Faktor (Position) des Gegners laut Matchups (> 1 günstig)."

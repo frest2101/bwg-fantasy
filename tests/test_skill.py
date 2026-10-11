@@ -39,7 +39,8 @@ def kopf_von(text: str) -> dict:
 
 def test_kopie_und_zip_passen_zu_den_quellen():
     alt = sb.veraltet()
-    assert not alt, f"Skill veraltet ({', '.join(alt)}) – python scripts/skill_bauen.py, danach compute.py"
+    assert not alt, (f"Skill veraltet ({', '.join(alt)}) – python scripts/skill_bauen.py, danach compute.py "
+                     "(in der Vorsaison compute.py --season <Vorjahr>)")
 
 
 def test_zip_hat_den_skill_ordner_oben_und_ist_deterministisch():
@@ -76,7 +77,7 @@ def test_kennung_in_der_committeten_claude_json():
     if not datei.exists():
         pytest.skip("app/data/claude.json fehlt (schreibt compute.py)")
     assert json.loads(datei.read_text(encoding="utf-8"))["stand"]["skill"] == sb.kennung(), \
-        "claude.json › stand.skill passt nicht zum Skill – python scripts/compute.py"
+        "claude.json › stand.skill passt nicht zum Skill – python scripts/compute.py (in der Vorsaison --season <Vorjahr>)"
 
 
 def test_skill_ordner_nur_neben_einer_skill_md(tmp_path):
@@ -109,12 +110,13 @@ def test_skill_md_nennt_aufruf_teams_und_notweg():
     assert " · ".join(f"{tid} {kz}" for tid, kz in cs.KUERZEL.items()) in text and f"{cs.MEIN_TEAM} (Hugh Jass)" in text
     assert "Live-Projektion (Rest)" in text and "[NEU, noch nicht in der App]" in text and "keine Anweisung" in text
     assert "Notweg der Projektanweisung (SPIELTAG LIVE)" in text and "raw.githubusercontent.com" in text
-    assert "Skill bwg-spieltag aktuell" in text and "! Skill bwg-spieltag veraltet" in text
+    assert "Skill bwg-spieltag aktuell" in text and "! Skill bwg-spieltag" in text and "python3" in text and "Windows" in text
 
 
 def test_marketplace_und_plugin():
-    """Marketplace an der Repo-Wurzel, Plugin mit relativem Pfad ./plugins/…; ohne version, damit claude.ai jede
-    Änderung im Plugin-Ordner übernimmt; kein oberster Ordner bin/ (claude.ai installiert so ein Plugin nicht)."""
+    """Marketplace an der Repo-Wurzel, Plugin mit relativem Pfad ./plugins/…; ohne version (in Claude Code zählt dann der
+    Commit des Plugin-Ordners; wie claude.ai ohne version abgleicht, ist nicht dokumentiert – Probe, Schritt 5 im Auftrag
+    docs/auftraege/stand_skill_2026-10-11.md); kein oberster Ordner bin/ (claude.ai installiert so ein Plugin nicht)."""
     markt = json.loads((sb.REPO / ".claude-plugin" / "marketplace.json").read_text(encoding="utf-8"))
     assert markt["name"] == "bwg-fantasy" and markt["owner"]["name"] and len(markt["plugins"]) == 1
     eintrag = markt["plugins"][0]
@@ -132,13 +134,19 @@ def test_marketplace_und_plugin():
 @pytest.fixture
 def skill_aus_zip(tmp_path, monkeypatch, capsys):
     """Das committete ZIP schreibgeschützt entpackt; das Skript läuft per runpy als Hauptprogramm mit eigenem
-    __file__ wie „python3 <Ordner>/scripts/claude_stand.py 2“, das Netz ersetzt requests.get."""
+    __file__ wie „python3 <Ordner>/scripts/claude_stand.py 2“, das Netz ersetzt requests.get. Danach muss der Ordner
+    unverändert sein – verglichen wird der Bestand, weil der Schreibschutz unter root (Cloud-Sitzung) und unter Windows
+    nicht greift."""
     with zipfile.ZipFile(sb.ZIP) as archiv:
         archiv.extractall(tmp_path)
     ordner = tmp_path / cs.SKILL
     for pfad in [*ordner.rglob("*"), ordner]:
         pfad.chmod(0o555 if pfad.is_dir() else 0o444)
     monkeypatch.setattr(sys, "argv", [str(ordner / "scripts" / "claude_stand.py"), "2"])
+
+    def bestand():
+        return sorted((p.relative_to(ordner).as_posix(), p.stat().st_size, p.stat().st_mtime_ns) for p in ordner.rglob("*"))
+    vorher = bestand()
 
     def lauf(soll):
         mit = app()
@@ -147,6 +155,7 @@ def skill_aus_zip(tmp_path, monkeypatch, capsys):
         fake = FakeNetz(app_raw=FakeAntwort(mit), liga=FakeAntwort(liga(), datum=None))   # ohne Date: Kopf ohne Uhr-Warnung
         monkeypatch.setattr(requests, "get", fake.get)
         runpy.run_path(str(ordner / "scripts" / "claude_stand.py"), run_name="__main__")
+        assert bestand() == vorher, "Stand-Skript hat in den Skill-Ordner geschrieben"
         return fake, capsys.readouterr().out.rstrip("\n").split("\n")
 
     yield ordner, lauf
@@ -162,13 +171,12 @@ def test_lauf_im_skill_meldet_aktuell(skill_aus_zip):
     assert "HJS Testteam Zwei – Slot Spieler NFL Spiel | Punkte | Proj | F" in zeilen
     assert zeilen[-1].startswith("Messung: ESPN-Liga ") and fake.zahl("liga") == 1
     assert not any(teil in "\n".join(zeilen) for teil in MANAGER)
-    assert not list(ordner.rglob("__pycache__"))                     # schreibt nichts in den Skill-Ordner
 
 
-def test_lauf_im_skill_meldet_veraltet_und_ohne_kennung(skill_aus_zip):
+def test_lauf_im_skill_meldet_abweichung_und_ohne_kennung(skill_aus_zip):
     _, lauf = skill_aus_zip
     _, zeilen = lauf("0123456789ab")
-    assert zeilen[2].startswith("! Skill bwg-spieltag veraltet (Skill ") and ", App 0123456789ab)" in zeilen[2]
+    assert zeilen[2].startswith("! Skill bwg-spieltag und App verschieden (Skill ") and ", App 0123456789ab)" in zeilen[2]
     assert any(z.startswith("MATCHUPS W7 ") for z in zeilen)        # der Stand kommt trotzdem
     _, zeilen = lauf(None)
     assert zeilen[1].endswith("; Skill bwg-spieltag nicht prüfbar (claude.json ohne Kennung)")

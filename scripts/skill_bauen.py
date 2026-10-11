@@ -13,7 +13,8 @@ passen; die Kennung des Skills (claude_stand.skill_kennung) schreibt app_export 
 
 Aufruf: python scripts/skill_bauen.py            schreibt Kopie und ZIP, nur bei Änderung
         python scripts/skill_bauen.py --pruefen  schreibt nichts; Exit-Code 1, wenn Kopie oder ZIP veraltet sind
-Danach python scripts/compute.py (neue Kennung in claude.json) und pytest.
+Danach python scripts/compute.py (neue Kennung in claude.json; in der Vorsaison, bis W1 final ist, schreibt nur
+compute.py --season <Vorjahr> die App-Daten) und pytest.
 """
 
 import io
@@ -95,7 +96,8 @@ def main(argv: list[str]) -> int:
         return 1 if alt else 0
     geschrieben = bauen()
     print(("geschrieben: " + ", ".join(geschrieben)) if geschrieben else "Skill unverändert")
-    print(f"Kennung {kennung()} – danach python scripts/compute.py (claude.json › stand.skill) und pytest")
+    print(f"Kennung {kennung()} – danach python scripts/compute.py (claude.json › stand.skill; in der Vorsaison, bis W1 "
+          "final ist, compute.py --season <Vorjahr>) und pytest")
     return 0
 
 

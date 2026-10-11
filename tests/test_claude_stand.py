@@ -387,8 +387,9 @@ def test_kopf_nennt_abweichende_matchup_periode():
 
 def test_kopf_nennt_den_skill_nur_im_skill():
     """skill = Kennung des Skills, aus dem das Skript läuft: gleich claude.json › stand.skill → „aktuell“ in der
-    App-Zeile; anders → eigene Zeile „! … veraltet“ (der Stand folgt trotzdem); claude.json ohne Kennung → „nicht
-    prüfbar“; außerhalb eines Skills (skill None) kein Wort dazu; ohne claude.json kein Vergleich."""
+    App-Zeile; verschieden → eigene Zeile „! … verschieden“ ohne Richtung (kurz nach einem Merge kann claude.json älter
+    sein als der Skill; der Stand folgt trotzdem); claude.json ohne Kennung → „nicht prüfbar“; außerhalb eines Skills
+    (skill None) kein Wort dazu; ohne claude.json kein Vergleich."""
     mit = app()
     mit["stand"]["skill"] = "1feac3ae5905"
     zeilen = text(app=mit, skill="1feac3ae5905").split("\n")
@@ -396,13 +397,27 @@ def test_kopf_nennt_den_skill_nur_im_skill():
     assert zeilen[2].startswith("Alle Zeiten deutsche Zeit.")
     zeilen = text(app=mit, skill="0123456789ab").split("\n")
     assert zeilen[1].endswith("10:16 MESZ") and zeilen[2] == (
-        "! Skill bwg-spieltag veraltet (Skill 0123456789ab, App 1feac3ae5905): Der Stand unten kommt von der älteren "
-        "Fassung – Skill aktualisieren (Plugin bwg-spieltag nach Updates suchen lassen, sonst bwg-spieltag.zip neu "
-        "hochladen)")
+        "! Skill bwg-spieltag und App verschieden (Skill 0123456789ab, App 1feac3ae5905): kurz nach einer Änderung am "
+        "Skill normal (claude.json kommt bis zu 5 min alt); hält es an, Skill aktualisieren (Plugin bwg-spieltag nach "
+        "Updates suchen lassen, sonst bwg-spieltag.zip neu hochladen)")
     assert "HJS Testteam Zwei – Slot Spieler NFL Spiel | Punkte | Proj | F" in zeilen
     assert text(skill="0123456789ab").split("\n")[1].endswith("; Skill bwg-spieltag nicht prüfbar (claude.json ohne Kennung)")
     assert "Skill" not in text(app=mit) and "Skill" not in text()
     assert "Skill" not in text(app=None, skill="0123456789ab", ausfall={"app": "HTTP 404"})
+
+
+@pytest.mark.parametrize("app_saison, warnt", [(2027, True), (2025, False)])
+def test_kopf_skill_einer_alten_saison_ist_veraltet(app_saison, warnt):
+    """Erfunden: Die App ist schon bei Saison 2027, der Skill liest noch ESPN 2026 – dann ist er sicher veraltet, auch
+    ohne Kennungsvergleich (die App-Daten passen ohnehin nicht). Eine ältere App (Vorsaison, neuer Skill) ist kein Fehler
+    des Skills; außerhalb eines Skills kein Wort dazu."""
+    mit = app()
+    mit["stand"].update(saison=app_saison, skill="1feac3ae5905")
+    zeilen = text(app=mit, skill="0123456789ab").split("\n")
+    assert zeilen[1].startswith(f"App zeigt Saison {app_saison}, ESPN Saison 2026 – ")
+    assert (zeilen[2] == "! Skill bwg-spieltag veraltet: Er liest ESPN-Saison 2026, die App zeigt Saison 2027 – Skill "
+            "aktualisieren (Plugin bwg-spieltag nach Updates suchen lassen, sonst bwg-spieltag.zip neu hochladen)") == warnt
+    assert sum("Skill" in z for z in zeilen) == warnt and "Skill" not in text(app=mit)
 
 
 def test_nfl_spiele_mit_etikett_je_anstoss():
