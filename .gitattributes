@@ -21,3 +21,8 @@ data/raw/*/nfl/stadien.json diff merge text eol=lf
 # Stat-Korrekturen (wNN/statkorrektur.json, eine Zeile je Spiel und Spieler): Text-Diff, damit eine rückwirkende
 # Punktänderung im Commit lesbar ist; Merge und Zeilenende bleiben wie bei den übrigen Rohdaten (binär).
 data/raw/*/w[0-9][0-9]/statkorrektur.json diff
+
+# Skill bwg-spieltag für claude.ai (scripts/skill_bauen.py): Textdateien immer LF wie das gebaute ZIP, das ZIP binär.
+plugins/** text eol=lf
+plugins/*.zip binary
+.claude-plugin/* text eol=lf

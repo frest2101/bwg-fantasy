@@ -17,6 +17,7 @@ import check_public
 import compute
 import espn_fetch as ef
 import rawdata
+import skill_bauen
 from lineup import QB, RB, WR
 from zahlen import round_to
 
@@ -644,7 +645,8 @@ def test_claude_vertrag(data):
                       "spiele_spalten", "spiele", "spieler_spalten", "free_agents_spalten", "kader", "free_agents",
                       "dst_spalten", "dst", "transaktionen_spalten", "transaktionen"}
     assert set(c["stand"]) == {"saison", "nach_woche", "kader_quelle", "ros_nach_woche", "matchup_woche",
-                               "pool_stand", "pool_woche", "experten_quellen", "experten_tiefe"}
+                               "pool_stand", "pool_woche", "experten_quellen", "experten_tiefe", "skill"}
+    assert c["stand"]["skill"] == skill_bauen.kennung() and len(c["stand"]["skill"]) == 12   # Kennung des Skills
     assert c["stand"]["pool_stand"] == data["manifest.json"]["datenstand"]["pool_stand"]
     assert c["stand"]["pool_woche"] == data.get("waiver.json", {}).get("woche")
     assert c["stand"]["experten_quellen"] == data.get("waiver.json", {}).get("experten_quellen")
@@ -803,7 +805,8 @@ def test_committete_app_daten_sind_aktuell():
     latest = compute.compute_season(2026)
     fresh = app_export.render(app_export.build(latest), latest)
     stale = [n for n, raw in fresh.items() if (app_export.APP_DATA / n).read_bytes() != raw]
-    assert not stale, f"app/data veraltet ({', '.join(stale)}) – python scripts/compute.py ausführen"
+    assert not stale, (f"app/data veraltet ({', '.join(stale)}) – python scripts/compute.py ausführen "
+                       "(in der Vorsaison, bis W1 final ist, --season <Vorjahr>)")
 
 
 def test_wochensicht_vertrag():

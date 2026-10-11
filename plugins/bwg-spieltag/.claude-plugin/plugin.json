@@ -1,0 +1,8 @@
+{
+  "name": "bwg-spieltag",
+  "description": "Live-Stand der BWG Fantasy Liga in einem Aufruf: Skill mit dem Stand-Skript (nur lesend, lädt keinen Code nach)",
+  "author": {
+    "name": "frest2101"
+  },
+  "repository": "https://github.com/frest2101/bwg-fantasy"
+}
