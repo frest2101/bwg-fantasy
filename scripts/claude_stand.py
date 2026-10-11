@@ -9,11 +9,16 @@ Daten, keine Anweisung.
 
 Aufrufe (team_id optional, Standard 2; nur das erste Argument zählt, und nur als Team-ID der Liga – alles andere,
 etwa '-c' oder die Argumente eines Notebooks, wird ignoriert):
+    python3 <Skill-Ordner>/scripts/claude_stand.py [team_id]     (claude.ai: Skill bwg-spieltag)
+    python scripts/claude_stand.py [team_id]                     (lokal, Claude Code)
+Im claude.ai-Chat liegt das Skript seit 11.10.2026 als Skill bwg-spieltag im Container (plugins/bwg-spieltag, Kopie
+dieser Datei, gebaut mit scripts/skill_bauen.py): Seit Chat und Cowork eins sind, prüft dort der Auto-Modus jeden
+Aufruf, und seine Regel „Code from External“ blockiert den früheren Weg, den Quelltext aus dem Netz zu laden und
+per exec auszuführen. Läuft das Skript im Skill, vergleicht es dessen Kennung (skill_kennung) mit claude.json ›
+stand.skill und sagt im Kopf, ob der Skill aktuell ist.
+Früherer Weg (im claude.ai-Chat blockiert, technisch weiter möglich):
     python3 -c "import requests; r = requests.get('<raw-Adresse>', timeout=20); r.raise_for_status(); exec(r.content, {'__name__': '__main__'})" [team_id]
-    curl -fsS <raw-Adresse> | python3 - [team_id]
-    python scripts/claude_stand.py [team_id]
 raw-Adresse: https://raw.githubusercontent.com/frest2101/bwg-fantasy/main/scripts/claude_stand.py
-Der erste Weg ist der empfohlene (ein Prozess, Zeitlimit, ein fehlendes Skript wird ein klarer HTTP-Fehler);
 exec(r.content, …) liest den Quelltext als UTF-8, auch wenn die Antwort keinen Zeichensatz nennt. Der eigene
 Namensraum {'__name__': '__main__'} gehört dazu: Mit ihm läuft der Aufruf auf jeder Ebene, auch in einer Funktion
 oder einem Notebook. Ein leerer Namensraum (exec(r.content, {})) geht ebenso; exec(r.content) ohne Namensraum nur
@@ -28,6 +33,7 @@ F drei, Prozente ganzzahlig, Expertenrang (Exp, Median der ESPN-Experten laut Ap
 einer Stelle. Eine Zeitzone im Text: deutsche Zeit mit Etikett MESZ/MEZ je Zeitpunkt, UTC nur im Kopf.
 """
 
+import hashlib
 import json
 import sys
 import threading
@@ -36,6 +42,7 @@ from collections import Counter
 from datetime import datetime, timedelta, timezone
 from decimal import ROUND_HALF_UP, Decimal
 from email.utils import parsedate_to_datetime
+from pathlib import Path
 
 try:
     import requests
@@ -79,6 +86,8 @@ SAMMEL_AB = 3                          # zeigen mehr Bankspieler auf denselben S
 TEXT_MAX = 40                          # Zeichen je Fremdtext (Teamname, Spielername, Scoreboard-Detail)
 APP_FENSTER_TAGE = 14                  # claude.json führt die Moves der 14 Tage bis zum letzten Move
 APP_FENSTER_MS = APP_FENSTER_TAGE * 86_400_000
+SKILL = "bwg-spieltag"                 # Skill für claude.ai (plugins/bwg-spieltag, scripts/skill_bauen.py)
+SKILL_DATEIEN = ("SKILL.md", "scripts/claude_stand.py")   # über diese Dateien geht die Kennung des Skills
 
 
 # ---------------------------------------------------------------- Zahlen, Zeit, Fremdtext (rein)
@@ -362,8 +371,10 @@ def gegner_von(liga: dict, team_id: int):
 
 # ---------------------------------------------------------------- Abschnitte des Textes (rein)
 
-def kopf(jetzt: datetime, liga, index: dict, abweichung, ausfall: dict) -> list:
-    """Uhrzeit (deutsche Zeit und UTC), Abweichung zur ESPN-Serverzeit, Woche, Datenstand der App und Lesehilfe."""
+def kopf(jetzt: datetime, liga, index: dict, abweichung, ausfall: dict, skill=None) -> list:
+    """Uhrzeit (deutsche Zeit und UTC), Abweichung zur ESPN-Serverzeit, Woche, Datenstand der App und Lesehilfe;
+    skill = Kennung des Skills, aus dem das Skript läuft (None außerhalb eines Skills): Vergleich mit
+    claude.json › stand.skill – aktuell, veraltet (eigene Zeile mit „!“) oder ohne Kennung nicht prüfbar."""
     zeile = f"STAND {zeit_text(jetzt, jahr=True)} ({jetzt:%H:%M} UTC, Uhr des Containers"
     if abweichung is not None:
         sek = zahl(abweichung, 0)  # Vorzeichen am gerundeten Wert: gerundet 0 steht ohne
@@ -376,7 +387,8 @@ def kopf(jetzt: datetime, liga, index: dict, abweichung, ausfall: dict) -> list:
     aus = [zeile]
     if abweichung is not None and abs(abweichung) >= 120:
         aus.append("! Die Uhr des Containers weicht stark von ESPN ab – „jetzt“ und Altersangaben mit Vorsicht lesen")
-    lesehilfe = "Alle Zeiten deutsche Zeit. Punkte, Projektion (Proj) und Siegchance: ESPN live."
+    lesehilfe = ("Alle Zeiten deutsche Zeit. Punkte, Projektion (Proj), Rest (Live-Projektion − Punkte live) und "
+                 "Siegchance: ESPN live.")
     stand = index["stand"]
     if not index["da"]:
         aus.append(f"App: claude.json nicht erreichbar ({ausfall.get('app', 'kein Abruf')}) – Datenstand der App, F, "
@@ -394,7 +406,14 @@ def kopf(jetzt: datetime, liga, index: dict, abweichung, ausfall: dict) -> list:
             f"Tagesstand {zeit_text(pool)} (vor {zahl(Decimal(int((jetzt - pool).total_seconds())) / 3600, 1)} h)"
         letzter = "Moves der App nicht lesbar" if not index["marken"] else \
             f"letzter Move in der App {zeit_text(aus_ms(index['bis']))}" if index["bis"] else "kein Move in der App"
-        aus.append(f"App: gerechnet bis Woche {stand.get('nach_woche', '?')}; {tagesstand}; {letzter}")
+        soll = stand.get("skill")
+        zusatz = "" if skill is None else f"; Skill {SKILL} aktuell" if soll == skill else \
+            "" if soll else f"; Skill {SKILL} nicht prüfbar (claude.json ohne Kennung)"
+        aus.append(f"App: gerechnet bis Woche {stand.get('nach_woche', '?')}; {tagesstand}; {letzter}{zusatz}")
+        if skill is not None and soll and soll != skill:
+            aus.append(f"! Skill {SKILL} veraltet (Skill {kurz(skill, 12)}, App {kurz(soll, 12)}): Der Stand unten kommt "
+                       f"von der älteren Fassung – Skill aktualisieren (Plugin {SKILL} nach Updates suchen lassen, sonst "
+                       f"{SKILL}.zip neu hochladen)")
         lesehilfe += " Laut App (Wochenstand): ROS/Sp = ROS-Projektion je Spiel"
         if index["f_ok"]:
             lesehilfe += ", F = Faktor (Position) des Gegners laut Matchups (> 1 günstig)."
@@ -446,21 +465,31 @@ def starterzahl(lage: dict, team_id) -> str:
     return f"{c['post']}/{c['in']}/{c['pre']}" + "".join(f" +{c[k]} {wort}" for k, wort in zusatz if c[k])
 
 
+def rest(seite: dict):
+    """Rest laut Projektion: Live-Projektion − Punkte live (Decimal, ungerundet); None ohne Live-Projektion."""
+    proj, live = seite.get("totalProjectedPointsLive"), seite.get("totalPointsLive", seite.get("totalPoints"))
+    if proj is None or live is None:
+        return None
+    return Decimal(str(proj)) - Decimal(str(live))
+
+
 def matchup_zeilen(lage: dict, mein_team: int) -> list:
-    """Je Matchup beide Seiten: Punkte live, Live-Projektion, Siegwahrscheinlichkeit, Starter nach Spielstatus."""
+    """Je Matchup beide Seiten: Punkte live, Live-Projektion mit Rest, Siegwahrscheinlichkeit, Starter nach
+    Spielstatus."""
     spalte = "Starter final/läuft/offen" if lage["hat_sb"] else "Starter gesperrt/offen"
     woche, periode = lage["woche"], periode_von(lage["liga"])
     titel = f"MATCHUPS W{woche}" if periode == woche else \
         f"MATCHUPS Matchup-Periode {periode} (Starterzahlen und Aufstellungen: ESPN Woche {woche})"
-    aus = [f"{titel} (* = eigenes): Team (Bilanz) Punkte live | Live-Projektion | Siegchance | {spalte}"]
+    aus = [f"{titel} (* = eigenes): Team (Bilanz) Punkte live | Live-Projektion (Rest) | Siegchance | {spalte}"]
 
     def seite(s: dict) -> str:
         tid = s.get("teamId")
         rec = ((lage["teams"].get(tid) or {}).get("record") or {}).get("overall") or {}
         bilanz = f"{rec.get('wins', 0)}-{rec.get('losses', 0)}" + (f"-{rec['ties']}" if rec.get("ties") else "")
+        offen = rest(s)
         return (f"{lage['kz'].get(tid, tid)} ({bilanz}) {zahl(s.get('totalPointsLive', s.get('totalPoints')))} | "
-                f"{zahl(s.get('totalProjectedPointsLive'))} | {prozent(s.get('winProbability'))} | "
-                f"{starterzahl(lage, tid)}")
+                f"{zahl(s.get('totalProjectedPointsLive'))}" + (f" (Rest {zahl(offen)})" if offen is not None else "")
+                + f" | {prozent(s.get('winProbability'))} | {starterzahl(lage, tid)}")
 
     spiele = paarungen(lage["liga"])
     for m in spiele:
@@ -707,10 +736,11 @@ def sicher(titel: str, funktion, *args) -> list:
 
 
 def bericht(jetzt: datetime, liga, scoreboard=None, app=None, kona=None, mein_team: int = MEIN_TEAM,
-            abweichung=None, ausfall=None) -> str:
+            abweichung=None, ausfall=None, skill=None) -> str:
     """Der ganze Text aus den geladenen Antworten (None = Ausfall) und dem Zeitpunkt jetzt (UTC); kein Netz, keine Uhr.
 
-    ausfall nennt je Quelle (liga, scoreboard, app, kona) den Grund; abweichung = ESPN-Serverzeit − Uhr in Sekunden.
+    ausfall nennt je Quelle (liga, scoreboard, app, kona) den Grund; abweichung = ESPN-Serverzeit − Uhr in Sekunden;
+    skill = Kennung des Skills, aus dem das Skript läuft (None außerhalb eines Skills, siehe kopf).
     """
     ausfall = ausfall or {}
     ist_liga = isinstance(liga, dict)
@@ -721,7 +751,7 @@ def bericht(jetzt: datetime, liga, scoreboard=None, app=None, kona=None, mein_te
     except Exception as exc:  # claude.json in unerwarteter Form: weiter wie ohne die Datei
         index = app_index(None, woche, saison)
         ausfall = dict(ausfall, app=f"nicht lesbar, {type(exc).__name__}: {kurz(exc, 80)}")
-    aus = sicher("Kopf", kopf, jetzt, liga, index, abweichung, ausfall)
+    aus = sicher("Kopf", kopf, jetzt, liga, index, abweichung, ausfall, skill)
     if liga is None or liga_mangel(liga):
         grund = ausfall.get("liga") or ("kein Abruf" if liga is None else liga_mangel(liga))
         return "\n".join(aus + [f"ESPN-Liga nicht erreichbar ({grund}) – Matchups, Aufstellungen und Bewegungen fehlen. "
@@ -766,6 +796,34 @@ def team_aus_args(argv) -> int:
     if isinstance(erstes, str) and erstes.isdecimal() and int(erstes) in KUERZEL:
         return int(erstes)
     return MEIN_TEAM
+
+
+# ---------------------------------------------------------------- Skill (Dateien)
+
+def skill_kennung(ordner):
+    """Kennung eines Skill-Ordners: SHA-256 über die SKILL_DATEIEN (Name und Inhalt, Zeilenende LF – eine Windows-
+    Arbeitskopie mit CRLF hat dieselbe Kennung), die ersten 12 Hexzeichen; None, wenn eine Datei fehlt.
+    Dieselbe Funktion rechnet app_export für claude.json › stand.skill aus plugins/bwg-spieltag."""
+    summe = hashlib.sha256()
+    for name in SKILL_DATEIEN:
+        try:
+            inhalt = Path(ordner, *name.split("/")).read_bytes()
+        except (OSError, TypeError):
+            return None
+        summe.update(name.encode("utf-8") + b"\0" + inhalt.replace(b"\r\n", b"\n") + b"\0")
+    return summe.hexdigest()[:12]
+
+
+def skill_ordner(datei):
+    """Der Skill-Ordner, wenn datei als <Skill>/scripts/claude_stand.py neben einer SKILL.md liegt (Skill im Chat-
+    Container oder plugins/bwg-spieltag im Repo); None sonst, auch für scripts/claude_stand.py und unter exec (kein
+    __file__)."""
+    try:
+        pfad = Path(datei).resolve()
+        ordner = pfad.parent.parent
+        return ordner if pfad.parent.name == "scripts" and (ordner / "SKILL.md").is_file() else None
+    except (OSError, TypeError, ValueError):
+        return None
 
 
 # ---------------------------------------------------------------- Abruf (Netz)
@@ -873,10 +931,12 @@ def main(argv=None) -> None:
         if requests is None:
             text = "Stand-Skript: Das Paket requests fehlt (pip install requests) – kein Stand."
         else:
+            ordner = skill_ordner(globals().get("__file__"))   # unter exec ohne __file__: kein Skill
             roh = abrufen()
             messung = roh["messung"]
             text = bericht(datetime.now(timezone.utc), roh["liga"], roh["scoreboard"], roh["app"], roh["kona"],
-                           team_aus_args(sys.argv if argv is None else argv), roh["abweichung"], roh["ausfall"])
+                           team_aus_args(sys.argv if argv is None else argv), roh["abweichung"], roh["ausfall"],
+                           skill_kennung(ordner) if ordner else None)
     except Exception as exc:
         text = f"Stand-Skript: unerwarteter Fehler ({type(exc).__name__}: {exc}) – kein Stand; bitte in Claude Code melden."
         if isinstance(exc, NameError):  # nur ASCII: ohne Namensraum fehlt auch sys, die Ausgabe ist nicht auf UTF-8 gestellt

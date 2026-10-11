@@ -16,6 +16,7 @@ import espn_fetch as ef
 import fantasypros
 import matchup as matchup_module
 import players as players_module
+import skill_bauen
 from records import ranked
 from lineup import POSITION_NAMES, RB, SLOT_NAMES, WR
 from zahlen import ZERO, dec, round_to, rounded
@@ -812,7 +813,10 @@ def build_claude(result: dict, teams: dict, schedule: dict, players: dict | None
                      "pool_stand": waiver["stand"] if waiver else None, "pool_woche": waiver["woche"] if waiver else None,
                      # Expertenränge pool_woche: Zahl der ESPN-Experten (0 = noch nicht veröffentlicht), Listentiefe N
                      "experten_quellen": waiver.get("experten_quellen") if waiver else None,
-                     "experten_tiefe": waiver.get("experten_tiefe") if waiver else None},
+                     "experten_tiefe": waiver.get("experten_tiefe") if waiver else None,
+                     # Kennung des Skills bwg-spieltag (plugins/, scripts/skill_bauen.py): Das Stand-Skript im Skill
+                     # vergleicht sie mit seiner eigenen und meldet „veraltet“, wenn der Skill im Chat älter ist
+                     "skill": skill_bauen.kennung()},
            "teams": {k(t["team_id"]): t["name"] for t in teams["teams"]},
            "tabelle_spalten": ["rang", "team", "name", "w_l_t", "pf", "allplay_pct", "matchup_glueck", "effizienz_pct", "form",
                                "score_50_10z", "kader", "pr_rang", "mu", "e", "trend", "playoff_anteil"],

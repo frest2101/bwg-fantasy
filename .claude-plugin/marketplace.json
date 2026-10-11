@@ -1,0 +1,16 @@
+{
+  "name": "bwg-fantasy",
+  "owner": {
+    "name": "frest2101"
+  },
+  "metadata": {
+    "description": "Skills zur BWG Fantasy Liga aus dem öffentlichen Liga-Repo frest2101/bwg-fantasy"
+  },
+  "plugins": [
+    {
+      "name": "bwg-spieltag",
+      "source": "./plugins/bwg-spieltag",
+      "description": "Live-Stand der BWG Fantasy Liga in einem Aufruf: Skill mit dem Stand-Skript (nur lesend, lädt keinen Code nach)"
+    }
+  ]
+}

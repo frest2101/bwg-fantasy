@@ -349,7 +349,7 @@ def test_kopf_vor_der_umstellung():
                          " – ESPN Woche 7")
     assert zeilen[1] == ("App: gerechnet bis Woche 6; Tagesstand Fr 23.10. 12:45 MESZ (vor 1.3 h); "
                          "letzter Move in der App Mi 21.10. 10:16 MESZ")
-    assert zeilen[2].startswith("Alle Zeiten deutsche Zeit. Punkte, Projektion (Proj) und Siegchance: ESPN live.")
+    assert zeilen[2].startswith("Alle Zeiten deutsche Zeit. Punkte, Projektion (Proj), Rest (Live-Projektion − Punkte live) und Siegchance: ESPN live.")
     assert zeilen[2].endswith("ROS/Sp = ROS-Projektion je Spiel, F = Faktor (Position) des Gegners laut Matchups (> 1 günstig).")
     assert "nicht auswertbar" not in "\n".join(zeilen)
 
@@ -378,11 +378,31 @@ def test_kopf_nennt_abweichende_matchup_periode():
     zeilen = cs.bericht(JETZT, daten, scoreboard(), app(), kona(), abweichung=2.4).split("\n")
     assert zeilen[0].endswith(" – ESPN Woche 7 (Matchup-Periode 6)")
     start = zeilen.index("MATCHUPS Matchup-Periode 6 (Starterzahlen und Aufstellungen: ESPN Woche 7) (* = eigenes): Team "
-                         "(Bilanz) Punkte live | Live-Projektion | Siegchance | Starter final/läuft/offen")
-    assert zeilen[start + 1:start + 3] == [" *HJS (5-1) 150.00 | 150.00 | 100 % | 1/1/2 +1 Bye  –  "
-                                           "ACB (3-2-1) 1.00 | 1.00 | 0 % | 0/0/0  [Sieger HJS]", ""]
+                         "(Bilanz) Punkte live | Live-Projektion (Rest) | Siegchance | Starter final/läuft/offen")
+    assert zeilen[start + 1:start + 3] == [" *HJS (5-1) 150.00 | 150.00 (Rest 0.00) | 100 % | 1/1/2 +1 Bye  –  "
+                                           "ACB (3-2-1) 1.00 | 1.00 (Rest 0.00) | 0 % | 0/0/0  [Sieger HJS]", ""]
     assert "ACB Testteam Eins – Slot Spieler NFL Spiel | Punkte | Proj | F" in zeilen       # Gegner der Periode
     assert not text().split("\n")[0].endswith(")") and "MATCHUPS W7 (* = eigenes): " in text()
+
+
+def test_kopf_nennt_den_skill_nur_im_skill():
+    """skill = Kennung des Skills, aus dem das Skript läuft: gleich claude.json › stand.skill → „aktuell“ in der
+    App-Zeile; anders → eigene Zeile „! … veraltet“ (der Stand folgt trotzdem); claude.json ohne Kennung → „nicht
+    prüfbar“; außerhalb eines Skills (skill None) kein Wort dazu; ohne claude.json kein Vergleich."""
+    mit = app()
+    mit["stand"]["skill"] = "1feac3ae5905"
+    zeilen = text(app=mit, skill="1feac3ae5905").split("\n")
+    assert zeilen[1].endswith("; letzter Move in der App Mi 21.10. 10:16 MESZ; Skill bwg-spieltag aktuell")
+    assert zeilen[2].startswith("Alle Zeiten deutsche Zeit.")
+    zeilen = text(app=mit, skill="0123456789ab").split("\n")
+    assert zeilen[1].endswith("10:16 MESZ") and zeilen[2] == (
+        "! Skill bwg-spieltag veraltet (Skill 0123456789ab, App 1feac3ae5905): Der Stand unten kommt von der älteren "
+        "Fassung – Skill aktualisieren (Plugin bwg-spieltag nach Updates suchen lassen, sonst bwg-spieltag.zip neu "
+        "hochladen)")
+    assert "HJS Testteam Zwei – Slot Spieler NFL Spiel | Punkte | Proj | F" in zeilen
+    assert text(skill="0123456789ab").split("\n")[1].endswith("; Skill bwg-spieltag nicht prüfbar (claude.json ohne Kennung)")
+    assert "Skill" not in text(app=mit) and "Skill" not in text()
+    assert "Skill" not in text(app=None, skill="0123456789ab", ausfall={"app": "HTTP 404"})
 
 
 def test_nfl_spiele_mit_etikett_je_anstoss():
@@ -405,14 +425,23 @@ def test_nur_eine_zeitzone_im_text():
 
 def test_matchup_zeilen():
     zeilen = text().split("\n")
-    start = zeilen.index("MATCHUPS W7 (* = eigenes): Team (Bilanz) Punkte live | Live-Projektion | Siegchance | "
+    start = zeilen.index("MATCHUPS W7 (* = eigenes): Team (Bilanz) Punkte live | Live-Projektion (Rest) | Siegchance | "
                          "Starter final/läuft/offen")
-    assert zeilen[start + 1] == (" *SGK (2-4) 9.00 | 27.13 | 35 % | 1/0/1  –  "
-                                 "HJS (5-1) 29.01 | 61.50 | 66 % | 1/1/2 +1 Bye")
+    assert zeilen[start + 1] == (" *SGK (2-4) 9.00 | 27.13 (Rest 18.13) | 35 % | 1/0/1  –  "
+                                 "HJS (5-1) 29.01 | 61.50 (Rest 32.49) | 66 % | 1/1/2 +1 Bye")
     assert zeilen[start + 2] == "  ACB (3-2-1) 100.50 | – | – | 0/0/0  –  4DS (2-4) 90.00 | – | – | 0/0/0  [Sieger ACB]"
     assert zeilen[start + 3] == ""                                   # die Vorwoche (150.00) kommt nicht vor
     assert cs.gegner_von(liga(), 2) == 10 and cs.gegner_von(liga(), 3) == 1 and cs.gegner_von(liga(), 7) is None
     assert "kein Gegner" not in "\n".join(zeilen)
+
+
+def test_rest_ist_live_projektion_minus_punkte_ungerundet():
+    """Rest = Live-Projektion − Punkte live, in Decimal ohne Zwischenrundung; gerundet erst in der Zeile (half up)."""
+    assert cs.rest({"totalProjectedPointsLive": 61.5, "totalPointsLive": 29.011666}) == Decimal("32.488334")
+    assert cs.rest({"totalProjectedPointsLive": 27.125, "totalPointsLive": 9.0}) == Decimal("18.125")   # Zeile: 18.13
+    assert cs.rest({"totalProjectedPointsLive": 20.0, "totalPoints": 7.5}) == Decimal("12.5")   # ohne Live-Feld
+    assert cs.rest({"totalPoints": 100.5}) is None and cs.rest({"totalProjectedPointsLive": 3.0}) is None
+    assert cs.zahl(cs.rest({"totalProjectedPointsLive": 0.1, "totalPointsLive": 0.3})) == "-0.20"
 
 
 def test_matchup_freilos_und_keine_paarung():
@@ -441,7 +470,7 @@ def test_matchup_unentschieden_und_playoff_runde():
     zeilen = cs.bericht(JETZT, daten, scoreboard(), app(), kona()).split("\n")
     assert ("  ACB (3-2-1) 100.50 | – | – | 0/0/0  –  4DS (2-4) 90.00 | – | – | 0/0/0  [Unentschieden]  [WINNERS_BRACKET]"
             in zeilen)
-    assert " *SGK (2-4) 9.00 | 27.13 | 35 % | 1/0/1  –  HJS (5-1) 29.01 | 61.50 | 66 % | 1/1/2 +1 Bye" in zeilen
+    assert " *SGK (2-4) 9.00 | 27.13 (Rest 18.13) | 35 % | 1/0/1  –  HJS (5-1) 29.01 | 61.50 (Rest 32.49) | 66 % | 1/1/2 +1 Bye" in zeilen
 
 
 def test_verschobenes_spiel_ist_eine_eigene_gruppe_und_sein_starter_tauschbar():
@@ -458,7 +487,7 @@ def test_verschobenes_spiel_ist_eine_eigene_gruppe_und_sein_starter_tauschbar():
                                            "  offen (Zeit offen): NYG@NYJ",
                                            "  verschoben (laut ESPN beendet ohne Ergebnis): DAL@PHI (Postponed)",
                                            ""]
-    assert " *SGK (2-4) 9.00 | 27.13 | 35 % | 1/0/0 +1 verschoben  –  HJS (5-1) 29.01 | 61.50 | 66 % | 1/1/2 +1 Bye" in zeilen
+    assert " *SGK (2-4) 9.00 | 27.13 (Rest 18.13) | 35 % | 1/0/0 +1 verschoben  –  HJS (5-1) 29.01 | 61.50 (Rest 32.49) | 66 % | 1/1/2 +1 Bye" in zeilen
     assert "  QB   Gustav Gegner PHI vs DAL verschoben (Postponed) | – | 18.13" in zeilen
     assert ("  Bank Erwin Ersatz QB SF @ SEA So 19:00 MEZ | – | 19.00 → mehr Proj als Starter Gustav Gegner "
             "(QB 18.13 verschoben)") in zeilen
@@ -588,7 +617,7 @@ def test_starter_ohne_nfl_team():
     daten = liga()
     spieler_von(daten, 102)["proTeamId"] = 0
     zeilen = cs.bericht(JETZT, daten, scoreboard(), app(), kona()).split("\n")
-    assert " *SGK (2-4) 9.00 | 27.13 | 35 % | 1/0/1  –  HJS (5-1) 29.01 | 61.50 | 66 % | 1/1/1 +1 Bye +1 ohne Team" in zeilen
+    assert " *SGK (2-4) 9.00 | 27.13 (Rest 18.13) | 35 % | 1/0/1  –  HJS (5-1) 29.01 | 61.50 (Rest 32.49) | 66 % | 1/1/1 +1 Bye +1 ohne Team" in zeilen
     assert "  RB   Rudi Beispiel FA ohne NFL-Team | – | – | F 0.947" in zeilen
     assert ("  Bank Otto Offen RB SEA vs SF So 19:00 MEZ | – | 3.00 → mehr Proj als Starter Rudi Beispiel "
             "(RB ohne NFL-Team)") in zeilen
@@ -803,7 +832,7 @@ def test_app_zeigt_eine_andere_saison():
     ausgabe = text(app=alt)
     zeilen = ausgabe.split("\n")
     assert zeilen[1] == "App zeigt Saison 2025, ESPN Saison 2026 – F, ROS/Sp, Marken [App]/[NEU] und Kadervergleich fehlen"
-    assert zeilen[2] == "Alle Zeiten deutsche Zeit. Punkte, Projektion (Proj) und Siegchance: ESPN live."
+    assert zeilen[2] == "Alle Zeiten deutsche Zeit. Punkte, Projektion (Proj), Rest (Live-Projektion − Punkte live) und Siegchance: ESPN live."
     for fehlt in ("[App]", "[NEU", "Kader live", "Kadervergleich", "| F", "ROS/Sp", "neuer als die App", "Marken nicht"):
         assert fehlt not in "\n".join(zeilen[3:])
     assert "HJS Testteam Zwei – Slot Spieler NFL Spiel | Punkte | Proj" in zeilen
@@ -829,7 +858,7 @@ def test_ausfall_scoreboard():
     assert ("NFL-Scoreboard nicht erreichbar (HTTP 503) – Spielstatus, Gegner und Anstoßzeiten fehlen; gesperrt/offen "
             "je Spieler stammt aus dem ESPN-Kader (lineupLocked). Byes nicht erkennbar – D/ST-Projektionen können "
             "spielfreie Teams betreffen") in ausgabe.split("\n")
-    assert "| Starter gesperrt/offen" in ausgabe and "| 1/1  –  HJS (5-1) 29.01 | 61.50 | 66 % | 2/3" in ausgabe
+    assert "| Starter gesperrt/offen" in ausgabe and "| 1/1  –  HJS (5-1) 29.01 | 61.50 (Rest 32.49) | 66 % | 2/3" in ausgabe
     assert "  QB   Quentin Erfunden KC gesperrt | 21.35 | 20.00 | F 1.050" in ausgabe
     assert "  RB   Rudi Beispiel SF offen | – | 15.33 | F 0.947" in ausgabe
     assert "→ mehr Proj als Starter Willi Muster (WR 0.00)" in ausgabe and "nicht auswertbar" not in ausgabe
@@ -861,7 +890,7 @@ def test_ausfall_claude_json():
     zeilen = ausgabe.split("\n")
     assert zeilen[1] == ("App: claude.json nicht erreichbar (HTTP 404, ConnectionError) – Datenstand der App, F, ROS/Sp, "
                          "Marken [App]/[NEU] und Kadervergleich fehlen")
-    assert zeilen[2] == "Alle Zeiten deutsche Zeit. Punkte, Projektion (Proj) und Siegchance: ESPN live."
+    assert zeilen[2] == "Alle Zeiten deutsche Zeit. Punkte, Projektion (Proj), Rest (Live-Projektion − Punkte live) und Siegchance: ESPN live."
     for fehlt in ("[App]", "[NEU", "Kader live", "Kadervergleich", "| F", "ROS/Sp 9.88", "neuer als die App", "Marken nicht"):
         assert fehlt not in "\n".join(zeilen[3:])
     assert " *SGK (2-4) 9.00" in ausgabe                               # Kürzel kommen nicht aus claude.json
