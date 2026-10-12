@@ -1,5 +1,5 @@
 {
-"stand":"2026-10-12T0710Z",
+"stand":"2026-10-12T0902Z",
 "woche":5,
 "einheiten":{"temp":"°C","wind":"km/h","boeen":"km/h","regen_wahrsch":"%","niederschlag":"mm","schnee":"cm"},
 "schwellen":{"wind":25,"boeen":40,"regen_wahrsch":60,"schnee":0},
@@ -18,7 +18,7 @@
 {"id":401872991,"woche":5,"kickoff":"2026-10-11T20:25Z","tbd":false,"heim":"ARI","gast":"DET","stadion":"State Farm Stadium","ort":"Glendale, AZ","dach":"beweglich","neutral":false,"temp":27.2,"wind":23.6,"boeen":47.2,"regen_wahrsch":17,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
 {"id":401872992,"woche":5,"kickoff":"2026-10-11T20:25Z","tbd":false,"heim":"SEA","gast":"SF","stadion":"Lumen Field","ort":"Seattle, WA","dach":"offen","neutral":false,"temp":14.3,"wind":12.5,"boeen":20.9,"regen_wahrsch":0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
 {"id":401872993,"woche":5,"kickoff":"2026-10-12T00:20Z","tbd":false,"heim":"ATL","gast":"BAL","stadion":"Mercedes-Benz Stadium","ort":"Atlanta, GA","dach":"beweglich","neutral":false,"temp":17.1,"wind":10.1,"boeen":31.7,"regen_wahrsch":0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
-{"id":401872994,"woche":5,"kickoff":"2026-10-13T00:15Z","tbd":false,"heim":"LAR","gast":"BUF","stadion":"SoFi Stadium","ort":"Inglewood, CA","dach":"fest","neutral":false,"temp":15.7,"wind":6.7,"boeen":24.8,"regen_wahrsch":2,"niederschlag":0.0,"schnee":0.0,"markierung":[]}
+{"id":401872994,"woche":5,"kickoff":"2026-10-13T00:15Z","tbd":false,"heim":"LAR","gast":"BUF","stadion":"SoFi Stadium","ort":"Inglewood, CA","dach":"fest","neutral":false,"temp":15.0,"wind":3.4,"boeen":16.9,"regen_wahrsch":2,"niederschlag":2.2,"schnee":0.0,"markierung":[]}
 ],
 "ist":[
 {"id":401872656,"woche":1,"kickoff":"2026-09-10T00:20Z","tbd":false,"heim":"SEA","gast":"NE","stadion":"Lumen Field","ort":"Seattle, WA","dach":"offen","neutral":false,"temp":21.6,"wind":6.3,"boeen":14.0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
