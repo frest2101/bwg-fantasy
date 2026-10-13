@@ -1,6 +1,6 @@
 {
 "through_week":4,
-"stand":"2026-10-13T0600Z",
+"stand":"2026-10-13T0709Z",
 "draft_datum":1788110942931,
 "keeper_zahl":12,
 "kader_plaetze":24,
@@ -264,7 +264,7 @@
 {"id":4360248,"name":"Kyle Pitts Sr.","pos":"TE","nfl":"ATL","team":10,"art":"keeper","pick":233,"runde":24,"von":10,"seit":null,"g":4,"avg":2.93,"vj_g":17,"vj_pts":212.8,"vj_avg":12.52,"vj_delta":-9.59,"rookie":false,"alter":26.0,"nfl_jahr":6,"wert":1925,"wert_rang":107,"wert_posrang":12,"wert_trend":-804,"wert_ue":221,"in_app":true},
 {"id":4360310,"name":"Trevor Lawrence","pos":"QB","nfl":"JAX","team":10,"art":"keeper","pick":153,"runde":16,"von":10,"seit":null,"g":4,"avg":26.1,"vj_g":17,"vj_pts":503.39,"vj_avg":29.61,"vj_delta":-3.51,"rookie":false,"alter":27.0,"nfl_jahr":6,"wert":5115,"wert_rang":26,"wert_posrang":8,"wert_trend":101,"wert_ue":3411,"in_app":true},
 {"id":4427366,"name":"Breece Hall","pos":"RB","nfl":"NYJ","team":10,"art":"keeper","pick":173,"runde":18,"von":10,"seit":null,"g":3,"avg":14.83,"vj_g":16,"vj_pts":224.78,"vj_avg":14.05,"vj_delta":0.78,"rookie":false,"alter":25.3,"nfl_jahr":5,"wert":3815,"wert_rang":44,"wert_posrang":12,"wert_trend":59,"wert_ue":2111,"in_app":true},
-{"id":4432708,"name":"Marvin Harrison Jr.","pos":"WR","nfl":"ARI","team":10,"art":"keeper","pick":203,"runde":21,"von":10,"seit":null,"g":4,"avg":4.88,"vj_g":12,"vj_pts":127.8,"vj_avg":10.65,"vj_delta":-5.78,"rookie":false,"alter":24.2,"nfl_jahr":3,"wert":2587,"wert_rang":83,"wert_posrang":29,"wert_trend":-377,"wert_ue":883,"in_app":true},
+{"id":4432708,"name":"Marvin Harrison Jr.","pos":"WR","nfl":"HOU","team":10,"art":"keeper","pick":203,"runde":21,"von":10,"seit":null,"g":4,"avg":4.88,"vj_g":12,"vj_pts":127.8,"vj_avg":10.65,"vj_delta":-5.78,"rookie":false,"alter":24.2,"nfl_jahr":3,"wert":2587,"wert_rang":83,"wert_posrang":29,"wert_trend":-377,"wert_ue":883,"in_app":true},
 {"id":4569559,"name":"Devaughn Vele","pos":"WR","nfl":"NO","team":10,"art":"draft","pick":83,"runde":9,"von":10,"seit":1788110942931,"g":4,"avg":13.9,"vj_g":13,"vj_pts":66.3,"vj_avg":5.1,"vj_delta":8.8,"rookie":false,"alter":28.8,"nfl_jahr":3,"wert":1444,"wert_rang":147,"wert_posrang":55,"wert_trend":684,"wert_ue":-260,"in_app":true},
 {"id":4685278,"name":"Luther Burden III","pos":"WR","nfl":"CHI","team":10,"art":"keeper","pick":213,"runde":22,"von":10,"seit":null,"g":4,"avg":11.48,"vj_g":15,"vj_pts":138.9,"vj_avg":9.26,"vj_delta":2.22,"rookie":false,"alter":22.8,"nfl_jahr":2,"wert":3194,"wert_rang":62,"wert_posrang":21,"wert_trend":-466,"wert_ue":1490,"in_app":true},
 {"id":4685512,"name":"Jadarian Price","pos":"RB","nfl":"SEA","team":10,"art":"draft","pick":3,"runde":1,"von":10,"seit":1788110942931,"g":4,"avg":3.0,"vj_g":null,"vj_pts":null,"vj_avg":null,"vj_delta":null,"rookie":true,"alter":23.0,"nfl_jahr":1,"wert":2648,"wert_rang":82,"wert_posrang":24,"wert_trend":-699,"wert_ue":944,"in_app":true},
