@@ -38,13 +38,13 @@ function power(box, r, svg) {
     {k: 'p', l: 'Projektion Kader', num: 1, x: 1, v: t => t.pr.p, f: t => U.val(t.pr.p, v => U.num(v, 1))},
     {k: 'vw', l: 'Rang Vorwoche', num: 1, x: 1, v: t => t.pr.rang_vorwoche, d: 1, f: t => U.val(t.pr.rang_vorwoche, v => v + '.', 'noch kein Vorwochenvergleich')}]}),
   U.legend(['mu', 'kader-proj', 'e', 'pr-rang', 'trend', 'kernsatz']));
-  // Kernsätze als Liste (auf dem Handy lesbar); ohne Freigabe „folgt“
+  // Kernsätze als Liste (auf dem Handy lesbar); fehlt der Satz der Woche noch, „folgt“
   const sorted = U.sortRows(rows, t => t.pr.rang, 1);
   const any = rows.some(t => t.pr.kernsatz);
   U.ap(box, U.card('Kernsätze', any
     ? h('ol', {class: 'ksl'}, sorted.map(t => h('li', null, h('strong', null, U.tl(t.team_id)), ' ',
       t.pr.kernsatz ? h('p', {class: 'ks'}, t.pr.kernsatz) : h('span', {class: 'na'}, 'folgt'))))
-    : h('p', {class: 'note'}, 'Die Kernsätze folgen nach Freigabe.')));
+    : h('p', {class: 'note'}, 'Die Kernsätze der Woche folgen.')));
   U.ap(box, svg.fig('Stärke mit Unsicherheit', svg.dots({title: 'Stärke je Team mit Unsicherheit', fmt: v => U.num(v, 1),
     desc: `${sorted[0].name} vorn mit Stärke ${U.num(sorted[0].pr.mu, 1)}, ${sorted.at(-1).name} hinten mit ${U.num(sorted.at(-1).pr.mu, 1)}; die Striche zeigen die Unsicherheit.`,
     rows: sorted.map(t => ({label: t.kuerzel, v: t.pr.mu, lo: t.pr.mu - t.pr.se, hi: t.pr.mu + t.pr.se}))}),
