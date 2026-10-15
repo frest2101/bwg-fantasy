@@ -75,5 +75,5 @@
 {"id":"0454cd2e-6489-44a6-ab22-c9843c2216b0","type":"FREEAGENT","team_id":9,"datum":1791983541109,"periode":6,"items":[{"type":"ADD","player_id":5082424,"name":"Dominic Zvada","from_team_id":0,"to_team_id":9,"in_app":true},{"type":"DROP","player_id":4360234,"name":"Evan McPherson","from_team_id":9,"to_team_id":0,"in_app":true}]},
 {"id":"91328233-53ed-404e-af9a-6a93c9982a79","type":"FREEAGENT","team_id":4,"datum":1791988772305,"periode":6,"items":[{"type":"ADD","player_id":4427095,"name":"DeMario Douglas","from_team_id":0,"to_team_id":4,"in_app":true},{"type":"DROP","player_id":4373626,"name":"Tyler Allgeier","from_team_id":4,"to_team_id":0,"in_app":true}]}
 ],
-"aufstellungswechsel":{"1":28,"2":28,"3":13,"4":24,"5":26,"6":6,"7":22,"8":21,"9":29,"10":46}
+"aufstellungswechsel":{"1":28,"2":28,"3":13,"4":24,"5":26,"6":7,"7":22,"8":21,"9":29,"10":46}
 }
