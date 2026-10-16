@@ -78,5 +78,5 @@
 {"id":"7197028a-74cf-4944-8867-f51303397222","type":"FREEAGENT","team_id":3,"datum":1792106786276,"periode":6,"items":[{"type":"ADD","player_id":3895856,"name":"Christian Kirk","from_team_id":0,"to_team_id":3,"in_app":true},{"type":"DROP","player_id":4384852,"name":"Dohnte Meyers","from_team_id":3,"to_team_id":0,"in_app":true}]},
 {"id":"5a7d5799-f507-4cb0-87d1-a0a310d00245","type":"FREEAGENT","team_id":10,"datum":1792123477580,"periode":6,"items":[{"type":"ADD","player_id":4249836,"name":"Pierre Strong Jr.","from_team_id":0,"to_team_id":10,"in_app":true},{"type":"DROP","player_id":4036133,"name":"T.J. Hockenson","from_team_id":10,"to_team_id":0,"in_app":true}]}
 ],
-"aufstellungswechsel":{"1":28,"2":28,"3":13,"4":24,"5":28,"6":7,"7":23,"8":24,"9":29,"10":48}
+"aufstellungswechsel":{"1":28,"2":29,"3":13,"4":24,"5":28,"6":7,"7":23,"8":24,"9":29,"10":48}
 }
