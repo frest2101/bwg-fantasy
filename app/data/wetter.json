@@ -1,10 +1,10 @@
 {
-"stand":"2026-10-16T0310Z",
+"stand":"2026-10-16T0413Z",
 "woche":6,
 "einheiten":{"temp":"°C","wind":"km/h","boeen":"km/h","regen_wahrsch":"%","niederschlag":"mm","schnee":"cm"},
 "schwellen":{"wind":25,"boeen":40,"regen_wahrsch":60,"schnee":0},
 "prognose":[
-{"id":401872995,"woche":6,"kickoff":"2026-10-16T00:15Z","tbd":false,"heim":"DEN","gast":"SEA","stadion":"Empower Field at Mile High","ort":"Denver, CO","dach":"offen","neutral":false,"temp":9.5,"wind":4.7,"boeen":24.1,"regen_wahrsch":0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
+{"id":401872995,"woche":6,"kickoff":"2026-10-16T00:15Z","tbd":false,"heim":"DEN","gast":"SEA","stadion":"Empower Field at Mile High","ort":"Denver, CO","dach":"offen","neutral":false,"temp":9.3,"wind":6.8,"boeen":24.1,"regen_wahrsch":0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
 {"id":401872996,"woche":6,"kickoff":"2026-10-18T13:30Z","tbd":false,"heim":"JAX","gast":"HOU","stadion":"Wembley Stadium","ort":"London, England","dach":"offen","neutral":true,"temp":10.5,"wind":21.4,"boeen":44.6,"regen_wahrsch":59,"niederschlag":0.4,"schnee":0.0,"markierung":["boeen"]},
 {"id":401872997,"woche":6,"kickoff":"2026-10-18T17:00Z","tbd":false,"heim":"CLE","gast":"BAL","stadion":"Huntington Bank Field","ort":"Cleveland, OH","dach":"offen","neutral":false,"temp":15.4,"wind":10.8,"boeen":16.6,"regen_wahrsch":0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
 {"id":401872998,"woche":6,"kickoff":"2026-10-18T17:00Z","tbd":false,"heim":"PHI","gast":"CAR","stadion":"Lincoln Financial Field","ort":"Philadelphia, PA","dach":"offen","neutral":false,"temp":14.6,"wind":13.6,"boeen":20.5,"regen_wahrsch":0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
