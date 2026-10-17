@@ -1,5 +1,5 @@
 {
-"stand":"2026-10-17T0805Z",
+"stand":"2026-10-17T0906Z",
 "woche":6,
 "einheiten":{"temp":"°C","wind":"km/h","boeen":"km/h","regen_wahrsch":"%","niederschlag":"mm","schnee":"cm"},
 "schwellen":{"wind":25,"boeen":40,"regen_wahrsch":60,"schnee":0},
@@ -11,10 +11,10 @@
 {"id":401872999,"woche":6,"kickoff":"2026-10-18T17:00Z","tbd":false,"heim":"ATL","gast":"CHI","stadion":"Mercedes-Benz Stadium","ort":"Atlanta, GA","dach":"beweglich","neutral":false,"temp":16.7,"wind":22.3,"boeen":36.4,"regen_wahrsch":0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
 {"id":401873000,"woche":6,"kickoff":"2026-10-18T17:00Z","tbd":false,"heim":"NYG","gast":"NO","stadion":"MetLife Stadium","ort":"East Rutherford, NJ","dach":"offen","neutral":false,"temp":13.9,"wind":10.1,"boeen":15.1,"regen_wahrsch":0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
 {"id":401873001,"woche":6,"kickoff":"2026-10-18T17:00Z","tbd":false,"heim":"NE","gast":"NYJ","stadion":"Gillette Stadium","ort":"Foxborough, MA","dach":"offen","neutral":false,"temp":11.4,"wind":4.8,"boeen":8.6,"regen_wahrsch":0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
-{"id":401873002,"woche":6,"kickoff":"2026-10-18T17:00Z","tbd":false,"heim":"TB","gast":"PIT","stadion":"Raymond James Stadium","ort":"Tampa, FL","dach":"offen","neutral":false,"temp":23.6,"wind":20.8,"boeen":35.6,"regen_wahrsch":7,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
+{"id":401873002,"woche":6,"kickoff":"2026-10-18T17:00Z","tbd":false,"heim":"TB","gast":"PIT","stadion":"Raymond James Stadium","ort":"Tampa, FL","dach":"offen","neutral":false,"temp":23.6,"wind":20.8,"boeen":35.6,"regen_wahrsch":0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
 {"id":401873003,"woche":6,"kickoff":"2026-10-18T17:00Z","tbd":false,"heim":"IND","gast":"TEN","stadion":"Lucas Oil Stadium","ort":"Indianapolis, IN","dach":"beweglich","neutral":false,"temp":14.3,"wind":10.5,"boeen":16.2,"regen_wahrsch":0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
-{"id":401873004,"woche":6,"kickoff":"2026-10-18T20:05Z","tbd":false,"heim":"LAR","gast":"ARI","stadion":"SoFi Stadium","ort":"Inglewood, CA","dach":"fest","neutral":false,"temp":29.4,"wind":14.9,"boeen":22.3,"regen_wahrsch":0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
-{"id":401873005,"woche":6,"kickoff":"2026-10-18T20:25Z","tbd":false,"heim":"LV","gast":"BUF","stadion":"Allegiant Stadium","ort":"Las Vegas, NV","dach":"fest","neutral":false,"temp":20.8,"wind":9.0,"boeen":15.5,"regen_wahrsch":0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
+{"id":401873004,"woche":6,"kickoff":"2026-10-18T20:05Z","tbd":false,"heim":"LAR","gast":"ARI","stadion":"SoFi Stadium","ort":"Inglewood, CA","dach":"fest","neutral":false,"temp":29.4,"wind":14.9,"boeen":22.3,"regen_wahrsch":1,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
+{"id":401873005,"woche":6,"kickoff":"2026-10-18T20:25Z","tbd":false,"heim":"LV","gast":"BUF","stadion":"Allegiant Stadium","ort":"Las Vegas, NV","dach":"fest","neutral":false,"temp":20.8,"wind":9.0,"boeen":15.5,"regen_wahrsch":3,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
 {"id":401873006,"woche":6,"kickoff":"2026-10-18T20:25Z","tbd":false,"heim":"KC","gast":"LAC","stadion":"GEHA Field at Arrowhead Stadium","ort":"Kansas City, MO","dach":"offen","neutral":false,"temp":17.1,"wind":16.5,"boeen":28.1,"regen_wahrsch":0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
 {"id":401873007,"woche":6,"kickoff":"2026-10-19T00:20Z","tbd":false,"heim":"GB","gast":"DAL","stadion":"Lambeau Field","ort":"Green Bay, WI","dach":"offen","neutral":false,"temp":8.7,"wind":11.4,"boeen":30.2,"regen_wahrsch":0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
 {"id":401873008,"woche":6,"kickoff":"2026-10-20T00:15Z","tbd":false,"heim":"SF","gast":"WSH","stadion":"Levi's Stadium","ort":"Santa Clara, CA","dach":"offen","neutral":false,"temp":17.3,"wind":14.3,"boeen":16.6,"regen_wahrsch":2,"niederschlag":0.0,"schnee":0.0,"markierung":[]}
