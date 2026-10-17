@@ -1,5 +1,5 @@
 {
-"stand":"2026-10-17T0508Z",
+"stand":"2026-10-17T0606Z",
 "woche":6,
 "einheiten":{"temp":"°C","wind":"km/h","boeen":"km/h","regen_wahrsch":"%","niederschlag":"mm","schnee":"cm"},
 "schwellen":{"wind":25,"boeen":40,"regen_wahrsch":60,"schnee":0},
@@ -16,8 +16,8 @@
 {"id":401873004,"woche":6,"kickoff":"2026-10-18T20:05Z","tbd":false,"heim":"LAR","gast":"ARI","stadion":"SoFi Stadium","ort":"Inglewood, CA","dach":"fest","neutral":false,"temp":28.0,"wind":17.5,"boeen":26.3,"regen_wahrsch":0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
 {"id":401873005,"woche":6,"kickoff":"2026-10-18T20:25Z","tbd":false,"heim":"LV","gast":"BUF","stadion":"Allegiant Stadium","ort":"Las Vegas, NV","dach":"fest","neutral":false,"temp":22.4,"wind":11.2,"boeen":18.7,"regen_wahrsch":0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
 {"id":401873006,"woche":6,"kickoff":"2026-10-18T20:25Z","tbd":false,"heim":"KC","gast":"LAC","stadion":"GEHA Field at Arrowhead Stadium","ort":"Kansas City, MO","dach":"offen","neutral":false,"temp":17.1,"wind":17.4,"boeen":30.2,"regen_wahrsch":0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
-{"id":401873007,"woche":6,"kickoff":"2026-10-19T00:20Z","tbd":false,"heim":"GB","gast":"DAL","stadion":"Lambeau Field","ort":"Green Bay, WI","dach":"offen","neutral":false,"temp":10.8,"wind":21.9,"boeen":54.0,"regen_wahrsch":0,"niederschlag":0.0,"schnee":0.0,"markierung":["boeen"]},
-{"id":401873008,"woche":6,"kickoff":"2026-10-20T00:15Z","tbd":false,"heim":"SF","gast":"WSH","stadion":"Levi's Stadium","ort":"Santa Clara, CA","dach":"offen","neutral":false,"temp":17.2,"wind":14.4,"boeen":17.3,"regen_wahrsch":2,"niederschlag":0.0,"schnee":0.0,"markierung":[]}
+{"id":401873007,"woche":6,"kickoff":"2026-10-19T00:20Z","tbd":false,"heim":"GB","gast":"DAL","stadion":"Lambeau Field","ort":"Green Bay, WI","dach":"offen","neutral":false,"temp":11.4,"wind":22.3,"boeen":54.0,"regen_wahrsch":0,"niederschlag":0.0,"schnee":0.0,"markierung":["boeen"]},
+{"id":401873008,"woche":6,"kickoff":"2026-10-20T00:15Z","tbd":false,"heim":"SF","gast":"WSH","stadion":"Levi's Stadium","ort":"Santa Clara, CA","dach":"offen","neutral":false,"temp":17.3,"wind":14.3,"boeen":17.3,"regen_wahrsch":2,"niederschlag":0.0,"schnee":0.0,"markierung":[]}
 ],
 "ist":[
 {"id":401872656,"woche":1,"kickoff":"2026-09-10T00:20Z","tbd":false,"heim":"SEA","gast":"NE","stadion":"Lumen Field","ort":"Seattle, WA","dach":"offen","neutral":false,"temp":21.6,"wind":6.3,"boeen":14.0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
