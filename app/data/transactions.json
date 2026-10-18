@@ -80,7 +80,8 @@
 {"id":"cebd483e-ebdc-4e7d-9657-1871fe9579ad","type":"FREEAGENT","team_id":1,"datum":1792173025414,"periode":6,"items":[{"type":"ADD","player_id":4373626,"name":"Tyler Allgeier","from_team_id":0,"to_team_id":1,"in_app":true},{"type":"DROP","player_id":4429676,"name":"Tyler Goodson","from_team_id":1,"to_team_id":0,"in_app":true}]},
 {"id":"99e8e6ea-33d5-4840-8693-1620c7a30e97","type":"FREEAGENT","team_id":1,"datum":1792176094077,"periode":6,"items":[{"type":"ADD","player_id":5082630,"name":"Jalen Royals","from_team_id":0,"to_team_id":1,"in_app":true},{"type":"DROP","player_id":2573401,"name":"Tyler Higbee","from_team_id":1,"to_team_id":0,"in_app":true}]},
 {"id":"936399a5-b6a3-49c0-bb65-e5f44cbdf5b7","type":"FREEAGENT","team_id":8,"datum":1792176462583,"periode":6,"items":[{"type":"ADD","player_id":4035671,"name":"Tyler Huntley","from_team_id":0,"to_team_id":8,"in_app":true},{"type":"DROP","player_id":4697815,"name":"Rachaad White","from_team_id":8,"to_team_id":0,"in_app":true}]},
-{"id":"0a6327fc-e1b0-43fb-8571-50b4f0cf4a00","type":"FREEAGENT","team_id":8,"datum":1792312034013,"periode":6,"items":[{"type":"ADD","player_id":4685201,"name":"Tanner McKee","from_team_id":0,"to_team_id":8,"in_app":true},{"type":"DROP","player_id":4688380,"name":"Cam Ward","from_team_id":8,"to_team_id":0,"in_app":true}]}
+{"id":"0a6327fc-e1b0-43fb-8571-50b4f0cf4a00","type":"FREEAGENT","team_id":8,"datum":1792312034013,"periode":6,"items":[{"type":"ADD","player_id":4685201,"name":"Tanner McKee","from_team_id":0,"to_team_id":8,"in_app":true},{"type":"DROP","player_id":4688380,"name":"Cam Ward","from_team_id":8,"to_team_id":0,"in_app":true}]},
+{"id":"0163d1e5-de67-426c-86e3-e21d9ac6e14f","type":"FREEAGENT","team_id":4,"datum":1792330214937,"periode":6,"items":[{"type":"ADD","player_id":4697815,"name":"Rachaad White","from_team_id":0,"to_team_id":4,"in_app":true},{"type":"DROP","player_id":4360939,"name":"Rashod Bateman","from_team_id":4,"to_team_id":0,"in_app":true}]}
 ],
-"aufstellungswechsel":{"1":31,"2":30,"3":13,"4":24,"5":29,"6":8,"7":24,"8":27,"9":29,"10":50}
+"aufstellungswechsel":{"1":31,"2":30,"3":13,"4":25,"5":29,"6":8,"7":24,"8":27,"9":29,"10":50}
 }
