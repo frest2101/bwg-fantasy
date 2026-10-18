@@ -81,5 +81,5 @@
 {"id":"99e8e6ea-33d5-4840-8693-1620c7a30e97","type":"FREEAGENT","team_id":1,"datum":1792176094077,"periode":6,"items":[{"type":"ADD","player_id":5082630,"name":"Jalen Royals","from_team_id":0,"to_team_id":1,"in_app":true},{"type":"DROP","player_id":2573401,"name":"Tyler Higbee","from_team_id":1,"to_team_id":0,"in_app":true}]},
 {"id":"936399a5-b6a3-49c0-bb65-e5f44cbdf5b7","type":"FREEAGENT","team_id":8,"datum":1792176462583,"periode":6,"items":[{"type":"ADD","player_id":4035671,"name":"Tyler Huntley","from_team_id":0,"to_team_id":8,"in_app":true},{"type":"DROP","player_id":4697815,"name":"Rachaad White","from_team_id":8,"to_team_id":0,"in_app":true}]}
 ],
-"aufstellungswechsel":{"1":30,"2":30,"3":13,"4":24,"5":28,"6":7,"7":24,"8":27,"9":29,"10":48}
+"aufstellungswechsel":{"1":30,"2":30,"3":13,"4":24,"5":28,"6":7,"7":24,"8":27,"9":29,"10":50}
 }
