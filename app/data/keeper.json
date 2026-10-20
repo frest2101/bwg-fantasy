@@ -1,6 +1,6 @@
 {
 "through_week":6,
-"stand":"2026-10-20T2002Z",
+"stand":"2026-10-20T2105Z",
 "draft_datum":1788110942931,
 "keeper_zahl":12,
 "kader_plaetze":24,
@@ -59,7 +59,7 @@
 {"id":3121422,"name":"Terry McLaurin","pos":"WR","nfl":"WSH","team":2,"art":"keeper","pick":135,"runde":14,"von":2,"seit":null,"g":5,"avg":9.2,"vj_g":10,"vj_pts":121.2,"vj_avg":12.12,"vj_delta":-2.92,"rookie":false,"alter":31.1,"nfl_jahr":8,"wert":1795,"wert_rang":114,"wert_posrang":42,"wert_trend":-17,"wert_ue":75,"in_app":true},
 {"id":3139477,"name":"Patrick Mahomes","pos":"QB","nfl":"KC","team":2,"art":"keeper","pick":175,"runde":18,"von":2,"seit":null,"g":5,"avg":30.07,"vj_g":14,"vj_pts":425.29,"vj_avg":30.38,"vj_delta":-0.31,"rookie":false,"alter":31.1,"nfl_jahr":10,"wert":5750,"wert_rang":21,"wert_posrang":7,"wert_trend":843,"wert_ue":4030,"in_app":true},
 {"id":3929630,"name":"Saquon Barkley","pos":"RB","nfl":"PHI","team":2,"art":"keeper","pick":155,"runde":16,"von":2,"seit":null,"g":4,"avg":5.5,"vj_g":16,"vj_pts":253.3,"vj_avg":15.83,"vj_delta":-10.33,"rookie":false,"alter":29.7,"nfl_jahr":9,"wert":2778,"wert_rang":76,"wert_posrang":21,"wert_trend":-1019,"wert_ue":1058,"in_app":true},
-{"id":4241457,"name":"Najee Harris","pos":"RB","nfl":"NYG","team":2,"art":"free_agent","pick":null,"runde":null,"von":null,"seit":1792335275063,"g":5,"avg":2.08,"vj_g":3,"vj_pts":11.6,"vj_avg":3.87,"vj_delta":-1.79,"rookie":false,"alter":28.6,"nfl_jahr":6,"wert":771,"wert_rang":227,"wert_posrang":63,"wert_trend":320,"wert_ue":-949,"in_app":true},
+{"id":4241457,"name":"Najee Harris","pos":"RB","nfl":null,"team":2,"art":"free_agent","pick":null,"runde":null,"von":null,"seit":1792335275063,"g":5,"avg":2.08,"vj_g":3,"vj_pts":11.6,"vj_avg":3.87,"vj_delta":-1.79,"rookie":false,"alter":28.6,"nfl_jahr":6,"wert":771,"wert_rang":227,"wert_posrang":63,"wert_trend":320,"wert_ue":-949,"in_app":true},
 {"id":4242335,"name":"Jonathan Taylor","pos":"RB","nfl":"IND","team":2,"art":"keeper","pick":215,"runde":22,"von":2,"seit":null,"g":6,"avg":19.42,"vj_g":17,"vj_pts":389.3,"vj_avg":22.9,"vj_delta":-3.48,"rookie":false,"alter":27.8,"nfl_jahr":7,"wert":5825,"wert_rang":20,"wert_posrang":5,"wert_trend":99,"wert_ue":4105,"in_app":true},
 {"id":4248528,"name":"Christian Watson","pos":"WR","nfl":"GB","team":2,"art":"keeper","pick":125,"runde":13,"von":2,"seit":null,"g":6,"avg":23.13,"vj_g":10,"vj_pts":143.4,"vj_avg":14.34,"vj_delta":8.79,"rookie":false,"alter":27.4,"nfl_jahr":5,"wert":3961,"wert_rang":42,"wert_posrang":16,"wert_trend":1019,"wert_ue":2241,"in_app":true},
 {"id":4361741,"name":"Brock Purdy","pos":"QB","nfl":"SF","team":2,"art":"keeper","pick":225,"runde":23,"von":2,"seit":null,"g":6,"avg":35.97,"vj_g":9,"vj_pts":271.39,"vj_avg":30.15,"vj_delta":5.81,"rookie":false,"alter":26.8,"nfl_jahr":5,"wert":5892,"wert_rang":19,"wert_posrang":6,"wert_trend":1365,"wert_ue":4172,"in_app":true},
