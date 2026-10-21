@@ -1,10 +1,10 @@
 {
-"stand":"2026-10-21T1213Z",
+"stand":"2026-10-21T1418Z",
 "woche":7,
 "einheiten":{"temp":"°C","wind":"km/h","boeen":"km/h","regen_wahrsch":"%","niederschlag":"mm","schnee":"cm"},
 "schwellen":{"wind":25,"boeen":40,"regen_wahrsch":60,"schnee":0},
 "prognose":[
-{"id":401873010,"woche":7,"kickoff":"2026-10-23T00:15Z","tbd":false,"heim":"CHI","gast":"NE","stadion":"Soldier Field","ort":"Chicago, IL","dach":"offen","neutral":false,"temp":12.8,"wind":9.0,"boeen":15.5,"regen_wahrsch":0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
+{"id":401873010,"woche":7,"kickoff":"2026-10-23T00:15Z","tbd":false,"heim":"CHI","gast":"NE","stadion":"Soldier Field","ort":"Chicago, IL","dach":"offen","neutral":false,"temp":12.7,"wind":9.3,"boeen":20.5,"regen_wahrsch":0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
 {"id":401873011,"woche":7,"kickoff":"2026-10-25T13:30Z","tbd":false,"heim":"NO","gast":"PIT","stadion":"Stade de France","ort":"Saint-Denis (Paris), Frankreich","dach":"offen","neutral":true,"temp":15.1,"wind":19.8,"boeen":46.4,"regen_wahrsch":32,"niederschlag":0.0,"schnee":0.0,"markierung":["boeen"]},
 {"id":401873012,"woche":7,"kickoff":"2026-10-25T17:00Z","tbd":false,"heim":"BAL","gast":"CIN","stadion":"M&T Bank Stadium","ort":"Baltimore, MD","dach":"offen","neutral":false,"temp":17.6,"wind":8.0,"boeen":9.0,"regen_wahrsch":0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
 {"id":401873013,"woche":7,"kickoff":"2026-10-25T17:00Z","tbd":false,"heim":"TEN","gast":"CLE","stadion":"Nissan Stadium","ort":"Nashville, TN","dach":"offen","neutral":false,"temp":23.7,"wind":3.5,"boeen":5.8,"regen_wahrsch":0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
