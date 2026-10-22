@@ -97,5 +97,5 @@
 {"id":"bf068ff4-bb9d-4105-8a81-2a8970d7c8f1","type":"FREEAGENT","team_id":2,"datum":1792612262840,"periode":7,"items":[{"type":"ADD","player_id":3116389,"name":"Samaje Perine","from_team_id":0,"to_team_id":2,"in_app":true},{"type":"DROP","player_id":4596334,"name":"Keaton Mitchell","from_team_id":2,"to_team_id":0,"in_app":true}]},
 {"id":"79979a8c-b3d4-4e85-b823-bd40fa9e0bcc","type":"FREEAGENT","team_id":3,"datum":1792646531698,"periode":7,"items":[{"type":"ADD","player_id":4710855,"name":"Konata Mumpfield","from_team_id":0,"to_team_id":3,"in_app":true},{"type":"DROP","player_id":4869645,"name":"Caleb Douglas","from_team_id":3,"to_team_id":0,"in_app":true}]}
 ],
-"aufstellungswechsel":{"1":35,"2":33,"3":16,"4":28,"5":36,"6":8,"7":25,"8":34,"9":32,"10":59}
+"aufstellungswechsel":{"1":35,"2":33,"3":16,"4":28,"5":36,"6":8,"7":25,"8":36,"9":32,"10":59}
 }
