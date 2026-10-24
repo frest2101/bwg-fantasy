@@ -1,5 +1,5 @@
 {
-"stand":"2026-10-24T0511Z",
+"stand":"2026-10-24T0609Z",
 "woche":7,
 "einheiten":{"temp":"°C","wind":"km/h","boeen":"km/h","regen_wahrsch":"%","niederschlag":"mm","schnee":"cm"},
 "schwellen":{"wind":25,"boeen":40,"regen_wahrsch":60,"schnee":0},
@@ -16,8 +16,8 @@
 {"id":401873019,"woche":7,"kickoff":"2026-10-25T20:05Z","tbd":false,"heim":"ARI","gast":"DEN","stadion":"State Farm Stadium","ort":"Glendale, AZ","dach":"beweglich","neutral":false,"temp":27.1,"wind":6.1,"boeen":10.1,"regen_wahrsch":0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
 {"id":401873020,"woche":7,"kickoff":"2026-10-25T20:25Z","tbd":false,"heim":"DET","gast":"GB","stadion":"Ford Field","ort":"Detroit, MI","dach":"fest","neutral":false,"temp":17.0,"wind":10.5,"boeen":18.4,"regen_wahrsch":0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
 {"id":401873021,"woche":7,"kickoff":"2026-10-25T20:25Z","tbd":false,"heim":"LV","gast":"LAR","stadion":"Allegiant Stadium","ort":"Las Vegas, NV","dach":"fest","neutral":false,"temp":23.6,"wind":5.4,"boeen":9.0,"regen_wahrsch":0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
-{"id":401873022,"woche":7,"kickoff":"2026-10-26T00:20Z","tbd":false,"heim":"SEA","gast":"KC","stadion":"Lumen Field","ort":"Seattle, WA","dach":"offen","neutral":false,"temp":10.3,"wind":8.4,"boeen":19.8,"regen_wahrsch":52,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
-{"id":401873009,"woche":7,"kickoff":"2026-10-27T00:15Z","tbd":false,"heim":"PHI","gast":"DAL","stadion":"Lincoln Financial Field","ort":"Philadelphia, PA","dach":"offen","neutral":false,"temp":15.9,"wind":7.8,"boeen":26.6,"regen_wahrsch":0,"niederschlag":0.0,"schnee":0.0,"markierung":[]}
+{"id":401873022,"woche":7,"kickoff":"2026-10-26T00:20Z","tbd":false,"heim":"SEA","gast":"KC","stadion":"Lumen Field","ort":"Seattle, WA","dach":"offen","neutral":false,"temp":11.1,"wind":4.8,"boeen":14.1,"regen_wahrsch":52,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
+{"id":401873009,"woche":7,"kickoff":"2026-10-27T00:15Z","tbd":false,"heim":"PHI","gast":"DAL","stadion":"Lincoln Financial Field","ort":"Philadelphia, PA","dach":"offen","neutral":false,"temp":15.9,"wind":7.6,"boeen":26.6,"regen_wahrsch":0,"niederschlag":0.0,"schnee":0.0,"markierung":[]}
 ],
 "ist":[
 {"id":401872656,"woche":1,"kickoff":"2026-09-10T00:20Z","tbd":false,"heim":"SEA","gast":"NE","stadion":"Lumen Field","ort":"Seattle, WA","dach":"offen","neutral":false,"temp":21.6,"wind":6.3,"boeen":14.0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
