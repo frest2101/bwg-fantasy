@@ -1,5 +1,5 @@
 {
-"stand":"2026-10-24T0910Z",
+"stand":"2026-10-24T1009Z",
 "woche":7,
 "einheiten":{"temp":"°C","wind":"km/h","boeen":"km/h","regen_wahrsch":"%","niederschlag":"mm","schnee":"cm"},
 "schwellen":{"wind":25,"boeen":40,"regen_wahrsch":60,"schnee":0},
