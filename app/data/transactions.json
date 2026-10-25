@@ -101,5 +101,5 @@
 {"id":"61ac2610-bcc5-49e5-891f-8e7b0ae33a56","type":"FREEAGENT","team_id":1,"datum":1792771600360,"periode":7,"items":[{"type":"ADD","player_id":4869645,"name":"Caleb Douglas","from_team_id":0,"to_team_id":1,"in_app":true},{"type":"DROP","player_id":5081432,"name":"Antonio Williams","from_team_id":1,"to_team_id":0,"in_app":true}]},
 {"id":"92ec9c5b-083f-4725-906d-11842ce05c24","type":"FREEAGENT","team_id":8,"datum":1792821894240,"periode":7,"items":[{"type":"ADD","player_id":2573401,"name":"Tyler Higbee","from_team_id":0,"to_team_id":8,"in_app":true},{"type":"DROP","player_id":4599739,"name":"Kendre Miller","from_team_id":8,"to_team_id":0,"in_app":true}]}
 ],
-"aufstellungswechsel":{"1":38,"2":33,"3":17,"4":28,"5":36,"6":9,"7":26,"8":39,"9":32,"10":61}
+"aufstellungswechsel":{"1":38,"2":33,"3":17,"4":28,"5":36,"6":9,"7":26,"8":39,"9":32,"10":62}
 }
