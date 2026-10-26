@@ -1,5 +1,5 @@
 {
-"stand":"2026-10-25T2256Z",
+"stand":"2026-10-26T0419Z",
 "woche":7,
 "einheiten":{"temp":"°C","wind":"km/h","boeen":"km/h","regen_wahrsch":"%","niederschlag":"mm","schnee":"cm"},
 "schwellen":{"wind":25,"boeen":40,"regen_wahrsch":60,"schnee":0},
@@ -13,11 +13,11 @@
 {"id":401873016,"woche":7,"kickoff":"2026-10-25T17:00Z","tbd":false,"heim":"HOU","gast":"NYG","stadion":"NRG Stadium","ort":"Houston, TX","dach":"beweglich","neutral":false,"temp":27.3,"wind":14.7,"boeen":19.4,"regen_wahrsch":0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
 {"id":401873017,"woche":7,"kickoff":"2026-10-25T17:00Z","tbd":false,"heim":"ATL","gast":"SF","stadion":"Mercedes-Benz Stadium","ort":"Atlanta, GA","dach":"beweglich","neutral":false,"temp":20.6,"wind":14.2,"boeen":23.4,"regen_wahrsch":0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
 {"id":401873018,"woche":7,"kickoff":"2026-10-25T17:00Z","tbd":false,"heim":"CAR","gast":"TB","stadion":"Bank of America Stadium","ort":"Charlotte, NC","dach":"offen","neutral":false,"temp":19.8,"wind":14.0,"boeen":22.0,"regen_wahrsch":0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
-{"id":401873019,"woche":7,"kickoff":"2026-10-25T20:05Z","tbd":false,"heim":"ARI","gast":"DEN","stadion":"State Farm Stadium","ort":"Glendale, AZ","dach":"beweglich","neutral":false,"temp":26.8,"wind":4.6,"boeen":7.9,"regen_wahrsch":0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
-{"id":401873020,"woche":7,"kickoff":"2026-10-25T20:25Z","tbd":false,"heim":"DET","gast":"GB","stadion":"Ford Field","ort":"Detroit, MI","dach":"fest","neutral":false,"temp":17.6,"wind":9.8,"boeen":17.3,"regen_wahrsch":0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
-{"id":401873021,"woche":7,"kickoff":"2026-10-25T20:25Z","tbd":false,"heim":"LV","gast":"LAR","stadion":"Allegiant Stadium","ort":"Las Vegas, NV","dach":"fest","neutral":false,"temp":22.6,"wind":5.6,"boeen":10.8,"regen_wahrsch":0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
-{"id":401873022,"woche":7,"kickoff":"2026-10-26T00:20Z","tbd":false,"heim":"SEA","gast":"KC","stadion":"Lumen Field","ort":"Seattle, WA","dach":"offen","neutral":false,"temp":11.1,"wind":3.4,"boeen":11.9,"regen_wahrsch":9,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
-{"id":401873009,"woche":7,"kickoff":"2026-10-27T00:15Z","tbd":false,"heim":"PHI","gast":"DAL","stadion":"Lincoln Financial Field","ort":"Philadelphia, PA","dach":"offen","neutral":false,"temp":12.6,"wind":7.4,"boeen":18.4,"regen_wahrsch":1,"niederschlag":0.0,"schnee":0.0,"markierung":[]}
+{"id":401873019,"woche":7,"kickoff":"2026-10-25T20:05Z","tbd":false,"heim":"ARI","gast":"DEN","stadion":"State Farm Stadium","ort":"Glendale, AZ","dach":"beweglich","neutral":false,"temp":26.8,"wind":4.1,"boeen":7.9,"regen_wahrsch":0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
+{"id":401873020,"woche":7,"kickoff":"2026-10-25T20:25Z","tbd":false,"heim":"DET","gast":"GB","stadion":"Ford Field","ort":"Detroit, MI","dach":"fest","neutral":false,"temp":18.0,"wind":9.1,"boeen":15.1,"regen_wahrsch":0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
+{"id":401873021,"woche":7,"kickoff":"2026-10-25T20:25Z","tbd":false,"heim":"LV","gast":"LAR","stadion":"Allegiant Stadium","ort":"Las Vegas, NV","dach":"fest","neutral":false,"temp":22.7,"wind":3.9,"boeen":8.6,"regen_wahrsch":0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
+{"id":401873022,"woche":7,"kickoff":"2026-10-26T00:20Z","tbd":false,"heim":"SEA","gast":"KC","stadion":"Lumen Field","ort":"Seattle, WA","dach":"offen","neutral":false,"temp":11.9,"wind":4.9,"boeen":18.7,"regen_wahrsch":8,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
+{"id":401873009,"woche":7,"kickoff":"2026-10-27T00:15Z","tbd":false,"heim":"PHI","gast":"DAL","stadion":"Lincoln Financial Field","ort":"Philadelphia, PA","dach":"offen","neutral":false,"temp":12.9,"wind":7.6,"boeen":18.4,"regen_wahrsch":1,"niederschlag":0.0,"schnee":0.0,"markierung":[]}
 ],
 "ist":[
 {"id":401872656,"woche":1,"kickoff":"2026-09-10T00:20Z","tbd":false,"heim":"SEA","gast":"NE","stadion":"Lumen Field","ort":"Seattle, WA","dach":"offen","neutral":false,"temp":21.6,"wind":6.3,"boeen":14.0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
@@ -121,6 +121,9 @@
 {"id":401873015,"woche":7,"kickoff":"2026-10-25T17:00Z","tbd":false,"heim":"NYJ","gast":"MIA","stadion":"MetLife Stadium","ort":"East Rutherford, NJ","dach":"offen","neutral":false,"temp":19.9,"wind":3.7,"boeen":9.7,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
 {"id":401873016,"woche":7,"kickoff":"2026-10-25T17:00Z","tbd":false,"heim":"HOU","gast":"NYG","stadion":"NRG Stadium","ort":"Houston, TX","dach":"beweglich","neutral":false,"temp":27.3,"wind":14.7,"boeen":19.4,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
 {"id":401873017,"woche":7,"kickoff":"2026-10-25T17:00Z","tbd":false,"heim":"ATL","gast":"SF","stadion":"Mercedes-Benz Stadium","ort":"Atlanta, GA","dach":"beweglich","neutral":false,"temp":20.6,"wind":14.2,"boeen":23.4,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
-{"id":401873018,"woche":7,"kickoff":"2026-10-25T17:00Z","tbd":false,"heim":"CAR","gast":"TB","stadion":"Bank of America Stadium","ort":"Charlotte, NC","dach":"offen","neutral":false,"temp":19.8,"wind":14.0,"boeen":22.0,"niederschlag":0.0,"schnee":0.0,"markierung":[]}
+{"id":401873018,"woche":7,"kickoff":"2026-10-25T17:00Z","tbd":false,"heim":"CAR","gast":"TB","stadion":"Bank of America Stadium","ort":"Charlotte, NC","dach":"offen","neutral":false,"temp":19.8,"wind":14.0,"boeen":22.0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
+{"id":401873019,"woche":7,"kickoff":"2026-10-25T20:05Z","tbd":false,"heim":"ARI","gast":"DEN","stadion":"State Farm Stadium","ort":"Glendale, AZ","dach":"beweglich","neutral":false,"temp":26.8,"wind":4.1,"boeen":7.9,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
+{"id":401873020,"woche":7,"kickoff":"2026-10-25T20:25Z","tbd":false,"heim":"DET","gast":"GB","stadion":"Ford Field","ort":"Detroit, MI","dach":"fest","neutral":false,"temp":18.0,"wind":9.1,"boeen":15.1,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
+{"id":401873021,"woche":7,"kickoff":"2026-10-25T20:25Z","tbd":false,"heim":"LV","gast":"LAR","stadion":"Allegiant Stadium","ort":"Las Vegas, NV","dach":"fest","neutral":false,"temp":22.7,"wind":3.9,"boeen":8.6,"niederschlag":0.0,"schnee":0.0,"markierung":[]}
 ]
 }
