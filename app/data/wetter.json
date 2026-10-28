@@ -1,10 +1,10 @@
 {
-"stand":"2026-10-28T0740Z",
+"stand":"2026-10-28T0830Z",
 "woche":8,
 "einheiten":{"temp":"°C","wind":"km/h","boeen":"km/h","regen_wahrsch":"%","niederschlag":"mm","schnee":"cm"},
 "schwellen":{"wind":25,"boeen":40,"regen_wahrsch":60,"schnee":0},
 "prognose":[
-{"id":401873023,"woche":8,"kickoff":"2026-10-30T00:15Z","tbd":false,"heim":"GB","gast":"CAR","stadion":"Lambeau Field","ort":"Green Bay, WI","dach":"offen","neutral":false,"temp":8.6,"wind":11.4,"boeen":26.6,"regen_wahrsch":0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
+{"id":401873023,"woche":8,"kickoff":"2026-10-30T00:15Z","tbd":false,"heim":"GB","gast":"CAR","stadion":"Lambeau Field","ort":"Green Bay, WI","dach":"offen","neutral":false,"temp":9.4,"wind":8.7,"boeen":23.4,"regen_wahrsch":0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
 {"id":401873024,"woche":8,"kickoff":"2026-11-01T18:00Z","tbd":false,"heim":"DAL","gast":"ARI","stadion":"AT&T Stadium","ort":"Arlington, TX","dach":"beweglich","neutral":false,"temp":27.3,"wind":8.0,"boeen":13.7,"regen_wahrsch":7,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
 {"id":401873025,"woche":8,"kickoff":"2026-11-01T18:00Z","tbd":false,"heim":"TB","gast":"ATL","stadion":"Raymond James Stadium","ort":"Tampa, FL","dach":"offen","neutral":false,"temp":29.2,"wind":10.3,"boeen":13.0,"regen_wahrsch":55,"niederschlag":0.8,"schnee":0.0,"markierung":[]},
 {"id":401873026,"woche":8,"kickoff":"2026-11-01T18:00Z","tbd":false,"heim":"BUF","gast":"BAL","stadion":"Highmark Stadium (Neubau 2026)","ort":"Orchard Park, NY","dach":"offen","neutral":false,"temp":18.8,"wind":6.4,"boeen":11.2,"regen_wahrsch":5,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
