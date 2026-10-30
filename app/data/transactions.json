@@ -111,5 +111,5 @@
 {"id":"74f38f82-1a52-4f53-8230-914f814811fa","type":"FREEAGENT","team_id":5,"datum":1793276329907,"periode":8,"items":[{"type":"ADD","player_id":3917232,"name":"Tyler Bass","from_team_id":0,"to_team_id":5,"in_app":true},{"type":"DROP","player_id":4428557,"name":"Tyjae Spears","from_team_id":5,"to_team_id":0,"in_app":true}]},
 {"id":"ddf24012-cdb0-4017-9906-5cdb2531fde6","type":"FREEAGENT","team_id":8,"datum":1793307296868,"periode":8,"items":[{"type":"ADD","player_id":4685279,"name":"Jaydon Blue","from_team_id":0,"to_team_id":8,"in_app":true},{"type":"DROP","player_id":4035671,"name":"Tyler Huntley","from_team_id":8,"to_team_id":0,"in_app":true}]}
 ],
-"aufstellungswechsel":{"1":42,"2":36,"3":18,"4":32,"5":42,"6":10,"7":27,"8":44,"9":36,"10":66}
+"aufstellungswechsel":{"1":42,"2":36,"3":18,"4":32,"5":42,"6":10,"7":27,"8":44,"9":36,"10":67}
 }
