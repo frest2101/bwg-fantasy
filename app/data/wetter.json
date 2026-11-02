@@ -1,5 +1,5 @@
 {
-"stand":"2026-11-02T0059Z",
+"stand":"2026-11-02T1142Z",
 "woche":8,
 "einheiten":{"temp":"°C","wind":"km/h","boeen":"km/h","regen_wahrsch":"%","niederschlag":"mm","schnee":"cm"},
 "schwellen":{"wind":25,"boeen":40,"regen_wahrsch":60,"schnee":0},
@@ -13,11 +13,11 @@
 {"id":401873029,"woche":8,"kickoff":"2026-11-01T18:00Z","tbd":false,"heim":"NYJ","gast":"LV","stadion":"MetLife Stadium","ort":"East Rutherford, NJ","dach":"offen","neutral":false,"temp":16.3,"wind":7.1,"boeen":15.1,"regen_wahrsch":0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
 {"id":401873030,"woche":8,"kickoff":"2026-11-01T18:00Z","tbd":false,"heim":"DET","gast":"MIN","stadion":"Ford Field","ort":"Detroit, MI","dach":"fest","neutral":false,"temp":18.3,"wind":5.5,"boeen":8.6,"regen_wahrsch":1,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
 {"id":401873031,"woche":8,"kickoff":"2026-11-01T18:00Z","tbd":false,"heim":"CIN","gast":"TEN","stadion":"Paycor Stadium","ort":"Cincinnati, OH","dach":"offen","neutral":false,"temp":20.4,"wind":2.5,"boeen":7.6,"regen_wahrsch":7,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
-{"id":401873032,"woche":8,"kickoff":"2026-11-01T21:05Z","tbd":false,"heim":"LAR","gast":"LAC","stadion":"SoFi Stadium","ort":"Inglewood, CA","dach":"fest","neutral":false,"temp":20.9,"wind":27.8,"boeen":46.1,"regen_wahrsch":1,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
-{"id":401873033,"woche":8,"kickoff":"2026-11-01T21:25Z","tbd":false,"heim":"DEN","gast":"KC","stadion":"Empower Field at Mile High","ort":"Denver, CO","dach":"offen","neutral":false,"temp":13.6,"wind":11.0,"boeen":25.9,"regen_wahrsch":10,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
-{"id":401873034,"woche":8,"kickoff":"2026-11-01T21:25Z","tbd":false,"heim":"MIA","gast":"NE","stadion":"Hard Rock Stadium","ort":"Miami Gardens, FL","dach":"offen","neutral":false,"temp":24.7,"wind":9.7,"boeen":27.4,"regen_wahrsch":76,"niederschlag":0.0,"schnee":0.0,"markierung":["regen_wahrsch"]},
-{"id":401873035,"woche":8,"kickoff":"2026-11-02T01:20Z","tbd":false,"heim":"WSH","gast":"PHI","stadion":"Northwest Stadium","ort":"Landover, MD","dach":"offen","neutral":false,"temp":10.1,"wind":6.3,"boeen":16.6,"regen_wahrsch":0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
-{"id":401873036,"woche":8,"kickoff":"2026-11-03T01:15Z","tbd":false,"heim":"SEA","gast":"CHI","stadion":"Lumen Field","ort":"Seattle, WA","dach":"offen","neutral":false,"temp":9.6,"wind":5.9,"boeen":11.2,"regen_wahrsch":3,"niederschlag":0.0,"schnee":0.0,"markierung":[]}
+{"id":401873032,"woche":8,"kickoff":"2026-11-01T21:05Z","tbd":false,"heim":"LAR","gast":"LAC","stadion":"SoFi Stadium","ort":"Inglewood, CA","dach":"fest","neutral":false,"temp":21.0,"wind":29.1,"boeen":46.1,"regen_wahrsch":1,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
+{"id":401873033,"woche":8,"kickoff":"2026-11-01T21:25Z","tbd":false,"heim":"DEN","gast":"KC","stadion":"Empower Field at Mile High","ort":"Denver, CO","dach":"offen","neutral":false,"temp":13.5,"wind":13.1,"boeen":25.9,"regen_wahrsch":10,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
+{"id":401873034,"woche":8,"kickoff":"2026-11-01T21:25Z","tbd":false,"heim":"MIA","gast":"NE","stadion":"Hard Rock Stadium","ort":"Miami Gardens, FL","dach":"offen","neutral":false,"temp":24.8,"wind":11.4,"boeen":27.4,"regen_wahrsch":76,"niederschlag":0.0,"schnee":0.0,"markierung":["regen_wahrsch"]},
+{"id":401873035,"woche":8,"kickoff":"2026-11-02T01:20Z","tbd":false,"heim":"WSH","gast":"PHI","stadion":"Northwest Stadium","ort":"Landover, MD","dach":"offen","neutral":false,"temp":9.5,"wind":4.2,"boeen":13.7,"regen_wahrsch":0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
+{"id":401873036,"woche":8,"kickoff":"2026-11-03T01:15Z","tbd":false,"heim":"SEA","gast":"CHI","stadion":"Lumen Field","ort":"Seattle, WA","dach":"offen","neutral":false,"temp":9.1,"wind":4.6,"boeen":8.6,"regen_wahrsch":3,"niederschlag":0.0,"schnee":0.0,"markierung":[]}
 ],
 "ist":[
 {"id":401872656,"woche":1,"kickoff":"2026-09-10T00:20Z","tbd":false,"heim":"SEA","gast":"NE","stadion":"Lumen Field","ort":"Seattle, WA","dach":"offen","neutral":false,"temp":21.6,"wind":6.3,"boeen":14.0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
@@ -135,6 +135,10 @@
 {"id":401873028,"woche":8,"kickoff":"2026-11-01T18:00Z","tbd":false,"heim":"JAX","gast":"IND","stadion":"EverBank Stadium","ort":"Jacksonville, FL","dach":"offen","neutral":false,"temp":24.0,"wind":15.0,"boeen":33.1,"niederschlag":1.1,"schnee":0.0,"markierung":[]},
 {"id":401873029,"woche":8,"kickoff":"2026-11-01T18:00Z","tbd":false,"heim":"NYJ","gast":"LV","stadion":"MetLife Stadium","ort":"East Rutherford, NJ","dach":"offen","neutral":false,"temp":16.3,"wind":7.1,"boeen":15.1,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
 {"id":401873030,"woche":8,"kickoff":"2026-11-01T18:00Z","tbd":false,"heim":"DET","gast":"MIN","stadion":"Ford Field","ort":"Detroit, MI","dach":"fest","neutral":false,"temp":18.3,"wind":5.5,"boeen":8.6,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
-{"id":401873031,"woche":8,"kickoff":"2026-11-01T18:00Z","tbd":false,"heim":"CIN","gast":"TEN","stadion":"Paycor Stadium","ort":"Cincinnati, OH","dach":"offen","neutral":false,"temp":20.4,"wind":2.5,"boeen":7.6,"niederschlag":0.0,"schnee":0.0,"markierung":[]}
+{"id":401873031,"woche":8,"kickoff":"2026-11-01T18:00Z","tbd":false,"heim":"CIN","gast":"TEN","stadion":"Paycor Stadium","ort":"Cincinnati, OH","dach":"offen","neutral":false,"temp":20.4,"wind":2.5,"boeen":7.6,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
+{"id":401873032,"woche":8,"kickoff":"2026-11-01T21:05Z","tbd":false,"heim":"LAR","gast":"LAC","stadion":"SoFi Stadium","ort":"Inglewood, CA","dach":"fest","neutral":false,"temp":21.0,"wind":29.1,"boeen":46.1,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
+{"id":401873033,"woche":8,"kickoff":"2026-11-01T21:25Z","tbd":false,"heim":"DEN","gast":"KC","stadion":"Empower Field at Mile High","ort":"Denver, CO","dach":"offen","neutral":false,"temp":13.5,"wind":13.1,"boeen":25.9,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
+{"id":401873034,"woche":8,"kickoff":"2026-11-01T21:25Z","tbd":false,"heim":"MIA","gast":"NE","stadion":"Hard Rock Stadium","ort":"Miami Gardens, FL","dach":"offen","neutral":false,"temp":24.8,"wind":11.4,"boeen":27.4,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
+{"id":401873035,"woche":8,"kickoff":"2026-11-02T01:20Z","tbd":false,"heim":"WSH","gast":"PHI","stadion":"Northwest Stadium","ort":"Landover, MD","dach":"offen","neutral":false,"temp":9.5,"wind":4.2,"boeen":13.7,"niederschlag":0.0,"schnee":0.0,"markierung":[]}
 ]
 }

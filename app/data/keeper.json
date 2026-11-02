@@ -1,6 +1,6 @@
 {
 "through_week":7,
-"stand":"2026-11-02T0059Z",
+"stand":"2026-11-02T1142Z",
 "draft_datum":1788110942931,
 "keeper_zahl":12,
 "kader_plaetze":24,
@@ -219,7 +219,7 @@
 {"id":4596448,"name":"Bucky Irving","pos":"RB","nfl":"TB","team":8,"art":"keeper","pick":187,"runde":19,"von":8,"seit":null,"g":7,"avg":15.94,"vj_g":10,"vj_pts":146.5,"vj_avg":14.65,"vj_delta":1.29,"rookie":false,"alter":24.2,"nfl_jahr":3,"wert":3860,"wert_rang":47,"wert_posrang":11,"wert_trend":742,"wert_ue":2131,"in_app":true},
 {"id":4683062,"name":"Xavier Worthy","pos":"WR","nfl":"KC","team":8,"art":"draft","pick":17,"runde":2,"von":8,"seit":1788110942931,"g":6,"avg":8.62,"vj_g":14,"vj_pts":109.9,"vj_avg":7.85,"vj_delta":0.77,"rookie":false,"alter":23.5,"nfl_jahr":3,"wert":1342,"wert_rang":158,"wert_posrang":57,"wert_trend":-145,"wert_ue":-387,"in_app":true},
 {"id":4685201,"name":"Tanner McKee","pos":"QB","nfl":"PHI","team":8,"art":"free_agent","pick":null,"runde":null,"von":null,"seit":1792312034013,"g":2,"avg":19.46,"vj_g":4,"vj_pts":22.98,"vj_avg":5.75,"vj_delta":13.72,"rookie":false,"alter":26.5,"nfl_jahr":4,"wert":1188,"wert_rang":183,"wert_posrang":37,"wert_trend":1228,"wert_ue":-541,"in_app":true},
-{"id":4685279,"name":"Jaydon Blue","pos":"RB","nfl":null,"team":8,"art":"free_agent","pick":null,"runde":null,"von":null,"seit":1793307296868,"g":0,"avg":null,"vj_g":5,"vj_pts":19.4,"vj_avg":3.88,"vj_delta":null,"rookie":false,"alter":22.8,"nfl_jahr":2,"wert":330,"wert_rang":278,"wert_posrang":79,"wert_trend":199,"wert_ue":-1399,"in_app":true},
+{"id":4685279,"name":"Jaydon Blue","pos":"RB","nfl":"PHI","team":8,"art":"free_agent","pick":null,"runde":null,"von":null,"seit":1793307296868,"g":0,"avg":null,"vj_g":5,"vj_pts":19.4,"vj_avg":3.88,"vj_delta":null,"rookie":false,"alter":22.8,"nfl_jahr":2,"wert":330,"wert_rang":278,"wert_posrang":79,"wert_trend":199,"wert_ue":-1399,"in_app":true},
 {"id":4808766,"name":"Mason Taylor","pos":"TE","nfl":"NYJ","team":8,"art":"free_agent","pick":null,"runde":null,"von":null,"seit":1793260340243,"g":5,"avg":7.94,"vj_g":null,"vj_pts":null,"vj_avg":null,"vj_delta":null,"rookie":false,"alter":22.5,"nfl_jahr":2,"wert":1162,"wert_rang":188,"wert_posrang":29,"wert_trend":752,"wert_ue":-567,"in_app":true},
 {"id":4837248,"name":"Fernando Mendoza","pos":"QB","nfl":"LV","team":8,"art":"draft","pick":7,"runde":1,"von":8,"seit":1788110942931,"g":3,"avg":1.22,"vj_g":null,"vj_pts":null,"vj_avg":null,"vj_delta":null,"rookie":true,"alter":23.1,"nfl_jahr":1,"wert":3664,"wert_rang":51,"wert_posrang":16,"wert_trend":154,"wert_ue":1935,"in_app":true},
 {"id":-16019,"name":"Giants D/ST","pos":"D/ST","nfl":"NYG","team":9,"art":"draft","pick":56,"runde":6,"von":9,"seit":1788110942931,"g":7,"avg":13.29,"vj_g":17,"vj_pts":212.0,"vj_avg":12.47,"vj_delta":0.82,"rookie":false,"alter":null,"nfl_jahr":null,"wert":null,"wert_rang":null,"wert_posrang":null,"wert_trend":null,"wert_ue":null,"in_app":true},
