@@ -122,5 +122,5 @@
 {"id":"119db229-dd6e-491e-911b-d57aca51533e","type":"FREEAGENT","team_id":4,"datum":1793878344531,"periode":9,"items":[{"type":"ADD","player_id":2991662,"name":"Mack Hollins","from_team_id":0,"to_team_id":4,"in_app":true},{"type":"DROP","player_id":4430968,"name":"Kimani Vidal","from_team_id":4,"to_team_id":0,"in_app":true}]},
 {"id":"414ee79e-9360-4fd9-bb2e-cb4bb097977e","type":"FREEAGENT","team_id":3,"datum":1793894107768,"periode":9,"items":[{"type":"ADD","player_id":3917792,"name":"Daniel Jones","from_team_id":0,"to_team_id":3,"in_app":true},{"type":"DROP","player_id":4710855,"name":"Konata Mumpfield","from_team_id":3,"to_team_id":0,"in_app":true}]}
 ],
-"aufstellungswechsel":{"1":47,"2":38,"3":19,"4":35,"5":46,"6":10,"7":30,"8":49,"9":41,"10":76}
+"aufstellungswechsel":{"1":47,"2":38,"3":19,"4":35,"5":46,"6":10,"7":30,"8":50,"9":41,"10":76}
 }
