@@ -1,6 +1,6 @@
 {
 "through_week":8,
-"stand":"2026-11-06T1132Z",
+"stand":"2026-11-06T1830Z",
 "draft_datum":1788110942931,
 "keeper_zahl":12,
 "kader_plaetze":24,
@@ -153,7 +153,7 @@
 {"id":-16006,"name":"Cowboys D/ST","pos":"D/ST","nfl":"DAL","team":6,"art":"draft","pick":39,"runde":4,"von":6,"seit":1788110942931,"g":8,"avg":9.0,"vj_g":17,"vj_pts":176.0,"vj_avg":10.35,"vj_delta":-1.35,"rookie":false,"alter":null,"nfl_jahr":null,"wert":null,"wert_rang":null,"wert_posrang":null,"wert_trend":null,"wert_ue":null,"in_app":true},
 {"id":-16004,"name":"Bengals D/ST","pos":"D/ST","nfl":"CIN","team":6,"art":"draft","pick":79,"runde":8,"von":6,"seit":1788110942931,"g":7,"avg":17.57,"vj_g":17,"vj_pts":207.0,"vj_avg":12.18,"vj_delta":5.39,"rookie":false,"alter":null,"nfl_jahr":null,"wert":null,"wert_rang":null,"wert_posrang":null,"wert_trend":null,"wert_ue":null,"in_app":true},
 {"id":15818,"name":"Keenan Allen","pos":"WR","nfl":"IND","team":6,"art":"keeper","pick":209,"runde":21,"von":6,"seit":null,"g":7,"avg":10.64,"vj_g":17,"vj_pts":182.7,"vj_avg":10.75,"vj_delta":-0.1,"rookie":false,"alter":34.5,"nfl_jahr":14,"wert":1065,"wert_rang":195,"wert_posrang":74,"wert_trend":282,"wert_ue":-626,"in_app":true},
-{"id":2578570,"name":"Jacoby Brissett","pos":"QB","nfl":"ARI","team":6,"art":"draft","pick":59,"runde":6,"von":6,"seit":1788110942931,"g":8,"avg":21.97,"vj_g":14,"vj_pts":372.42,"vj_avg":26.6,"vj_delta":-4.64,"rookie":false,"alter":33.9,"nfl_jahr":11,"wert":1382,"wert_rang":143,"wert_posrang":35,"wert_trend":-173,"wert_ue":-309,"in_app":true},
+{"id":2578570,"name":"Jacoby Brissett","pos":"QB","nfl":"BAL","team":6,"art":"draft","pick":59,"runde":6,"von":6,"seit":1788110942931,"g":8,"avg":21.97,"vj_g":14,"vj_pts":372.42,"vj_avg":26.6,"vj_delta":-4.64,"rookie":false,"alter":33.9,"nfl_jahr":11,"wert":1382,"wert_rang":143,"wert_posrang":35,"wert_trend":-173,"wert_ue":-309,"in_app":true},
 {"id":2977187,"name":"Cooper Kupp","pos":"WR","nfl":"SEA","team":6,"art":"draft","pick":109,"runde":11,"von":6,"seit":1788110942931,"g":8,"avg":6.45,"vj_g":16,"vj_pts":114.3,"vj_avg":7.14,"vj_delta":-0.69,"rookie":false,"alter":33.4,"nfl_jahr":10,"wert":448,"wert_rang":252,"wert_posrang":99,"wert_trend":-125,"wert_ue":-1243,"in_app":true},
 {"id":3040151,"name":"George Kittle","pos":"TE","nfl":"SF","team":6,"art":"keeper","pick":189,"runde":19,"von":6,"seit":null,"g":7,"avg":15.79,"vj_g":11,"vj_pts":163.5,"vj_avg":14.86,"vj_delta":0.92,"rookie":false,"alter":33.1,"nfl_jahr":10,"wert":2628,"wert_rang":77,"wert_posrang":9,"wert_trend":-23,"wert_ue":937,"in_app":true},
 {"id":3121023,"name":"Dallas Goedert","pos":"TE","nfl":"PHI","team":6,"art":"keeper","pick":149,"runde":15,"von":6,"seit":null,"g":6,"avg":11.0,"vj_g":15,"vj_pts":187.1,"vj_avg":12.47,"vj_delta":-1.47,"rookie":false,"alter":31.8,"nfl_jahr":9,"wert":1426,"wert_rang":138,"wert_posrang":18,"wert_trend":-11,"wert_ue":-265,"in_app":true},
