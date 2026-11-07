@@ -124,5 +124,5 @@
 {"id":"fc42e09e-77c3-466c-b007-f4180edd211c","type":"FREEAGENT","team_id":8,"datum":1794028099939,"periode":9,"items":[{"type":"ADD","player_id":4360698,"name":"Joe Milton","from_team_id":0,"to_team_id":8,"in_app":true},{"type":"DROP","player_id":4429084,"name":"Anthony Richardson Sr.","from_team_id":8,"to_team_id":0,"in_app":true}]},
 {"id":"7fe3889f-82df-4296-be38-4bd7c60772d3","type":"FREEAGENT","team_id":9,"datum":1794039453296,"periode":9,"items":[{"type":"ADD","player_id":4831959,"name":"Eli Raridon","from_team_id":0,"to_team_id":9,"in_app":true}]}
 ],
-"aufstellungswechsel":{"1":47,"2":38,"3":19,"4":35,"5":46,"6":10,"7":30,"8":50,"9":42,"10":76}
+"aufstellungswechsel":{"1":47,"2":38,"3":19,"4":35,"5":46,"6":10,"7":31,"8":50,"9":42,"10":76}
 }
