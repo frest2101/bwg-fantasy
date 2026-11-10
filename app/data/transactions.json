@@ -128,5 +128,5 @@
 {"id":"46bf733d-40bd-4d67-a218-dd469089f8c4","type":"FREEAGENT","team_id":2,"datum":1794137710719,"periode":9,"items":[{"type":"ADD","player_id":4361409,"name":"Jahan Dotson","from_team_id":0,"to_team_id":2,"in_app":true},{"type":"DROP","player_id":3116406,"name":"Tyreek Hill","from_team_id":2,"to_team_id":0,"in_app":true}]},
 {"id":"598a97c8-dc3e-467b-8b25-c6bdab42de9c","type":"FREEAGENT","team_id":3,"datum":1794158990678,"periode":9,"items":[{"type":"ADD","player_id":4569682,"name":"Audric Estime","from_team_id":0,"to_team_id":3,"in_app":true},{"type":"DROP","player_id":3895856,"name":"Christian Kirk","from_team_id":3,"to_team_id":0,"in_app":true}]}
 ],
-"aufstellungswechsel":{"1":47,"2":40,"3":21,"4":39,"5":48,"6":11,"7":31,"8":50,"9":42,"10":76}
+"aufstellungswechsel":{"1":47,"2":40,"3":21,"4":43,"5":48,"6":11,"7":31,"8":50,"9":45,"10":76}
 }
