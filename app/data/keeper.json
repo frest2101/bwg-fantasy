@@ -1,6 +1,6 @@
 {
 "through_week":9,
-"stand":"2026-11-10T2001Z",
+"stand":"2026-11-10T2155Z",
 "draft_datum":1788110942931,
 "keeper_zahl":12,
 "kader_plaetze":24,
@@ -144,7 +144,7 @@
 {"id":4595348,"name":"Malik Nabers","pos":"WR","nfl":"NYG","team":5,"art":"keeper","pick":141,"runde":15,"von":5,"seit":null,"g":8,"avg":17.1,"vj_g":4,"vj_pts":61.1,"vj_avg":15.28,"vj_delta":1.83,"rookie":false,"alter":23.3,"nfl_jahr":3,"wert":6484,"wert_rang":14,"wert_posrang":6,"wert_trend":1175,"wert_ue":4760,"in_app":true},
 {"id":4685382,"name":"Omarion Hampton","pos":"RB","nfl":"LAC","team":5,"art":"keeper","pick":131,"runde":14,"von":5,"seit":null,"g":8,"avg":8.28,"vj_g":9,"vj_pts":143.7,"vj_avg":15.97,"vj_delta":-7.69,"rookie":false,"alter":23.7,"nfl_jahr":2,"wert":2825,"wert_rang":72,"wert_posrang":20,"wert_trend":-1106,"wert_ue":1101,"in_app":true},
 {"id":4688380,"name":"Cam Ward","pos":"QB","nfl":"TEN","team":5,"art":"waiver","pick":null,"runde":null,"von":null,"seit":1792569173833,"g":8,"avg":18.38,"vj_g":17,"vj_pts":295.73,"vj_avg":17.4,"vj_delta":0.98,"rookie":false,"alter":24.5,"nfl_jahr":2,"wert":2589,"wert_rang":78,"wert_posrang":21,"wert_trend":162,"wert_ue":865,"in_app":true},
-{"id":4688813,"name":"Josh Downs","pos":"WR","nfl":"IND","team":5,"art":"keeper","pick":201,"runde":21,"von":5,"seit":null,"g":9,"avg":8.34,"vj_g":16,"vj_pts":135.4,"vj_avg":8.46,"vj_delta":-0.12,"rookie":false,"alter":25.2,"nfl_jahr":4,"wert":1724,"wert_rang":120,"wert_posrang":44,"wert_trend":-24,"wert_ue":0,"in_app":true},
+{"id":4688813,"name":"Josh Downs","pos":"WR","nfl":"KC","team":5,"art":"keeper","pick":201,"runde":21,"von":5,"seit":null,"g":9,"avg":8.34,"vj_g":16,"vj_pts":135.4,"vj_avg":8.46,"vj_delta":-0.12,"rookie":false,"alter":25.2,"nfl_jahr":4,"wert":1724,"wert_rang":120,"wert_posrang":44,"wert_trend":-24,"wert_ue":0,"in_app":true},
 {"id":4701936,"name":"Matthew Golden","pos":"WR","nfl":"GB","team":5,"art":"keeper","pick":181,"runde":19,"von":5,"seit":null,"g":9,"avg":19.1,"vj_g":14,"vj_pts":70.0,"vj_avg":5.0,"vj_delta":14.1,"rookie":false,"alter":23.3,"nfl_jahr":2,"wert":4514,"wert_rang":28,"wert_posrang":9,"wert_trend":1811,"wert_ue":2790,"in_app":true},
 {"id":4702555,"name":"Jonah Coleman","pos":"RB","nfl":"DEN","team":5,"art":"draft","pick":31,"runde":4,"von":5,"seit":1788110942931,"g":5,"avg":12.58,"vj_g":null,"vj_pts":null,"vj_avg":null,"vj_delta":null,"rookie":true,"alter":23.2,"nfl_jahr":1,"wert":2678,"wert_rang":75,"wert_posrang":22,"wert_trend":817,"wert_ue":954,"in_app":true},
 {"id":4871023,"name":"Carnell Tate","pos":"WR","nfl":"TEN","team":5,"art":"draft","pick":1,"runde":1,"von":5,"seit":1788110942931,"g":7,"avg":10.9,"vj_g":null,"vj_pts":null,"vj_avg":null,"vj_delta":null,"rookie":true,"alter":21.8,"nfl_jahr":1,"wert":3513,"wert_rang":53,"wert_posrang":19,"wert_trend":-167,"wert_ue":1789,"in_app":true},
