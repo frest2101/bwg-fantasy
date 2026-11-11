@@ -136,5 +136,5 @@
 {"id":"776f2355-cbf6-488b-af8e-46f47cefbb37","type":"FREEAGENT","team_id":8,"datum":1794393013851,"periode":10,"items":[{"type":"ADD","player_id":2576925,"name":"Darren Waller","from_team_id":0,"to_team_id":8,"in_app":true},{"type":"DROP","player_id":4808766,"name":"Mason Taylor","from_team_id":8,"to_team_id":0,"in_app":true}]},
 {"id":"d2871a64-1794-4fd2-b7cb-904302e0db69","type":"FREEAGENT","team_id":2,"datum":1794412745834,"periode":10,"items":[{"type":"ADD","player_id":4869132,"name":"Reggie Virgil","from_team_id":0,"to_team_id":2,"in_app":true},{"type":"DROP","player_id":4428850,"name":"Dontayvion Wicks","from_team_id":2,"to_team_id":0,"in_app":true}]}
 ],
-"aufstellungswechsel":{"1":47,"2":41,"3":21,"4":43,"5":51,"6":11,"7":32,"8":58,"9":46,"10":80}
+"aufstellungswechsel":{"1":47,"2":41,"3":21,"4":43,"5":53,"6":11,"7":32,"8":58,"9":46,"10":80}
 }
