@@ -137,5 +137,5 @@
 {"id":"d2871a64-1794-4fd2-b7cb-904302e0db69","type":"FREEAGENT","team_id":2,"datum":1794412745834,"periode":10,"items":[{"type":"ADD","player_id":4869132,"name":"Reggie Virgil","from_team_id":0,"to_team_id":2,"in_app":true},{"type":"DROP","player_id":4428850,"name":"Dontayvion Wicks","from_team_id":2,"to_team_id":0,"in_app":true}]},
 {"id":"89e240cb-072d-4284-bf3d-dac3d4f73298","type":"FREEAGENT","team_id":8,"datum":1794477013534,"periode":10,"items":[{"type":"ADD","player_id":4819231,"name":"Kaleb Johnson","from_team_id":0,"to_team_id":8,"in_app":true},{"type":"DROP","player_id":4241555,"name":"Elijah Mitchell","from_team_id":8,"to_team_id":0,"in_app":true}]}
 ],
-"aufstellungswechsel":{"1":47,"2":41,"3":21,"4":43,"5":54,"6":11,"7":32,"8":58,"9":46,"10":80}
+"aufstellungswechsel":{"1":47,"2":42,"3":21,"4":43,"5":54,"6":11,"7":32,"8":58,"9":46,"10":81}
 }
