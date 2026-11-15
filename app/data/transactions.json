@@ -139,7 +139,8 @@
 {"id":"70ea6bea-2779-4fe7-bf14-251438f191ac","type":"FREEAGENT","team_id":3,"datum":1794553663316,"periode":10,"items":[{"type":"ADD","player_id":4433971,"name":"Kyle McCord","from_team_id":0,"to_team_id":3,"in_app":true},{"type":"DROP","player_id":4887558,"name":"Emanuel Wilson","from_team_id":3,"to_team_id":0,"in_app":true}]},
 {"id":"052ff681-4633-407f-a5f4-ae543edb0d60","type":"FREEAGENT","team_id":3,"datum":1794684086210,"periode":10,"items":[{"type":"ADD","player_id":4605951,"name":"CJ Daniels","from_team_id":0,"to_team_id":3,"in_app":true},{"type":"DROP","player_id":3917315,"name":"Kyler Murray","from_team_id":3,"to_team_id":0,"in_app":true}]},
 {"id":"89026a31-4c31-478c-9992-5e0743358761","type":"FREEAGENT","team_id":3,"datum":1794738825320,"periode":10,"items":[{"type":"ADD","player_id":3124679,"name":"Jason Sanders","from_team_id":0,"to_team_id":3,"in_app":true},{"type":"DROP","player_id":4697745,"name":"Tyler Loop","from_team_id":3,"to_team_id":0,"in_app":true}]},
-{"id":"ed420ced-c563-49e5-9e80-449ec16cf000","type":"FREEAGENT","team_id":2,"datum":1794740231958,"periode":10,"items":[{"type":"ADD","player_id":4689936,"name":"Jake Bates","from_team_id":0,"to_team_id":2,"in_app":true},{"type":"DROP","player_id":2473037,"name":"Jason Myers","from_team_id":2,"to_team_id":0,"in_app":true}]}
+{"id":"ed420ced-c563-49e5-9e80-449ec16cf000","type":"FREEAGENT","team_id":2,"datum":1794740231958,"periode":10,"items":[{"type":"ADD","player_id":4689936,"name":"Jake Bates","from_team_id":0,"to_team_id":2,"in_app":true},{"type":"DROP","player_id":2473037,"name":"Jason Myers","from_team_id":2,"to_team_id":0,"in_app":true}]},
+{"id":"23dfb26e-a802-43a3-8fdd-d3e9ced053f0","type":"ROSTER","team_id":7,"datum":1794763585093,"periode":10,"items":[{"type":"DROP","player_id":4635008,"name":"Keon Coleman","from_team_id":7,"to_team_id":0,"in_app":true}]}
 ],
-"aufstellungswechsel":{"1":48,"2":43,"3":27,"4":43,"5":55,"6":12,"7":33,"8":58,"9":46,"10":81}
+"aufstellungswechsel":{"1":48,"2":44,"3":27,"4":43,"5":55,"6":12,"7":35,"8":58,"9":46,"10":81}
 }
