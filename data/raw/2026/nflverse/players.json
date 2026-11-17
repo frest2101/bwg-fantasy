@@ -2,7 +2,6 @@
 "quelle":"nflverse players (https://github.com/nflverse/nflverse-data, Release players), Auszug für die Spieler des ESPN-Pools",
 "lizenz":"CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)",
 "spieler":{
-"5529":{"geb":"1981-12-08","rookie":2004,"draft":[2004,1,4]},
 "8439":{"geb":"1983-12-02","rookie":2005,"draft":[2005,1,24]},
 "9614":{"geb":"1984-05-19","rookie":2006,"draft":[2006,1,28]},
 "10621":{"geb":"1984-11-05","rookie":2007,"draft":[2007,6,178]},
