@@ -142,5 +142,5 @@
 {"id":"ed420ced-c563-49e5-9e80-449ec16cf000","type":"FREEAGENT","team_id":2,"datum":1794740231958,"periode":10,"items":[{"type":"ADD","player_id":4689936,"name":"Jake Bates","from_team_id":0,"to_team_id":2,"in_app":true},{"type":"DROP","player_id":2473037,"name":"Jason Myers","from_team_id":2,"to_team_id":0,"in_app":true}]},
 {"id":"23dfb26e-a802-43a3-8fdd-d3e9ced053f0","type":"ROSTER","team_id":7,"datum":1794763585093,"periode":10,"items":[{"type":"DROP","player_id":4635008,"name":"Keon Coleman","from_team_id":7,"to_team_id":0,"in_app":true}]}
 ],
-"aufstellungswechsel":{"1":48,"2":44,"3":27,"4":50,"5":55,"6":12,"7":35,"8":58,"9":46,"10":81}
+"aufstellungswechsel":{"1":49,"2":44,"3":27,"4":51,"5":55,"6":12,"7":36,"8":58,"9":52,"10":81}
 }
