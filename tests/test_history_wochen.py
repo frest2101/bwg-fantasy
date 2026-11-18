@@ -1,4 +1,5 @@
-"""Tests Wochen 2018–2022 aus der DSGVO-Auskunft von nfl.com (data/history, scripts/nfl_export.py, history.compute_history → wochen).
+"""Tests Wochen 2018–2022 aus der DSGVO-Auskunft von nfl.com (data/history, scripts/nfl_export.py, history.compute_history → wochen)
+und Wochen von Hugh Jass 2015–2017 und 2023–2025 aus der DSGVO-Auskunft von Disney (scripts/disney_export.py).
 
 Die Rohdateien liegen nicht im Repo; geprüft werden die abgeleiteten Dateien gegen team_seasons.csv, gegen
 docs/referenz_historie.md und auf innere Stimmigkeit, dazu der Datenschutz aller Dateien in data/history.
@@ -44,7 +45,9 @@ def num(text: str) -> Decimal:
 
 WEEKS = rows("team_weeks.csv")
 GAMES = rows("games.csv")
-HJ = rows("hugh_jass_2023_2025.csv")
+HJ_DATEI = {2015: "hugh_jass_2015_2017.csv", 2016: "hugh_jass_2015_2017.csv", 2017: "hugh_jass_2015_2017.csv",
+            2023: "hugh_jass_2023_2025.csv", 2024: "hugh_jass_2023_2025.csv", 2025: "hugh_jass_2023_2025.csv"}
+HJ = {name: rows(name) for name in set(HJ_DATEI.values())}
 TS = {(int(r["season"]), int(r["slot"])): r for r in rows("team_seasons.csv")}
 RS_GAMES = {int(r["season"]): int(r["rs_games"]) for r in rows("seasons.csv")}
 PTS = {(int(w["season"]), int(w["week"]), int(w["slot"])): Decimal(w["pts"]) for w in WEEKS}
@@ -235,29 +238,61 @@ def test_seed_regel_trifft_alle_runden_ausser_halbfinale_von_hand(season):
             assert got == expected, round_
 
 
-# ---------------------------------------------------------------- Hugh Jass 2023–2025
+# ---------------------------------------------------------------- Hugh Jass 2015–2017 und 2023–2025 (Disney-Auskunft)
 
-def test_hugh_jass_2023_2025_kopf_vermerkt_umfang_und_gegenprobe():
-    head = [line for line in (HISTORY / "hugh_jass_2023_2025.csv").read_text(encoding="utf-8").splitlines()
-            if line.startswith("#")]
-    assert head[0].startswith("# Umfang: nur Hugh Jass")
-    probe = next(line for line in head if "Gegenprobe" in line)
-    assert f"{ZAEHLER['Gegenprobe Hugh Jass 2020–2022 exakt']} von {ZAEHLER['Gegenprobe Hugh Jass 2020–2022 Wochen']}" \
-        in probe
+def kopf(name: str) -> str:
+    return " ".join(line for line in (HISTORY / name).read_text(encoding="utf-8").splitlines() if line.startswith("#"))
 
 
-@pytest.mark.parametrize("season", (2023, 2024, 2025))
+def test_hugh_jass_kopf_vermerkt_umfang_quelle_und_grenzen():
+    for name in set(HJ_DATEI.values()):
+        head = kopf(name)
+        assert head.startswith("# Umfang: nur Hugh Jass (Slot 2)") and "DSGVO-Auskunft Disney" in head, name
+        assert "nicht garantiert" not in head, name                 # seit der Disney-Auskunft echte Wochenwerte
+    assert "Alt-Scoring" in kopf("hugh_jass_2015_2017.csv")
+    assert "Gegenprobe" in kopf("hugh_jass_2023_2025.csv") and "42 Wochen" in kopf("hugh_jass_2023_2025.csv")
+
+
+@pytest.mark.parametrize("season", sorted(HJ_DATEI))
 def test_hugh_jass_wochen_wie_saisonwerte(season):
-    mine = [r for r in HJ if int(r["season"]) == season]
-    assert [int(r["week"]) for r in mine] == list(range(1, RS_GAMES[season] + 1))
-    assert {r["slot"] for r in mine} == {"2"}
+    """Regular Season wie team_seasons.csv (PF, PA, W-L, Ergebnis aus den Punkten), danach genau drei Playoff-Wochen
+    nur mit Punkten und Bank."""
+    mine = [r for r in HJ[HJ_DATEI[season]] if int(r["season"]) == season]
+    n = RS_GAMES[season]
+    assert [int(r["week"]) for r in mine] == list(range(1, n + 4))
+    assert [r["phase"] for r in mine] == ["RS"] * n + ["PO"] * 3
+    assert {r["slot"] for r in mine} == {"2"} and all(r["bench_pts"] for r in mine)
+    rs, po = mine[:n], mine[n:]
     t = TS[(season, 2)]
-    assert sum(Decimal(r["pts"]) for r in mine) == Decimal(t["pf"])
-    assert sum(Decimal(r["pts_against"]) for r in mine) == Decimal(t["pa"])
-    assert (sum(r["result"] == "W" for r in mine), sum(r["result"] == "L" for r in mine)) == (int(t["w"]), int(t["l"]))
-    for r in mine:
+    assert sum(Decimal(r["pts"]) for r in rs) == Decimal(t["pf"])
+    assert sum(Decimal(r["pts_against"]) for r in rs) == Decimal(t["pa"])
+    assert (sum(r["result"] == "W" for r in rs), sum(r["result"] == "L" for r in rs)) == (int(t["w"]), int(t["l"]))
+    for r in rs:
         pf, pa = Decimal(r["pts"]), Decimal(r["pts_against"])
         assert r["result"] == ("W" if pf > pa else "L")
+    assert all(r["pts"] and r["pts_against"] == r["result"] == r.get("opponent_slot", "") == "" for r in po)
+
+
+def test_hugh_jass_gegner_nur_2016():
+    """Die Auskunft nennt Gegner nur 2016: je Spiel ein anderes Team der Saison, sonst leer."""
+    alt = HJ["hugh_jass_2015_2017.csv"]
+    gegner = [int(r["opponent_slot"]) for r in alt if r["season"] == "2016" and r["phase"] == "RS"]
+    assert len(gegner) == RS_GAMES[2016]
+    assert set(gegner) <= {slot for (s, slot) in TS if s == 2016} - {2}
+    assert all(r["opponent_slot"] == "" for r in alt if r["season"] != "2016" or r["phase"] == "PO")
+
+
+def test_hugh_jass_screenshot_finale_2024_wie_auskunft():
+    """Finale 2024 laut Disney-Auskunft 261,16 (der Screenshot zeigte 261,17); matchups_hist.csv führt den Endstand."""
+    shot = next(m for m in rows("matchups_hist.csv") if (m["season"], m["week"]) == ("2024", "17"))
+    w17 = next(r for r in HJ["hugh_jass_2023_2025.csv"] if (r["season"], r["week"]) == ("2024", "17"))
+    assert (shot["slot_a"], shot["pts_a"], w17["phase"], w17["pts"]) == ("2", "261.16", "PO", "261.16")
+
+
+def test_hugh_jass_dateien_ohne_ueberschneidung_mit_team_weeks():
+    """Die Disney-Auskunft deckt 2018–2022 auch ab, dort vergleicht sie nur der Import mit team_weeks.csv; keine
+    Hugh-Jass-Datei führt eine Saison von team_weeks.csv ein zweites Mal."""
+    assert not {int(r["season"]) for rs_ in HJ.values() for r in rs_} & set(SAISONS)
 
 
 # ---------------------------------------------------------------- Datenschutz (Repo öffentlich)
@@ -273,7 +308,9 @@ ERLAUBTE_SPALTEN = {
     "team_weeks.csv": {"season", "week", "phase", "slot", "pts", "bench_pts", "allplay_w", "allplay_l", "allplay_t",
                        "result"},
     "games.csv": {"season", "week", "round", "slot_a", "slot_b", "pts_a", "pts_b", "winner_slot", "herleitung"},
-    "hugh_jass_2023_2025.csv": {"season", "week", "slot", "pts", "pts_against", "result"},
+    "hugh_jass_2015_2017.csv": {"season", "week", "phase", "slot", "pts", "bench_pts", "pts_against", "opponent_slot",
+                                "result"},
+    "hugh_jass_2023_2025.csv": {"season", "week", "phase", "slot", "pts", "bench_pts", "pts_against", "result"},
     "rekorde.csv": {"id", "kategorie", "rekord", "wert", "details", "quelle", "ableitbar", "verifiziert", "slots",
                     "saisons"},
 }
@@ -330,7 +367,8 @@ def wochen():
 
 def test_wochen_in_compute_history(wochen):
     """Ein Einstieg (Stephan 03.10.2026): die Wochen stehen in compute_history unter „wochen“."""
-    assert set(wochen) == {"saisons", "spiele", "ohne_gegner", "schnitt", "h2h", "rekorde", "allplay", "hugh_jass_2023_2025"}
+    assert set(wochen) == {"saisons", "spiele", "ohne_gegner", "schnitt", "h2h", "rekorde", "allplay",
+                           "hugh_jass_2015_2017", "hugh_jass_2023_2025"}
 
 
 def test_ligaschnitt_je_woche(wochen):
@@ -460,5 +498,15 @@ def test_allplay_saisons(wochen):
 
 
 def test_hugh_jass_und_saisons_in_der_ausgabe(wochen):
-    assert len(wochen["hugh_jass_2023_2025"]) == 42
+    """Je Datei alle Wochen (Regular Season und drei Playoff-Wochen je Saison); die übrigen Kennzahlen bleiben bei
+    2018–2022 – keine ärenübergreifenden Rekorde, kein H2H aus den Gegnern 2016."""
+    for key, seasons in (("hugh_jass_2015_2017", (2015, 2016, 2017)), ("hugh_jass_2023_2025", (2023, 2024, 2025))):
+        hj = wochen[key]
+        assert len(hj) == sum(RS_GAMES[s] + 3 for s in seasons)
+        assert set(hj[0]) == {"season", "week", "phase", "slot", "pf", "bench", "pa", "opponent_id", "result"}
+        assert all((w["pa"] is None) == (w["result"] is None) == (w["phase"] == "PO") for w in hj)
+    assert sum(w["opponent_id"] is not None for w in wochen["hugh_jass_2015_2017"]) == RS_GAMES[2016]
     assert wochen["saisons"] == list(SAISONS)
+    assert {e["season"] for phase in wochen["rekorde"].values() for entries in phase.values() for e in entries} <= \
+        set(SAISONS)
+    assert {s["season"] for s in wochen["spiele"]} | {f["season"] for f in wochen["ohne_gegner"]} == set(SAISONS)

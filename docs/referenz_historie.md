@@ -72,5 +72,3 @@ Saisonstand der Datei `nfl_fantasy_league_team` (letzter Snapshot je Saison, Fel
 | Höchster Wochenwert Saison | 2018 |
 | Höchster Wochenwert Woche | 2 |
 | Höchster Wochenwert Slot | 2 |
-| Gegenprobe Hugh Jass 2020–2022 Wochen | 41 |
-| Gegenprobe Hugh Jass 2020–2022 exakt | 38 |
