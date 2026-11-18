@@ -9,18 +9,22 @@ Commissioner-Protokoll, Zugriffsprotokolle, andere Ligen und der Ordner espn/ we
 nie ins Repo, auch nicht der Name des ZIP.
 
 - Regular Season (Wochen 1 … rs_games laut seasons.csv): Punkte, Bank, PA = Differenz der kumulierten „Season points
-  against“ zur Vorwoche, Ergebnis aus der Änderung der Bilanz „Record W-L-T“ (muss zur Spalte Result und zu den
-  Punkten passen), Gegner nur, wo die Auskunft ihn nennt (2016), über den Teamnamen der Saison in team_seasons.csv.
+  against“ zur Vorwoche (nie negativ), Ergebnis aus der Änderung der Bilanz „Record W-L-T“ (muss zur Spalte Result
+  und zu den Punkten passen), Gegner nur, wo die Auskunft ihn nennt (nur 2016; ein Gegner außerhalb 2015–2017 bricht
+  ab, weil die Datei 2023–2025 keine Spalte dafür hat und 2018–2022 games.csv gilt), über den Teamnamen der Saison
+  in team_seasons.csv. Die Gegner 2016 sind nicht gegengeprüft (siehe KOPF_ALT).
 - Playoff-Wochen (die drei Wochen danach, Phase PO wie in team_weeks.csv): nur Punkte und Bank – die Auskunft nennt
   weder Gegner noch Ergebnis, ein Bye in Runde 1 hat ebenfalls Punkte. Eine leere Woche dahinter (2016 W17 in einer
   Saison mit 16 Fantasy-Wochen) fällt weg.
 - Prüfungen, Abbruch bei jeder Abweichung: je Saison Σ PF und letzte kumulierte PA = pf/pa und W-L = w/l in
   team_seasons.csv; 2018–2022 jede Woche wie team_weeks.csv (Punkte, Bank, Phase, Ergebnis) und die PA wie games.csv;
-  2023–2025 die Regular Season wie hugh_jass_2023_2025.csv (PF, PA, Ergebnis); jedes Screenshot-Spiel von Hugh Jass in
-  matchups_hist.csv mit den Punkten der Auskunft (in der Regular Season auch die PA).
+  jedes Screenshot-Spiel von Hugh Jass in matchups_hist.csv mit den Punkten der Auskunft (in der Regular Season auch
+  die PA).
 - hugh_jass_2023_2025.csv schreibt seit dem 18.11.2026 dieses Skript (vorher nfl_export.py aus Snapshots ohne Bank
-  und Playoffs); nfl_export.py --check prüft die Regular Season darin gegen die nfl.com-Snapshots – so prüfen sich
-  beide Auskünfte gegenseitig. 2018–2022 stehen schon in team_weeks.csv und werden nur verglichen.
+  und Playoffs). Beim Erstimport stimmte die Regular Season in allen 42 Wochen mit der Snapshot-Datei überein (PF,
+  PA, Ergebnis). Seitdem halten die beiden --check-Läufe die Auskünfte zusammen: dieses Skript prüft Datei =
+  Disney-Auskunft, nfl_export.py prüft Regular Season der Datei = nfl.com-Snapshots. 2018–2022 stehen schon in
+  team_weeks.csv und werden nur verglichen.
 
 Aufruf: python scripts/disney_export.py <zip-oder-ordner> [--check]
   --check schreibt nichts und prüft nur, ob die Dateien in data/history der Auskunft entsprechen (Exit-Code 1 sonst).
@@ -66,6 +70,8 @@ KOPF_ALT = (
     "# Ergebnis, Gegner (opponent_slot über den Teamnamen der Saison) nur 2016; Playoff-Wochen (Phase PO, je drei) nur",
     "# mit Punkten und Bank, ohne Gegner und Ergebnis. Ohne All-Play.",
     *QUELLE,
+    "# Gegner 2016 wie in der Auskunft, nicht gegengeprüft: dreimal SaschaM und kein Spiel gegen TheNutCrackerz passen",
+    "# nicht zum Divisionsspielplan (je Divisionsgegner zwei Spiele, sonst eines) – vermutlich ist eine Woche falsch zugeordnet.",
     "# Alt-Scoring 2015–2017: nie mit den Werten ab 2018 (BWG-Scoring) oder ab 2026 (ESPN) mischen.",
 )
 KOPF_NEU = (
@@ -177,6 +183,8 @@ def saison_wochen(season: int, weeks: dict[int, dict], n_rs: int, names: dict) -
             if ERGEBNIS.get(r["Result"].removesuffix(AUS_BILANZ)) != res:
                 raise ImportFehler(f"{season} W{week}: Result passt nicht zur Bilanz")
             pa = pa_cum - pa_before
+            if pa < 0:
+                raise ImportFehler(f"{season} W{week}: kumulierte PA fällt")
             if res != ("W" if row["pts"] > pa else "L" if row["pts"] < pa else "T"):
                 raise ImportFehler(f"{season} W{week}: Ergebnis passt nicht zu den Punkten")
             row.update(phase=RS, pts_against=pa, opponent_slot=gegner(r["Opponent"], season, names), result=res)
@@ -236,16 +244,12 @@ def check_team_weeks(wochen: dict[int, list[dict]], team_weeks: list[dict], game
                 raise ImportFehler(f"{season} W{key[1]}: PA weicht von games.csv ab")
 
 
-def check_hugh_jass_datei(wochen: dict[int, list[dict]], file_rows: list[dict]) -> None:
-    """2023–2025: die Regular Season wie in hugh_jass_2023_2025.csv (PF, PA, Ergebnis). Eine Datei ohne Spalte phase
-    (Stand vor dem 18.11.2026) führt nur die Regular Season."""
-    got = {(w["season"], w["week"]): (w["pts"], w["pts_against"], w["result"])
-           for season in NEU for w in wochen[season] if w["phase"] == RS}
-    have = {(int(r["season"]), int(r["week"])): (Decimal(r["pts"]), Decimal(r["pts_against"]), r["result"])
-            for r in file_rows if r.get("phase", RS) == RS and int(r["slot"]) == SLOT}
-    if got != have:
-        off = sorted(set(got) ^ set(have) | {k for k in got.keys() & have.keys() if got[k] != have[k]})
-        raise ImportFehler(f"2023–2025: weicht von {DATEI_NEU} ab ({', '.join(f'{s} W{w}' for s, w in off)})")
+def check_gegner(wochen: dict[int, list[dict]]) -> None:
+    """Gegner nur 2015–2017: Die Datei 2023–2025 hat keine Spalte dafür (er ginge still verloren), und 2018–2022 gelten
+    die Paarungen aus games.csv."""
+    for season, mine in wochen.items():
+        if season not in ALT and any(w["opponent_slot"] is not None for w in mine):
+            raise ImportFehler(f"{season}: Gegner in der Auskunft, vorgesehen nur 2015–2017")
 
 
 def check_screenshots(wochen: dict[int, list[dict]], screenshots: list[dict]) -> None:
@@ -291,9 +295,9 @@ def build(source: Path) -> dict[str, str]:
     rs_games = {int(r["season"]): int(r["rs_games"]) for r in read_csv(history / "seasons.csv")}
 
     wochen = alle_wochen(zeilen(quelltext(source)), rs_games, names)
+    check_gegner(wochen)
     check_saisons(wochen, seasons_rows)
     check_team_weeks(wochen, read_csv(history / "team_weeks.csv"), read_csv(history / "games.csv"))
-    check_hugh_jass_datei(wochen, read_csv(history / DATEI_NEU))
     check_screenshots(wochen, read_csv(history / "matchups_hist.csv"))
     return {
         DATEI_ALT: to_csv(SPALTEN_ALT, [w for s in ALT for w in wochen[s]], KOPF_ALT),

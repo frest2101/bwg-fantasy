@@ -1,7 +1,8 @@
 """Tests Import der Disney-DSGVO-Auskunft (scripts/disney_export.py) an erfundenen Daten.
 
-Die echte Auskunft liegt nicht im Repo (Datenschutz); alle Werte, Teamnamen und Saisons hier sind erfunden und nur so
-gewählt, dass sie eine Regel des Imports auslösen. Die abgeleiteten Dateien prüft tests/test_history_wochen.py.
+Die echte Auskunft liegt nicht im Repo (Datenschutz); alle Punktwerte und Teamnamen hier sind erfunden und nur so
+gewählt, dass sie eine Regel des Imports auslösen (echt sind nur Liga- und Teamname des Filters und die Saisons, an
+denen eine Regel hängt). Die abgeleiteten Dateien prüft tests/test_history_wochen.py.
 Aufruf: python -m pytest
 """
 
@@ -184,17 +185,35 @@ def test_saison_wie_team_seasons():
         dx.check_saisons(weeks, [dict(ts[0], w="2", l="0")])
 
 
-def test_hugh_jass_datei_alt_und_neu(monkeypatch):
-    """Erfundene Werte: Die Regular Season muss der Datei entsprechen, ob mit Spalte phase oder ohne (alter Stand)."""
-    monkeypatch.setattr(dx, "NEU", (2099,))
-    weeks = {2099: [rs(2099, 1, "100.00", "90.00", "W"), rs(2099, 2, "70.00", None, None, phase="PO")]}
-    alt = [{"season": "2099", "week": "1", "slot": "2", "pts": "100.00", "pts_against": "90.00", "result": "W"}]
-    neu = [dict(alt[0], phase="RS"), {"season": "2099", "week": "2", "phase": "PO", "slot": "2", "pts": "70.00",
-                                      "pts_against": "", "result": ""}]
-    dx.check_hugh_jass_datei(weeks, alt)
-    dx.check_hugh_jass_datei(weeks, neu)
-    with pytest.raises(dx.ImportFehler, match="2099 W1"):
-        dx.check_hugh_jass_datei(weeks, [dict(alt[0], pts="100.01")])
+def test_saison_mit_abweichender_pa_oder_unentschieden_bricht_ab():
+    """Erfundene Werte: nur die PA weicht ab; ein Unentschieden passt nie, weil team_seasons.csv keine Spalte T hat."""
+    weeks = {2099: [rs(2099, 1, "100.00", "90.00", "W"), rs(2099, 2, "80.00", "110.00", "L")]}
+    ts = [{"season": "2099", "slot": "2", "w": "1", "l": "1", "pf": "180.00", "pa": "200.00"}]
+    with pytest.raises(dx.ImportFehler, match="team_seasons"):
+        dx.check_saisons(weeks, [dict(ts[0], pa="200.01")])
+    tie = {2099: [rs(2099, 1, "100.00", "90.00", "W"), rs(2099, 2, "80.00", "80.00", "T")]}
+    with pytest.raises(dx.ImportFehler, match="team_seasons"):
+        dx.check_saisons(tie, [dict(ts[0], l="0", pa="170.00")])
+
+
+def test_gegner_nur_2015_bis_2017():
+    """Erfundene Werte: Ein Gegner 2023–2025 hätte in der Datei keine Spalte, 2018–2022 gilt games.csv → Abbruch."""
+    weeks = {2016: [dict(rs(2016, 1, "100.00", "90.00", "W"), opponent_slot=3)],
+             2024: [dict(rs(2024, 1, "100.00", "90.00", "W"), opponent_slot=None)]}
+    dx.check_gegner(weeks)
+    with pytest.raises(dx.ImportFehler, match="2024"):
+        dx.check_gegner({**weeks, 2024: [dict(weeks[2024][0], opponent_slot=3)]})
+
+
+def test_fallende_pa_und_leere_playoff_woche_brechen_ab():
+    rows = saison()
+    rows[1] = dict(rows[1], **{"Season points against": "80.00", "Points": "70.00"})   # Woche 2 mit PA −10
+    with pytest.raises(dx.ImportFehler, match="PA fällt"):
+        dx.saison_wochen(2099, wochen(rows), 2, NAMES)
+    rows = saison()
+    rows[3] = po(4)                                                   # leere Woche innerhalb der drei Playoff-Wochen
+    with pytest.raises(dx.ImportFehler, match="kein Punktwert"):
+        dx.saison_wochen(2099, wochen(rows), 2, NAMES)
 
 
 def test_team_weeks_und_games(monkeypatch):
@@ -215,16 +234,38 @@ def test_team_weeks_und_games(monkeypatch):
 
 
 def test_screenshot_muss_zur_auskunft_passen():
-    """Erfundenes Finale: Der Screenshot zeigte einen Hundertstel mehr als der Endstand der Auskunft → Abbruch."""
-    weeks = {2099: [rs(2099, 1, "100.00", "90.00", "W"), rs(2099, 3, "261.16", None, None, phase="PO")]}
-    shot = {"season": "2099", "week": "3", "slot_a": "2", "slot_b": "6", "pts_a": "261.16", "pts_b": "190.50"}
+    """Erfundenes Finale: Der Screenshot zeigt einen Hundertstel mehr als der Endstand der Auskunft → Abbruch."""
+    weeks = {2099: [rs(2099, 1, "100.00", "90.00", "W"), rs(2099, 3, "150.00", None, None, phase="PO")]}
+    shot = {"season": "2099", "week": "3", "slot_a": "2", "slot_b": "9", "pts_a": "150.00", "pts_b": "120.00"}
     dx.check_screenshots(weeks, [shot, dict(shot, slot_a="7")])     # Spiel ohne Hugh Jass wird nicht geprüft
     with pytest.raises(dx.ImportFehler, match="Screenshot-Spiel 2099 W3"):
-        dx.check_screenshots(weeks, [dict(shot, pts_a="261.17")])
+        dx.check_screenshots(weeks, [dict(shot, pts_a="150.01")])
     regular = {"season": "2099", "week": "1", "slot_a": "4", "slot_b": "2", "pts_a": "90.00", "pts_b": "100.00"}
     dx.check_screenshots(weeks, [regular])
     with pytest.raises(dx.ImportFehler, match="W1"):                  # in der Regular Season zählt auch die PA
         dx.check_screenshots(weeks, [dict(regular, pts_a="91.00")])
+
+
+def test_main_schreibt_und_prueft(tmp_path, monkeypatch, capsys):
+    """Ablauf von main() mit erfundenem Inhalt (build umgangen): schreiben, --check grün, nach einer Änderung rot."""
+    (tmp_path / "data" / "history").mkdir(parents=True)
+    monkeypatch.setattr(dx.ef, "REPO_DIR", tmp_path)
+    monkeypatch.setattr(dx, "build", lambda source: {"x.csv": "# Kopf\na,b\n1,2\n"})
+    assert dx.main([str(tmp_path)]) == 0
+    assert (tmp_path / "data" / "history" / "x.csv").read_bytes() == b"# Kopf\na,b\n1,2\n"
+    assert dx.main([str(tmp_path), "--check"]) == 0 and "aktuell" in capsys.readouterr().out
+    (tmp_path / "data" / "history" / "x.csv").write_bytes(b"a,b\n1,3\n")
+    assert dx.main([str(tmp_path), "--check"]) == 1 and "weicht ab: x.csv" in capsys.readouterr().out
+
+
+def test_abbruch_schreibt_nichts(tmp_path, monkeypatch):
+    (tmp_path / "data" / "history").mkdir(parents=True)
+    monkeypatch.setattr(dx.ef, "REPO_DIR", tmp_path)
+    def fehler(source):
+        raise dx.ImportFehler("erfunden")
+    monkeypatch.setattr(dx, "build", fehler)
+    assert dx.main([str(tmp_path)]) == 1
+    assert not list((tmp_path / "data" / "history").iterdir())
 
 
 def test_unbekannter_schalter_schreibt_nicht(tmp_path):

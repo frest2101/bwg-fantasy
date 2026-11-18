@@ -3,6 +3,8 @@
 # mit Punkten und Bank, ohne Gegner und Ergebnis. Ohne All-Play.
 # Quelle: DSGVO-Auskunft Disney (Lieferung 18.11.2026), nfl/weekly_scores.csv: Punkte und Bank je Woche, PA als
 # Differenz der kumulierten Season points against, Ergebnis aus der Bilanzänderung.
+# Gegner 2016 wie in der Auskunft, nicht gegengeprüft: dreimal SaschaM und kein Spiel gegen TheNutCrackerz passen
+# nicht zum Divisionsspielplan (je Divisionsgegner zwei Spiele, sonst eines) – vermutlich ist eine Woche falsch zugeordnet.
 # Alt-Scoring 2015–2017: nie mit den Werten ab 2018 (BWG-Scoring) oder ab 2026 (ESPN) mischen.
 season,week,phase,slot,pts,bench_pts,pts_against,opponent_slot,result
 2015,1,RS,2,151.15,143.70,114.30,,W

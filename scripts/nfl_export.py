@@ -396,11 +396,11 @@ def check_season_totals(weeks: list[dict], games: list[dict], seasons_rows: list
 
 def check_hugh_jass_datei(hj: list[dict], file_rows: list[dict]) -> None:
     """Die Snapshot-Wochen 2023–2025 entsprechen der Regular Season in hugh_jass_2023_2025.csv (PF, PA, Ergebnis). Die
-    Datei schreibt seit dem 18.11.2026 scripts/disney_export.py aus der Disney-Auskunft; beide Auskünfte prüfen sich so
-    gegenseitig. Eine Datei ohne Spalte phase (Stand davor) führt nur die Regular Season."""
+    Datei schreibt seit dem 18.11.2026 scripts/disney_export.py aus der Disney-Auskunft, dessen --check sie gegen die
+    Auskunft hält; zusammen mit dieser Prüfung entsprechen sich so beide Auskünfte."""
     got = {(r["season"], r["week"]): (r["slot"], r["pts"], r["pts_against"], r["result"]) for r in hj}
     have = {(int(r["season"]), int(r["week"])): (int(r["slot"]), Decimal(r["pts"]), Decimal(r["pts_against"]), r["result"])
-            for r in file_rows if r.get("phase", RS) == RS and int(r["season"]) in HJ_SAISONS}
+            for r in file_rows if r["phase"] == RS and int(r["season"]) in HJ_SAISONS}
     if got != have:
         off = sorted(set(got) ^ set(have) | {k for k in got.keys() & have.keys() if got[k] != have[k]})
         raise ImportFehler(f"Hugh Jass: Snapshots weichen von {HJ_DATEI} ab ({', '.join(f'{s} W{w}' for s, w in off)})")
@@ -436,10 +436,8 @@ def cell(value) -> str:
     return str(value)
 
 
-def to_csv(columns: tuple, rows: list[dict], head: tuple = ()) -> str:
+def to_csv(columns: tuple, rows: list[dict]) -> str:
     out = io.StringIO()
-    for line in head:
-        out.write(line + "\n")
     writer = csv.writer(out, lineterminator="\n")
     writer.writerow(columns)
     for r in rows:

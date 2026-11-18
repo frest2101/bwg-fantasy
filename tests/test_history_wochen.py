@@ -282,6 +282,28 @@ def test_hugh_jass_gegner_nur_2016():
     assert all(r["opponent_slot"] == "" for r in alt if r["season"] != "2016" or r["phase"] == "PO")
 
 
+def test_hugh_jass_gegner_2016_wie_in_der_auskunft():
+    """Hält die Verteilung der Gegner 2016 fest, wie die Auskunft sie nennt: dreimal SaschaM (6), kein Spiel gegen
+    TheNutCrackerz (9) – nach dem Divisionsspielplan wären es je zwei Spiele gegen die vier Divisionsgegner und je eines
+    gegen die übrigen fünf. Vermutlich ist eine Woche falsch zugeordnet (Dateikopf, README); eine Korrektur soll hier
+    bewusst nachgezogen werden, nicht still durchrutschen."""
+    gegner = Counter(int(r["opponent_slot"]) for r in HJ["hugh_jass_2015_2017.csv"]
+                     if r["season"] == "2016" and r["phase"] == "RS")
+    division = {int(t["slot"]) for (s, _), t in TS.items() if s == 2016 and t["division"] == TS[(2016, 2)]["division"]}
+    assert division - {2} == {1, 4, 6, 8}
+    assert gegner == {1: 2, 4: 2, 6: 3, 8: 2, 3: 1, 5: 1, 7: 1, 10: 1}
+    assert 9 not in gegner and "TheNutCrackerz" in kopf("hugh_jass_2015_2017.csv")
+
+
+def test_hugh_jass_zaehler_wie_referenz():
+    ref = dict(table("Hugh Jass Zähler"))
+    assert len(HJ["hugh_jass_2015_2017.csv"]) == int(ref["Wochen 2015–2017"])
+    assert len(HJ["hugh_jass_2023_2025.csv"]) == int(ref["Wochen 2023–2025"])
+    assert sum(r["opponent_slot"] != "" for r in HJ["hugh_jass_2015_2017.csv"]) == int(ref["Spiele mit Gegner 2016"])
+    w17 = next(r for r in HJ["hugh_jass_2023_2025.csv"] if (r["season"], r["week"]) == ("2024", "17"))
+    assert Decimal(w17["pts"]) == num(ref["Finale 2024 Hugh Jass"])
+
+
 def test_hugh_jass_screenshot_finale_2024_wie_auskunft():
     """Finale 2024 laut Disney-Auskunft 261,16 (der Screenshot zeigte 261,17); matchups_hist.csv führt den Endstand."""
     shot = next(m for m in rows("matchups_hist.csv") if (m["season"], m["week"]) == ("2024", "17"))
