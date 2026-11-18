@@ -2,7 +2,8 @@
 Wochen 2018–2022 (H2H, Wochenrekorde, All-Play).
 
 Quelle ist der einmalige Notion-Export unter data/history/*.csv (ohne Manager, siehe dortige README), für die Wochen
-2018–2022 die DSGVO-Auskunft von nfl.com (scripts/nfl_export.py).
+2018–2022 die DSGVO-Auskunft von nfl.com (scripts/nfl_export.py), für die Wochen von Hugh Jass 2015–2017 und 2023–2025
+die DSGVO-Auskunft von Disney (scripts/disney_export.py).
 Schlüssel ist der Franchise-Slot 1–10 (= mTeam-ID). Punkte als ungerundete Decimal, gerundet wird erst beim Export.
 
 Ära: Alt-Scoring 2015–2017 ergibt deutlich weniger Punkte als das BWG-Scoring ab 2018; die Regular Season hatte
@@ -243,13 +244,16 @@ def top_game(game_list: list[dict], ts: list[dict]) -> dict | None:
 # ---------------------------------------------------------------- Wochen 2018–2022 (nfl.com-Export)
 # Quelle: DSGVO-Auskunft nfl.com, einmalig importiert mit scripts/nfl_export.py (data/history/README.md). Eigene
 # Statistik der nfl.com-Ära: nie mit den Rekorden der ESPN-Saisons ab 2026 mischen (Statistik-Neustart, Scoring seit
-# 18.09.2026 anders). In compute_history unter „wochen“; die App zeigt es noch nicht.
+# 18.09.2026 anders). In compute_history unter „wochen“. Dazu die Wochen nur von Hugh Jass 2015–2017 und 2023–2025
+# (DSGVO-Auskunft Disney, scripts/disney_export.py): eigene Listen, nie in H2H, Rekorde oder All-Play, die App zeigt
+# sie nicht (nur ein Team; 2015–2017 im Alt-Scoring).
 
 RS, PO = "RS", "PO"
 REGULAR = "Regular Season"
 WOCHEN_REKORDE = ("hoechster_score", "niedrigster_score", "groesster_sieg", "knappstes_ergebnis", "hoechste_bank")
 TOP_N = 5
-HUGH_JASS_DATEI = "hugh_jass_2023_2025.csv"
+# Schlüssel in compute_history › wochen → Datei in data/history
+HUGH_JASS_DATEIEN = {"hugh_jass_2015_2017": "hugh_jass_2015_2017.csv", "hugh_jass_2023_2025": "hugh_jass_2023_2025.csv"}
 
 
 def read_commented(name: str) -> list[dict]:
@@ -398,9 +402,13 @@ def wochen_schnitt(weeks: list[dict]) -> list[dict]:
 
 
 def hugh_jass_wochen(rows: list[dict]) -> list[dict]:
-    """hugh_jass_2023_2025.csv typisiert (nur Slot 2, nur Regular Season, ohne Gegner)."""
-    return [{"season": int(r["season"]), "week": int(r["week"]), "slot": int(r["slot"]), "pf": dec(r["pts"]),
-             "pa": dec(r["pts_against"]), "result": r["result"]} for r in rows]
+    """hugh_jass_*.csv typisiert (nur Slot 2): je Woche Phase, Punkte und Bank; in der Regular Season PA und Ergebnis,
+    der Gegner nur, wo die Quelle ihn nennt (2016); in den Playoff-Wochen ohne PA, Gegner und Ergebnis (None)."""
+    return [{"season": int(r["season"]), "week": int(r["week"]), "phase": r["phase"], "slot": int(r["slot"]),
+             "pf": dec(r["pts"]), "bench": dec(r["bench_pts"]),
+             "pa": dec(r["pts_against"]) if r["pts_against"] else None,
+             "opponent_id": int(r["opponent_slot"]) if r.get("opponent_slot") else None,
+             "result": r["result"] or None} for r in rows]
 
 
 # ---------------------------------------------------------------- Einstieg
@@ -412,7 +420,8 @@ def compute_history(ssn: rawdata.Season) -> dict:
     Keine Manager, keine Regeländerungen.
     wochen = nfl.com-Ära 2018–2022: saisons, spiele (Paarungen je Woche), ohne_gegner (Playoff-Wochen ohne Spiel) und
     schnitt (Ligaschnitt je RS-Woche),
-    h2h und rekorde je Phase (RS, PO), allplay je Team-Saison, dazu hugh_jass_2023_2025 (nur dieses Team, ohne Gegner).
+    h2h und rekorde je Phase (RS, PO), allplay je Team-Saison, dazu hugh_jass_2015_2017 und hugh_jass_2023_2025 (nur
+    dieses Team, Regular Season und Playoff-Wochen; Gegner nur 2016; fließen in keine der übrigen Kennzahlen).
     """
     rows = ssn.history("team_seasons")
     formats = {int(f["season"]): f for f in ssn.history("seasons")}
@@ -439,6 +448,6 @@ def compute_history(ssn: rawdata.Season) -> dict:
             "h2h": h2h_wochen(sides, sorted({w["slot"] for w in weeks})),
             "rekorde": wochen_rekorde(sides),
             "allplay": allplay_saisons(weeks, ts),
-            "hugh_jass_2023_2025": hugh_jass_wochen(read_commented(HUGH_JASS_DATEI)),
+            **{key: hugh_jass_wochen(read_commented(name)) for key, name in HUGH_JASS_DATEIEN.items()},
         },
     }

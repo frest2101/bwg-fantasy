@@ -25,12 +25,12 @@ Auch die nfl.com-Liga-ID steht nicht im Code: Geprüft wird nur, dass alle geles
   (check_screenshots). Das Spiel um Platz 5 in der Finalwoche ist 2018, 2019 und 2022 aus den
   Punkten belegt (in der Halbfinalwoche hatte der Sechste mehr), 2020 und 2021 passen beide Wochen – dort gilt das
   Format der übrigen Jahre. Trostrunde 7–10: Format unbekannt, nicht abgeleitet.
-- Hugh Jass 2023–2025 (league_team): Der Export führt ligaweite Tabellen nur bis 2022 (vermutlich, weil die Auskunft an der
-  Liga-Owner-Rolle des anfragenden Kontos hängt, bis 2022) und für 2023–2025 nur das eigene Team (team_id 1) als Snapshots der kumulierten Bilanz. Je
-  Spielstand (W + L + T) gilt der letzte Snapshot; Wochenwerte = Differenzen. Ohne Gegner und Bank; All-Play steckt
-  kumuliert in den Snapshots, wird aber nicht übernommen (nicht beauftragt). Gegenprobe (hj_gegenprobe): dieselbe
-  Methode für Hugh Jass 2020–2022 gegen die echten Wochenwerte; 2022 verschob eine Neuberechnung von nfl.com am
-  13.12.2022 Punkte aus W1/W2 nach W14 – die Grenze steht mit Zahlen im Kopf der Datei.
+- Hugh Jass 2023–2025 (league_team), nur noch Gegenprobe: Der Export führt ligaweite Tabellen nur bis 2022
+  (vermutlich, weil die Auskunft an der Liga-Owner-Rolle des anfragenden Kontos hängt, bis 2022) und für 2023–2025 nur
+  das eigene Team (team_id 1) als Snapshots der kumulierten Bilanz. Je Spielstand (W + L + T) gilt der letzte Snapshot;
+  Wochenwerte = Differenzen. Bis zum 18.11.2026 schrieb dieses Skript daraus hugh_jass_2023_2025.csv; seitdem schreibt
+  sie scripts/disney_export.py aus der Disney-Auskunft (echte Wochenwerte mit Bank und Playoff-Wochen), und hier wird
+  nur geprüft, dass PF, PA und Ergebnis der Regular Season darin den Snapshots entsprechen (check_hugh_jass_datei).
 
 Aufruf: python scripts/nfl_export.py <export-ordner> [--check]
   --check schreibt nichts und prüft nur, ob die Dateien in data/history dem Export entsprechen (Exit-Code 1 sonst).
@@ -50,8 +50,8 @@ import espn_fetch as ef
 
 GAME_ID_BASIS = 100000
 SAISONS = range(2018, 2023)                  # Wochen aller Teams
-HJ_SAISONS = range(2023, 2026)               # nur Hugh Jass, nur Regular Season
-HJ_GEGENPROBE = range(2020, 2023)            # Snapshots und echte Wochen (2018/2019 nur ein Snapshot je Saison)
+HJ_SAISONS = range(2023, 2026)               # nur Hugh Jass, nur Regular Season, nur Gegenprobe
+HJ_DATEI = "hugh_jass_2023_2025.csv"         # schreibt scripts/disney_export.py
 HJ_TEAM_ID, HJ_SLOT = 1, 2
 # Halbfinale, die nach Runde 1 von Hand neu gepaart wurden: Nur 2020 und 2021 trägt das Commissioner-Protokoll des
 # Exports „updated playoff teams“ zwischen Runde 1 und Halbfinale (sonst vor Runde 1), und nur dort weicht das Halbfinale
@@ -86,14 +86,6 @@ ERGEBNIS = {"win": "W", "loss": "L", "tie": "T"}
 
 TEAM_WEEKS = ("season", "week", "phase", "slot", "pts", "bench_pts", "allplay_w", "allplay_l", "allplay_t", "result")
 GAMES = ("season", "week", "round", "slot_a", "slot_b", "pts_a", "pts_b", "winner_slot", "herleitung")
-HUGH_JASS = ("season", "week", "slot", "pts", "pts_against", "result")
-HUGH_JASS_KOPF = (
-    "# Umfang: nur Hugh Jass (Slot 2), nur Regular Season 2023–2025 (je 14 Wochen); ohne Gegner, Bank und All-Play.",
-    "# Quelle: DSGVO-Auskunft nfl.com (Export 24.09.2026), Snapshots der kumulierten Bilanz: je Spielstand der letzte",
-    "# Snapshot, Wochenwerte als Differenzen (eine Stat-Korrektur zählt in der Woche, in der sie erschien).",
-    "# Gegenprobe 2020–2022 mit derselben Methode: {exakt} von {wochen} Wochen exakt, {abw} um höchstens {max} Punkte",
-    "# verschoben ({wo}); Saisonsummen und Ergebnisse exakt, einzelne Wochenwerte nicht garantiert.",
-)
 
 
 class ImportFehler(Exception):
@@ -349,7 +341,7 @@ def playoff_games(season: int, fmt: dict, weeks: list[dict], seasons_rows: list[
     return games
 
 
-# ---------------------------------------------------------------- Hugh Jass 2023–2025
+# ---------------------------------------------------------------- Hugh Jass 2023–2025 (Gegenprobe)
 
 def hugh_jass(team_rows: list[dict], seasons_rows: list[dict], rs_games_by_season: dict[int, int],
               seasons=HJ_SAISONS) -> list[dict]:
@@ -402,22 +394,16 @@ def check_season_totals(weeks: list[dict], games: list[dict], seasons_rows: list
             raise ImportFehler(f"Saison {season} Slot {slot}: PF/PA/Bilanz weichen von team_seasons.csv ab")
 
 
-def hj_gegenprobe(team_rows: list[dict], seasons_rows: list[dict], rs_games_by_season: dict[int, int],
-                  weeks: list[dict], games: list[dict]) -> dict:
-    """Snapshot-Methode für Hugh Jass 2020–2022 gegen die echten Wochenwerte (PF aus den Wochen, PA aus den Spielen):
-    Zahl der Wochen, der abweichenden Wochen, größte Abweichung und die abweichenden Wochen."""
-    pf = {(w["season"], w["week"]): w["pts"] for w in weeks if w["slot"] == HJ_SLOT and w["phase"] == RS}
-    pa = {(g["season"], g["week"]): g["pts_b"] if g["slot_a"] == HJ_SLOT else g["pts_a"]
-          for g in games if g["round"] == REGULAR and HJ_SLOT in (g["slot_a"], g["slot_b"])}
-    off = {}
-    for r in hugh_jass(team_rows, seasons_rows, rs_games_by_season, HJ_GEGENPROBE):
-        key = (r["season"], r["week"])
-        d = max(abs(r["pts"] - pf[key]), abs(r["pts_against"] - pa[key]))
-        if d:
-            off[key] = d
-    n = sum(rs_games_by_season[s] for s in HJ_GEGENPROBE)
-    return {"wochen": n, "exakt": n - len(off), "abw": len(off), "max": max(off.values(), default=Decimal(0)),
-            "wo": ", ".join(f"{s} W{w}" for s, w in sorted(off)) or "keine"}
+def check_hugh_jass_datei(hj: list[dict], file_rows: list[dict]) -> None:
+    """Die Snapshot-Wochen 2023–2025 entsprechen der Regular Season in hugh_jass_2023_2025.csv (PF, PA, Ergebnis). Die
+    Datei schreibt seit dem 18.11.2026 scripts/disney_export.py aus der Disney-Auskunft, dessen --check sie gegen die
+    Auskunft hält; zusammen mit dieser Prüfung entsprechen sich so beide Auskünfte."""
+    got = {(r["season"], r["week"]): (r["slot"], r["pts"], r["pts_against"], r["result"]) for r in hj}
+    have = {(int(r["season"]), int(r["week"])): (int(r["slot"]), Decimal(r["pts"]), Decimal(r["pts_against"]), r["result"])
+            for r in file_rows if r["phase"] == RS and int(r["season"]) in HJ_SAISONS}
+    if got != have:
+        off = sorted(set(got) ^ set(have) | {k for k in got.keys() & have.keys() if got[k] != have[k]})
+        raise ImportFehler(f"Hugh Jass: Snapshots weichen von {HJ_DATEI} ab ({', '.join(f'{s} W{w}' for s, w in off)})")
 
 
 def check_confirmed(fmts: dict[int, dict]) -> None:
@@ -450,10 +436,8 @@ def cell(value) -> str:
     return str(value)
 
 
-def to_csv(columns: tuple, rows: list[dict], head: tuple = ()) -> str:
+def to_csv(columns: tuple, rows: list[dict]) -> str:
     out = io.StringIO()
-    for line in head:
-        out.write(line + "\n")
     writer = csv.writer(out, lineterminator="\n")
     writer.writerow(columns)
     for r in rows:
@@ -482,21 +466,19 @@ def build(folder: Path) -> dict[str, str]:
         games += playoff_games(season, fmt, weeks, seasons_rows, screenshots)
     check_season_totals(weeks, games, seasons_rows)
     check_screenshots(games, screenshots)
-    hj = hugh_jass(teams, seasons_rows, rs_games_by_season)
-    probe = hj_gegenprobe(teams, seasons_rows, rs_games_by_season, weeks, games)
-    kopf = tuple(line.format(**dict(probe, max=f"{probe['max']:.2f}".replace(".", ","))) for line in HUGH_JASS_KOPF)
+    check_hugh_jass_datei(hugh_jass(teams, seasons_rows, rs_games_by_season), read_csv(history / HJ_DATEI))
 
     games.sort(key=lambda g: (g["season"], g["week"], g["slot_a"]))
     return {
         "team_weeks.csv": to_csv(TEAM_WEEKS, weeks),
         "games.csv": to_csv(GAMES, games),
-        "hugh_jass_2023_2025.csv": to_csv(HUGH_JASS, hj, kopf),
     }
 
 
 def read_csv(path: Path) -> list[dict]:
+    """CSV aus data/history; Kopfzeilen „# …“ (Umfang der Datei) fallen weg."""
     with open(path, encoding="utf-8", newline="") as f:
-        return list(csv.DictReader(f))
+        return list(csv.DictReader(line for line in f if not line.startswith("#")))
 
 
 def main(argv: list[str]) -> int:

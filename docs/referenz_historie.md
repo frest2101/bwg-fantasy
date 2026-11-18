@@ -72,5 +72,12 @@ Saisonstand der Datei `nfl_fantasy_league_team` (letzter Snapshot je Saison, Fel
 | Höchster Wochenwert Saison | 2018 |
 | Höchster Wochenwert Woche | 2 |
 | Höchster Wochenwert Slot | 2 |
-| Gegenprobe Hugh Jass 2020–2022 Wochen | 41 |
-| Gegenprobe Hugh Jass 2020–2022 exakt | 38 |
+
+## Hugh Jass Zähler (Disney-Auskunft)
+Grundlage für `tests/test_history_wochen.py`: Umfang der Dateien aus der DSGVO-Auskunft von Disney (Lieferung 18.11.2026), beim Import gezählt; das Finale 2024 nach dem Endstand der Auskunft (der Screenshot zeigte 261,17).
+| Größe | Wert |
+|---|---|
+| Wochen 2015–2017 | 49 |
+| Wochen 2023–2025 | 51 |
+| Spiele mit Gegner 2016 | 13 |
+| Finale 2024 Hugh Jass | 261,16 |

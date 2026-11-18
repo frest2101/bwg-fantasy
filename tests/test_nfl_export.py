@@ -265,3 +265,16 @@ def test_hugh_jass_differenzen_mit_korrektur():
     got = nx.hugh_jass(snaps, ts, {2099: 2}, seasons=(2099,))
     assert [(r["week"], r["pts"], r["pts_against"], r["result"]) for r in got] == [
         (1, Decimal("100.00"), Decimal("90.00"), "W"), (2, Decimal("79.00"), Decimal("110.00"), "L")]
+
+
+def test_hugh_jass_nur_noch_gegenprobe(monkeypatch):
+    """Erfundene Werte: Die Snapshots müssen der Regular Season der Datei entsprechen, die seit dem 18.11.2026
+    disney_export.py schreibt; Playoff-Wochen der Datei zählen nicht, eine Abweichung bricht ab."""
+    monkeypatch.setattr(nx, "HJ_SAISONS", (2099,))
+    hj = [{"season": 2099, "week": 1, "slot": 2, "pts": Decimal("100.00"), "pts_against": Decimal("90.00"), "result": "W"}]
+    datei = [{"season": "2099", "week": "1", "phase": "RS", "slot": "2", "pts": "100.00", "pts_against": "90.00",
+              "result": "W"},
+             {"season": "2099", "week": "2", "phase": "PO", "slot": "2", "pts": "80.00", "pts_against": "", "result": ""}]
+    nx.check_hugh_jass_datei(hj, datei)
+    with pytest.raises(nx.ImportFehler, match="2099 W1"):
+        nx.check_hugh_jass_datei(hj, [dict(datei[0], pts_against="90.01")])
