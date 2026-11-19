@@ -150,7 +150,8 @@
 {"id":"b109656a-b65a-4639-9f35-7b30336081a3","type":"ROSTER","team_id":7,"datum":1795066749382,"periode":11,"items":[{"type":"DROP","player_id":4249087,"name":"Matt Gay","from_team_id":7,"to_team_id":0,"in_app":true}]},
 {"id":"4ab5332c-5949-4e00-96cd-b0a392e48e73","type":"FREEAGENT","team_id":7,"datum":1795066902411,"periode":11,"items":[{"type":"ADD","player_id":3117256,"name":"Dalton Schultz","from_team_id":0,"to_team_id":7,"in_app":true}]},
 {"id":"39f81943-dc8e-4701-9073-79b75cd6a35e","type":"FREEAGENT","team_id":2,"datum":1795071637305,"periode":11,"items":[{"type":"ADD","player_id":4429086,"name":"Michael Mayer","from_team_id":0,"to_team_id":2,"in_app":true},{"type":"DROP","player_id":4429275,"name":"Trey Benson","from_team_id":2,"to_team_id":0,"in_app":true}]},
-{"id":"7e359dba-ecff-43da-bbd9-4d1f09a7b295","type":"FREEAGENT","team_id":2,"datum":1795071683650,"periode":11,"items":[{"type":"ADD","player_id":4430656,"name":"Myles Price","from_team_id":0,"to_team_id":2,"in_app":true},{"type":"DROP","player_id":4431431,"name":"Corey Kiner","from_team_id":2,"to_team_id":0,"in_app":true}]}
+{"id":"7e359dba-ecff-43da-bbd9-4d1f09a7b295","type":"FREEAGENT","team_id":2,"datum":1795071683650,"periode":11,"items":[{"type":"ADD","player_id":4430656,"name":"Myles Price","from_team_id":0,"to_team_id":2,"in_app":true},{"type":"DROP","player_id":4431431,"name":"Corey Kiner","from_team_id":2,"to_team_id":0,"in_app":true}]},
+{"id":"734d0dce-5c61-430e-a367-4d115d0af200","type":"FREEAGENT","team_id":10,"datum":1795115190211,"periode":11,"items":[{"type":"ADD","player_id":3116164,"name":"Mike Gesicki","from_team_id":0,"to_team_id":10,"in_app":true},{"type":"DROP","player_id":4367209,"name":"Greg Dulcich","from_team_id":10,"to_team_id":0,"in_app":true}]}
 ],
-"aufstellungswechsel":{"1":51,"2":46,"3":27,"4":51,"5":55,"6":12,"7":40,"8":66,"9":55,"10":88}
+"aufstellungswechsel":{"1":52,"2":46,"3":27,"4":52,"5":55,"6":12,"7":40,"8":66,"9":55,"10":90}
 }
