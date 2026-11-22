@@ -157,5 +157,5 @@
 {"id":"2ef8a049-c508-42ce-bf47-97f75504edba","type":"FREEAGENT","team_id":5,"datum":1795296232665,"periode":11,"items":[{"type":"ADD","player_id":4635008,"name":"Keon Coleman","from_team_id":0,"to_team_id":5,"in_app":true},{"type":"DROP","player_id":3043116,"name":"Demarcus Robinson","from_team_id":5,"to_team_id":0,"in_app":true}]},
 {"id":"a1db25f8-af61-432c-8331-dc4c4a6b2f17","type":"FREEAGENT","team_id":5,"datum":1795296402868,"periode":11,"items":[{"type":"ADD","player_id":3930086,"name":"Dawson Knox","from_team_id":0,"to_team_id":5,"in_app":true},{"type":"DROP","player_id":4431574,"name":"Eli Stowers","from_team_id":5,"to_team_id":0,"in_app":true}]}
 ],
-"aufstellungswechsel":{"1":52,"2":46,"3":28,"4":52,"5":60,"6":12,"7":40,"8":66,"9":55,"10":90}
+"aufstellungswechsel":{"1":53,"2":47,"3":28,"4":53,"5":60,"6":13,"7":40,"8":66,"9":55,"10":90}
 }
