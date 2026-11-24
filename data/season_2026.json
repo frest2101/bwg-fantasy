@@ -1,46 +1,46 @@
 {
  "season": 2026,
- "through_week": 10,
+ "through_week": 11,
  "active_profile": "Standard",
  "active_norm": "z",
- "sigma": 34.93,
- "ligafaktor": 0.98,
+ "sigma": 34.16,
+ "ligafaktor": 0.97,
  "teams": [
   {
    "team_id": 1,
    "name": "Asse's Cowboys",
    "division": 1,
-   "games": 10,
-   "w": 8,
+   "games": 11,
+   "w": 9,
    "l": 2,
    "t": 0,
-   "pf": 2316.1,
-   "pa": 2045.96,
-   "pf_per_game": 231.61,
-   "win_pct": 80.0,
-   "allplay_w": 64,
+   "pf": 2579.55,
+   "pa": 2236.44,
+   "pf_per_game": 234.5,
+   "win_pct": 81.82,
+   "allplay_w": 73,
    "allplay_l": 26,
    "allplay_t": 0,
-   "allplay_pct": 71.11,
-   "median_w": 8,
+   "allplay_pct": 73.74,
+   "median_w": 9,
    "median_l": 2,
    "matchup_glueck": -0.03,
-   "spielplan_pkt": -3.24,
-   "optimal": 2648.19,
+   "spielplan_pkt": 2.37,
+   "optimal": 2911.64,
    "verschenkt": 332.09,
-   "efficiency": 87.46,
-   "kader_potenzial": 264.82,
-   "kader_projektion": 224.58,
-   "bench": 785.18,
+   "efficiency": 88.59,
+   "kader_potenzial": 264.69,
+   "kader_projektion": 221.98,
+   "bench": 838.99,
    "floor": 182.47,
-   "form": 228.17,
-   "form_delta": -3.44,
-   "form_band": 16.87,
-   "streak": "W2",
-   "projection": 2300.71,
-   "projektions_delta": 15.39,
-   "waiver_prio": 8,
-   "moves": 20,
+   "form": 249.42,
+   "form_delta": 14.91,
+   "form_band": 16.82,
+   "streak": "W3",
+   "projection": 2543.96,
+   "projektions_delta": 35.59,
+   "waiver_prio": 7,
+   "moves": 21,
    "kader_quelle": "projektion",
    "rang": 1,
    "rang_division": 1,
@@ -49,7 +49,7 @@
      "pf": 100.0,
      "allplay": 100.0,
      "win": 100.0,
-     "coaching": 70.01,
+     "coaching": 76.67,
      "kader": 100.0,
      "floor": 100.0,
      "form": 100.0
@@ -58,36 +58,36 @@
      "pf": 10,
      "allplay": 10,
      "win": 10,
-     "coaching": 5,
+     "coaching": 6,
      "kader": 10,
      "floor": 10,
      "form": 10
     },
     "z": {
-     "pf": 2.475,
-     "allplay": 2.054,
+     "pf": 2.682,
+     "allplay": 2.306,
      "win": 2.236,
-     "coaching": 0.339,
-     "kader": 2.446,
-     "floor": 1.286,
-     "form": 1.484
+     "coaching": 0.573,
+     "kader": 1.966,
+     "floor": 1.313,
+     "form": 2.019
     }
    },
    "score": {
     "Standard": {
-     "minmax": 97.0,
-     "rank": 9.5,
-     "z": 2.03
+     "minmax": 97.67,
+     "rank": 9.6,
+     "z": 2.061
     },
     "Verdienst": {
-     "minmax": 91.0,
-     "rank": 8.5,
-     "z": 1.527
+     "minmax": 93.0,
+     "rank": 8.8,
+     "z": 1.705
     },
     "Form": {
-     "minmax": 97.0,
-     "rank": 9.5,
-     "z": 1.807
+     "minmax": 97.67,
+     "rank": 9.6,
+     "z": 2.074
     }
    },
    "rang_score": 1
@@ -96,49 +96,49 @@
    "team_id": 2,
    "name": "Hugh Jass",
    "division": 2,
-   "games": 10,
-   "w": 6,
+   "games": 11,
+   "w": 7,
    "l": 4,
    "t": 0,
-   "pf": 2151.25,
-   "pa": 2045.89,
-   "pf_per_game": 215.13,
-   "win_pct": 60.0,
-   "allplay_w": 54,
-   "allplay_l": 36,
+   "pf": 2330.98,
+   "pa": 2216.51,
+   "pf_per_game": 211.91,
+   "win_pct": 63.64,
+   "allplay_w": 57,
+   "allplay_l": 42,
    "allplay_t": 0,
-   "allplay_pct": 60.0,
+   "allplay_pct": 57.58,
    "median_w": 7,
-   "median_l": 3,
-   "matchup_glueck": -0.22,
-   "spielplan_pkt": -3.17,
-   "optimal": 2393.43,
-   "verschenkt": 242.18,
-   "efficiency": 89.88,
-   "kader_potenzial": 239.34,
-   "kader_projektion": 203.3,
-   "bench": 756.3,
-   "floor": 181.02,
-   "form": 208.03,
-   "form_delta": -7.1,
-   "form_band": 16.87,
-   "streak": "W1",
-   "projection": 2150.56,
-   "projektions_delta": 0.69,
-   "waiver_prio": 9,
-   "moves": 21,
+   "median_l": 4,
+   "matchup_glueck": 0.18,
+   "spielplan_pkt": 22.3,
+   "optimal": 2591.76,
+   "verschenkt": 260.78,
+   "efficiency": 89.94,
+   "kader_potenzial": 235.61,
+   "kader_projektion": 200.43,
+   "bench": 811.69,
+   "floor": 179.73,
+   "form": 205.03,
+   "form_delta": -6.87,
+   "form_band": 16.82,
+   "streak": "W2",
+   "projection": 2349.74,
+   "projektions_delta": -18.76,
+   "waiver_prio": 8,
+   "moves": 25,
    "kader_quelle": "projektion",
    "rang": 2,
    "rang_division": 1,
    "norm": {
     "minmax": {
-     "pf": 57.51,
-     "allplay": 70.59,
+     "pf": 43.05,
+     "allplay": 56.76,
      "win": 60.0,
-     "coaching": 94.15,
-     "kader": 27.74,
-     "floor": 97.72,
-     "form": 51.56
+     "coaching": 89.44,
+     "kader": 13.22,
+     "floor": 95.69,
+     "form": 41.76
     },
     "rank": {
      "pf": 9,
@@ -150,288 +150,202 @@
      "form": 6
     },
     "z": {
-     "pf": 0.983,
-     "allplay": 0.973,
-     "win": 0.745,
-     "coaching": 1.034,
-     "kader": -0.132,
-     "floor": 1.221,
-     "form": 0.084
+     "pf": 0.725,
+     "allplay": 0.736,
+     "win": 0.958,
+     "coaching": 0.967,
+     "kader": -0.617,
+     "floor": 1.19,
+     "form": -0.019
     }
    },
    "score": {
     "Standard": {
-     "minmax": 61.02,
+     "minmax": 48.92,
      "rank": 8.0,
-     "z": 0.73
+     "z": 0.463
     },
     "Verdienst": {
-     "minmax": 78.05,
+     "minmax": 69.98,
      "rank": 9.0,
-     "z": 1.008
+     "z": 0.894
     },
     "Form": {
-     "minmax": 59.38,
+     "minmax": 47.68,
      "rank": 7.55,
-     "z": 0.559
+     "z": 0.357
     }
    },
    "rang_score": 2
   },
   {
-   "team_id": 7,
-   "name": "Rotzleffe",
-   "division": 1,
-   "games": 10,
+   "team_id": 4,
+   "name": "cool runnings",
+   "division": 2,
+   "games": 11,
    "w": 6,
-   "l": 4,
+   "l": 5,
    "t": 0,
-   "pf": 2002.36,
-   "pa": 1979.91,
-   "pf_per_game": 200.24,
-   "win_pct": 60.0,
-   "allplay_w": 41,
-   "allplay_l": 49,
+   "pf": 2211.95,
+   "pa": 2241.86,
+   "pf_per_game": 201.09,
+   "win_pct": 54.55,
+   "allplay_w": 49,
+   "allplay_l": 50,
    "allplay_t": 0,
-   "allplay_pct": 45.56,
+   "allplay_pct": 49.49,
    "median_w": 4,
-   "median_l": 6,
-   "matchup_glueck": 1.64,
-   "spielplan_pkt": 62.81,
-   "optimal": 2403.94,
-   "verschenkt": 401.58,
-   "efficiency": 83.29,
-   "kader_potenzial": 240.39,
-   "kader_projektion": 197.19,
-   "bench": 967.43,
-   "floor": 163.59,
-   "form": 193.22,
-   "form_delta": -7.02,
-   "form_band": 16.87,
-   "streak": "W2",
-   "projection": 2074.97,
-   "projektions_delta": -72.61,
-   "waiver_prio": 3,
-   "moves": 3,
+   "median_l": 7,
+   "matchup_glueck": 1.42,
+   "spielplan_pkt": -3.05,
+   "optimal": 2683.23,
+   "verschenkt": 471.28,
+   "efficiency": 82.44,
+   "kader_potenzial": 243.93,
+   "kader_projektion": 199.97,
+   "bench": 1179.28,
+   "floor": 168.88,
+   "form": 214.49,
+   "form_delta": 13.4,
+   "form_band": 16.82,
+   "streak": "W1",
+   "projection": 2247.71,
+   "projektions_delta": -35.76,
+   "waiver_prio": 9,
+   "moves": 16,
    "kader_quelle": "projektion",
    "rang": 3,
    "rang_division": 2,
    "norm": {
     "minmax": {
-     "pf": 19.13,
-     "allplay": 32.35,
-     "win": 60.0,
-     "coaching": 28.5,
-     "kader": 6.99,
-     "floor": 70.33,
-     "form": 15.95
+     "pf": 15.77,
+     "allplay": 35.14,
+     "win": 40.0,
+     "coaching": 18.18,
+     "kader": 11.37,
+     "floor": 78.65,
+     "form": 54.17
     },
     "rank": {
-     "pf": 4,
-     "allplay": 4,
-     "win": 9,
-     "coaching": 3,
-     "kader": 3,
-     "floor": 6,
-     "form": 3
+     "pf": 7,
+     "allplay": 5,
+     "win": 8,
+     "coaching": 2,
+     "kader": 4,
+     "floor": 7,
+     "form": 7
     },
     "z": {
-     "pf": -0.365,
-     "allplay": -0.432,
-     "win": 0.745,
-     "coaching": -0.855,
-     "kader": -0.872,
-     "floor": 0.444,
-     "form": -0.946
+     "pf": -0.211,
+     "allplay": -0.049,
+     "win": 0.319,
+     "coaching": -1.234,
+     "kader": -0.672,
+     "floor": 0.7,
+     "form": 0.415
     }
    },
    "score": {
     "Standard": {
-     "minmax": 25.46,
-     "rank": 3.85,
-     "z": -0.477
-    },
-    "Verdienst": {
-     "minmax": 37.01,
-     "rank": 4.5,
+     "minmax": 26.04,
+     "rank": 5.25,
      "z": -0.297
     },
+    "Verdienst": {
+     "minmax": 33.19,
+     "rank": 5.1,
+     "z": -0.288
+    },
     "Form": {
-     "minmax": 21.04,
-     "rank": 3.45,
-     "z": -0.685
+     "minmax": 33.85,
+     "rank": 5.7,
+     "z": -0.1
     }
    },
-   "rang_score": 8
+   "rang_score": 6
   },
   {
-   "team_id": 6,
-   "name": "SaschaM",
-   "division": 2,
-   "games": 10,
-   "w": 5,
+   "team_id": 7,
+   "name": "Rotzleffe",
+   "division": 1,
+   "games": 11,
+   "w": 6,
    "l": 5,
    "t": 0,
-   "pf": 2080.59,
-   "pa": 1955.97,
-   "pf_per_game": 208.06,
-   "win_pct": 50.0,
-   "allplay_w": 49,
-   "allplay_l": 41,
+   "pf": 2192.84,
+   "pa": 2243.36,
+   "pf_per_game": 199.35,
+   "win_pct": 54.55,
+   "allplay_w": 46,
+   "allplay_l": 53,
    "allplay_t": 0,
-   "allplay_pct": 54.44,
-   "median_w": 6,
-   "median_l": 4,
-   "matchup_glueck": -0.41,
-   "spielplan_pkt": 86.75,
-   "optimal": 2319.55,
-   "verschenkt": 238.96,
-   "efficiency": 89.7,
-   "kader_potenzial": 231.96,
-   "kader_projektion": 195.13,
-   "bench": 596.54,
-   "floor": 122.63,
-   "form": 186.58,
-   "form_delta": -21.48,
-   "form_band": 16.87,
-   "streak": "L2",
-   "projection": 2096.5,
-   "projektions_delta": -15.91,
-   "waiver_prio": 1,
-   "moves": 0,
+   "allplay_pct": 46.46,
+   "median_w": 5,
+   "median_l": 6,
+   "matchup_glueck": 0.66,
+   "spielplan_pkt": -4.55,
+   "optimal": 2611.92,
+   "verschenkt": 419.08,
+   "efficiency": 83.96,
+   "kader_potenzial": 237.45,
+   "kader_projektion": 201.3,
+   "bench": 996.33,
+   "floor": 163.59,
+   "form": 191.97,
+   "form_delta": -7.38,
+   "form_band": 16.82,
+   "streak": "L1",
+   "projection": 2280.74,
+   "projektions_delta": -87.9,
+   "waiver_prio": 3,
+   "moves": 5,
    "kader_quelle": "projektion",
    "rang": 4,
    "rang_division": 2,
    "norm": {
     "minmax": {
-     "pf": 39.29,
-     "allplay": 55.88,
+     "pf": 11.39,
+     "allplay": 27.03,
      "win": 40.0,
-     "coaching": 92.32,
-     "kader": 0.0,
-     "floor": 5.97,
-     "form": 0.0
+     "coaching": 32.61,
+     "kader": 16.73,
+     "floor": 70.33,
+     "form": 24.62
     },
     "rank": {
-     "pf": 8,
-     "allplay": 8,
-     "win": 7,
-     "coaching": 8,
-     "kader": 1,
-     "floor": 2,
-     "form": 1
+     "pf": 6,
+     "allplay": 4,
+     "win": 8,
+     "coaching": 3,
+     "kader": 6,
+     "floor": 6,
+     "form": 4
     },
     "z": {
-     "pf": 0.343,
-     "allplay": 0.432,
-     "win": 0.0,
-     "coaching": 0.981,
-     "kader": -1.122,
-     "floor": -1.382,
-     "form": -1.407
+     "pf": -0.362,
+     "allplay": -0.343,
+     "win": 0.319,
+     "coaching": -0.788,
+     "kader": -0.513,
+     "floor": 0.461,
+     "form": -0.619
     }
    },
    "score": {
     "Standard": {
-     "minmax": 35.59,
-     "rank": 5.65,
-     "z": -0.11
-    },
-    "Verdienst": {
-     "minmax": 54.42,
-     "rank": 7.0,
-     "z": 0.264
-    },
-    "Form": {
-     "minmax": 31.06,
-     "rank": 4.85,
-     "z": -0.33
-    }
-   },
-   "rang_score": 3
-  },
-  {
-   "team_id": 4,
-   "name": "cool runnings",
-   "division": 2,
-   "games": 10,
-   "w": 5,
-   "l": 5,
-   "t": 0,
-   "pf": 2024.58,
-   "pa": 2070.7,
-   "pf_per_game": 202.46,
-   "win_pct": 50.0,
-   "allplay_w": 45,
-   "allplay_l": 45,
-   "allplay_t": 0,
-   "allplay_pct": 50.0,
-   "median_w": 4,
-   "median_l": 6,
-   "matchup_glueck": 1.11,
-   "spielplan_pkt": -27.98,
-   "optimal": 2488.86,
-   "verschenkt": 464.28,
-   "efficiency": 81.35,
-   "kader_potenzial": 248.89,
-   "kader_projektion": 200.97,
-   "bench": 1164.68,
-   "floor": 168.88,
-   "form": 223.12,
-   "form_delta": 20.66,
-   "form_band": 16.87,
-   "streak": "L1",
-   "projection": 2047.36,
-   "projektions_delta": -22.78,
-   "waiver_prio": 6,
-   "moves": 15,
-   "kader_quelle": "projektion",
-   "rang": 5,
-   "rang_division": 3,
-   "norm": {
-    "minmax": {
-     "pf": 24.85,
-     "allplay": 44.12,
-     "win": 40.0,
-     "coaching": 9.07,
-     "kader": 19.82,
-     "floor": 78.65,
-     "form": 87.84
-    },
-    "rank": {
-     "pf": 7,
-     "allplay": 6,
-     "win": 7,
-     "coaching": 2,
-     "kader": 4,
-     "floor": 7,
-     "form": 8
-    },
-    "z": {
-     "pf": -0.164,
-     "allplay": 0.0,
-     "win": 0.0,
-     "coaching": -1.414,
-     "kader": -0.415,
-     "floor": 0.68,
-     "form": 1.133
-    }
-   },
-   "score": {
-    "Standard": {
-     "minmax": 32.21,
-     "rank": 5.5,
-     "z": -0.226
-    },
-    "Verdienst": {
-     "minmax": 34.52,
-     "rank": 5.25,
+     "minmax": 24.65,
+     "rank": 5.2,
      "z": -0.355
     },
+    "Verdienst": {
+     "minmax": 33.37,
+     "rank": 4.8,
+     "z": -0.294
+    },
     "Form": {
-     "minmax": 49.63,
-     "rank": 6.3,
-     "z": 0.181
+     "minmax": 22.58,
+     "rank": 4.5,
+     "z": -0.505
     }
    },
    "rang_score": 7
@@ -440,428 +354,514 @@
    "team_id": 5,
    "name": "TeamTy",
    "division": 1,
-   "games": 10,
-   "w": 5,
+   "games": 11,
+   "w": 6,
    "l": 5,
    "t": 0,
-   "pf": 1934.83,
-   "pa": 2105.65,
-   "pf_per_game": 193.48,
-   "win_pct": 50.0,
-   "allplay_w": 43,
-   "allplay_l": 47,
+   "pf": 2143.11,
+   "pa": 2277.88,
+   "pf_per_game": 194.83,
+   "win_pct": 54.55,
+   "allplay_w": 50,
+   "allplay_l": 49,
    "allplay_t": 0,
-   "allplay_pct": 47.78,
-   "median_w": 4,
+   "allplay_pct": 50.51,
+   "median_w": 5,
    "median_l": 6,
    "matchup_glueck": 1.0,
-   "spielplan_pkt": -62.93,
-   "optimal": 2198.62,
-   "verschenkt": 263.79,
-   "efficiency": 88.0,
-   "kader_potenzial": 219.86,
-   "kader_projektion": 209.32,
-   "bench": 677.53,
+   "spielplan_pkt": -39.07,
+   "optimal": 2446.11,
+   "verschenkt": 303.0,
+   "efficiency": 87.61,
+   "kader_potenzial": 222.37,
+   "kader_projektion": 219.02,
+   "bench": 743.99,
    "floor": 137.03,
-   "form": 195.73,
-   "form_delta": 2.25,
-   "form_band": 16.87,
-   "streak": "L1",
-   "projection": 2016.59,
-   "projektions_delta": -81.76,
+   "form": 198.4,
+   "form_delta": 3.57,
+   "form_band": 16.82,
+   "streak": "W1",
+   "projection": 2216.61,
+   "projektions_delta": -73.5,
    "waiver_prio": 5,
-   "moves": 4,
+   "moves": 6,
+   "kader_quelle": "projektion",
+   "rang": 5,
+   "rang_division": 3,
+   "norm": {
+    "minmax": {
+     "pf": 0.0,
+     "allplay": 37.84,
+     "win": 40.0,
+     "coaching": 67.35,
+     "kader": 88.09,
+     "floor": 28.6,
+     "form": 33.06
+    },
+    "rank": {
+     "pf": 1,
+     "allplay": 7,
+     "win": 8,
+     "coaching": 5,
+     "kader": 9,
+     "floor": 4,
+     "form": 5
+    },
+    "z": {
+     "pf": -0.753,
+     "allplay": 0.049,
+     "win": 0.319,
+     "coaching": 0.285,
+     "kader": 1.612,
+     "floor": -0.737,
+     "form": -0.324
+    }
+   },
+   "score": {
+    "Standard": {
+     "minmax": 41.08,
+     "rank": 5.2,
+     "z": 0.144
+    },
+    "Verdienst": {
+     "minmax": 37.95,
+     "rank": 4.85,
+     "z": -0.131
+    },
+    "Form": {
+     "minmax": 36.57,
+     "rank": 5.1,
+     "z": -0.062
+    }
+   },
+   "rang_score": 3
+  },
+  {
+   "team_id": 6,
+   "name": "SaschaM",
+   "division": 2,
+   "games": 11,
+   "w": 5,
+   "l": 6,
+   "t": 0,
+   "pf": 2274.58,
+   "pa": 2179.57,
+   "pf_per_game": 206.78,
+   "win_pct": 45.45,
+   "allplay_w": 55,
+   "allplay_l": 44,
+   "allplay_t": 0,
+   "allplay_pct": 55.56,
+   "median_w": 7,
+   "median_l": 4,
+   "matchup_glueck": -1.0,
+   "spielplan_pkt": 59.24,
+   "optimal": 2539.34,
+   "verschenkt": 264.76,
+   "efficiency": 89.57,
+   "kader_potenzial": 230.85,
+   "kader_projektion": 197.15,
+   "bench": 652.14,
+   "floor": 122.63,
+   "form": 173.21,
+   "form_delta": -33.57,
+   "form_band": 16.82,
+   "streak": "L3",
+   "projection": 2285.29,
+   "projektions_delta": -10.71,
+   "waiver_prio": 1,
+   "moves": 0,
    "kader_quelle": "projektion",
    "rang": 6,
    "rang_division": 3,
    "norm": {
     "minmax": {
-     "pf": 1.72,
-     "allplay": 38.24,
-     "win": 40.0,
-     "coaching": 75.42,
-     "kader": 48.18,
-     "floor": 28.6,
-     "form": 22.0
-    },
-    "rank": {
-     "pf": 2,
-     "allplay": 5,
-     "win": 7,
-     "coaching": 6,
-     "kader": 9,
-     "floor": 4,
-     "form": 4
-    },
-    "z": {
-     "pf": -0.977,
-     "allplay": -0.216,
-     "win": 0.0,
-     "coaching": 0.495,
-     "kader": 0.597,
-     "floor": -0.74,
-     "form": -0.771
-    }
-   },
-   "score": {
-    "Standard": {
-     "minmax": 32.52,
-     "rank": 5.1,
-     "z": -0.222
-    },
-    "Verdienst": {
-     "minmax": 40.82,
-     "rank": 4.75,
-     "z": -0.212
-    },
-    "Form": {
-     "minmax": 29.96,
-     "rank": 4.55,
-     "z": -0.41
-    }
-   },
-   "rang_score": 6
-  },
-  {
-   "team_id": 8,
-   "name": "gloane saubande",
-   "division": 2,
-   "games": 10,
-   "w": 4,
-   "l": 6,
-   "t": 0,
-   "pf": 2013.23,
-   "pa": 2166.49,
-   "pf_per_game": 201.32,
-   "win_pct": 40.0,
-   "allplay_w": 49,
-   "allplay_l": 41,
-   "allplay_t": 0,
-   "allplay_pct": 54.44,
-   "median_w": 6,
-   "median_l": 4,
-   "matchup_glueck": -1.47,
-   "spielplan_pkt": -123.77,
-   "optimal": 2225.34,
-   "verschenkt": 212.11,
-   "efficiency": 90.47,
-   "kader_potenzial": 222.53,
-   "kader_projektion": 195.4,
-   "bench": 643.52,
-   "floor": 154.41,
-   "form": 193.14,
-   "form_delta": -8.18,
-   "form_band": 16.87,
-   "streak": "L1",
-   "projection": 2107.51,
-   "projektions_delta": -94.28,
-   "waiver_prio": 10,
-   "moves": 29,
-   "kader_quelle": "projektion",
-   "rang": 7,
-   "rang_division": 4,
-   "norm": {
-    "minmax": {
-     "pf": 21.93,
-     "allplay": 55.88,
+     "pf": 30.12,
+     "allplay": 51.35,
      "win": 20.0,
-     "coaching": 100.0,
-     "kader": 0.91,
-     "floor": 55.91,
-     "form": 15.77
+     "coaching": 85.97,
+     "kader": 0.0,
+     "floor": 5.97,
+     "form": 0.0
     },
     "rank": {
-     "pf": 6,
+     "pf": 8,
      "allplay": 8,
-     "win": 4,
-     "coaching": 10,
-     "kader": 2,
-     "floor": 5,
-     "form": 2
+     "win": 5,
+     "coaching": 8,
+     "kader": 1,
+     "floor": 2,
+     "form": 1
     },
     "z": {
-     "pf": -0.267,
-     "allplay": 0.432,
-     "win": -0.745,
-     "coaching": 1.202,
-     "kader": -1.089,
-     "floor": 0.035,
-     "form": -0.951
+     "pf": 0.282,
+     "allplay": 0.54,
+     "win": -0.319,
+     "coaching": 0.861,
+     "kader": -1.011,
+     "floor": -1.387,
+     "form": -1.481
     }
    },
    "score": {
     "Standard": {
-     "minmax": 36.37,
-     "rank": 5.8,
-     "z": -0.121
+     "minmax": 31.07,
+     "rank": 5.65,
+     "z": -0.086
     },
     "Verdienst": {
-     "minmax": 58.74,
-     "rank": 7.35,
-     "z": 0.346
+     "minmax": 47.55,
+     "rank": 6.8,
+     "z": 0.209
     },
     "Form": {
-     "minmax": 33.96,
-     "rank": 5.1,
-     "z": -0.267
+     "minmax": 27.46,
+     "rank": 4.85,
+     "z": -0.342
     }
    },
    "rang_score": 4
   },
   {
+   "team_id": 8,
+   "name": "gloane saubande",
+   "division": 2,
+   "games": 11,
+   "w": 4,
+   "l": 7,
+   "t": 0,
+   "pf": 2184.39,
+   "pa": 2353.86,
+   "pf_per_game": 198.58,
+   "win_pct": 36.36,
+   "allplay_w": 50,
+   "allplay_l": 49,
+   "allplay_t": 0,
+   "allplay_pct": 50.51,
+   "median_w": 6,
+   "median_l": 5,
+   "matchup_glueck": -1.48,
+   "spielplan_pkt": -115.05,
+   "optimal": 2399.1,
+   "verschenkt": 214.71,
+   "efficiency": 91.05,
+   "kader_potenzial": 218.1,
+   "kader_projektion": 199.44,
+   "bench": 652.72,
+   "floor": 154.41,
+   "form": 184.65,
+   "form_delta": -13.93,
+   "form_band": 16.82,
+   "streak": "L2",
+   "projection": 2293.47,
+   "projektions_delta": -109.08,
+   "waiver_prio": 10,
+   "moves": 31,
+   "kader_quelle": "projektion",
+   "rang": 7,
+   "rang_division": 4,
+   "norm": {
+    "minmax": {
+     "pf": 9.46,
+     "allplay": 37.84,
+     "win": 0.0,
+     "coaching": 100.0,
+     "kader": 9.23,
+     "floor": 55.91,
+     "form": 15.01
+    },
+    "rank": {
+     "pf": 5,
+     "allplay": 7,
+     "win": 4,
+     "coaching": 10,
+     "kader": 3,
+     "floor": 5,
+     "form": 2
+    },
+    "z": {
+     "pf": -0.428,
+     "allplay": 0.049,
+     "win": -0.958,
+     "coaching": 1.294,
+     "kader": -0.736,
+     "floor": 0.047,
+     "form": -0.955
+    }
+   },
+   "score": {
+    "Standard": {
+     "minmax": 30.2,
+     "rank": 5.5,
+     "z": -0.166
+    },
+    "Verdienst": {
+     "minmax": 49.74,
+     "rank": 6.9,
+     "z": 0.226
+    },
+    "Form": {
+     "minmax": 27.53,
+     "rank": 4.75,
+     "z": -0.352
+    }
+   },
+   "rang_score": 5
+  },
+  {
    "team_id": 9,
    "name": "Dynamo",
    "division": 1,
-   "games": 10,
+   "games": 11,
    "w": 4,
-   "l": 6,
+   "l": 7,
    "t": 0,
-   "pf": 2003.27,
-   "pa": 1977.94,
-   "pf_per_game": 200.33,
-   "win_pct": 40.0,
+   "pf": 2173.89,
+   "pa": 2157.67,
+   "pf_per_game": 197.63,
+   "win_pct": 36.36,
    "allplay_w": 41,
-   "allplay_l": 49,
+   "allplay_l": 58,
    "allplay_t": 0,
-   "allplay_pct": 45.56,
+   "allplay_pct": 41.41,
    "median_w": 4,
-   "median_l": 6,
+   "median_l": 7,
    "matchup_glueck": 0.12,
-   "spielplan_pkt": 64.78,
-   "optimal": 2490.52,
-   "verschenkt": 487.25,
-   "efficiency": 80.44,
-   "kader_potenzial": 249.05,
-   "kader_projektion": 207.35,
-   "bench": 967.23,
-   "floor": 172.0,
-   "form": 212.1,
-   "form_delta": 11.77,
-   "form_band": 16.87,
-   "streak": "L2",
-   "projection": 2108.8,
-   "projektions_delta": -105.53,
-   "waiver_prio": 7,
+   "spielplan_pkt": 81.14,
+   "optimal": 2699.74,
+   "verschenkt": 525.85,
+   "efficiency": 80.52,
+   "kader_potenzial": 245.43,
+   "kader_projektion": 207.99,
+   "bench": 1017.73,
+   "floor": 170.62,
+   "form": 190.38,
+   "form_delta": -7.24,
+   "form_band": 16.82,
+   "streak": "L3",
+   "projection": 2322.37,
+   "projektions_delta": -148.48,
+   "waiver_prio": 6,
    "moves": 12,
    "kader_quelle": "projektion",
    "rang": 8,
    "rang_division": 4,
    "norm": {
     "minmax": {
-     "pf": 19.36,
-     "allplay": 32.35,
-     "win": 20.0,
+     "pf": 7.05,
+     "allplay": 13.51,
+     "win": 0.0,
      "coaching": 0.0,
-     "kader": 41.48,
-     "floor": 83.55,
-     "form": 61.34
+     "kader": 43.65,
+     "floor": 81.38,
+     "form": 22.54
     },
     "rank": {
-     "pf": 5,
-     "allplay": 4,
+     "pf": 4,
+     "allplay": 3,
      "win": 4,
      "coaching": 1,
-     "kader": 8,
+     "kader": 7,
      "floor": 8,
-     "form": 7
+     "form": 3
     },
     "z": {
-     "pf": -0.357,
-     "allplay": -0.432,
-     "win": -0.745,
-     "coaching": -1.675,
-     "kader": 0.358,
-     "floor": 0.819,
-     "form": 0.367
+     "pf": -0.511,
+     "allplay": -0.834,
+     "win": -0.958,
+     "coaching": -1.796,
+     "kader": 0.289,
+     "floor": 0.779,
+     "form": -0.692
     }
    },
    "score": {
     "Standard": {
-     "minmax": 32.62,
-     "rank": 5.4,
-     "z": -0.211
+     "minmax": 24.55,
+     "rank": 4.6,
+     "z": -0.391
     },
     "Verdienst": {
-     "minmax": 26.49,
-     "rank": 3.9,
-     "z": -0.634
+     "minmax": 17.0,
+     "rank": 3.45,
+     "z": -0.829
     },
     "Form": {
-     "minmax": 37.58,
-     "rank": 5.35,
-     "z": -0.183
+     "minmax": 17.04,
+     "rank": 3.4,
+     "z": -0.704
     }
    },
-   "rang_score": 5
-  },
-  {
-   "team_id": 3,
-   "name": "4th Down Syndrom",
-   "division": 1,
-   "games": 10,
-   "w": 4,
-   "l": 6,
-   "t": 0,
-   "pf": 1972.8,
-   "pa": 2128.35,
-   "pf_per_game": 197.28,
-   "win_pct": 40.0,
-   "allplay_w": 34,
-   "allplay_l": 56,
-   "allplay_t": 0,
-   "allplay_pct": 37.78,
-   "median_w": 3,
-   "median_l": 7,
-   "matchup_glueck": 1.0,
-   "spielplan_pkt": -85.63,
-   "optimal": 2241.11,
-   "verschenkt": 268.31,
-   "efficiency": 88.03,
-   "kader_potenzial": 224.11,
-   "kader_projektion": 203.4,
-   "bench": 633.2,
-   "floor": 118.83,
-   "form": 226.48,
-   "form_delta": 29.2,
-   "form_band": 16.87,
-   "streak": "W1",
-   "projection": 2023.76,
-   "projektions_delta": -50.96,
-   "waiver_prio": 4,
-   "moves": 15,
-   "kader_quelle": "projektion",
-   "rang": 9,
-   "rang_division": 5,
-   "norm": {
-    "minmax": {
-     "pf": 11.51,
-     "allplay": 11.76,
-     "win": 20.0,
-     "coaching": 75.67,
-     "kader": 28.08,
-     "floor": 0.0,
-     "form": 95.93
-    },
-    "rank": {
-     "pf": 3,
-     "allplay": 2,
-     "win": 4,
-     "coaching": 7,
-     "kader": 6,
-     "floor": 1,
-     "form": 9
-    },
-    "z": {
-     "pf": -0.633,
-     "allplay": -1.189,
-     "win": -0.745,
-     "coaching": 0.502,
-     "kader": -0.12,
-     "floor": -1.552,
-     "form": 1.367
-    }
-   },
-   "score": {
-    "Standard": {
-     "minmax": 20.98,
-     "rank": 3.7,
-     "z": -0.622
-    },
-    "Verdienst": {
-     "minmax": 29.94,
-     "rank": 3.75,
-     "z": -0.58
-    },
-    "Form": {
-     "minmax": 49.19,
-     "rank": 5.55,
-     "z": 0.093
-    }
-   },
-   "rang_score": 9
+   "rang_score": 8
   },
   {
    "team_id": 10,
    "name": "SaureGurken",
    "division": 2,
-   "games": 10,
-   "w": 3,
+   "games": 11,
+   "w": 4,
    "l": 7,
    "t": 0,
-   "pf": 1928.16,
-   "pa": 1950.31,
-   "pf_per_game": 192.82,
-   "win_pct": 30.0,
-   "allplay_w": 30,
-   "allplay_l": 60,
+   "pf": 2151.76,
+   "pa": 2144.3,
+   "pf_per_game": 195.61,
+   "win_pct": 36.36,
+   "allplay_w": 38,
+   "allplay_l": 61,
    "allplay_t": 0,
-   "allplay_pct": 33.33,
-   "median_w": 4,
+   "allplay_pct": 38.38,
+   "median_w": 5,
    "median_l": 6,
-   "matchup_glueck": -0.23,
-   "spielplan_pkt": 92.41,
-   "optimal": 2291.21,
-   "verschenkt": 363.05,
-   "efficiency": 84.15,
-   "kader_potenzial": 229.12,
-   "kader_projektion": 207.28,
-   "bench": 845.31,
+   "matchup_glueck": -0.24,
+   "spielplan_pkt": 94.51,
+   "optimal": 2557.43,
+   "verschenkt": 405.67,
+   "efficiency": 84.14,
+   "kader_potenzial": 232.49,
+   "kader_projektion": 209.35,
+   "bench": 933.8,
    "floor": 135.44,
-   "form": 201.67,
-   "form_delta": 8.85,
-   "form_band": 16.87,
-   "streak": "W1",
-   "projection": 1994.75,
-   "projektions_delta": -66.59,
+   "form": 214.93,
+   "form_delta": 19.32,
+   "form_band": 16.82,
+   "streak": "W2",
+   "projection": 2200.39,
+   "projektions_delta": -48.63,
    "waiver_prio": 2,
-   "moves": 6,
+   "moves": 7,
+   "kader_quelle": "projektion",
+   "rang": 9,
+   "rang_division": 5,
+   "norm": {
+    "minmax": {
+     "pf": 1.98,
+     "allplay": 5.41,
+     "win": 0.0,
+     "coaching": 34.34,
+     "kader": 49.13,
+     "floor": 26.1,
+     "form": 54.75
+    },
+    "rank": {
+     "pf": 3,
+     "allplay": 2,
+     "win": 4,
+     "coaching": 4,
+     "kader": 8,
+     "floor": 3,
+     "form": 8
+    },
+    "z": {
+     "pf": -0.685,
+     "allplay": -1.128,
+     "win": -0.958,
+     "coaching": -0.735,
+     "kader": 0.452,
+     "floor": -0.809,
+     "form": 0.435
+    }
+   },
+   "score": {
+    "Standard": {
+     "minmax": 20.27,
+     "rank": 4.1,
+     "z": -0.529
+    },
+    "Verdienst": {
+     "minmax": 15.96,
+     "rank": 3.15,
+     "z": -0.857
+    },
+    "Form": {
+     "minmax": 29.26,
+     "rank": 5.1,
+     "z": -0.295
+    }
+   },
+   "rang_score": 9
+  },
+  {
+   "team_id": 3,
+   "name": "4th Down Syndrom",
+   "division": 1,
+   "games": 11,
+   "w": 4,
+   "l": 7,
+   "t": 0,
+   "pf": 2145.03,
+   "pa": 2336.63,
+   "pf_per_game": 195.0,
+   "win_pct": 36.36,
+   "allplay_w": 36,
+   "allplay_l": 63,
+   "allplay_t": 0,
+   "allplay_pct": 36.36,
+   "median_w": 3,
+   "median_l": 8,
+   "matchup_glueck": 1.0,
+   "spielplan_pkt": -97.82,
+   "optimal": 2421.14,
+   "verschenkt": 276.11,
+   "efficiency": 88.6,
+   "kader_potenzial": 220.1,
+   "kader_projektion": 199.16,
+   "bench": 671.04,
+   "floor": 118.83,
+   "form": 232.0,
+   "form_delta": 37.0,
+   "form_band": 16.82,
+   "streak": "L1",
+   "projection": 2234.22,
+   "projektions_delta": -89.19,
+   "waiver_prio": 4,
+   "moves": 16,
    "kader_quelle": "projektion",
    "rang": 10,
    "rang_division": 5,
    "norm": {
     "minmax": {
-     "pf": 0.0,
+     "pf": 0.44,
      "allplay": 0.0,
      "win": 0.0,
-     "coaching": 37.07,
-     "kader": 41.25,
-     "floor": 26.1,
-     "form": 36.27
+     "coaching": 76.69,
+     "kader": 8.1,
+     "floor": 0.0,
+     "form": 77.15
     },
     "rank": {
-     "pf": 1,
+     "pf": 2,
      "allplay": 1,
-     "win": 1,
-     "coaching": 4,
-     "kader": 7,
-     "floor": 3,
-     "form": 5
+     "win": 4,
+     "coaching": 7,
+     "kader": 2,
+     "floor": 1,
+     "form": 9
     },
     "z": {
-     "pf": -1.037,
-     "allplay": -1.621,
-     "win": -1.491,
-     "coaching": -0.609,
-     "kader": 0.35,
-     "floor": -0.811,
-     "form": -0.358
+     "pf": -0.738,
+     "allplay": -1.325,
+     "win": -0.958,
+     "coaching": 0.574,
+     "kader": -0.769,
+     "floor": -1.558,
+     "form": 1.22
     }
    },
    "score": {
     "Standard": {
-     "minmax": 16.63,
-     "rank": 3.0,
-     "z": -0.771
+     "minmax": 9.83,
+     "rank": 2.15,
+     "z": -0.843
     },
     "Verdienst": {
-     "minmax": 15.04,
-     "rank": 2.2,
-     "z": -1.066
+     "minmax": 23.09,
+     "rank": 3.3,
+     "z": -0.636
     },
     "Form": {
-     "minmax": 20.53,
-     "rank": 3.3,
-     "z": -0.764
+     "minmax": 35.57,
+     "rank": 4.7,
+     "z": -0.072
     }
    },
    "rang_score": 10
@@ -1089,8 +1089,8 @@
    "gegner_abstand": 22.63,
    "allplay_pct": 55.56,
    "gegner_pkt": -11.89,
-   "matchup_glueck": -0.47,
-   "matchup_kum": -0.47
+   "matchup_glueck": -0.48,
+   "matchup_kum": -0.48
   },
   {
    "team_id": 9,
@@ -1341,8 +1341,8 @@
    "gegner_abstand": 45.54,
    "allplay_pct": 55.56,
    "gegner_pkt": -46.62,
-   "matchup_glueck": -0.71,
-   "matchup_kum": -0.71
+   "matchup_glueck": -0.73,
+   "matchup_kum": -0.73
   },
   {
    "team_id": 8,
@@ -1370,7 +1370,7 @@
    "allplay_pct": 77.78,
    "gegner_pkt": 3.15,
    "matchup_glueck": 0.0,
-   "matchup_kum": -0.47
+   "matchup_kum": -0.48
   },
   {
    "team_id": 9,
@@ -1453,8 +1453,8 @@
    "gegner_abstand": -21.59,
    "allplay_pct": 22.22,
    "gegner_pkt": 25.09,
-   "matchup_glueck": 0.5,
-   "matchup_kum": 0.5
+   "matchup_glueck": 0.51,
+   "matchup_kum": 0.51
   },
   {
    "team_id": 2,
@@ -1622,7 +1622,7 @@
    "allplay_pct": 77.78,
    "gegner_pkt": 13.43,
    "matchup_glueck": 0.0,
-   "matchup_kum": -0.71
+   "matchup_kum": -0.73
   },
   {
    "team_id": 8,
@@ -1650,7 +1650,7 @@
    "allplay_pct": 66.67,
    "gegner_pkt": 2.55,
    "matchup_glueck": 0.0,
-   "matchup_kum": -0.47
+   "matchup_kum": -0.48
   },
   {
    "team_id": 9,
@@ -1734,7 +1734,7 @@
    "allplay_pct": 100.0,
    "gegner_pkt": -18.44,
    "matchup_glueck": 0.0,
-   "matchup_kum": 0.5
+   "matchup_kum": 0.51
   },
   {
    "team_id": 2,
@@ -1817,8 +1817,8 @@
    "gegner_abstand": -38.81,
    "allplay_pct": 33.33,
    "gegner_pkt": 40.88,
-   "matchup_glueck": 0.65,
-   "matchup_kum": 1.57
+   "matchup_glueck": 0.67,
+   "matchup_kum": 1.59
   },
   {
    "team_id": 5,
@@ -1902,7 +1902,7 @@
    "allplay_pct": 11.11,
    "gegner_pkt": -5.89,
    "matchup_glueck": 0.0,
-   "matchup_kum": -0.71
+   "matchup_kum": -0.73
   },
   {
    "team_id": 8,
@@ -1930,7 +1930,7 @@
    "allplay_pct": 88.89,
    "gegner_pkt": -68.72,
    "matchup_glueck": -1.0,
-   "matchup_kum": -1.47
+   "matchup_kum": -1.48
   },
   {
    "team_id": 9,
@@ -2014,7 +2014,7 @@
    "allplay_pct": 11.11,
    "gegner_pkt": -51.89,
    "matchup_glueck": 0.0,
-   "matchup_kum": 0.5
+   "matchup_kum": 0.51
   },
   {
    "team_id": 2,
@@ -2098,7 +2098,7 @@
    "allplay_pct": 33.33,
    "gegner_pkt": -30.03,
    "matchup_glueck": 0.0,
-   "matchup_kum": 1.57
+   "matchup_kum": 1.59
   },
   {
    "team_id": 5,
@@ -2182,7 +2182,7 @@
    "allplay_pct": 66.67,
    "gegner_pkt": -6.99,
    "matchup_glueck": 0.0,
-   "matchup_kum": -0.71
+   "matchup_kum": -0.73
   },
   {
    "team_id": 8,
@@ -2210,7 +2210,7 @@
    "allplay_pct": 44.44,
    "gegner_pkt": -23.48,
    "matchup_glueck": 0.0,
-   "matchup_kum": -1.47
+   "matchup_kum": -1.48
   },
   {
    "team_id": 9,
@@ -2265,8 +2265,8 @@
    "gegner_abstand": 12.4,
    "allplay_pct": 55.56,
    "gegner_pkt": -15.46,
-   "matchup_glueck": -0.23,
-   "matchup_kum": -0.23
+   "matchup_glueck": -0.24,
+   "matchup_kum": -0.24
   },
   {
    "team_id": 1,
@@ -2294,7 +2294,7 @@
    "allplay_pct": 88.89,
    "gegner_pkt": 7.74,
    "matchup_glueck": 0.0,
-   "matchup_kum": 0.5
+   "matchup_kum": 0.51
   },
   {
    "team_id": 2,
@@ -2378,7 +2378,7 @@
    "allplay_pct": 33.33,
    "gegner_pkt": -39.35,
    "matchup_glueck": 0.0,
-   "matchup_kum": 1.57
+   "matchup_kum": 1.59
   },
   {
    "team_id": 5,
@@ -2433,8 +2433,8 @@
    "gegner_abstand": 25.31,
    "allplay_pct": 55.56,
    "gegner_pkt": -20.66,
-   "matchup_glueck": -0.41,
-   "matchup_kum": -0.41
+   "matchup_glueck": -0.42,
+   "matchup_kum": -0.42
   },
   {
    "team_id": 7,
@@ -2461,7 +2461,7 @@
    "gegner_abstand": -29.62,
    "allplay_pct": 22.22,
    "gegner_pkt": 34.26,
-   "matchup_glueck": 0.72,
+   "matchup_glueck": 0.73,
    "matchup_kum": 0.01
   },
   {
@@ -2490,7 +2490,7 @@
    "allplay_pct": 0.0,
    "gegner_pkt": 25.17,
    "matchup_glueck": 0.0,
-   "matchup_kum": -1.47
+   "matchup_kum": -1.48
   },
   {
    "team_id": 9,
@@ -2546,7 +2546,7 @@
    "allplay_pct": 66.67,
    "gegner_pkt": 25.31,
    "matchup_glueck": 0.0,
-   "matchup_kum": -0.23
+   "matchup_kum": -0.24
   },
   {
    "team_id": 1,
@@ -2574,7 +2574,7 @@
    "allplay_pct": 66.67,
    "gegner_pkt": 6.78,
    "matchup_glueck": 0.0,
-   "matchup_kum": 0.5
+   "matchup_kum": 0.51
   },
   {
    "team_id": 2,
@@ -2601,8 +2601,8 @@
    "gegner_abstand": 41.83,
    "allplay_pct": 55.56,
    "gegner_pkt": -36.69,
-   "matchup_glueck": -0.62,
-   "matchup_kum": -0.62
+   "matchup_glueck": -0.64,
+   "matchup_kum": -0.64
   },
   {
    "team_id": 3,
@@ -2658,7 +2658,7 @@
    "allplay_pct": 44.44,
    "gegner_pkt": -12.84,
    "matchup_glueck": 0.0,
-   "matchup_kum": 1.57
+   "matchup_kum": 1.59
   },
   {
    "team_id": 5,
@@ -2714,7 +2714,7 @@
    "allplay_pct": 88.89,
    "gegner_pkt": 8.19,
    "matchup_glueck": 0.0,
-   "matchup_kum": -0.41
+   "matchup_kum": -0.42
   },
   {
    "team_id": 7,
@@ -2770,7 +2770,7 @@
    "allplay_pct": 77.78,
    "gegner_pkt": 22.16,
    "matchup_glueck": 0.0,
-   "matchup_kum": -1.47
+   "matchup_kum": -1.48
   },
   {
    "team_id": 9,
@@ -2797,8 +2797,8 @@
    "gegner_abstand": -17.97,
    "allplay_pct": 22.22,
    "gegner_pkt": 23.11,
-   "matchup_glueck": 0.44,
-   "matchup_kum": 0.44
+   "matchup_glueck": 0.45,
+   "matchup_kum": 0.45
   },
   {
    "team_id": 10,
@@ -2826,7 +2826,7 @@
    "allplay_pct": 0.0,
    "gegner_pkt": 17.92,
    "matchup_glueck": 0.0,
-   "matchup_kum": -0.23
+   "matchup_kum": -0.24
   },
   {
    "team_id": 1,
@@ -2853,7 +2853,7 @@
    "gegner_abstand": 35.94,
    "allplay_pct": 55.56,
    "gegner_pkt": -33.9,
-   "matchup_glueck": -0.54,
+   "matchup_glueck": -0.55,
    "matchup_kum": -0.03
   },
   {
@@ -2881,7 +2881,7 @@
    "gegner_abstand": -42.52,
    "allplay_pct": 22.22,
    "gegner_pkt": 44.56,
-   "matchup_glueck": 0.74,
+   "matchup_glueck": 0.76,
    "matchup_kum": 0.12
   },
   {
@@ -2938,7 +2938,7 @@
    "allplay_pct": 77.78,
    "gegner_pkt": 5.99,
    "matchup_glueck": 0.0,
-   "matchup_kum": 1.57
+   "matchup_kum": 1.59
   },
   {
    "team_id": 5,
@@ -2994,7 +2994,7 @@
    "allplay_pct": 88.89,
    "gegner_pkt": 0.5,
    "matchup_glueck": 0.0,
-   "matchup_kum": -0.41
+   "matchup_kum": -0.42
   },
   {
    "team_id": 7,
@@ -3050,7 +3050,7 @@
    "allplay_pct": 44.44,
    "gegner_pkt": -35.54,
    "matchup_glueck": 0.0,
-   "matchup_kum": -1.47
+   "matchup_kum": -1.48
   },
   {
    "team_id": 9,
@@ -3078,7 +3078,7 @@
    "allplay_pct": 100.0,
    "gegner_pkt": 3.58,
    "matchup_glueck": 0.0,
-   "matchup_kum": 0.44
+   "matchup_kum": 0.45
   },
   {
    "team_id": 10,
@@ -3106,7 +3106,7 @@
    "allplay_pct": 11.11,
    "gegner_pkt": -0.06,
    "matchup_glueck": 0.0,
-   "matchup_kum": -0.23
+   "matchup_kum": -0.24
   },
   {
    "team_id": 1,
@@ -3161,7 +3161,7 @@
    "gegner_abstand": 22.64,
    "allplay_pct": 55.56,
    "gegner_pkt": -29.91,
-   "matchup_glueck": -0.34,
+   "matchup_glueck": -0.35,
    "matchup_kum": -0.22
   },
   {
@@ -3217,8 +3217,8 @@
    "gegner_abstand": -35.0,
    "allplay_pct": 33.33,
    "gegner_pkt": 27.72,
-   "matchup_glueck": 0.54,
-   "matchup_kum": 2.11
+   "matchup_glueck": 0.55,
+   "matchup_kum": 2.14
   },
   {
    "team_id": 5,
@@ -3274,7 +3274,7 @@
    "allplay_pct": 0.0,
    "gegner_pkt": 26.94,
    "matchup_glueck": 0.0,
-   "matchup_kum": -0.41
+   "matchup_kum": -0.42
   },
   {
    "team_id": 7,
@@ -3330,7 +3330,7 @@
    "allplay_pct": 88.89,
    "gegner_pkt": -8.52,
    "matchup_glueck": 0.0,
-   "matchup_kum": -1.47
+   "matchup_kum": -1.48
   },
   {
    "team_id": 9,
@@ -3357,7 +3357,7 @@
    "gegner_abstand": 11.47,
    "allplay_pct": 66.67,
    "gegner_pkt": -18.74,
-   "matchup_glueck": -0.32,
+   "matchup_glueck": -0.33,
    "matchup_kum": 0.12
   },
   {
@@ -3386,7 +3386,7 @@
    "allplay_pct": 11.11,
    "gegner_pkt": -4.53,
    "matchup_glueck": 0.0,
-   "matchup_kum": -0.23
+   "matchup_kum": -0.24
   },
   {
    "team_id": 1,
@@ -3498,7 +3498,7 @@
    "allplay_pct": 88.89,
    "gegner_pkt": -97.5,
    "matchup_glueck": -1.0,
-   "matchup_kum": 1.11
+   "matchup_kum": 1.14
   },
   {
    "team_id": 5,
@@ -3554,7 +3554,7 @@
    "allplay_pct": 33.33,
    "gegner_pkt": -6.6,
    "matchup_glueck": 0.0,
-   "matchup_kum": -0.41
+   "matchup_kum": -0.42
   },
   {
    "team_id": 7,
@@ -3581,8 +3581,8 @@
    "gegner_abstand": -37.4,
    "allplay_pct": 44.44,
    "gegner_pkt": 38.05,
-   "matchup_glueck": 0.64,
-   "matchup_kum": 1.64
+   "matchup_glueck": 0.65,
+   "matchup_kum": 1.66
   },
   {
    "team_id": 8,
@@ -3610,7 +3610,7 @@
    "allplay_pct": 0.0,
    "gegner_pkt": -28.66,
    "matchup_glueck": 0.0,
-   "matchup_kum": -1.47
+   "matchup_kum": -1.48
   },
   {
    "team_id": 9,
@@ -3666,7 +3666,287 @@
    "allplay_pct": 77.78,
    "gegner_pkt": 67.39,
    "matchup_glueck": 0.0,
-   "matchup_kum": -0.23
+   "matchup_kum": -0.24
+  },
+  {
+   "team_id": 1,
+   "week": 11,
+   "opponent_id": 7,
+   "home": false,
+   "pf": 263.45,
+   "pa": 190.48,
+   "result": "W",
+   "starter_sum": 263.45,
+   "starter_projection": 243.25,
+   "bench": 53.81,
+   "optimal": 263.45,
+   "verschenkt": 0.0,
+   "efficiency": 100.0,
+   "projektions_delta": 20.2,
+   "abweichung": 0.0,
+   "allplay_w": 9,
+   "allplay_l": 0,
+   "allplay_t": 0,
+   "wochenrang": 1,
+   "median_win": true,
+   "median_abstand": 74.53,
+   "gegner_abstand": 1.56,
+   "allplay_pct": 100.0,
+   "gegner_pkt": 5.61,
+   "matchup_glueck": 0.0,
+   "matchup_kum": -0.03
+  },
+  {
+   "team_id": 2,
+   "week": 11,
+   "opponent_id": 9,
+   "home": false,
+   "pf": 179.73,
+   "pa": 170.62,
+   "result": "W",
+   "starter_sum": 179.73,
+   "starter_projection": 199.19,
+   "bench": 55.39,
+   "optimal": 198.33,
+   "verschenkt": 18.6,
+   "efficiency": 90.62,
+   "projektions_delta": -19.46,
+   "abweichung": 0.0,
+   "allplay_w": 3,
+   "allplay_l": 6,
+   "allplay_t": 0,
+   "wochenrang": 7,
+   "median_win": false,
+   "median_abstand": -9.2,
+   "gegner_abstand": -18.31,
+   "allplay_pct": 33.33,
+   "gegner_pkt": 25.47,
+   "matchup_glueck": 0.4,
+   "matchup_kum": 0.18
+  },
+  {
+   "team_id": 3,
+   "week": 11,
+   "opponent_id": 5,
+   "home": true,
+   "pf": 172.23,
+   "pa": 208.28,
+   "result": "L",
+   "starter_sum": 172.23,
+   "starter_projection": 210.46,
+   "bench": 37.84,
+   "optimal": 180.03,
+   "verschenkt": 7.8,
+   "efficiency": 95.67,
+   "projektions_delta": -38.23,
+   "abweichung": 0.0,
+   "allplay_w": 2,
+   "allplay_l": 7,
+   "allplay_t": 0,
+   "wochenrang": 8,
+   "median_win": false,
+   "median_abstand": -16.7,
+   "gegner_abstand": 19.36,
+   "allplay_pct": 22.22,
+   "gegner_pkt": -12.19,
+   "matchup_glueck": 0.0,
+   "matchup_kum": 1.0
+  },
+  {
+   "team_id": 4,
+   "week": 11,
+   "opponent_id": 8,
+   "home": false,
+   "pf": 187.37,
+   "pa": 171.16,
+   "result": "W",
+   "starter_sum": 187.37,
+   "starter_projection": 200.34,
+   "bench": 14.6,
+   "optimal": 194.37,
+   "verschenkt": 7.0,
+   "efficiency": 96.4,
+   "projektions_delta": -12.97,
+   "abweichung": 0.0,
+   "allplay_w": 4,
+   "allplay_l": 5,
+   "allplay_t": 0,
+   "wochenrang": 6,
+   "median_win": false,
+   "median_abstand": -1.56,
+   "gegner_abstand": -17.77,
+   "allplay_pct": 44.44,
+   "gegner_pkt": 24.93,
+   "matchup_glueck": 0.28,
+   "matchup_kum": 1.42
+  },
+  {
+   "team_id": 5,
+   "week": 11,
+   "opponent_id": 3,
+   "home": false,
+   "pf": 208.28,
+   "pa": 172.23,
+   "result": "W",
+   "starter_sum": 208.28,
+   "starter_projection": 200.02,
+   "bench": 66.46,
+   "optimal": 247.49,
+   "verschenkt": 39.21,
+   "efficiency": 84.16,
+   "projektions_delta": 8.26,
+   "abweichung": 0.0,
+   "allplay_w": 7,
+   "allplay_l": 2,
+   "allplay_t": 0,
+   "wochenrang": 3,
+   "median_win": true,
+   "median_abstand": 19.36,
+   "gegner_abstand": -16.7,
+   "allplay_pct": 77.78,
+   "gegner_pkt": 23.86,
+   "matchup_glueck": 0.0,
+   "matchup_kum": 1.0
+  },
+  {
+   "team_id": 6,
+   "week": 11,
+   "opponent_id": 10,
+   "home": false,
+   "pf": 193.99,
+   "pa": 223.6,
+   "result": "L",
+   "starter_sum": 193.99,
+   "starter_projection": 188.79,
+   "bench": 55.6,
+   "optimal": 219.79,
+   "verschenkt": 25.8,
+   "efficiency": 88.26,
+   "projektions_delta": 5.2,
+   "abweichung": 0.0,
+   "allplay_w": 6,
+   "allplay_l": 3,
+   "allplay_t": 0,
+   "wochenrang": 4,
+   "median_win": true,
+   "median_abstand": 5.07,
+   "gegner_abstand": 34.68,
+   "allplay_pct": 66.67,
+   "gegner_pkt": -27.51,
+   "matchup_glueck": -0.58,
+   "matchup_kum": -1.0
+  },
+  {
+   "team_id": 7,
+   "week": 11,
+   "opponent_id": 1,
+   "home": true,
+   "pf": 190.48,
+   "pa": 263.45,
+   "result": "L",
+   "starter_sum": 190.48,
+   "starter_projection": 205.76,
+   "bench": 28.9,
+   "optimal": 207.98,
+   "verschenkt": 17.5,
+   "efficiency": 91.59,
+   "projektions_delta": -15.28,
+   "abweichung": 0.0,
+   "allplay_w": 5,
+   "allplay_l": 4,
+   "allplay_t": 0,
+   "wochenrang": 5,
+   "median_win": true,
+   "median_abstand": 1.56,
+   "gegner_abstand": 74.53,
+   "allplay_pct": 55.56,
+   "gegner_pkt": -67.36,
+   "matchup_glueck": -1.0,
+   "matchup_kum": 0.66
+  },
+  {
+   "team_id": 8,
+   "week": 11,
+   "opponent_id": 4,
+   "home": true,
+   "pf": 171.16,
+   "pa": 187.37,
+   "result": "L",
+   "starter_sum": 171.16,
+   "starter_projection": 185.96,
+   "bench": 9.2,
+   "optimal": 173.76,
+   "verschenkt": 2.6,
+   "efficiency": 98.5,
+   "projektions_delta": -14.8,
+   "abweichung": 0.0,
+   "allplay_w": 1,
+   "allplay_l": 8,
+   "allplay_t": 0,
+   "wochenrang": 9,
+   "median_win": false,
+   "median_abstand": -17.77,
+   "gegner_abstand": -1.56,
+   "allplay_pct": 11.11,
+   "gegner_pkt": 8.72,
+   "matchup_glueck": 0.0,
+   "matchup_kum": -1.48
+  },
+  {
+   "team_id": 9,
+   "week": 11,
+   "opponent_id": 2,
+   "home": true,
+   "pf": 170.62,
+   "pa": 179.73,
+   "result": "L",
+   "starter_sum": 170.62,
+   "starter_projection": 213.57,
+   "bench": 50.5,
+   "optimal": 209.22,
+   "verschenkt": 38.6,
+   "efficiency": 81.55,
+   "projektions_delta": -42.95,
+   "abweichung": 0.0,
+   "allplay_w": 0,
+   "allplay_l": 9,
+   "allplay_t": 0,
+   "wochenrang": 10,
+   "median_win": false,
+   "median_abstand": -18.31,
+   "gegner_abstand": -9.2,
+   "allplay_pct": 0.0,
+   "gegner_pkt": 16.36,
+   "matchup_glueck": 0.0,
+   "matchup_kum": 0.12
+  },
+  {
+   "team_id": 10,
+   "week": 11,
+   "opponent_id": 6,
+   "home": true,
+   "pf": 223.6,
+   "pa": 193.99,
+   "result": "W",
+   "starter_sum": 223.6,
+   "starter_projection": 205.64,
+   "bench": 88.49,
+   "optimal": 266.22,
+   "verschenkt": 42.62,
+   "efficiency": 83.99,
+   "projektions_delta": 17.96,
+   "abweichung": 0.0,
+   "allplay_w": 8,
+   "allplay_l": 1,
+   "allplay_t": 0,
+   "wochenrang": 2,
+   "median_win": true,
+   "median_abstand": 34.68,
+   "gegner_abstand": 5.07,
+   "allplay_pct": 88.89,
+   "gegner_pkt": 2.1,
+   "matchup_glueck": 0.0,
+   "matchup_kum": -0.24
   }
  ],
  "weeks": [
@@ -3759,6 +4039,15 @@
    "low": 154.41,
    "median": 221.15,
    "effizienz_liga": 91.35
+  },
+  {
+   "week": 11,
+   "top_team_id": 1,
+   "ligaschnitt": 196.09,
+   "high": 263.45,
+   "low": 170.62,
+   "median": 188.93,
+   "effizienz_liga": 90.76
   }
  ]
 }
