@@ -1,5 +1,5 @@
 {
-"stand":"2026-11-24T0114Z",
+"stand":"2026-11-24T0301Z",
 "woche":11,
 "einheiten":{"temp":"°C","wind":"km/h","boeen":"km/h","regen_wahrsch":"%","niederschlag":"mm","schnee":"cm"},
 "schwellen":{"wind":25,"boeen":40,"regen_wahrsch":60,"schnee":0},
@@ -16,7 +16,7 @@
 {"id":401873069,"woche":11,"kickoff":"2026-11-22T21:25Z","tbd":false,"heim":"NYG","gast":"JAX","stadion":"MetLife Stadium","ort":"East Rutherford, NJ","dach":"offen","neutral":false,"temp":15.3,"wind":8.2,"boeen":25.2,"regen_wahrsch":8,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
 {"id":401873075,"woche":11,"kickoff":"2026-11-22T21:25Z","tbd":false,"heim":"DEN","gast":"LV","stadion":"Empower Field at Mile High","ort":"Denver, CO","dach":"offen","neutral":false,"temp":5.1,"wind":10.0,"boeen":18.0,"regen_wahrsch":0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
 {"id":401873077,"woche":11,"kickoff":"2026-11-23T01:20Z","tbd":false,"heim":"SF","gast":"MIN","stadion":"Estadio Banorte (Estadio Azteca)","ort":"Mexiko-Stadt, Mexiko","dach":"offen","neutral":true,"temp":16.0,"wind":3.5,"boeen":26.6,"regen_wahrsch":99,"niederschlag":0.9,"schnee":0.0,"markierung":["regen_wahrsch"]},
-{"id":401873078,"woche":11,"kickoff":"2026-11-24T01:15Z","tbd":false,"heim":"WSH","gast":"CIN","stadion":"Northwest Stadium","ort":"Landover, MD","dach":"offen","neutral":false,"temp":12.4,"wind":19.8,"boeen":43.6,"regen_wahrsch":11,"niederschlag":0.4,"schnee":0.0,"markierung":["boeen"]}
+{"id":401873078,"woche":11,"kickoff":"2026-11-24T01:15Z","tbd":false,"heim":"WSH","gast":"CIN","stadion":"Northwest Stadium","ort":"Landover, MD","dach":"offen","neutral":false,"temp":12.4,"wind":16.3,"boeen":42.5,"regen_wahrsch":13,"niederschlag":0.0,"schnee":0.0,"markierung":["boeen"]}
 ],
 "ist":[
 {"id":401872656,"woche":1,"kickoff":"2026-09-10T00:20Z","tbd":false,"heim":"SEA","gast":"NE","stadion":"Lumen Field","ort":"Seattle, WA","dach":"offen","neutral":false,"temp":21.6,"wind":6.3,"boeen":14.0,"niederschlag":0.0,"schnee":0.0,"markierung":[]},
